@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `particle-playground/index.html` — 캔버스 파티클 드로잉 툴
 
 각 앱은 폴더 하나에 `index.html` 한 개가 전부다. 서로 코드를 공유하지 않으며,
-공유 라이브러리·번들러·패키지 매니저·CDN 의존성이 없다. Git 저장소도 아니다.
+공유 라이브러리·번들러·패키지 매니저·CDN 의존성이 없다.
 
 ## 실행 및 검증
 

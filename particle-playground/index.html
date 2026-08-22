@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>파티클 플레이그라운드</title>
+<style>
+  :root { --panel-bg: rgba(20,20,30,0.75); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05050a; font-family: 'Segoe UI', Pretendard, sans-serif; }
+  canvas { display: block; touch-action: none; }
+
+  .panel {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    background: var(--panel-bg);
+    backdrop-filter: blur(8px);
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: #eee;
+    width: 230px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    font-size: 0.85rem;
+  }
+  .panel h1 { font-size: 1rem; margin: 0 0 10px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .row label { color: #aab; flex-shrink: 0; }
+  .row input[type=range] { flex: 1; accent-color: #4cc9f0; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+  .swatch.active { border-color: white; }
+  .buttons { display: flex; gap: 8px; }
+  .buttons button {
+    flex: 1;
+    background: #232338;
+    border: 1px solid #3a3a5c;
+    color: #eee;
+    border-radius: 10px;
+    padding: 8px 0;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+  .buttons button:hover { background: #2c2c48; }
+  .hint {
+    position: fixed;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #778;
+    font-size: 0.75rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  .toggle-hide {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    background: var(--panel-bg);
+    color: #eee;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="panel" id="panel">
+  <h1>✨ 파티클 플레이그라운드</h1>
+  <div class="row"><label>파티클 크기</label><input type="range" id="sizeRange" min="1" max="8" value="3"></div>
+  <div class="row"><label>수명</label><input type="range" id="lifeRange" min="20" max="200" value="80"></div>
+  <div class="row"><label>중력</label><input type="range" id="gravRange" min="-5" max="5" value="0"></div>
+  <div class="swatches" id="swatches"></div>
+  <div class="buttons">
+    <button id="clearBtn">지우기</button>
+    <button id="modeBtn">모드: 폭죽</button>
+  </div>
+</div>
+<button class="toggle-hide" id="hideBtn">패널 숨기기</button>
+<div class="hint">마우스/손가락으로 드래그해서 그려보세요</div>
+
+<script>
+(function () {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const palette = ['#f25c54', '#4cc9f0', '#ffd166', '#06d6a0', '#c77dff', '#ffffff'];
+  let colorIndex = 0;
+  const swatchesEl = document.getElementById('swatches');
+  palette.forEach((color, i) => {
+    const s = document.createElement('div');
+    s.className = 'swatch' + (i === 0 ? ' active' : '');
+    s.style.background = color;
+    s.addEventListener('click', () => {
+      colorIndex = i;
+      document.querySelectorAll('.swatch').forEach(el => el.classList.remove('active'));
+      s.classList.add('active');
+    });
+    swatchesEl.appendChild(s);
+  });
+
+  const sizeRange = document.getElementById('sizeRange');
+  const lifeRange = document.getElementById('lifeRange');
+  const gravRange = document.getElementById('gravRange');
+  const clearBtn = document.getElementById('clearBtn');
+  const modeBtn = document.getElementById('modeBtn');
+  const hideBtn = document.getElementById('hideBtn');
+  const panel = document.getElementById('panel');
+
+  const modes = ['폭죽', '트레일', '오비트'];
+  let modeIdx = 0;
+  modeBtn.addEventListener('click', () => {
+    modeIdx = (modeIdx + 1) % modes.length;
+    modeBtn.textContent = '모드: ' + modes[modeIdx];
+  });
+
+  hideBtn.addEventListener('click', () => {
+    const hidden = panel.style.display === 'none';
+    panel.style.display = hidden ? 'block' : 'none';
+    hideBtn.textContent = hidden ? '패널 숨기기' : '패널 보이기';
+  });
+
+  clearBtn.addEventListener('click', () => particles.length = 0);
+
+  let particles = [];
+  let pointer = { x: W / 2, y: H / 2, down: false, lastX: null, lastY: null };
+  let orbitCenter = { x: W / 2, y: H / 2 };
+
+  function hexToRgb(hex) {
+    const v = parseInt(hex.slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+
+  function spawn(x, y) {
+    const baseColor = hexToRgb(palette[colorIndex]);
+    const size = Number(sizeRange.value);
+    const life = Number(lifeRange.value);
+    const count = modes[modeIdx] === '폭죽' ? 6 : 2;
+
+    for (let i = 0; i < count; i++) {
+      let vx, vy;
+      if (modes[modeIdx] === '폭죽') {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 4 + 1;
+        vx = Math.cos(angle) * speed;
+        vy = Math.sin(angle) * speed;
+      } else if (modes[modeIdx] === '트레일') {
+        vx = (Math.random() - 0.5) * 0.6;
+        vy = (Math.random() - 0.5) * 0.6;
+      } else {
+        const dx = x - orbitCenter.x, dy = y - orbitCenter.y;
+        vx = -dy * 0.02;
+        vy = dx * 0.02;
+      }
+      particles.push({
+        x, y, vx, vy,
+        r: size + Math.random() * size,
+        life: life + Math.random() * 20,
+        maxLife: life,
+        color: baseColor
+      });
+    }
+  }
+
+  function pointerPos(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function handleDown(e) {
+    pointer.down = true;
+    const p = pointerPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    pointer.lastX = p.x; pointer.lastY = p.y;
+    orbitCenter = { x: p.x, y: p.y };
+  }
+  function handleMove(e) {
+    const p = pointerPos(e);
+    pointer.x = p.x; pointer.y = p.y;
+    if (pointer.down) {
+      spawn(p.x, p.y);
+    }
+  }
+  function handleUp() { pointer.down = false; }
+
+  canvas.addEventListener('mousedown', handleDown);
+  canvas.addEventListener('mousemove', handleMove);
+  window.addEventListener('mouseup', handleUp);
+  canvas.addEventListener('touchstart', e => { handleDown(e); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { handleMove(e); e.preventDefault(); }, { passive: false });
+  canvas.addEventListener('touchend', handleUp);
+
+  function step() {
+    ctx.fillStyle = 'rgba(5,5,10,0.18)';
+    ctx.fillRect(0, 0, W, H);
+
+    const gravity = Number(gravRange.value) * 0.02;
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.vy += gravity;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life--;
+
+      if (p.life <= 0 || p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50) {
+        particles.splice(i, 1);
+        continue;
+      }
+
+      const alpha = Math.max(0, p.life / p.maxLife);
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(${p.color[0]},${p.color[1]},${p.color[2]},${alpha})`;
+      ctx.arc(p.x, p.y, p.r * alpha + 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (particles.length > 4000) particles.splice(0, particles.length - 4000);
+
+    requestAnimationFrame(step);
+  }
+  step();
+})();
+</script>
+</body>
+</html>

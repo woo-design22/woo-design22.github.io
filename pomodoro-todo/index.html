@@ -247,7 +247,7 @@
 
   function notify(msg) {
     try {
-      if (Notification && Notification.permission === 'granted') {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         new Notification(msg);
       }
     } catch (e) {}
@@ -260,7 +260,7 @@
     running = true;
     startBtn.textContent = '일시정지';
     timerId = setInterval(tick, 1000);
-    if (Notification && Notification.permission === 'default') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }

@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>샌드믹스 — 모래 색섞기 퍼즐</title>
+<style>
+  :root {
+    --bg: #0d0d16;
+    --panel: #171724;
+    --panel-2: #1f1f30;
+    --line: #2c2c44;
+    --ink: #f0eef6;
+    --ink-dim: #8f8da6;
+    --accent: #ffcf3f;
+    --danger: #ff5a4e;
+
+    /* 모래 색 — 캔버스가 getComputedStyle 로 읽어간다. 하드코딩 금지 */
+    --sand-r: #ff3d4a;
+    --sand-y: #ffd43b;
+    --sand-b: #3d8bff;
+    --sand-o: #ff8c1a;
+    --sand-g: #35d07a;
+    --sand-p: #a957ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Segoe UI', Pretendard, sans-serif;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: none;
+  }
+
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  /* ---------- 상단 HUD ---------- */
+  #hud {
+    width: min(820px, 96vw);
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .stat {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 6px 10px;
+    text-align: center;
+  }
+
+  .stat .label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--ink-dim);
+  }
+
+  .stat .value {
+    font-size: 20px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  #comboStat .value { color: var(--accent); }
+
+  #nextBox {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #nextBox .label { font-size: 10px; letter-spacing: 0.12em; color: var(--ink-dim); }
+  #nextCanvas { width: 40px; height: 28px; image-rendering: pixelated; }
+
+  /* ---------- 보드 ---------- */
+  #boardWrap {
+    flex: 1;
+    width: min(820px, 96vw);
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  /* 캔버스와 오버레이를 같은 크기로 묶는 상자 — 크기는 resize() 가 px 로 준다 */
+  #boardBox {
+    position: relative;
+  }
+
+  #board {
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #08080f;
+    image-rendering: pixelated;
+    display: block;
+  }
+
+  /* ---------- 오버레이 ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(13, 13, 22, 0.86);
+    border-radius: 8px;
+    text-align: center;
+    padding: 20px;
+    z-index: 5;
+  }
+
+  .hidden, .overlay.hidden { display: none; }
+
+  .overlay h1 { font-size: 30px; letter-spacing: 0.02em; }
+  .overlay h1 .mix { color: var(--accent); }
+  .overlay p { color: var(--ink-dim); font-size: 14px; line-height: 1.7; }
+  .overlay p b { color: var(--ink); }
+
+  .mixLegend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+  }
+
+  .mixRow { display: flex; align-items: center; justify-content: center; gap: 6px; }
+
+  .dot {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  .overlay button {
+    font: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    color: #101018;
+    background: var(--accent);
+    border: 0;
+    border-radius: 10px;
+    padding: 12px 34px;
+    cursor: pointer;
+  }
+
+  .overlay button:active { transform: scale(0.96); }
+
+  .finalScore { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 하단 도움말 ---------- */
+  #helpBar {
+    width: min(820px, 96vw);
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--ink-dim);
+    padding: 0 2px 4px;
+  }
+
+  #helpBar .keys { display: none; }
+  @media (hover: hover) and (pointer: fine) {
+    #helpBar .keys { display: block; }
+    #helpBar .touch { display: none; }
+  }
+
+  #helpBar .btns { display: flex; gap: 6px; flex: none; }
+
+  #pauseBtn, #settingsBtn, #soundBtn {
+    font: inherit;
+    font-size: 11px;
+    color: var(--ink-dim);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3px 12px;
+    cursor: pointer;
+  }
+
+  /* ---------- 속도 설정 창 ---------- */
+  .settings { width: min(300px, 100%); display: flex; flex-direction: column; gap: 18px; }
+
+  .setting label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--ink-dim);
+    margin-bottom: 6px;
+  }
+
+  .setting label output {
+    color: var(--ink);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .setting input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .setting .hint { font-size: 11px; color: var(--ink-dim); margin-top: 4px; text-align: left; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="stat">
+      <div class="label">점수</div>
+      <div class="value" id="scoreEl">0</div>
+    </div>
+    <div class="stat" id="comboStat">
+      <div class="label">콤보</div>
+      <div class="value" id="comboEl">-</div>
+    </div>
+    <div class="stat">
+      <div class="label">최고</div>
+      <div class="value" id="bestEl">0</div>
+    </div>
+    <div id="nextBox">
+      <div class="label">다음</div>
+      <canvas id="nextCanvas" width="20" height="14"></canvas>
+    </div>
+  </div>
+
+  <div id="boardWrap">
+   <div id="boardBox">
+    <canvas id="board"></canvas>
+
+    <div class="overlay" id="startOverlay">
+      <h1>샌드<span class="mix">믹스</span></h1>
+      <p>블록이 떨어지면 <b>모래로 부서진다.</b><br>
+        같은 색 모래가 <b>왼쪽 벽에서 오른쪽 벽까지</b> 이어지면 소거!</p>
+      <div id="mixInfo" class="hidden">
+        <div class="mixLegend" id="mixLegend"></div>
+        <p>섞인 색(체크무늬)은 <b>양쪽 원색 사이의 다리</b>가 된다.<br>
+          노랑–주황–노랑도 한 줄! 섞인 알갱이는 <b>점수 3배.</b></p>
+      </div>
+      <button id="startBtn">시작</button>
+    </div>
+
+    <div class="overlay hidden" id="overOverlay">
+      <h1>게임 오버</h1>
+      <div class="finalScore" id="finalScoreEl">0</div>
+      <p id="newBestEl"></p>
+      <button id="retryBtn">다시 하기</button>
+    </div>
+
+    <div class="overlay hidden" id="pauseOverlay">
+      <h1>일시정지</h1>
+      <button id="resumeBtn">계속</button>
+    </div>
+
+    <div class="overlay hidden" id="settingsOverlay">
+      <h1>속도 설정</h1>
+      <div class="settings">
+        <div class="setting">
+          <label for="fallRange">시작 낙하 속도 <output id="fallOut">0.8</output></label>
+          <input type="range" id="fallRange" min="0.3" max="2.0" step="0.1" value="0.8">
+          <div class="hint">시간이 지나면 여기서 +0.5까지 서서히 빨라진다</div>
+        </div>
+        <div class="setting">
+          <label for="moveRange">좌우 이동 속도 <output id="moveOut">4</output></label>
+          <input type="range" id="moveRange" min="2" max="8" step="1" value="4">
+        </div>
+        <div class="setting">
+          <label for="mixCheck">색 섞기 (실험) <input type="checkbox" id="mixCheck"></label>
+          <div class="hint">켜면 다른 원색이 닿을 때 주황·초록·보라가 생긴다. 기본은 꺼짐.</div>
+        </div>
+      </div>
+      <button id="settingsCloseBtn">닫기</button>
+    </div>
+   </div>
+  </div>
+
+  <div id="helpBar">
+    <span class="keys">← → 이동 · ↑ 회전 · ↓ 빠르게 · Space 낙하 · P 일시정지</span>
+    <span class="touch">드래그 이동 · 탭 회전 · 아래로 쓸면 낙하</span>
+    <span class="btns">
+      <button id="soundBtn">🔊 소리</button>
+      <button id="settingsBtn">⚙ 속도</button>
+      <button id="pauseBtn">일시정지 (P)</button>
+    </span>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 저장 래퍼 (localStorage 예외 안전) ---------- */
+  const store = {
+    get(key, fallback) {
+      try {
+        const v = localStorage.getItem(key);
+        return v === null ? fallback : JSON.parse(v);
+      } catch (e) { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    }
+  };
+
+  /* ---------- 상수 ---------- */
+  const W = 100;            // 모래 격자 가로 (알갱이 단위)
+  const H = 150;            // 모래 격자 세로
+  const DANGER_Y = 14;      // 이 줄 위로 모래가 쌓이면 게임 오버
+  const BLOCK = 7;          // 조각 블록 하나 = BLOCK×BLOCK 알갱이
+  const SIM_STEPS = 3;      // 프레임당 모래 물리 반복 횟수
+  const CLEAR_SCAN_EVERY = 12; // N프레임마다 소거 검사
+  const COMBO_WINDOW = 240;    // 콤보 유지 프레임 (약 4초)
+
+  // 손맛 튜닝 — 단위는 알갱이/프레임(60fps 기준)
+  const FALL_RAMP_MAX = 0.5;      // 시간이 갈수록 더해지는 최대 가속 (시작 속도 + 0.5)
+  const FALL_RAMP_FRAMES = 16200; // 최대 속도까지 걸리는 프레임 (약 4.5분, 선형 증가)
+  const SOFT_DROP = 7;            // ↓ / 아래로 드래그
+  const HARD_DROP = 20;           // Space / 아래로 쓸기
+  const MOVE_REPEAT_DELAY = 2;    // 키를 누르고 있을 때 반복 시작까지 (30ms 단위)
+
+  // 플레이어가 ⚙ 설정 창에서 바꾸는 값 — store 에 저장
+  const DEFAULT_SETTINGS = { fall: 0.8, move: 4, mix: false, sound: true };
+  const settings = Object.assign({}, DEFAULT_SETTINGS, store.get('sandmix_settings', {}));
+  // fall: 시작 낙하 속도 (알갱이/프레임, 0.8 ≈ 한 판 3.1초) / move: 좌우 입력 한 번당 이동 알갱이
+  const DRAG_GAIN = 1.5;          // 터치 드래그 1px 당 이동 배율
+
+  // 색 코드: 0 빈칸 / 1빨 2노 3파 (원색) / 4주황 5초록 6보라 (2차색)
+  const PRIMARY_MAX = 3;
+  // 원색 두 개 → 2차색 (mixMap[a][b])
+  const MIX = [
+    [0, 0, 0, 0],
+    [0, 0, 4, 6],   // 빨+노=주황, 빨+파=보라
+    [0, 4, 0, 5],   // 노+파=초록
+    [0, 6, 5, 0]
+  ];
+
+  /* ---------- CSS 변수에서 색 읽기 ---------- */
+  const css = getComputedStyle(document.documentElement);
+  function hexToRgb(name) {
+    const h = css.getPropertyValue(name).trim().replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  const COLORS = [
+    [0, 0, 0],
+    hexToRgb('--sand-r'), hexToRgb('--sand-y'), hexToRgb('--sand-b'),
+    hexToRgb('--sand-o'), hexToRgb('--sand-g'), hexToRgb('--sand-p')
+  ];
+  const COLOR_NAMES = ['', '빨강', '노랑', '파랑', '주황', '초록', '보라'];
+
+  /* ---------- 상태 ---------- */
+  const grid = new Uint8Array(W * H);   // 정착한 모래
+  const moved = new Uint8Array(W * H);  // 직전에 움직였던 알갱이 표시 (섞임 판정용)
+  const noise = new Float32Array(W * H); // 알갱이 질감용 밝기 편차
+  for (let i = 0; i < noise.length; i++) noise[i] = 0.9 + Math.random() * 0.18; // 색 구분을 해치지 않을 만큼만
+
+  let piece = null;        // 떨어지는 조각 { cells:[{x,y}], color, x, y(실수), }
+  let nextColor = 0, nextShape = 0;
+  let score = 0, best = store.get('sandmix_best', 0);
+  let combo = 0, comboTimer = 0;
+  let running = false, paused = false, over = false;
+  let frame = 0;
+  let fastDrop = false, hardDrop = false;
+  let dissolveGrace = 0;   // 조각이 부서진 뒤 소거 검사까지 잠깐 대기
+  let scanBias = 0;        // 모래 흐름 좌우 편향 교대
+  let dirtySettle = false; // 정착 발생 → 소거 검사 필요
+
+  const fx = [];           // 소거 반짝임 효과 [{x,y,ttl,color}]
+
+  /* ---------- 조각 모양 (블록 좌표, BLOCK 단위) ---------- */
+  const SHAPES = [
+    [[0, 0], [1, 0], [0, 1], [1, 1]],           // ㅁ
+    [[0, 0], [1, 0], [2, 0], [3, 0]],           // ㅡ
+    [[0, 0], [0, 1], [1, 1], [2, 1]],           // ㄴ
+    [[2, 0], [0, 1], [1, 1], [2, 1]],           // ⌐
+    [[1, 0], [0, 1], [1, 1], [2, 1]],           // ㅗ
+    [[1, 0], [2, 0], [0, 1], [1, 1]],           // S
+    [[0, 0], [1, 0], [1, 1], [2, 1]]            // Z
+  ];
+
+  /* ---------- DOM ---------- */
+  const boardEl = document.getElementById('board');
+  const bctx = boardEl.getContext('2d');
+  const nextCanvas = document.getElementById('nextCanvas');
+  const nctx = nextCanvas.getContext('2d');
+  const scoreEl = document.getElementById('scoreEl');
+  const bestEl = document.getElementById('bestEl');
+  const comboEl = document.getElementById('comboEl');
+
+  // 오프스크린: 격자 1알갱이 = 1픽셀
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const octx = off.getContext('2d');
+  const img = octx.createImageData(W, H);
+
+  /* ---------- 크기 ---------- */
+  let lastWrapW = -1, lastWrapH = -1;
+  function resize() {
+    const wrap = document.getElementById('boardWrap');
+    const maxW = wrap.clientWidth, maxH = wrap.clientHeight;
+    lastWrapW = maxW; lastWrapH = maxH;
+    if (maxW === 0 || maxH === 0) return; // 아직 레이아웃 전 — tick 가드가 재시도
+    let h = maxH, w = h * (W / H);
+    if (w > maxW) { w = maxW; h = w * (H / W); }
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const box = document.getElementById('boardBox');
+    box.style.width = w + 'px';
+    box.style.height = h + 'px';
+    // HUD 와 도움말 줄은 보드 폭에 맞춘다
+    document.getElementById('hud').style.width = w + 'px';
+    document.getElementById('helpBar').style.width = w + 'px';
+    boardEl.width = Math.round(w * dpr);
+    boardEl.height = Math.round(h * dpr);
+    bctx.imageSmoothingEnabled = false;
+  }
+  window.addEventListener('resize', resize);
+
+  /* ---------- 조각 생성 ---------- */
+  function rollNext() {
+    nextColor = 1 + Math.floor(Math.random() * PRIMARY_MAX);
+    nextShape = Math.floor(Math.random() * SHAPES.length);
+    drawNext();
+  }
+
+  function shapeCells(shapeIdx) {
+    return SHAPES[shapeIdx].map(([bx, by]) => ({ x: bx, y: by }));
+  }
+
+  function spawnPiece() {
+    const cells = shapeCells(nextShape);
+    const maxBx = Math.max(...cells.map(c => c.x)) + 1;
+    piece = {
+      cells,
+      color: nextColor,
+      x: Math.floor((W - maxBx * BLOCK) / 2),
+      y: -Math.max(...cells.map(c => c.y)) * BLOCK - BLOCK
+    };
+    rollNext();
+    // 스폰 위치가 이미 막혀 있으면 게임 오버
+    if (pieceCollides(piece.x, Math.ceil(piece.y))) gameOver();
+  }
+
+  // 조각의 알갱이 하나하나에 대해 충돌 검사
+  function pieceCollides(px, py) {
+    for (const c of piece.cells) {
+      const gx0 = px + c.x * BLOCK, gy0 = py + c.y * BLOCK;
+      for (let dy = 0; dy < BLOCK; dy++) {
+        const gy = gy0 + dy;
+        if (gy >= H) return true;                 // 바닥
+        for (let dx = 0; dx < BLOCK; dx++) {
+          const gx = gx0 + dx;
+          if (gx < 0 || gx >= W) return true;     // 벽 (보드 위쪽에서도 검사)
+          if (gy >= 0 && grid[gy * W + gx]) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function dissolvePiece() {
+    // 천장 위에서 멈췄다 = 쌓을 곳이 없다 → 게임 오버 (블록 아웃)
+    const restY = Math.round(piece.y);
+    let blockedOut = restY < 0;
+    for (const c of piece.cells) {
+      const gx0 = piece.x + c.x * BLOCK, gy0 = Math.round(piece.y) + c.y * BLOCK;
+      for (let dy = 0; dy < BLOCK; dy++) {
+        const gy = gy0 + dy;
+        if (gy < 0 || gy >= H) continue;
+        for (let dx = 0; dx < BLOCK; dx++) {
+          const gx = gx0 + dx;
+          if (gx < 0 || gx >= W) continue;
+          const i = gy * W + gx;
+          if (!grid[i]) { grid[i] = piece.color; moved[i] = 1; }
+        }
+      }
+    }
+    piece = null;
+    hardDrop = false;
+    dissolveGrace = 30;
+    spawnDelay = 14;
+    if (blockedOut) gameOver();
+  }
+
+  let spawnDelay = 0;
+
+  /* ---------- 조각 이동/회전 ---------- */
+  function tryMove(dx) {
+    if (!piece) return;
+    const nx = piece.x + dx;
+    if (!pieceCollides(nx, Math.floor(piece.y))) piece.x = nx;
+  }
+
+  function tryRotate() {
+    if (!piece) return;
+    const cells = piece.cells;
+    const maxX = Math.max(...cells.map(c => c.x));
+    const rotated = cells.map(c => ({ x: maxX - c.y, y: c.x })); // 시계 방향… 사실상 90도
+    const old = piece.cells;
+    piece.cells = rotated;
+    // 벽 킥: 제자리 → 좌 → 우 순서로 시도
+    for (const kick of [0, -BLOCK, BLOCK, -2 * BLOCK, 2 * BLOCK]) {
+      if (!pieceCollides(piece.x + kick, Math.floor(piece.y))) {
+        piece.x += kick;
+        return;
+      }
+    }
+    piece.cells = old; // 실패 시 원복
+  }
+
+  /* ---------- 모래 물리 ---------- */
+  function simSand() {
+    scanBias ^= 1;
+    for (let y = H - 1; y >= 0; y--) {
+      const row = y * W;
+      // 스캔 방향을 교대해 좌우 편향 제거
+      const x0 = scanBias ? 0 : W - 1;
+      const x1 = scanBias ? W : -1;
+      const dxStep = scanBias ? 1 : -1;
+      for (let x = x0; x !== x1; x += dxStep) {
+        const i = row + x;
+        const c = grid[i];
+        if (!c) continue;
+        if (y === H - 1) { // 바닥
+          if (moved[i]) { moved[i] = 0; settle(i, x, y); }
+          continue;
+        }
+        const below = i + W;
+        if (!grid[below]) {
+          grid[below] = c; grid[i] = 0;
+          moved[below] = 1; moved[i] = 0;
+          continue;
+        }
+        // 대각선 흐름
+        const dir = ((x + y + frame) & 1) ? 1 : -1;
+        let moved2 = false;
+        for (const d of [dir, -dir]) {
+          const nx2 = x + d;
+          if (nx2 < 0 || nx2 >= W) continue;
+          const diag = below + d;
+          if (!grid[diag] && !grid[i + d]) {
+            grid[diag] = c; grid[i] = 0;
+            moved[diag] = 1; moved[i] = 0;
+            moved2 = true;
+            break;
+          }
+        }
+        if (!moved2 && moved[i]) { moved[i] = 0; settle(i, x, y); }
+      }
+    }
+  }
+
+  // 알갱이가 멈추는 순간: 이웃의 다른 원색과 섞인다
+  function settle(i, x, y) {
+    dirtySettle = true;
+    if (!settings.mix) return;   // 색 섞기 꺼짐(기본) — 원색 3가지만 존재
+    const c = grid[i];
+    if (c > PRIMARY_MAX) return; // 2차색은 더 안 섞임
+    const neighbors = [];
+    if (x > 0) neighbors.push(i - 1);
+    if (x < W - 1) neighbors.push(i + 1);
+    if (y > 0) neighbors.push(i - W);
+    if (y < H - 1) neighbors.push(i + W);
+    for (const n of neighbors) {
+      const nc = grid[n];
+      if (nc && nc <= PRIMARY_MAX && nc !== c) {
+        const sec = MIX[c][nc];
+        grid[i] = sec;
+        grid[n] = sec;
+        return;
+      }
+    }
+  }
+
+  /* ---------- 소거 검사 (같은 색이 좌우 벽을 잇는가) ---------- */
+  const visited = new Uint8Array(W * H);
+  const stack = new Int32Array(W * H);
+
+  // 소거 규칙: 원색 C 의 줄은 "C 또는 C 가 섞인 2차색" 으로 이어지면 된다.
+  // 즉 섞인 색은 양쪽 부모색 사이의 다리 역할을 한다 (노랑–주황–노랑 = 노랑 줄).
+  // 빨강–주황–노랑은 빨강≠노랑이라 안 이어진다.
+  // FAMILY[C][code] = 1 이면 code 가 C 계열.
+  const FAMILY = [
+    null,
+    [0, 1, 0, 0, 1, 0, 1], // 빨강: 빨강, 주황, 보라
+    [0, 0, 1, 0, 1, 1, 0], // 노랑: 노랑, 주황, 초록
+    [0, 0, 0, 1, 0, 1, 1]  // 파랑: 파랑, 초록, 보라
+  ];
+
+  function clearScan() {
+    let clearedTotal = 0;
+
+    for (let C = 1; C <= PRIMARY_MAX; C++) {
+      const fam = FAMILY[C];
+      visited.fill(0);
+
+      // 왼쪽 벽에 붙은 알갱이에서만 출발하면 충분하다
+      for (let y = 0; y < H; y++) {
+        const start = y * W;
+        if (!fam[grid[start]] || visited[start]) continue;
+
+        // BFS (4방향)
+        let sp = 0, touchesRight = false;
+        stack[sp++] = start;
+        visited[start] = 1;
+        const component = [];
+        while (sp > 0) {
+          const i = stack[--sp];
+          component.push(i);
+          const x = i % W;
+          if (x === W - 1) touchesRight = true;
+          if (x > 0) { const n = i - 1; if (!visited[n] && fam[grid[n]]) { visited[n] = 1; stack[sp++] = n; } }
+          if (x < W - 1) { const n = i + 1; if (!visited[n] && fam[grid[n]]) { visited[n] = 1; stack[sp++] = n; } }
+          if (i >= W) { const n = i - W; if (!visited[n] && fam[grid[n]]) { visited[n] = 1; stack[sp++] = n; } }
+          if (i < W * (H - 1)) { const n = i + W; if (!visited[n] && fam[grid[n]]) { visited[n] = 1; stack[sp++] = n; } }
+        }
+
+        if (touchesRight) {
+          for (const i of component) {
+            const code = grid[i];
+            // 섞어 만든 알갱이는 3배
+            clearedTotal += code > PRIMARY_MAX ? 3 : 1;
+            grid[i] = 0;
+            moved[i] = 0;
+            // 소거 반짝임 (일부만 뽑아 부담을 줄인다)
+            if (Math.random() < 0.12) {
+              fx.push({ x: i % W, y: (i / W) | 0, ttl: 24, color: code });
+            }
+          }
+        }
+      }
+    }
+
+    if (clearedTotal > 0) {
+      combo++;
+      comboTimer = COMBO_WINDOW;
+      score += clearedTotal * combo;
+      if (score > best) { best = score; store.set('sandmix_best', best); } // 즉시 저장 — 탭을 닫아도 기록 유지
+      updateHud();
+      sfxClear(combo);
+      // 참고: moved 플래그를 건드리지 않는다. 물리는 매 프레임 모든 알갱이를
+      // 시도하므로 빈 공간 위 모래는 알아서 흐르고, 전체에 플래그를 세우면
+      // 기존 색 경계가 한꺼번에 섞여 버린다.
+    }
+    return clearedTotal;
+  }
+
+  /* ---------- 게임 오버 판정 ---------- */
+  function checkDanger() {
+    // 위험선 위에 "정착한" 모래가 있으면 오버 (조각이 부서진 직후 잠깐은 유예)
+    if (dissolveGrace > 0) return;
+    const limit = DANGER_Y * W;
+    for (let i = 0; i < limit; i++) {
+      if (grid[i] && !moved[i]) { gameOver(); return; }
+    }
+  }
+
+  function gameOver() {
+    if (over) return;
+    over = true;
+    running = false;
+    stopBgm();
+    sfxOver();
+    const isBest = score > best;
+    if (isBest) { best = score; store.set('sandmix_best', best); }
+    document.getElementById('finalScoreEl').textContent = score.toLocaleString();
+    document.getElementById('newBestEl').textContent =
+      isBest ? '🎉 신기록!' : `최고 기록 ${best.toLocaleString()}`;
+    document.getElementById('overOverlay').classList.remove('hidden');
+    updateHud();
+  }
+
+  /* ---------- 렌더 ---------- */
+  function render() {
+    const data = img.data;
+    // 격자 → 픽셀
+    for (let i = 0; i < grid.length; i++) {
+      const c = grid[i];
+      const o = i * 4;
+      if (!c) {
+        data[o] = 8; data[o + 1] = 8; data[o + 2] = 15; data[o + 3] = 255;
+      } else {
+        const rgb = COLORS[c];
+        // 섞인 모래는 체크무늬 질감으로 "혼합" 표시 — 원색과 한눈에 구분되게
+        const n = c > PRIMARY_MAX ? (((i % W) + ((i / W) | 0)) & 1 ? 1.14 : 0.84) : noise[i];
+        data[o] = Math.min(255, rgb[0] * n);
+        data[o + 1] = Math.min(255, rgb[1] * n);
+        data[o + 2] = Math.min(255, rgb[2] * n);
+        data[o + 3] = 255;
+      }
+    }
+    // 떨어지는 조각
+    if (piece) {
+      const rgb = COLORS[piece.color];
+      const py = Math.floor(piece.y);
+      for (const c of piece.cells) {
+        const gx0 = piece.x + c.x * BLOCK, gy0 = py + c.y * BLOCK;
+        for (let dy = 0; dy < BLOCK; dy++) {
+          const gy = gy0 + dy;
+          if (gy < 0 || gy >= H) continue;
+          for (let dx = 0; dx < BLOCK; dx++) {
+            const gx = gx0 + dx;
+            if (gx < 0 || gx >= W) continue;
+            const o = (gy * W + gx) * 4;
+            const edge = (dx === 0 || dy === 0 || dx === BLOCK - 1 || dy === BLOCK - 1) ? 1.25 : 1;
+            data[o] = Math.min(255, rgb[0] * edge);
+            data[o + 1] = Math.min(255, rgb[1] * edge);
+            data[o + 2] = Math.min(255, rgb[2] * edge);
+            data[o + 3] = 255;
+          }
+        }
+      }
+    }
+    // 소거 반짝임
+    for (let f = fx.length - 1; f >= 0; f--) {
+      const p = fx[f];
+      p.ttl--;
+      if (p.ttl <= 0) { fx.splice(f, 1); continue; }
+      const o = (p.y * W + p.x) * 4;
+      const glow = p.ttl / 24;
+      data[o] = 255 * glow + data[o] * (1 - glow);
+      data[o + 1] = 255 * glow + data[o + 1] * (1 - glow);
+      data[o + 2] = 255 * glow + data[o + 2] * (1 - glow);
+    }
+    // 위험선
+    {
+      const rowO = DANGER_Y * W * 4;
+      for (let x = 0; x < W; x += 4) {
+        const o = rowO + x * 4;
+        data[o] = 130; data[o + 1] = 60; data[o + 2] = 70;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    bctx.clearRect(0, 0, boardEl.width, boardEl.height);
+    bctx.drawImage(off, 0, 0, boardEl.width, boardEl.height);
+  }
+
+  function drawNext() {
+    nctx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+    const rgb = COLORS[nextColor];
+    nctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    for (const [bx, by] of SHAPES[nextShape]) {
+      nctx.fillRect(bx * 5, by * 5 + 2, 4, 4);
+    }
+  }
+
+  function updateHud() {
+    scoreEl.textContent = score.toLocaleString();
+    bestEl.textContent = best.toLocaleString();
+    comboEl.textContent = combo > 1 ? '×' + combo : '-';
+  }
+
+  /* ---------- 메인 루프 ---------- */
+  // ?headless : rAF 가 멈추는 환경(숨긴 탭)에서 로직을 검증하기 위한 테스트 훅.
+  // 일반 플레이 경로에는 영향 없다.
+  const HEADLESS = new URLSearchParams(location.search).has('headless');
+  function schedule() {
+    if (HEADLESS) setTimeout(tick, 0);
+    else requestAnimationFrame(tick);
+  }
+
+  function tick() {
+    schedule();
+    // 뷰포트가 늦게 잡히는 환경(WebView 등) 대비: 크기가 바뀌었으면 다시 계산
+    {
+      const wrap = document.getElementById('boardWrap');
+      if (wrap.clientWidth !== lastWrapW || wrap.clientHeight !== lastWrapH) resize();
+    }
+    if (!running || paused) { render(); return; }
+    frame++;
+
+    // 난이도: 시간이 갈수록 낙하 가속
+    const baseSpeed = settings.fall + FALL_RAMP_MAX * Math.min(1, frame / FALL_RAMP_FRAMES);
+
+    if (piece) {
+      const speed = hardDrop ? HARD_DROP : (fastDrop ? SOFT_DROP : baseSpeed);
+      let remaining = speed;
+      while (remaining > 0) {
+        const step = Math.min(1, remaining);
+        remaining -= step;
+        const ny = piece.y + step;
+        if (pieceCollides(piece.x, Math.ceil(ny))) { dissolvePiece(); break; }
+        piece.y = ny;
+      }
+    } else if (spawnDelay > 0) {
+      spawnDelay--;
+      if (spawnDelay === 0 && !over) spawnPiece();
+    }
+
+    for (let s = 0; s < SIM_STEPS; s++) simSand();
+
+    if (dissolveGrace > 0) dissolveGrace--;
+    if (comboTimer > 0) { comboTimer--; if (comboTimer === 0) { combo = 0; updateHud(); } }
+
+    if (frame % CLEAR_SCAN_EVERY === 0) {
+      if (dirtySettle) { dirtySettle = false; clearScan(); }
+      checkDanger(); // 정착 이벤트와 무관하게 항상 검사 (만석 정지 보드 대비)
+    }
+
+    render();
+  }
+
+  /* ---------- 입력: 키보드 ---------- */
+  const held = {};
+  let moveRepeat = 0;
+
+  document.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (settingsOpen) { // 설정 창이 열려 있으면 게임 키는 무시
+      if (e.code === 'Escape') closeSettings();
+      return;
+    }
+    switch (e.code) {
+      case 'ArrowLeft': held.left = true; tryMove(-settings.move); moveRepeat = 0; e.preventDefault(); break;
+      case 'ArrowRight': held.right = true; tryMove(settings.move); moveRepeat = 0; e.preventDefault(); break;
+      case 'ArrowUp': tryRotate(); e.preventDefault(); break;
+      case 'ArrowDown': fastDrop = true; e.preventDefault(); break;
+      case 'Space':
+        if (!running && !over && !paused) startGame();
+        else if (over) restart();
+        else if (piece) hardDrop = true; // 조각 없을 때 눌러도 다음 조각에 안 걸리게
+        e.preventDefault();
+        break;
+      case 'KeyP': togglePause(); break;
+      case 'KeyR': restart(); break;
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft') held.left = false;
+    if (e.code === 'ArrowRight') held.right = false;
+    if (e.code === 'ArrowDown') fastDrop = false;
+  });
+
+  // 누르고 있는 동안 반복 이동
+  setInterval(() => {
+    if (!running || paused) return;
+    if (held.left || held.right) {
+      moveRepeat++;
+      if (moveRepeat > MOVE_REPEAT_DELAY) tryMove(held.left ? -settings.move : settings.move);
+    }
+  }, 30);
+
+  /* ---------- 입력: 터치 & 마우스 드래그 ---------- */
+  let dragActive = false, dragStartX = 0, dragStartY = 0, dragPieceX = 0, dragMovedFar = false, dragStartT = 0;
+
+  function pointerDown(cx, cy) {
+    if (!running || paused || !piece) return;
+    dragActive = true;
+    dragStartX = cx; dragStartY = cy;
+    dragPieceX = piece.x;
+    dragMovedFar = false;
+    dragStartT = performance.now();
+  }
+
+  function pointerMove(cx, cy) {
+    if (!dragActive || !piece) return;
+    const rect = boardEl.getBoundingClientRect();
+    const grainPerPx = W / rect.width;
+    const dx = Math.round((cx - dragStartX) * grainPerPx * DRAG_GAIN);
+    if (Math.abs(cx - dragStartX) > 12 || Math.abs(cy - dragStartY) > 12) dragMovedFar = true;
+    // 목표 x 로 한 칸씩 이동 (충돌 시 멈춤)
+    const target = dragPieceX + dx;
+    let guard = W;
+    while (piece.x !== target && guard-- > 0) {
+      const step = target > piece.x ? 1 : -1;
+      if (pieceCollides(piece.x + step, Math.floor(piece.y))) break;
+      piece.x += step;
+    }
+    // 아래로 쓸기 → 빠른 낙하
+    if (cy - dragStartY > 46) fastDrop = true;
+  }
+
+  function pointerUp(cy) {
+    if (!dragActive) return;
+    dragActive = false;
+    fastDrop = false;
+    const dt = performance.now() - dragStartT;
+    // 짧은 탭 = 회전
+    if (!dragMovedFar && dt < 260) tryRotate();
+    // 빠르게 아래로 쓸어내리면 하드드롭
+    else if (cy - dragStartY > 70 && dt < 220) hardDrop = true;
+  }
+
+  boardEl.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    pointerDown(t.clientX, t.clientY);
+  }, { passive: false });
+
+  boardEl.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    pointerMove(t.clientX, t.clientY);
+  }, { passive: false });
+
+  boardEl.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    pointerUp(e.changedTouches[0].clientY);
+  }, { passive: false });
+
+  boardEl.addEventListener('mousedown', (e) => pointerDown(e.clientX, e.clientY));
+  window.addEventListener('mousemove', (e) => { if (dragActive) pointerMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', (e) => pointerUp(e.clientY));
+
+  /* ---------- 사운드: Web Audio 로 전부 합성 (음원 파일 없음) ---------- */
+  let audioCtx = null, master = null, noiseBuf = null;
+  let bgmTimer = null, nextNoteTime = 0, bgmStep = 0;
+  const BPM = 112;
+  const STEP_SEC = 60 / BPM / 4;   // 16분음표 길이
+  // C 장조 펜타토닉 2마디 루프 (MIDI 번호, 0 = 쉼표)
+  const MELODY = [72, 0, 76, 0, 79, 0, 76, 0, 74, 0, 77, 0, 81, 0, 79, 0,
+                  72, 0, 76, 0, 79, 0, 84, 0, 81, 0, 79, 0, 76, 0, 74, 0];
+  const BASS   = [48, 0, 0, 0, 55, 0, 0, 0, 50, 0, 0, 0, 57, 0, 0, 0,
+                  48, 0, 0, 0, 55, 0, 0, 0, 53, 0, 0, 0, 55, 0, 0, 0];
+
+  function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  // 오디오 컨텍스트는 사용자 조작(시작 버튼) 안에서 처음 만든다 — 브라우저 자동재생 정책
+  function ensureAudio() {
+    if (!settings.sound) return false;
+    try {
+      if (!audioCtx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        audioCtx = new AC();
+        const lowpass = audioCtx.createBiquadFilter(); // 사각파의 날카로움을 깎는다
+        lowpass.type = 'lowpass';
+        lowpass.frequency.value = 2600;
+        master = audioCtx.createGain();
+        master.gain.value = 0.5;
+        master.connect(lowpass);
+        lowpass.connect(audioCtx.destination);
+        // 하이햇용 화이트 노이즈 (0.06초)
+        noiseBuf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.06), audioCtx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function tone(freq, t, dur, type, vol) {
+    const o = audioCtx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.03);
+  }
+
+  function hat(t, vol) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuf;
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 6000;
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    src.connect(hp); hp.connect(g); g.connect(master);
+    src.start(t);
+  }
+
+  function scheduleBgmStep(t) {
+    const i = bgmStep % MELODY.length;
+    if (MELODY[i]) tone(midiToFreq(MELODY[i]), t, STEP_SEC * 1.7, 'square', 0.07);
+    if (BASS[i]) tone(midiToFreq(BASS[i]), t, STEP_SEC * 3.6, 'triangle', 0.18);
+    if (i % 4 === 2) hat(t, 0.05);          // 오프비트 하이햇
+    if (i % 8 === 0) tone(55, t, 0.12, 'sine', 0.25); // 킥 대용 저음
+    bgmStep++;
+  }
+
+  // 룩어헤드 스케줄러: 0.12초 앞까지 미리 예약해 두면 타이머가 흔들려도 박자가 안 밀린다
+  function bgmTick() {
+    if (!audioCtx) return;
+    while (nextNoteTime < audioCtx.currentTime + 0.12) {
+      scheduleBgmStep(nextNoteTime);
+      nextNoteTime += STEP_SEC;
+    }
+  }
+
+  function startBgm() {
+    if (!ensureAudio() || bgmTimer) return;
+    bgmStep = 0;
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    bgmTimer = setInterval(bgmTick, 30);
+  }
+
+  function stopBgm() {
+    if (bgmTimer) { clearInterval(bgmTimer); bgmTimer = null; }
+  }
+
+  function suspendAudio() { if (audioCtx && audioCtx.state === 'running') audioCtx.suspend(); }
+  function resumeAudio() { if (settings.sound && audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }
+
+  // 효과음: 소거 (콤보가 쌓일수록 음이 올라간다)
+  function sfxClear(comboLevel) {
+    if (!audioCtx || !settings.sound || audioCtx.state !== 'running') return;
+    const t = audioCtx.currentTime;
+    const base = 72 + Math.min(comboLevel - 1, 6) * 2;
+    tone(midiToFreq(base), t, 0.12, 'square', 0.12);
+    tone(midiToFreq(base + 4), t + 0.07, 0.12, 'square', 0.12);
+    tone(midiToFreq(base + 7), t + 0.14, 0.22, 'square', 0.12);
+  }
+
+  // 효과음: 게임 오버 (내려가는 세 음)
+  function sfxOver() {
+    if (!audioCtx || !settings.sound || audioCtx.state !== 'running') return;
+    const t = audioCtx.currentTime;
+    tone(midiToFreq(64), t, 0.25, 'triangle', 0.2);
+    tone(midiToFreq(60), t + 0.22, 0.25, 'triangle', 0.2);
+    tone(midiToFreq(55), t + 0.44, 0.5, 'triangle', 0.2);
+  }
+
+  function syncSoundBtn() {
+    document.getElementById('soundBtn').textContent = settings.sound ? '🔊 소리' : '🔇 소리';
+  }
+
+  function toggleSound() {
+    settings.sound = !settings.sound;
+    store.set('sandmix_settings', settings);
+    syncSoundBtn();
+    if (settings.sound) { if (running) startBgm(); }
+    else { stopBgm(); suspendAudio(); }
+  }
+
+  /* ---------- 흐름 제어 ---------- */
+  function startGame() {
+    document.getElementById('startOverlay').classList.add('hidden');
+    running = true;
+    over = false;
+    spawnPiece();
+    startBgm();
+  }
+
+  function restart() {
+    grid.fill(0);
+    moved.fill(0);
+    fx.length = 0;
+    score = 0; combo = 0; comboTimer = 0; frame = 0;
+    piece = null; over = false; paused = false;
+    hardDrop = false; fastDrop = false;
+    document.getElementById('overOverlay').classList.add('hidden');
+    document.getElementById('pauseOverlay').classList.add('hidden');
+    updateHud();
+    running = true;
+    spawnPiece();
+    stopBgm();
+    startBgm();
+  }
+
+  function togglePause() {
+    if (!running && !paused) return;
+    paused = !paused;
+    document.getElementById('pauseOverlay').classList.toggle('hidden', !paused);
+    if (paused) { running = false; suspendAudio(); }
+    else { running = true; resumeAudio(); }
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', restart);
+  document.getElementById('resumeBtn').addEventListener('click', togglePause);
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+
+  /* ---------- 속도 설정 창 ---------- */
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const fallRange = document.getElementById('fallRange');
+  const fallOut = document.getElementById('fallOut');
+  const moveRange = document.getElementById('moveRange');
+  const moveOut = document.getElementById('moveOut');
+  const mixCheck = document.getElementById('mixCheck');
+  let settingsOpen = false;
+  let settingsWasRunning = false;
+
+  function syncSettingsUI() {
+    fallRange.value = settings.fall;
+    fallOut.textContent = settings.fall.toFixed(1);
+    moveRange.value = settings.move;
+    moveOut.textContent = settings.move;
+    mixCheck.checked = settings.mix;
+    document.getElementById('mixInfo').classList.toggle('hidden', !settings.mix); // 시작 화면 범례
+  }
+
+  function saveSettings() {
+    store.set('sandmix_settings', settings);
+    syncSettingsUI();
+  }
+
+  fallRange.addEventListener('input', () => { settings.fall = parseFloat(fallRange.value); saveSettings(); });
+  moveRange.addEventListener('input', () => { settings.move = parseInt(moveRange.value, 10); saveSettings(); });
+  mixCheck.addEventListener('change', () => { settings.mix = mixCheck.checked; saveSettings(); });
+
+  function openSettings() {
+    if (settingsOpen) return;
+    settingsOpen = true;
+    settingsWasRunning = running;
+    running = false; // 슬라이더 만지는 동안 게임 정지
+    suspendAudio();
+    syncSettingsUI();
+    settingsOverlay.classList.remove('hidden');
+  }
+
+  function closeSettings() {
+    if (!settingsOpen) return;
+    settingsOpen = false;
+    settingsOverlay.classList.add('hidden');
+    if (settingsWasRunning && !over && !paused) { running = true; resumeAudio(); }
+  }
+
+  document.getElementById('settingsBtn').addEventListener('click', openSettings);
+  document.getElementById('settingsCloseBtn').addEventListener('click', closeSettings);
+  document.getElementById('soundBtn').addEventListener('click', toggleSound);
+
+  // 탭이 백그라운드로 가면 자동 일시정지 (소리도 같이 멈춘다)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && running && !HEADLESS) togglePause();
+  });
+
+  /* ---------- 시작 화면 색 범례 ---------- */
+  (function buildLegend() {
+    const legend = document.getElementById('mixLegend');
+    const pairs = [[1, 2, 4], [2, 3, 5], [3, 1, 6]];
+    for (const [a, b, s] of pairs) {
+      const row = document.createElement('div');
+      row.className = 'mixRow';
+      const mk = (ci) => {
+        const d = document.createElement('span');
+        d.className = 'dot';
+        const rgb = COLORS[ci];
+        d.style.background = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+        return d;
+      };
+      row.appendChild(mk(a));
+      row.appendChild(document.createTextNode('+'));
+      row.appendChild(mk(b));
+      row.appendChild(document.createTextNode('='));
+      row.appendChild(mk(s));
+      row.appendChild(document.createTextNode(' ' + COLOR_NAMES[s]));
+      legend.appendChild(row);
+    }
+  })();
+
+  /* ---------- 부팅 ---------- */
+  resize();
+  rollNext();
+  updateHud();
+  syncSettingsUI(); // 저장된 설정을 UI 와 시작 화면에 반영
+  syncSoundBtn();
+  schedule();
+})();
+</script>
+</body>
+</html>

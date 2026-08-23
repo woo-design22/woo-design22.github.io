@@ -9,9 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `game-2048/index.html` — 2048 퍼즐
 - `pomodoro-todo/index.html` — 뽀모도로 타이머 + 할 일 목록
 - `particle-playground/index.html` — 캔버스 파티클 드로잉 툴
+- `mood-log/index.html` — 기분·수면·통증 일지 (본인/배우자 2프로필)
 
 각 앱은 폴더 하나에 `index.html` 한 개가 전부다. 서로 코드를 공유하지 않으며,
-공유 라이브러리·번들러·패키지 매니저·CDN 의존성이 없다. Git 저장소도 아니다.
+공유 라이브러리·번들러·패키지 매니저·CDN 의존성이 없다.
 
 ## 실행 및 검증
 
@@ -25,12 +26,13 @@ python -m http.server 8765
 - http://localhost:8765/game-2048/
 - http://localhost:8765/pomodoro-todo/
 - http://localhost:8765/particle-playground/
+- http://localhost:8765/mood-log/
 
 테스트 스위트, 린터, 타입 체커가 없다. 변경 검증은 브라우저에서 직접 구동해
 콘솔 에러 확인 + 조작 테스트로 한다. `file://`로 직접 열어도 동작하도록 작성돼
 있으므로(아래 `store` 참고) 그 경로도 깨뜨리지 말 것.
 
-## 세 앱이 공유하는 규칙
+## 모든 앱이 공유하는 규칙
 
 파일 구조가 동일하다. `<head>`에 `<style>`, `</body>` 직전에 즉시실행 함수
 (IIFE) 하나로 감싼 `<script>`. 전역 스코프에 아무것도 노출하지 않는다.
@@ -47,12 +49,13 @@ python -m http.server 8765
 
 ### `store` 래퍼 (중요)
 
-`game-2048`과 `pomodoro-todo`는 `localStorage`를 직접 부르지 않고 try/catch로
+`game-2048`, `pomodoro-todo`, `mood-log`는 `localStorage`를 직접 부르지 않고 try/catch로
 감싼 `store.get` / `store.set`을 쓴다. `file://`이나 쿠키 차단 환경에서
 `localStorage` 접근이 예외를 던져도 앱 전체가 멈추지 않게 하려는 의도다.
 **새로운 영속 상태도 반드시 `store`를 통해야 한다.**
 
-사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`.
+사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`,
+`mood_me`, `mood_partner`, `mood_profile`.
 
 ## 앱별 구조
 
@@ -93,3 +96,33 @@ python -m http.server 8765
 - 모드(폭죽/트레일/오비트)는 `spawn()`의 **초기 속도 계산에만** 영향을 준다.
   새 모드 추가는 `modes` 배열과 `spawn()`의 분기만 건드리면 된다.
 - 이 앱만 영속 상태가 없다(`store` 미사용).
+
+### mood-log
+
+- 프로필은 `PROFILES` 배열에 고정된 두 개(`me`, `partner`)이고, 프로필마다
+  `store` 키 하나(`mood_<id>`)에 기록 배열 전체를 JSON으로 저장한다. 마지막 선택
+  프로필은 `mood_profile`. 프로필을 바꾸면 `load()`로 배열을 통째로 다시 읽는다.
+- 기록은 날짜(`YYYY-MM-DD`)당 한 건이며 같은 날짜 저장은 덮어쓴다. 눈금 값은
+  `SCALES`에 정의된 이산값만 허용한다(기분 -3~+3, 수면 3~8, 통증 0~10 짝수,
+  에너지 1~5). 눈금을 바꾸면 JSON 가져오기의 `snap()`이 가장 가까운 값으로 맞춘다.
+- 날짜 계산은 `Date` 로컬 시간 기준 문자열 비교(`addDays`, `todayStr`)만 쓴다.
+  타임존 변환이나 `Date.parse`를 쓰지 말 것 — 자정 경계에서 하루가 밀린다.
+- 패턴 힌트(`renderPatterns`)는 최근 28일 창에서 단순 평균 차이와 연속 구간만 본다.
+  진단이 아니라는 문구를 항상 마지막에 붙인다. 통계 기법을 더하더라도 이 문구는 유지.
+- 인쇄(`@media print`)는 진료실 제출용이다. 입력 폼·탭·도구 버튼을 숨기고 요약·패턴·
+  기록만 남긴다. 새 섹션을 추가하면 인쇄에 포함할지 결정해야 한다.
+- 주간·월간 통계(`periods`, `renderStats`)는 주를 월요일 시작으로 잡고, 진행 중인
+  기간의 분모는 오늘까지의 날 수다. 그래프 기간(14/30/90일)과 통계 단위(주/월)는
+  `chartDays`, `statsKind` 메모리 상태일 뿐 `store`에 남기지 않는다.
+- **APK 브리지**: `window.AndroidBridge`(`saveFile`, `copyText`, `print`)가 있으면
+  내보내기·복사·인쇄를 그쪽으로 보낸다. 없으면 브라우저 경로. 브리지 메서드를 바꾸면
+  `android-mood-log/java/.../MainActivity.java`의 `Bridge` 클래스도 같이 바꿔야 한다.
+
+### android-mood-log (APK 셸)
+
+`mood-log/index.html`을 WebView로 감싼 안드로이드 앱. Gradle 없이
+`build.ps1`(aapt2 → javac → d8 → zipalign → apksigner)로 빌드하며, 실행 시
+`mood-log/index.html`을 `assets/`로 복사하므로 **웹과 APK의 원본은 항상 같은 파일**이다.
+네트워크 권한이 없고, JSON 저장/불러오기는 시스템 문서 선택기(SAF)로 처리한다.
+기록은 WebView의 localStorage에 남으므로 앱을 지우면 기록도 사라진다(JSON 백업 안내 필수).
+`build/`, `dist/`, `assets/`, `debug.keystore`는 커밋하지 않는다(폴더 안 `.gitignore`).

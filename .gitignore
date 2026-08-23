@@ -4,3 +4,20 @@ Desktop.ini
 .DS_Store
 .vscode/
 .idea/
+
+# 안드로이드 빌드 산출물 (build.ps1 이 매번 다시 만든다)
+android-particle/build/
+android-particle/dist/
+android-particle/assets/
+# 서명 키는 저장소에 넣지 않는다. 없으면 build.ps1 이 새로 만든다.
+android-particle/debug.keystore
+
+# 샌드믹스 / 마음결 안드로이드 빌드 산출물
+android-sandmix/build/
+android-sandmix/dist/
+android-sandmix/assets/
+android-sandmix/debug.keystore
+android-counsel/build/
+android-counsel/dist/
+android-counsel/assets/
+android-counsel/debug.keystore

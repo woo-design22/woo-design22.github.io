@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기분·수면 일지</title>
+<style>
+  :root {
+    --bg-top: #232342;
+    --bg-bottom: #14141f;
+    --card: #22223b;
+    --card2: #2b2b48;
+    --line: #3a3a5c;
+    --accent: #4cc9f0;
+    --accent2: #f25c54;
+    --on-accent: #111;
+    --text: #e9ecef;
+    --muted: #9a9ab0;
+    --good: #4caf50;
+    --bad: #f25c54;
+    --neutral: #9a9ab0;
+    --warn: #ffb74d;
+    --shadow: rgba(0,0,0,0.3);
+    /* 인쇄용 (흰 종이·흑백 복합기 기준) */
+    --print-bg: #fff;
+    --print-text: #000;
+    --print-line: #999;
+    --print-stat: #eee;
+    --print-bar: #777;
+    --print-bar-strong: #000;
+    --print-bar-weak: #bbb;
+  }
+  * { box-sizing: border-box; }
+  button, input, textarea { font-family: inherit; touch-action: manipulation; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at top, var(--bg-top), var(--bg-bottom));
+    color: var(--text);
+    font-family: 'Segoe UI', Pretendard, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .app { width: 100%; max-width: 520px; }
+  h1 { text-align: center; font-size: 1.4rem; margin: 0 0 4px; }
+  h1 .who { color: var(--accent); font-weight: 600; }
+  .subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+
+  /* 프로필 탭 */
+  .tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .tabs button {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 8px 18px;
+    min-height: 40px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .tabs button.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
+
+  .card {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 30px var(--shadow);
+    margin-bottom: 20px;
+  }
+  .card h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .card-head h2 { margin: 0; }
+  /* 기간 전환 토글 (14/30/90일, 주간/월간) */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { background: transparent; border: none; color: var(--muted); padding: 6px 12px; min-height: 32px; font-size: 0.78rem; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+  /* 입력 폼 */
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .row label, .row .label { flex: 0 0 64px; font-size: 0.85rem; color: var(--muted); }
+  .row input[type="date"] {
+    flex: 1;
+    min-width: 0;
+    background: var(--card2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 1rem; /* 16px 미만이면 iOS가 포커스 시 화면을 확대한다 */
+    color-scheme: dark;
+  }
+  .scale { flex: 1; min-width: 0; display: flex; gap: 4px; }
+  .scale button {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    background: var(--card2);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 8px 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .scale button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+  .hint { font-size: 0.72rem; color: var(--muted); margin: -6px 0 10px 74px; }
+  .row textarea {
+    flex: 1;
+    min-width: 0;
+    background: var(--card2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 56px;
+  }
+  @media (max-width: 420px) {
+    /* 좁은 화면: 라벨을 윗줄로 올려 눈금 버튼 폭을 확보 */
+    .row { flex-wrap: wrap; }
+    .row label, .row .label { flex-basis: 100%; }
+    .hint { margin-left: 0; }
+    /* 통계 표: 기분 숫자 아래에 범위 띠를 내려 폭을 아낀다 */
+    .stats-table .mood-cell { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .stats-table .mood-v { min-width: 0; }
+  }
+  .actions { display: flex; gap: 10px; margin-top: 4px; }
+  .actions button {
+    flex: 1;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 0;
+    min-height: 44px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  #saveBtn { background: var(--accent); color: var(--on-accent); }
+  #clearBtn { background: var(--card2); color: var(--text); }
+  .saved-msg { text-align: center; color: var(--good); font-size: 0.8rem; min-height: 1.2em; margin-top: 8px; }
+
+  /* 요약 */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stat { background: var(--card2); border-radius: 12px; padding: 10px 6px; text-align: center; }
+  .stat .v { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+  .patterns { list-style: none; padding: 0; margin: 0; }
+  .patterns li { font-size: 0.85rem; padding: 6px 0; border-top: 1px solid var(--line); color: var(--text); }
+  .patterns li:first-child { border-top: none; }
+  .patterns li.warn { color: var(--warn); }
+  .patterns li.warn::before { content: '▲ '; }
+  .patterns li.muted { color: var(--muted); }
+
+  /* 그래프 */
+  .chart { display: flex; align-items: flex-end; gap: 3px; height: 72px; margin-top: 8px; }
+  .bar { flex: 1; min-width: 0; border-radius: 3px 3px 0 0; background: var(--neutral); opacity: .9; border: none; padding: 0; cursor: pointer; }
+  .bar.good { background: var(--good); }
+  .bar.bad { background: var(--bad); }
+  .bar.empty { background: transparent; border: 1px dashed var(--line); cursor: default; }
+  .chart-label { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+  .chart-pick { font-size: 0.8rem; color: var(--text); min-height: 1.2em; margin-top: 6px; text-align: center; }
+  .chart.dense { gap: 1px; }
+  .chart.dense .bar { border-radius: 1px 1px 0 0; }
+
+  /* 주간·월간 통계 표 */
+  .table-wrap { overflow-x: auto; }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+  .stats-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .stats-table td { padding: 7px 3px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .stats-table td.period { color: var(--muted); }
+  .stats-table td.dim { color: var(--muted); }
+  .stats-table .mood-cell { display: flex; align-items: center; gap: 6px; }
+  .stats-table .mood-v { min-width: 2.6em; font-weight: 700; }
+  .stats-table .mood-v.low, .stats-table .mood-v.high { color: var(--bad); }
+  .stats-table .mood-v.ok { color: var(--good); }
+  /* -3~+3 트랙 위에 최소~최대 범위를 띠로 표시 */
+  .range { position: relative; width: 44px; height: 8px; background: var(--card2); border-radius: 4px; }
+  .range::after { content: ''; position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: var(--line); }
+  .range .span { position: absolute; top: 0; height: 100%; border-radius: 4px; background: var(--accent); opacity: .85; }
+  .stats-table .dist { color: var(--muted); font-size: 0.72rem; }
+  .stats-table .dist b { color: var(--bad); font-weight: 600; }
+  .stats-note { font-size: 0.72rem; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+
+  /* 기록 목록 */
+  .entries { list-style: none; padding: 0; margin: 0; }
+  .entry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 0.85rem; }
+  .entry:first-child { border-top: none; }
+  .entry .d { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .entry .dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 12px; }
+  .entry .nums { flex: 1 1 auto; min-width: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .entry .note { flex: 1 1 100%; order: 9; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .entry .note:empty { display: none; }
+  .entry .btns { flex: 0 0 auto; margin-left: auto; display: flex; }
+  .entry button { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 8px 10px; min-width: 40px; min-height: 40px; }
+  .entry button:hover { color: var(--accent2); }
+
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tools button {
+    flex: 1 1 30%;
+    background: var(--card2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px 0;
+    min-height: 44px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .tools button.danger { color: var(--accent2); }
+  .empty { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 12px 0; }
+  .privacy { font-size: 0.72rem; color: var(--muted); text-align: center; margin-top: 4px; line-height: 1.5; }
+
+  /* 인쇄: 진료실에 가져갈 표. 기본 설정(배경 그래픽 끔)에서도 막대·점이 찍히게 한다 */
+  @media print {
+    body { background: var(--print-bg); color: var(--print-text); padding: 0; display: block; }
+    .app { max-width: none; }
+    h1 .who { color: var(--print-text); }
+    .card { box-shadow: none; background: var(--print-bg); border: 1px solid var(--print-line); border-radius: 0; page-break-inside: avoid; }
+    .card h2, .subtitle, .entry .d, .entry .nums, .stat .k, .patterns li, .patterns li.muted, .chart-label, .chart-pick { color: var(--print-text); }
+    .patterns li.warn { color: var(--print-text); font-weight: 700; }
+    .tabs, #formCard, .tools, .saved-msg, .entry .btns, .privacy, .seg { display: none; }
+    .stats-table th, .stats-table td, .stats-table td.period, .stats-table td.dim, .stats-table .dist, .stats-note { color: var(--print-text); }
+    .stats-table .mood-v.low, .stats-table .mood-v.high { color: var(--print-text); text-decoration: underline; }
+    .stats-table .mood-v.ok { color: var(--print-text); }
+    .range { background: var(--print-stat); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .range .span { background: var(--print-bar-strong); }
+    .entry .note { white-space: normal; }
+    .stat { background: var(--print-stat); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bar, .entry .dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .bar { background: var(--print-bar); opacity: 1; }
+    .bar.good { background: var(--print-bar-weak); }
+    .bar.bad { background: var(--print-bar-strong); }
+    .bar.empty { background: transparent; border-color: var(--print-bar-weak); }
+    .entry .dot { border: 1px solid var(--print-text); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>기분·수면 일지 <span class="who" id="whoLabel"></span></h1>
+  <p class="subtitle">하루 30초. 숫자로 쌓이면 패턴이 보인다.</p>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="card" id="formCard">
+    <h2 id="formTitle">오늘 기록</h2>
+    <div class="row">
+      <label for="dateInput">날짜</label>
+      <input type="date" id="dateInput">
+    </div>
+    <div class="row">
+      <span class="label" id="moodLabel">기분</span>
+      <div class="scale" id="moodScale" role="group" aria-labelledby="moodLabel"></div>
+    </div>
+    <p class="hint">-3 매우 가라앉음 · 0 보통 · +3 매우 들뜸</p>
+    <div class="row">
+      <span class="label" id="sleepLabel">수면</span>
+      <div class="scale" id="sleepScale" role="group" aria-labelledby="sleepLabel"></div>
+    </div>
+    <p class="hint">잔 시간(시간). 8+는 8시간 이상</p>
+    <div class="row">
+      <span class="label" id="painLabel">통증</span>
+      <div class="scale" id="painScale" role="group" aria-labelledby="painLabel"></div>
+    </div>
+    <p class="hint">0 없음 · 5 신경 쓰임 · 10 최악</p>
+    <div class="row">
+      <span class="label" id="energyLabel">에너지</span>
+      <div class="scale" id="energyScale" role="group" aria-labelledby="energyLabel"></div>
+    </div>
+    <p class="hint">1 바닥 · 3 보통 · 5 넘침</p>
+    <div class="row">
+      <label for="noteInput">메모</label>
+      <textarea id="noteInput" placeholder="있었던 일, 약 복용, 다툼, 좋았던 것 — 한 줄이면 충분"></textarea>
+    </div>
+    <div class="actions">
+      <button id="saveBtn">저장</button>
+      <button id="clearBtn">비우기</button>
+    </div>
+    <div class="saved-msg" id="savedMsg" role="status" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2 id="summaryTitle">최근 14일</h2>
+      <div class="seg" id="rangeSeg" role="group" aria-label="그래프 기간"></div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="chart" id="chart"></div>
+    <div class="chart-label"><span id="chartFrom"></span><span>기분 (위 = 들뜸, 아래 = 가라앉음)</span><span id="chartTo"></span></div>
+    <div class="chart-pick" id="chartPick"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2 id="statsTitle">주간 통계</h2>
+      <div class="seg" id="kindSeg" role="group" aria-label="통계 단위"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="stats-table" id="statsTable"></table>
+    </div>
+    <p class="stats-note">기분 칸의 띠는 그 기간의 최저~최고 범위(-3~+3), 가운데 선이 0. ↓는 -2 이하, ↑는 +2 이상이었던 날 수.</p>
+  </div>
+
+  <div class="card">
+    <h2>패턴</h2>
+    <ul class="patterns" id="patterns"></ul>
+  </div>
+
+  <div class="card">
+    <h2 id="entriesTitle">기록</h2>
+    <ul class="entries" id="entries"></ul>
+  </div>
+
+  <div class="card">
+    <h2>진료용 · 백업</h2>
+    <div class="tools">
+      <button id="copyBtn">텍스트 복사</button>
+      <button id="printBtn">인쇄</button>
+      <button id="exportBtn">JSON 내보내기</button>
+      <button id="importBtn">JSON 가져오기</button>
+      <button id="wipeBtn" class="danger">이 프로필 전체 삭제</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+    <p class="privacy">데이터는 이 브라우저 안에만 저장된다. 서버로 가지 않는다.<br>브라우저 데이터를 지우면 함께 사라지니 가끔 JSON으로 백업할 것.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── 저장소 ──────────────────────────────────────────────
+  // file:// 이나 쿠키 차단 환경에서 localStorage 접근이 예외를 던져도
+  // 앱이 멈추지 않도록 감싼다. 새 영속 상태는 반드시 이걸 통한다.
+  const store = {
+    get(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+    set(key, value) { try { localStorage.setItem(key, value); } catch (e) {} },
+    remove(key) { try { localStorage.removeItem(key); } catch (e) {} }
+  };
+
+  // 프로필은 두 개 고정. 키: mood_me, mood_partner, mood_profile(마지막 선택)
+  const PROFILES = [
+    { id: 'me', label: '나' },
+    { id: 'partner', label: '배우자' }
+  ];
+  const KEY_OF = id => 'mood_' + id;
+  const labelOf = id => PROFILES.find(p => p.id === id).label;
+
+  const SCALES = {
+    mood:   { values: [-3, -2, -1, 0, 1, 2, 3], labels: ['-3', '-2', '-1', '0', '+1', '+2', '+3'] },
+    sleep:  { values: [3, 4, 5, 6, 7, 8], labels: ['≤3', '4', '5', '6', '7', '8+'] },
+    pain:   { values: [0, 2, 4, 6, 8, 10], labels: ['0', '2', '4', '6', '8', '10'] },
+    energy: { values: [1, 2, 3, 4, 5], labels: ['1', '2', '3', '4', '5'] }
+  };
+  const FIELDS = ['mood', 'sleep', 'pain', 'energy'];
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const LIST_CAP = 60; // 화면 목록 표시 상한. 인쇄·복사·내보내기는 전체.
+
+  // ── 상태 ────────────────────────────────────────────────
+  const storedProfile = store.get('mood_profile');
+  let profile = PROFILES.some(p => p.id === storedProfile) ? storedProfile : 'me';
+  let entries = [];          // { date:'YYYY-MM-DD', mood, sleep, pain, energy, note }
+  let draft;                 // 입력 폼 상태. 항상 draftFor()로 만든다.
+  let renderedDay = null;    // 마지막 전체 렌더 시점의 날짜. 자정을 넘기면 다시 그린다.
+  let chartDays = 14;        // 요약 그래프 기간 (14 / 30 / 90). 영속하지 않는다.
+  let statsKind = 'week';    // 통계 단위 ('week' / 'month'). 영속하지 않는다.
+  const CHART_RANGES = [14, 30, 90];
+  const STATS_KINDS = [['week', '주간'], ['month', '월간']];
+  // APK 안에서는 MainActivity가 window.AndroidBridge 로 파일 저장·복사·인쇄를 대신한다
+  const native = typeof window.AndroidBridge === 'object' && window.AndroidBridge ? window.AndroidBridge : null;
+
+  function emptyDraft(date) {
+    return { date: date || todayStr(), mood: null, sleep: null, pain: null, energy: null, note: '' };
+  }
+  // 그 날짜에 기록이 있으면 그 값을 실은 draft, 없으면 빈 draft.
+  // 제목이 "수정"이면 눈금도 켜져 있어야 한다 — 빈 draft로 덮어쓰면 나머지 값이 null로 사라진다.
+  function draftFor(date) {
+    const existing = entries.find(e => e.date === date);
+    return existing ? { ...emptyDraft(date), ...existing } : emptyDraft(date);
+  }
+  function draftIsBlank(d) {
+    return FIELDS.every(k => d[k] === null) && !d.note;
+  }
+  function todayStr() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  // 로컬 날짜 문자열만 다룬다. Date.parse/타임존 변환은 자정 경계에서 하루가 밀리므로 쓰지 않는다.
+  function addDays(dateStr, n) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + n);
+    const p = k => String(k).padStart(2, '0');
+    return `${dt.getFullYear()}-${p(dt.getMonth() + 1)}-${p(dt.getDate())}`;
+  }
+
+  function load() {
+    try { entries = JSON.parse(store.get(KEY_OF(profile)) || '[]'); }
+    catch (e) { entries = []; }
+    if (!Array.isArray(entries)) entries = [];
+    // 손상된 항목은 버린다 (다른 도구로 편집했거나 저장 중 깨진 경우)
+    entries = entries.filter(e => e && typeof e === 'object' && typeof e.date === 'string' && DATE_RE.test(e.date));
+    entries.sort((a, b) => a.date < b.date ? 1 : -1); // 최신이 앞
+  }
+  function save() {
+    store.set(KEY_OF(profile), JSON.stringify(entries));
+  }
+
+  // ── DOM ─────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const tabsEl = $('tabs'), whoLabel = $('whoLabel'), formTitle = $('formTitle'), dateInput = $('dateInput'),
+        noteInput = $('noteInput'), savedMsg = $('savedMsg'),
+        summaryTitle = $('summaryTitle'), statsEl = $('stats'), chartEl = $('chart'),
+        chartFrom = $('chartFrom'), chartTo = $('chartTo'), chartPick = $('chartPick'),
+        patternsEl = $('patterns'), entriesTitle = $('entriesTitle'), entriesEl = $('entries'), importFile = $('importFile'),
+        rangeSeg = $('rangeSeg'), kindSeg = $('kindSeg'), statsTitle = $('statsTitle'), statsTable = $('statsTable');
+  const scaleEls = { mood: $('moodScale'), sleep: $('sleepScale'), pain: $('painScale'), energy: $('energyScale') };
+
+  // ── 렌더: 상태가 바뀌면 전부 다시 그린다 ───────────────
+  function render() {
+    renderedDay = todayStr();
+    renderTabs();
+    renderForm();
+    renderSummary();
+    renderStats();
+    renderPatterns();
+    renderEntries();
+  }
+
+  // 토글 버튼 묶음. 값이 바뀌면 해당 카드만 다시 그린다.
+  function renderSeg(el, items, current, onPick) {
+    el.innerHTML = '';
+    items.forEach(([value, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.setAttribute('aria-pressed', value === current ? 'true' : 'false');
+      b.addEventListener('click', () => onPick(value));
+      el.appendChild(b);
+    });
+  }
+
+  function renderTabs() {
+    const label = labelOf(profile);
+    whoLabel.textContent = '· ' + label;
+    document.title = `기분·수면 일지 · ${label}`;
+    tabsEl.innerHTML = '';
+    PROFILES.forEach(p => {
+      const b = document.createElement('button');
+      b.textContent = p.label;
+      b.className = p.id === profile ? 'active' : '';
+      b.setAttribute('aria-pressed', p.id === profile ? 'true' : 'false');
+      b.addEventListener('click', () => switchProfile(p.id));
+      tabsEl.appendChild(b);
+    });
+  }
+
+  // focusKey/focusIdx: 눈금 버튼을 다시 만든 뒤 키보드 포커스를 같은 자리로 되돌린다
+  function renderForm(focusKey, focusIdx) {
+    const existing = entries.find(e => e.date === draft.date);
+    formTitle.textContent = (existing ? '기록 수정 · ' : '기록 · ') + draft.date;
+    dateInput.value = draft.date;
+    dateInput.max = todayStr();
+    noteInput.value = draft.note;
+    FIELDS.forEach(key => {
+      const el = scaleEls[key];
+      el.innerHTML = '';
+      SCALES[key].values.forEach((v, i) => {
+        const b = document.createElement('button');
+        b.textContent = SCALES[key].labels[i];
+        b.setAttribute('aria-pressed', draft[key] === v ? 'true' : 'false');
+        b.addEventListener('click', () => { draft[key] = (draft[key] === v ? null : v); renderForm(key, i); });
+        el.appendChild(b);
+      });
+    });
+    if (focusKey !== undefined && scaleEls[focusKey].children[focusIdx]) scaleEls[focusKey].children[focusIdx].focus();
+  }
+
+  // 최근 N일 창: 오늘 포함, 미래 날짜 제외
+  function windowEntries(days) {
+    const today = todayStr();
+    const from = addDays(today, -(days - 1));
+    return entries.filter(e => e.date >= from && e.date <= today);
+  }
+  function avg(list, key) {
+    const xs = list.map(e => e[key]).filter(v => typeof v === 'number');
+    if (!xs.length) return null;
+    return xs.reduce((a, b) => a + b, 0) / xs.length;
+  }
+  const fmt = (v, digits = 1) => v === null ? '–' : (Math.round(v * 10 ** digits) / 10 ** digits).toFixed(digits);
+  const fmtMood = v => v === null ? '–' : (v > 0 ? '+' : '') + (Number.isInteger(v) ? String(v) : fmt(v));
+  const fmtMoodAvg = v => v === null ? '–' : (v > 0 ? '+' : '') + fmt(v);
+  const num = (e, k) => typeof e[k] === 'number' ? e[k] : null;
+
+  function renderSummary() {
+    const days = chartDays;
+    const list = windowEntries(days);
+    summaryTitle.textContent = `${labelOf(profile)} · 최근 ${days}일 · ${list.length}일 기록`;
+    renderSeg(rangeSeg, CHART_RANGES.map(n => [n, n + '일']), days, n => { chartDays = n; renderSummary(); });
+    chartEl.classList.toggle('dense', days > 31);
+    statsEl.innerHTML = '';
+    [
+      ['기분 평균', fmtMoodAvg(avg(list, 'mood'))],
+      ['수면 평균', fmt(avg(list, 'sleep'))],
+      ['통증 평균', fmt(avg(list, 'pain'))],
+      ['에너지', fmt(avg(list, 'energy'))]
+    ].forEach(([k, v]) => {
+      const d = document.createElement('div');
+      d.className = 'stat';
+      const vEl = document.createElement('div'); vEl.className = 'v'; vEl.textContent = v;
+      const kEl = document.createElement('div'); kEl.className = 'k'; kEl.textContent = k;
+      d.append(vEl, kEl);
+      statsEl.appendChild(d);
+    });
+
+    // 막대: 날짜별 기분. 0은 중간 높이, ±3이 양 끝.
+    chartEl.innerHTML = '';
+    chartPick.textContent = '';
+    const today = todayStr();
+    const from = addDays(today, -(days - 1));
+    chartFrom.textContent = from.slice(5).replace('-', '/');
+    chartTo.textContent = today.slice(5).replace('-', '/');
+    const byDate = Object.fromEntries(list.map(e => [e.date, e]));
+    for (let i = 0; i < days; i++) {
+      const d = addDays(from, i);
+      const e = byDate[d];
+      const bar = document.createElement('button');
+      bar.type = 'button';
+      if (!e || typeof e.mood !== 'number') {
+        bar.className = 'bar empty';
+        bar.style.height = '50%';
+        bar.setAttribute('aria-label', `${d} 기록 없음`);
+        bar.disabled = true;
+      } else {
+        // -3 → 10%, 0 → 50%, +3 → 90%
+        bar.className = 'bar ' + (Math.abs(e.mood) >= 2 ? 'bad' : e.mood === 0 ? '' : 'good');
+        bar.style.height = (50 + e.mood * 13.3) + '%';
+        const text = `${d.slice(5).replace('-', '/')} 기분 ${fmtMood(e.mood)}` + (typeof e.sleep === 'number' ? ` · 수면 ${e.sleep}` : '') + (e.note ? ` · ${e.note}` : '');
+        bar.title = text;
+        bar.setAttribute('aria-label', text);
+        // 터치에서는 툴팁이 없으므로 탭하면 아래 줄에 보여준다 (마우스·키보드도 같은 경로)
+        bar.addEventListener('click', () => { chartPick.textContent = text; });
+      }
+      chartEl.appendChild(bar);
+    }
+  }
+
+  // ── 주간·월간 통계 ─────────────────────────────────────
+  // 주는 월요일 시작. 기간은 오늘을 포함하는 구간부터 거꾸로 센다.
+  function periods(kind, count) {
+    const today = todayStr();
+    const out = [];
+    if (kind === 'week') {
+      const [y, m, d] = today.split('-').map(Number);
+      const dow = (new Date(y, m - 1, d).getDay() + 6) % 7; // 월=0 … 일=6
+      let start = addDays(today, -dow);
+      for (let i = 0; i < count; i++) {
+        const end = addDays(start, 6);
+        const short = d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
+        out.push({ from: start, to: end, label: `${short(start)}~${short(end)}`, days: 7 });
+        start = addDays(start, -7);
+      }
+    } else {
+      let [y, m] = today.split('-').map(Number);
+      for (let i = 0; i < count; i++) {
+        const p = String(m).padStart(2, '0');
+        const from = `${y}-${p}-01`;
+        const daysIn = new Date(y, m, 0).getDate();
+        out.push({ from, to: `${y}-${p}-${String(daysIn).padStart(2, '0')}`, label: `${y}.${p}`, days: daysIn });
+        m -= 1; if (m === 0) { m = 12; y -= 1; }
+      }
+    }
+    return out;
+  }
+
+  function renderStats() {
+    const count = statsKind === 'week' ? 8 : 6;
+    statsTitle.textContent = `${labelOf(profile)} · ${statsKind === 'week' ? '주간' : '월간'} 통계`;
+    renderSeg(kindSeg, STATS_KINDS, statsKind, k => { statsKind = k; renderStats(); });
+    const today = todayStr();
+    statsTable.innerHTML = '';
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    ['기간', '기록', '기분', '수면', '통증', '에너지', '↓ ↑'].forEach(t => { const th = document.createElement('th'); th.textContent = t; hr.appendChild(th); });
+    thead.appendChild(hr); statsTable.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    let any = false;
+    periods(statsKind, count).forEach(pd => {
+      const list = entries.filter(e => e.date >= pd.from && e.date <= pd.to && e.date <= today);
+      const tr = document.createElement('tr');
+      const td = (text, cls) => { const c = document.createElement('td'); c.textContent = text; if (cls) c.className = cls; tr.appendChild(c); return c; };
+      // 진행 중인 기간은 오늘까지의 날 수로 분모를 잡는다
+      let denom = pd.days;
+      if (pd.to > today) { denom = 0; for (let d = pd.from; d <= today; d = addDays(d, 1)) denom++; }
+      td(pd.label, 'period');
+      if (!list.length) {
+        td(`0/${denom}`, 'dim'); td('–', 'dim'); td('–', 'dim'); td('–', 'dim'); td('–', 'dim'); td('', 'dim');
+        tbody.appendChild(tr); return;
+      }
+      any = true;
+      td(`${list.length}/${denom}`);
+      const moods = list.map(e => e.mood).filter(v => typeof v === 'number');
+      const mAvg = avg(list, 'mood');
+      const cell = document.createElement('td');
+      const wrap = document.createElement('span'); wrap.className = 'mood-cell';
+      const mv = document.createElement('span'); mv.className = 'mood-v ' + (mAvg === null ? '' : mAvg >= 1.5 ? 'high' : mAvg <= -1.5 ? 'low' : 'ok');
+      mv.textContent = fmtMoodAvg(mAvg);
+      wrap.appendChild(mv);
+      if (moods.length) {
+        const lo = Math.min(...moods), hi = Math.max(...moods);
+        const range = document.createElement('span'); range.className = 'range';
+        range.title = `최저 ${fmtMood(lo)} · 최고 ${fmtMood(hi)}`;
+        const span = document.createElement('span'); span.className = 'span';
+        // -3 → 0%, +3 → 100%. 최소 폭을 줘서 한 점도 보이게
+        span.style.left = ((lo + 3) / 6 * 100) + '%';
+        span.style.width = Math.max(6, (hi - lo) / 6 * 100) + '%';
+        range.appendChild(span); wrap.appendChild(range);
+      }
+      cell.appendChild(wrap); tr.appendChild(cell);
+      td(fmt(avg(list, 'sleep')));
+      td(fmt(avg(list, 'pain')));
+      td(fmt(avg(list, 'energy')));
+      const low = moods.filter(v => v <= -2).length, high = moods.filter(v => v >= 2).length;
+      const dist = td('', 'dist');
+      const lowEl = document.createElement(low ? 'b' : 'span'); lowEl.textContent = `↓${low}`;
+      const highEl = document.createElement(high ? 'b' : 'span'); highEl.textContent = ` ↑${high}`;
+      dist.append(lowEl, highEl);
+      tbody.appendChild(tr);
+    });
+    statsTable.appendChild(tbody);
+    if (!any) {
+      const tr = document.createElement('tr'); const c = document.createElement('td'); c.colSpan = 7; c.className = 'empty'; c.textContent = '이 기간에 기록이 없다.'; tr.appendChild(c); tbody.appendChild(tr);
+    }
+  }
+
+  // 패턴 힌트: 상관관계가 아니라 "눈에 띄는 것"을 문장으로. 의학적 판단이 아니다.
+  function renderPatterns() {
+    patternsEl.innerHTML = '';
+    const out = [];
+    const list = windowEntries(28).slice().sort((a, b) => a.date < b.date ? -1 : 1); // 오래된 것부터
+    const n = list.length;
+
+    if (n < 5) {
+      out.push({ text: `기록이 ${n}일이다. 5일 이상 쌓이면 패턴을 보여준다.`, cls: 'muted' });
+    } else {
+      // 1) 수면 짧은 다음 날 기분
+      const byDate = Object.fromEntries(list.map(e => [e.date, e]));
+      const shortNext = [], normalNext = [];
+      list.forEach(e => {
+        if (typeof e.sleep !== 'number') return;
+        const next = byDate[addDays(e.date, 1)];
+        if (!next || typeof next.mood !== 'number') return;
+        (e.sleep <= 5 ? shortNext : normalNext).push(next.mood);
+      });
+      if (shortNext.length >= 2 && normalNext.length >= 2) {
+        const a = shortNext.reduce((x, y) => x + y, 0) / shortNext.length;
+        const b = normalNext.reduce((x, y) => x + y, 0) / normalNext.length;
+        const diff = Math.abs(a - b);
+        if (diff >= 0.8) {
+          out.push({ text: `수면 5시간 이하 다음 날 기분 평균 ${fmtMoodAvg(a)}, 그 외 ${fmtMoodAvg(b)} (${shortNext.length}일 vs ${normalNext.length}일)`, cls: 'warn' });
+        } else {
+          out.push({ text: `수면과 다음 날 기분 사이에 뚜렷한 차이 없음 (차이 ${fmt(diff)})`, cls: '' });
+        }
+      }
+
+      // 2) 기분 변동 폭: 연속 이틀 사이 변화가 3 이상인 날
+      let swings = 0;
+      for (let i = 1; i < n; i++) {
+        const a = list[i - 1], b = list[i];
+        if (typeof a.mood === 'number' && typeof b.mood === 'number' && addDays(a.date, 1) === b.date && Math.abs(b.mood - a.mood) >= 3) swings++;
+      }
+      if (swings > 0) out.push({ text: `하루 사이 기분이 3칸 이상 바뀐 날 ${swings}회 (최근 28일)`, cls: swings >= 3 ? 'warn' : '' });
+      else out.push({ text: '하루 사이 3칸 이상 급변한 날 없음', cls: '' });
+
+      // 3) 극단값 연속: +2 이상 또는 -2 이하가 "날짜가 이어진" 3일 이상 구간. 빈 날이 있으면 끊는다.
+      let run = 0, sign = 0, longest = { len: 0, sign: 0 };
+      for (let i = 0; i < n; i++) {
+        const e = list[i], prev = list[i - 1];
+        const s = typeof e.mood !== 'number' ? 0 : e.mood >= 2 ? 1 : e.mood <= -2 ? -1 : 0;
+        const adjacent = prev && addDays(prev.date, 1) === e.date;
+        if (s !== 0 && s === sign && adjacent) run++; else { run = s !== 0 ? 1 : 0; sign = s; }
+        if (run > longest.len) longest = { len: run, sign: s };
+      }
+      if (longest.len >= 3) {
+        out.push({ text: `${longest.sign > 0 ? '들뜬(+2 이상)' : '가라앉은(-2 이하)'} 상태가 ${longest.len}일 연속 — 진료 때 말할 것`, cls: 'warn' });
+      }
+
+      // 4) 통증과 기분
+      const painHi = list.filter(e => typeof e.pain === 'number' && e.pain >= 6 && typeof e.mood === 'number');
+      const painLo = list.filter(e => typeof e.pain === 'number' && e.pain <= 2 && typeof e.mood === 'number');
+      if (painHi.length >= 2 && painLo.length >= 2) {
+        const a = avg(painHi, 'mood'), b = avg(painLo, 'mood');
+        if (Math.abs(a - b) >= 0.8) out.push({ text: `통증 6 이상인 날 기분 ${fmtMoodAvg(a)}, 2 이하인 날 ${fmtMoodAvg(b)}`, cls: 'warn' });
+      }
+
+      // 5) 기록 빈도
+      const missing = 28 - n;
+      if (missing > 10) out.push({ text: `최근 28일 중 ${missing}일 비어 있음. 빈 날이 많으면 패턴이 흐려진다.`, cls: 'muted' });
+    }
+    out.push({ text: '이 힌트는 기록의 요약이지 진단이 아니다. 판단은 진료실에서.', cls: 'muted' });
+
+    out.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = p.text;
+      li.className = p.cls;
+      patternsEl.appendChild(li);
+    });
+  }
+
+  function moodColor(m) {
+    if (typeof m !== 'number') return 'var(--line)';
+    if (Math.abs(m) >= 2) return 'var(--bad)';
+    if (m === 0) return 'var(--neutral)';
+    return 'var(--good)';
+  }
+
+  function renderEntries() {
+    entriesEl.innerHTML = '';
+    entriesTitle.textContent = entries.length > LIST_CAP ? `기록 · 최근 ${LIST_CAP}일 표시 / 전체 ${entries.length}일` : '기록';
+    if (!entries.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = '아직 기록이 없다. 위에서 오늘 것부터.';
+      entriesEl.appendChild(li);
+      return;
+    }
+    entries.slice(0, LIST_CAP).forEach(e => {
+      const li = document.createElement('li');
+      li.className = 'entry';
+      const d = document.createElement('span'); d.className = 'd'; d.textContent = e.date;
+      const dot = document.createElement('span'); dot.className = 'dot'; dot.style.background = moodColor(e.mood);
+      const nums = document.createElement('span'); nums.className = 'nums';
+      const v = k => num(e, k) === null ? '–' : (k === 'mood' ? fmtMood(e[k]) : e[k]);
+      nums.textContent = `기분 ${v('mood')} · 수면 ${v('sleep')} · 통증 ${v('pain')} · 에너지 ${v('energy')}`;
+      const note = document.createElement('span'); note.className = 'note'; note.textContent = e.note || '';
+      const btns = document.createElement('span'); btns.className = 'btns';
+      const edit = document.createElement('button'); edit.textContent = '✎'; edit.title = '수정'; edit.setAttribute('aria-label', `${e.date} 수정`);
+      edit.addEventListener('click', () => { draft = draftFor(e.date); renderForm(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      const del = document.createElement('button'); del.textContent = '✕'; del.title = '삭제'; del.setAttribute('aria-label', `${e.date} 삭제`);
+      del.addEventListener('click', () => {
+        if (!confirm(`${e.date} 기록을 지울까?`)) return;
+        entries = entries.filter(x => x.date !== e.date);
+        save();
+        if (draft.date === e.date) draft = emptyDraft(e.date);
+        render();
+      });
+      btns.append(edit, del);
+      li.append(d, dot, nums, btns, note);
+      entriesEl.appendChild(li);
+    });
+    if (entries.length > LIST_CAP) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = `이후 ${entries.length - LIST_CAP}일은 생략 — 전체는 텍스트 복사·인쇄·JSON 내보내기로`;
+      entriesEl.appendChild(li);
+    }
+  }
+
+  // ── 동작 ────────────────────────────────────────────────
+  function switchProfile(id) {
+    if (id === profile) return;
+    profile = id;
+    store.set('mood_profile', profile);
+    load();
+    draft = draftFor(todayStr());
+    render();
+  }
+
+  function saveEntry() {
+    draft.note = noteInput.value.trim();
+    draft.date = DATE_RE.test(dateInput.value) ? dateInput.value : todayStr();
+    if (draft.date > todayStr()) { flash('미래 날짜는 기록할 수 없다'); return; }
+    if (draftIsBlank(draft)) { flash('아무것도 안 골랐다. 기분 하나만이라도.'); return; }
+    const saved = { date: draft.date, mood: draft.mood, sleep: draft.sleep, pain: draft.pain, energy: draft.energy, note: draft.note };
+    entries = entries.filter(e => e.date !== saved.date);
+    entries.push(saved);
+    entries.sort((a, b) => a.date < b.date ? 1 : -1);
+    save();
+    // 방금 저장한 값을 폼에 그대로 둔다. 비우면 "수정" 제목인데 눈금이 빈 상태가 되어
+    // 한 칸만 고치고 다시 저장할 때 나머지가 null로 덮어써진다.
+    draft = draftFor(saved.date);
+    render();
+    flash('저장됨');
+  }
+
+  let flashTimer = null;
+  function flash(msg) {
+    savedMsg.textContent = msg;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => { savedMsg.textContent = ''; }, 2500);
+  }
+
+  // 진료용 텍스트: 날짜순, 한 줄에 하나. 전체 기록.
+  function toText() {
+    const list = entries.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const lines = [`기분·수면 일지 (${labelOf(profile)}) — ${list.length}일`, '날짜 | 기분(-3~+3) | 수면(h) | 통증(0~10) | 에너지(1~5) | 메모'];
+    list.forEach(e => {
+      const v = k => num(e, k) === null ? '-' : (k === 'mood' ? fmtMood(e[k]) : e[k]);
+      lines.push(`${e.date} | ${v('mood')} | ${v('sleep')} | ${v('pain')} | ${v('energy')} | ${(e.note || '').replace(/\s+/g, ' ')}`);
+    });
+    return lines.join('\n');
+  }
+
+  function copyText() {
+    const text = toText();
+    const done = () => flash('복사됨 — 메모장이나 AI에 붙여넣기');
+    const fail = () => flash('복사 실패 — 인쇄나 JSON 내보내기를 써볼 것');
+    if (native && native.copyText) { native.copyText(text); done(); return; }
+    // http(비보안) 접속이나 구형 WebView에는 clipboard API가 없다. execCommand는 실패해도 예외 대신 false.
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      ok ? done() : fail();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else fallback();
+  }
+
+  function exportJson() {
+    const name = `mood-log-${profile}-${todayStr()}.json`;
+    if (native && native.saveFile) {
+      native.saveFile(name, JSON.stringify({ profile, exportedAt: todayStr(), entries }, null, 2));
+      flash('저장할 위치를 고르면 된다');
+      return;
+    }
+    // 카카오톡·네이버 인앱 브라우저는 blob 다운로드를 처리하지 못하고 아무 반응이 없다
+    if (/KAKAOTALK|NAVER\(inapp/i.test(navigator.userAgent)) {
+      flash('인앱 브라우저에서는 내보내기가 안 된다 — Chrome/Safari로 열 것');
+      return;
+    }
+    const blob = new Blob([JSON.stringify({ profile, exportedAt: todayStr(), entries }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    // iOS Safari는 다운로드 확인 시트에서 사용자가 누를 때 URL을 읽으므로 바로 해제하면 실패한다
+    setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+  }
+
+  function importJson(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); } catch (e) { flash('JSON을 읽지 못했다'); return; }
+      const list = Array.isArray(data) ? data : (data && Array.isArray(data.entries) ? data.entries : null);
+      if (!list) { flash('형식이 다르다 — 이 앱에서 내보낸 파일만'); return; }
+      // 눈금 밖 값(다른 도구에서 만든 파일 등)은 가장 가까운 눈금으로 맞춘다
+      const snap = (key, v) => {
+        if (typeof v !== 'number' || !isFinite(v)) return null;
+        return SCALES[key].values.reduce((best, x) => Math.abs(x - v) < Math.abs(best - v) ? x : best);
+      };
+      const today = todayStr();
+      const clean = list.filter(e => e && typeof e.date === 'string' && DATE_RE.test(e.date) && e.date <= today).map(e => ({
+        date: e.date,
+        mood: snap('mood', e.mood),
+        sleep: snap('sleep', e.sleep),
+        pain: snap('pain', e.pain),
+        energy: snap('energy', e.energy),
+        note: typeof e.note === 'string' ? e.note : ''
+      })).filter(e => !draftIsBlank(e));
+      if (!clean.length) { flash('가져올 기록이 없다'); return; }
+      if (!confirm(`${clean.length}일치를 현재 프로필(${labelOf(profile)})에 합칠까? 같은 날짜는 파일 쪽으로 덮어쓴다.`)) return;
+      const byDate = Object.fromEntries(entries.map(e => [e.date, e]));
+      clean.forEach(e => { byDate[e.date] = e; });
+      entries = Object.values(byDate).sort((a, b) => a.date < b.date ? 1 : -1);
+      save();
+      draft = draftFor(draft.date);
+      render();
+      flash(`${clean.length}일 가져옴`);
+    };
+    reader.readAsText(file);
+  }
+
+  function wipe() {
+    if (!confirm(`'${labelOf(profile)}' 프로필의 기록 ${entries.length}일을 전부 지울까? 되돌릴 수 없다.`)) return;
+    if (!confirm('정말로? 먼저 JSON 내보내기를 했는지 확인.')) return;
+    entries = [];
+    store.remove(KEY_OF(profile));
+    draft = emptyDraft();
+    render();
+    flash('지웠다');
+  }
+
+  // ── 이벤트 ──────────────────────────────────────────────
+  $('saveBtn').addEventListener('click', saveEntry);
+  $('clearBtn').addEventListener('click', () => { draft = emptyDraft(draft.date); renderForm(); });
+  dateInput.addEventListener('change', () => {
+    const d = DATE_RE.test(dateInput.value) ? dateInput.value : todayStr();
+    if (d === draft.date) return;
+    const existing = entries.find(e => e.date === d);
+    // 그 날짜에 기록이 있으면 불러오고, 없으면 지금 고른 값은 유지한 채 날짜만 바꾼다
+    // (iOS 날짜 휠은 스크롤 중에도 change를 계속 내보내므로 입력값을 버리면 안 된다)
+    if (existing && !draftIsBlank(draft) && !confirm(`${d}에는 이미 기록이 있다. 불러올까? (지금 고른 값은 버린다)`)) {
+      dateInput.value = draft.date;
+      return;
+    }
+    draft = existing ? draftFor(d) : { ...draft, date: d };
+    renderForm();
+  });
+  noteInput.addEventListener('input', () => { draft.note = noteInput.value; });
+  noteInput.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEntry(); }
+  });
+  $('copyBtn').addEventListener('click', copyText);
+  $('printBtn').addEventListener('click', () => { if (native && native.print) native.print(); else window.print(); });
+  $('exportBtn').addEventListener('click', exportJson);
+  $('importBtn').addEventListener('click', () => importFile.click());
+  importFile.addEventListener('change', () => {
+    if (importFile.files && importFile.files[0]) importJson(importFile.files[0]);
+    importFile.value = '';
+  });
+  $('wipeBtn').addEventListener('click', wipe);
+
+  // 자정을 넘긴 채 켜 둔 탭: 다시 보일 때 요약·패턴을 오늘 기준으로 다시 그리고,
+  // 입력 중인 값이 없으면 폼도 오늘로 옮긴다 (입력 중이면 건드리지 않는다)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || renderedDay === todayStr()) return;
+    const untouched = draftIsBlank(draft) || JSON.stringify(draft) === JSON.stringify(draftFor(draft.date));
+    if (untouched) draft = draftFor(todayStr());
+    render();
+  });
+
+  // 오늘 이미 기록했으면 수정 모드로 시작
+  load();
+  draft = draftFor(todayStr());
+  render();
+})();
+</script>
+</body>
+</html>

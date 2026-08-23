@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 실행 순간 흰 화면이 번쩍이지 않도록 배경을 앱 배경색(#14141f)과 맞춘다.
+         입력 폼 앱이라 상태바·내비게이션바는 숨기지 않고 색만 맞춘다. -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#14141F</item>
+        <item name="android:colorBackground">#14141F</item>
+        <item name="android:statusBarColor">#14141F</item>
+        <item name="android:navigationBarColor">#14141F</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

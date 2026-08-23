@@ -1,0 +1,28 @@
+# 마음결 API 프록시 설정
+#
+# 대시보드(브라우저)로 배포할 거면 이 파일은 참고용이다.
+# Workers & Pages > Create > Worker 로 만들고 worker.js 내용을 붙여 넣은 뒤,
+# 아래 [vars] 와 secret, [[ratelimits]] 를 대시보드에서 같은 이름으로 설정하면 된다.
+
+name = "maeumgyeol-proxy"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+# 배포한 웹앱 주소만 허용한다. 쉼표로 여러 개.
+# 비워 두면 아무 곳에서나 호출된다 — 반드시 채울 것.
+ALLOWED_ORIGINS = "https://woo-design22.github.io"
+
+# ANTHROPIC_API_KEY 는 여기 쓰지 않는다. 반드시 secret 으로 넣는다:
+#   대시보드: Settings > Variables and Secrets > Add > Type: Secret
+#   CLI:      npx wrangler secret put ANTHROPIC_API_KEY
+
+# IP 당 60초에 8회. 상담 대화 속도로는 넉넉하고 자동 남용은 걸린다.
+# period 는 10 또는 60 만 허용된다.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 8
+  period = 60

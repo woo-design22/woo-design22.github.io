@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>mini web apps</title>
+<style>
+  :root {
+    --bg: #f4f4f2;
+    --surface: #ffffff;
+    --line: #e0dfda;
+    --ink: #1c1e22;
+    --ink-2: #565a61;
+    --ink-3: #8b9098;
+    --accent: #2f6f5e;
+    --font: 'Segoe UI', Pretendard, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181b;
+      --surface: #1f2328;
+      --line: #31363d;
+      --ink: #eceef0;
+      --ink-2: #aeb4bb;
+      --ink-3: #7b828a;
+      --accent: #61b39a;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 56px 20px 72px;
+  }
+
+  header { margin-bottom: 36px; }
+
+  h1 {
+    font-size: 30px;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  header p { color: var(--ink-2); font-size: 15px; }
+
+  h2 {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 32px 0 12px;
+    font-weight: 600;
+  }
+
+  .grid { display: flex; flex-direction: column; gap: 10px; }
+
+  a.card {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 18px;
+    text-decoration: none;
+    color: inherit;
+  }
+
+  a.card:hover { border-color: var(--accent); }
+  a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a.card:active { transform: scale(0.995); }
+
+  .card .name { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+  .card .desc { color: var(--ink-2); font-size: 14px; margin-top: 3px; }
+
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 5px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: 2px;
+  }
+
+  footer {
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--ink-3);
+    line-height: 1.75;
+  }
+
+  footer a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    a.card:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>mini web apps</h1>
+    <p>브라우저에서 바로 열리는 작은 앱들. 설치가 필요 없습니다.</p>
+  </header>
+
+  <h2>AI 대화</h2>
+  <div class="grid">
+    <a class="card" href="counsel-chat/">
+      <div class="name">마음결<span class="tag">개발 중</span></div>
+      <div class="desc">심리상담 훈련을 받은 AI와 나누는 대화. 8개 분야를 골라 이야기합니다.</div>
+    </a>
+    <a class="card" href="emergency-chat/">
+      <div class="name">지금바로 구급대원<span class="tag">개발 중</span></div>
+      <div class="desc">119에 전화하기 망설여질 때, 응급인지 먼저 물어보는 곳.</div>
+    </a>
+  </div>
+
+  <h2>게임</h2>
+  <div class="grid">
+    <a class="card" href="sand-mix/">
+      <div class="name">샌드믹스</div>
+      <div class="desc">블록이 떨어지면 모래로 부서집니다. 같은 색이 벽에서 벽까지 이어지면 소거.</div>
+    </a>
+    <a class="card" href="game-2048/">
+      <div class="name">2048</div>
+      <div class="desc">같은 숫자를 합쳐 2048을 만드는 퍼즐.</div>
+    </a>
+  </div>
+
+  <h2>도구</h2>
+  <div class="grid">
+    <a class="card" href="mood-log/">
+      <div class="name">기분 일지</div>
+      <div class="desc">기분·수면·통증을 기록하고 주간·월간 흐름을 봅니다. 진료실 제출용 인쇄 지원.</div>
+    </a>
+    <a class="card" href="pomodoro-todo/">
+      <div class="name">뽀모도로 + 할 일</div>
+      <div class="desc">25분 집중 타이머와 할 일 목록.</div>
+    </a>
+    <a class="card" href="particle-playground/">
+      <div class="name">파티클 플레이그라운드</div>
+      <div class="desc">손가락이나 마우스로 그리는 캔버스 파티클 놀이터.</div>
+    </a>
+  </div>
+
+  <footer>
+    개인이 만든 실험적인 앱들이며 예고 없이 바뀌거나 멈출 수 있습니다.<br>
+    마음결과 지금바로 구급대원은 <b>AI가 생성한 답변</b>이며 실제 상담·의료 행위가 아니고,
+    이용 결과에 대해 제작자는 책임지지 않습니다.
+    의료기기가 아니며 어떤 질환도 진단·치료·예방하지 않습니다.<br>
+    급한 상황에서는 <b>119</b>, 마음이 힘들 때는 <b>109</b>(자살예방·24시간)로 연락하세요.
+  </footer>
+</div>
+</body>
+</html>

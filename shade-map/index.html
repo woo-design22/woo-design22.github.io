@@ -273,7 +273,10 @@
       <ul>
         <li><b>태양 위치</b>는 날짜·시각·좌표로 직접 계산합니다(천문 공식).</li>
         <li><b>건물 모양과 높이</b>는 OpenStreetMap에서 실시간으로 가져옵니다.</li>
-        <li>건물 외곽선을 <b>높이 ÷ tan(태양고도)</b> 만큼 태양 반대편으로 밀어 그림자를 만듭니다.</li>
+        <li>그림자는 건물 바닥면을 <b>높이 ÷ tan(태양고도)</b> 만큼 태양 반대편으로
+          쓸어낸 영역입니다. 해가 낮을수록 <b>길게 늘어납니다</b>
+          (정오 0.5배 → 저녁 7배 이상).</li>
+        <li><b>밤에는 건물에 불이 켜집니다.</b> 초저녁에 가장 많고 새벽 4시경 가장 적습니다.</li>
       </ul>
     </div>
 
@@ -283,6 +286,7 @@
         <li>건물 정보는 <b>OpenStreetMap 공용 서버</b>에서 가져옵니다. 무료 서버라
           <b>혼잡하면 응답하지 않을 수 있습니다.</b> 그럴 땐 잠시 뒤 지도를 조금 움직여 보세요.</li>
         <li>OSM에 <b>높이 정보가 있는 건물은 절반 이하</b>입니다(서울 기준 23~55%).
+          없으면 층수×3.1m, 그것도 없으면 5층(15m)으로 추정합니다.
           없으면 층수×3m로 추정하고, 그것도 없으면 기본값을 씁니다.</li>
         <li><b>가로수·육교·구름은 반영되지 않습니다.</b> 실제 그늘과 다를 수 있습니다.</li>
         <li>지형 높낮이를 무시한 평지 가정입니다.</li>
@@ -330,7 +334,8 @@
   const TILE = 256;
   const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
   const FETCH_Z = 16;                 // 이 줌 이상에서만 건물을 불러온다
-  const DEFAULT_H = 9;                // 높이 정보가 전혀 없을 때 (3층 가정)
+  const SHADE_COLOR = 'rgba(24,37,64,0.62)';   // 그늘 색·농도. 레이어에서 한 번만 칠한다
+  const DEFAULT_H = 15;               // 높이 정보가 없을 때. 서울 도심 평균 5층 가정.
   const LEVEL_H = 3.1;                // 한 층 높이
 
   /* ---------- 상태 ---------- */
@@ -338,6 +343,7 @@
   let minutes = nowMinutes();
   let buildings = [];        // [{pts:[[lat,lon]...], h, name}]
   let pois = [];             // [{kind:'subway'|'bus', lat, lon, name}]
+  let windows = null;        // 밤 불빛 위치 (뷰가 바뀔 때만 다시 만든다)
   let loadedKey = null;      // 마지막으로 불러온 영역
   let playing = false, playTimer = null;
   let heightStat = { total: 0, known: 0 };
@@ -625,8 +631,17 @@
         xs[i] = lonToX(b.pts[i][1], view.z) - cx + ox;
         ys[i] = latToY(b.pts[i][0], view.z) - cy + oy;
       }
+      // 감김 방향을 하나로 맞춘다. 섞여 있으면 nonzero 채우기에서 서로 상쇄돼
+      // 그림자에 구멍이 생긴다(실측: 쓸고 간 면적 4460px 중 1600px 만 칠해짐).
+      let area2 = 0;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area2 += xs[i] * ys[j] - xs[j] * ys[i];
+      }
+      if (area2 < 0) { xs.reverse(); ys.reverse(); }
       return { xs: xs, ys: ys, h: b.h };
     });
+    buildWindows();
   }
 
   // 이 줌·위도에서 1미터가 몇 픽셀인가 (메르카토르는 등각이라 x·y 동일)
@@ -670,57 +685,91 @@
     if (!projected || !projected.length) return;
     const w = cv.width / dpr(), h = cv.height / dpr();
 
-    // 태양이 지평선 아래면 그림자가 아니라 전체가 그늘이다
-    if (sun.alt <= 0.02) {
-      ctx.fillStyle = 'rgba(22,35,61,0.55)';
-      ctx.fillRect(0, 0, w, h);
-      return;
-    }
+    if (sun.alt <= 0.02) return;   // 밤은 drawNight() 이 따로 처리한다
 
-    // 그림자 길이(m) = 높이 / tan(고도). 방향은 태양 반대편.
-    // 픽셀 오프셋은 건물마다 높이만 다르므로 단위벡터를 한 번만 구해 곱한다.
+    /* ── 그림자 기하 ──────────────────────────────────────────────
+     * 그림자는 평행 이동이 아니라 "쓸고 지나간 영역"이다.
+     * 수학적으로는 건물 바닥면 P 와 선분 d = (그림자 벡터) 의 민코프스키 합:
+     *
+     *     Shadow = P ⊕ {t·d | 0 ≤ t ≤ 1}
+     *            = P ∪ (P+d) ∪ ⋃(각 변을 d 만큼 쓸어낸 사각형)
+     *
+     * 길이는 |d| = 높이 / tan(태양고도) 이므로 해가 낮아질수록 늘어난다.
+     * 방향은 태양의 정반대(방위각 + 180°).
+     *
+     * 중요: nonzero 채우기가 성립하려면 P 와 P+d 를 반드시 함께 넣어야 한다.
+     * 변 사각형만 넣으면 감김 수가 상쇄되어 겹치는 곳에 구멍이 생긴다.
+     * (이전 판이 "면적이 넓어지면 희미해진다"고 보였던 원인)
+     * ──────────────────────────────────────────────────────────── */
     const cot = 1 / Math.tan(sun.alt);
     const dirAz = sun.az + Math.PI;
     const ppm = pixelsPerMeter();
     const ux = Math.sin(dirAz) * ppm;     // 동쪽이 화면 +x
     const uy = -Math.cos(dirAz) * ppm;    // 북쪽이 화면 -y
 
-    // 그림자를 별도 레이어에 그린다. 겹쳐도 진해지지 않게 한 번에 합친 뒤
-    // 통째로 얹어야 실제 그늘처럼 균일한 농도가 나온다.
     const lay = shadowLayer(w, h);
     const lc = lay.getContext('2d');
     lc.setTransform(1, 0, 0, 1, 0, 0);
     lc.clearRect(0, 0, lay.width, lay.height);
     lc.scale(dpr(), dpr());
 
-    // 태양이 낮을수록 그림자 경계가 흐려진다(반영). 실제로도 그렇다.
-    // 흐리게 하면 안 보인다. 아주 살짝만 부드럽게 한다.
-    const soft = Math.min(2.2, Math.max(0.6, 0.9 * cot));
-    lc.filter = 'blur(' + soft.toFixed(1) + 'px)';
-    lc.fillStyle = '#16233d';
+    lc.globalCompositeOperation = 'source-over';
+    lc.fillStyle = SHADE_COLOR;
     lc.beginPath();
 
     for (const b of projected) {
       const len = b.h * cot;
-      if (len > 500) continue;            // 해질 무렵의 비현실적인 그림자는 자른다
+      if (len > 900) continue;            // 일출·일몰 직전의 무한대에 가까운 그림자는 자른다
       const dx = len * ux, dy = len * uy;
       const xs = b.xs, ys = b.ys, n = xs.length;
-      // 건물 자리 + 밀어낸 자리 + 그 사이를 모두 채운다
+
+      // ① 바닥면 P
+      lc.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < n; i++) lc.lineTo(xs[i], ys[i]);
+      lc.closePath();
+
+      // ② 밀어낸 면 P+d
+      lc.moveTo(xs[0] + dx, ys[0] + dy);
+      for (let i = 1; i < n; i++) lc.lineTo(xs[i] + dx, ys[i] + dy);
+      lc.closePath();
+
+      // ③ 각 변이 쓸고 간 사각형.
+      //    변의 방향과 그림자 벡터의 외적 부호에 따라 감김이 뒤집히므로,
+      //    부호를 보고 꼭짓점 순서를 맞춰 항상 같은 방향으로 만든다.
       for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
+        const cross = (xs[j] - xs[i]) * dy - (ys[j] - ys[i]) * dx;
         lc.moveTo(xs[i], ys[i]);
-        lc.lineTo(xs[j], ys[j]);
-        lc.lineTo(xs[j] + dx, ys[j] + dy);
-        lc.lineTo(xs[i] + dx, ys[i] + dy);
+        if (cross >= 0) {
+          lc.lineTo(xs[j], ys[j]);
+          lc.lineTo(xs[j] + dx, ys[j] + dy);
+          lc.lineTo(xs[i] + dx, ys[i] + dy);
+        } else {
+          lc.lineTo(xs[i] + dx, ys[i] + dy);
+          lc.lineTo(xs[j] + dx, ys[j] + dy);
+          lc.lineTo(xs[j], ys[j]);
+        }
         lc.closePath();
       }
     }
     lc.fill('nonzero');
-    lc.filter = 'none';
 
-    // 완성된 그림자 레이어를 한 겹으로 얹는다
+    // 건물 안은 걸을 수 없으므로 그늘에서 도려낸다.
+    // 위에서 P 를 넣은 것은 어디까지나 채우기 규칙을 성립시키기 위해서다.
+    lc.globalCompositeOperation = 'destination-out';
+    lc.beginPath();
+    for (const b of projected) {
+      const xs = b.xs, ys = b.ys;
+      lc.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < xs.length; i++) lc.lineTo(xs[i], ys[i]);
+      lc.closePath();
+    }
+    lc.fill('nonzero');
+    lc.globalCompositeOperation = 'source-over';
+
+    // 완성된 그림자를 한 겹으로 얹는다. 레이어 안에서 이미 합쳐졌으므로
+    // 몇 겹이 겹쳤든 농도는 어디서나 똑같다.
     ctx.save();
-    ctx.globalAlpha = 0.78;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(lay, 0, 0);
     ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0);
@@ -833,6 +882,111 @@
     ctx.restore();
   }
 
+  /* =====================================================================
+   * 밤 — 건물 창문 불빛
+   *
+   * 시각에 따라 "깨어 있는 집"의 비율이 달라진다. 초저녁엔 거의 다 켜져 있고
+   * 새벽 3~4시엔 드문드문 남는다. 아래 곡선은 그 감각을 따라 만든 값이다.
+   * 불빛 위치는 건물마다 고정(시드 난수)이라 시간을 옮겨도 자리가 튀지 않고,
+   * 켜짐/꺼짐만 바뀐다.
+   * ===================================================================== */
+
+  // 분 단위 시각 → 불이 켜져 있을 확률
+  function litFraction(min) {
+    const t = ((min % 1440) + 1440) % 1440;
+    // 구간별 선형 보간 [시각(분), 비율]
+    const curve = [
+      [0,    0.30],   // 자정
+      [120,  0.14],   // 02시
+      [240,  0.07],   // 04시 — 가장 적다
+      [330,  0.12],   // 05:30 기상 시작
+      [420,  0.35],   // 07시
+      [1080, 0.55],   // 18시
+      [1170, 0.92],   // 19:30 — 가장 많다
+      [1320, 0.78],   // 22시
+      [1440, 0.30]    // 자정
+    ];
+    for (let i = 0; i < curve.length - 1; i++) {
+      const a = curve[i], b = curve[i + 1];
+      if (t >= a[0] && t <= b[0]) {
+        const k = (t - a[0]) / (b[0] - a[0]);
+        return a[1] + (b[1] - a[1]) * k;
+      }
+    }
+    return 0.2;
+  }
+
+  // 건물마다 같은 자리에 창을 두기 위한 결정적 난수 (xorshift)
+  function seeded(n) {
+    let x = (n * 2654435761) >>> 0;
+    return function () {
+      x ^= x << 13; x >>>= 0;
+      x ^= x >> 17;
+      x ^= x << 5;  x >>>= 0;
+      return x / 4294967296;
+    };
+  }
+
+  // 건물 안쪽에 창 위치를 미리 뿌려 둔다. 지도를 움직일 때만 다시 만든다.
+  function buildWindows() {
+    if (!projected) { windows = null; return; }
+    const list = [];
+    for (let bi = 0; bi < projected.length; bi++) {
+      const b = projected[bi];
+      const xs = b.xs, ys = b.ys;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < xs.length; i++) {
+        if (xs[i] < minX) minX = xs[i];
+        if (xs[i] > maxX) maxX = xs[i];
+        if (ys[i] < minY) minY = ys[i];
+        if (ys[i] > maxY) maxY = ys[i];
+      }
+      const wpx = maxX - minX, hpx = maxY - minY;
+      if (wpx < 6 || hpx < 6) continue;               // 너무 작으면 창을 못 그린다
+      // 넓고 높은 건물일수록 창이 많다
+      const area = wpx * hpx;
+      const count = Math.max(1, Math.min(14, Math.round(area / 260 + b.h / 14)));
+      const rnd = seeded(bi + 1);
+      for (let k = 0; k < count; k++) {
+        // 외곽선에 딱 붙지 않게 안쪽으로 조금 당긴다
+        const x = minX + wpx * (0.18 + rnd() * 0.64);
+        const y = minY + hpx * (0.18 + rnd() * 0.64);
+        list.push({ x: x, y: y, phase: rnd() * Math.PI * 2, rank: rnd() });
+      }
+    }
+    windows = list;
+  }
+
+  function drawNight(sun) {
+    // 해가 완전히 지기 전부터 서서히 어두워진다 (박명)
+    const dusk = Math.max(0, Math.min(1, (0.09 - sun.alt) / 0.19));
+    if (dusk <= 0) return;
+
+    const w = cv.width / dpr(), h = cv.height / dpr();
+
+    // 밤하늘 톤을 전체에 얹는다
+    ctx.save();
+    ctx.fillStyle = 'rgba(18,28,50,' + (0.62 * dusk).toFixed(3) + ')';
+    ctx.fillRect(0, 0, w, h);
+
+    if (windows && windows.length) {
+      const frac = litFraction(minutes);
+      const t = performance.now() / 1000;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const win of windows) {
+        if (win.rank > frac) continue;                 // 이 시각엔 꺼진 집
+        if (win.x < -4 || win.x > w + 4 || win.y < -4 || win.y > h + 4) continue;
+        // 아주 느리게 깜빡인다. 사람이 움직이는 정도의 흔들림.
+        const tw = 0.72 + 0.28 * Math.sin(t * 0.9 + win.phase);
+        const a = (0.55 + 0.45 * tw) * dusk;
+        ctx.fillStyle = 'rgba(255,214,130,' + a.toFixed(3) + ')';
+        ctx.fillRect(win.x - 1.3, win.y - 1.3, 2.6, 2.6);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.restore();
+  }
+
   function drawSunDial(sun) {
     const s = dial.width, c = s / 2, r = s / 2 - 14;
     dctx.clearRect(0, 0, s, s);
@@ -874,6 +1028,7 @@
     const sun = sunPosition(selectedDate(), view.lat, view.lon);
     drawShadows(sun);
     drawBuildings();
+    drawNight(sun);
     drawPois();
     drawSunDial(sun);
 
@@ -996,6 +1151,7 @@
     minutes = parseInt(range.value, 10);
     stopPlay();
     draw();
+    ensureAnim();
   });
 
   for (const chip of document.querySelectorAll('.chip[data-jump]')) {
@@ -1004,6 +1160,7 @@
       range.value = minutes;
       stopPlay();
       draw();
+      ensureAnim();
     });
   }
 
@@ -1057,6 +1214,31 @@
     loadBuildings();
   });
 
+  /* ---------- 밤 불빛 애니메이션 ----------
+   * 밤일 때만 프레임을 돌린다. 낮에는 멈춰서 배터리를 쓰지 않는다. */
+  let animId = null;
+  function tickLights() {
+    animId = null;
+    const sun = sunPosition(selectedDate(), view.lat, view.lon);
+    if (sun.alt < 0.09 && !document.hidden) {
+      draw();
+      animId = requestAnimationFrame(tickLights);
+    }
+  }
+  function ensureAnim() {
+    const sun = sunPosition(selectedDate(), view.lat, view.lon);
+    if (sun.alt < 0.09 && animId === null && !document.hidden) {
+      animId = requestAnimationFrame(tickLights);
+    }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (animId !== null) { cancelAnimationFrame(animId); animId = null; }
+    } else {
+      ensureAnim();
+    }
+  });
+
   /* ---------- 부팅 ---------- */
   window.addEventListener('resize', resize);
   if (store.get('shade_seen', false)) {
@@ -1067,6 +1249,7 @@
     resize();
   }
   draw();
+  ensureAnim();
 })();
 </script>
 </body>

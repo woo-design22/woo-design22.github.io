@@ -1,5 +1,5 @@
 /**
- * 마음결 API 프록시 — Cloudflare Worker
+ * 마음톡 API 프록시 — Cloudflare Worker
  *
  * 목적: Anthropic API 키를 브라우저에 노출하지 않고 상담 앱을 공개 배포한다.
  *
@@ -24,8 +24,8 @@ const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 
 // ---- 비용 상한 (여기 숫자가 곧 청구서다) ----
-const MODEL = 'claude-sonnet-5';   // 서버가 고정한다. 클라이언트가 못 바꾼다.
-const MAX_TOKENS = 700;            // 상담 답변은 3~5문장이면 충분하다
+const MODEL = 'claude-opus-5';     // 서버가 고정한다. 클라이언트가 못 바꾼다.
+const MAX_TOKENS = 8000;           // 생각+답변 합산 천장. 답변 길이는 프롬프트가 잡는다
 const MAX_CHARS_PER_MSG = 2000;    // 한 번에 보낼 수 있는 글자 수
 const MAX_HISTORY = 24;            // API 로 넘기는 최근 메시지 수
 const MAX_TOTAL_CHARS = 24000;     // 대화 전체 길이 상한
@@ -371,7 +371,8 @@ export default {
         { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
         { type: 'text', text: modeById(body.mode).prompt }
       ],
-      output_config: { effort: 'low' },
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'high' },
       messages: messages
     };
 

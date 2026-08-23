@@ -1,5 +1,5 @@
 /**
- * 마음결 API 프록시 — Deno Deploy 판
+ * 마음톡 API 프록시 — Deno Deploy 판
  *
  * Cloudflare Worker 판(worker.js)과 기능은 같다. 옮긴 이유는 하나다:
  * Anthropic 이 Cloudflare Worker 에서 나가는 요청을 403 forbidden
@@ -26,10 +26,16 @@
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
+const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
 // ---- 비용 상한 (여기 숫자가 곧 청구서다) ----
-const MODEL = 'claude-sonnet-5';   // 서버가 고정한다. 클라이언트가 못 바꾼다.
-const MAX_TOKENS = 700;
+const MODEL = 'claude-opus-5';     // 서버가 고정한다. 클라이언트가 못 바꾼다.
+const EFFORT = 'high';             // low < medium < high < xhigh < max
+                                   // xhigh 는 체감 차이 대비 비용이 커서 high 로 둔다
+// max_tokens 는 "생각 + 답변"을 합친 천장이다. xhigh 는 생각을 많이 하므로
+// 넉넉히 줘야 답변이 중간에 잘리지 않는다. 실제 청구는 생성한 만큼만 된다.
+// 답변 길이는 max_tokens 가 아니라 프롬프트의 "3~5문장" 지시가 잡는다.
+const MAX_TOKENS = 8000;
 const MAX_CHARS_PER_MSG = 2000;
 const MAX_HISTORY = 24;
 const MAX_TOTAL_CHARS = 24000;
@@ -306,7 +312,7 @@ function modeById(id) {
  * 안심시키는 방향으로 완화하는 수정은 하지 말 것.
  * ===================================================================== */
 
-const TRIAGE_MAX_TOKENS = 900;
+const TRIAGE_MAX_TOKENS = 8000;
 
 const TRIAGE_PROMPT = [
   '당신은 한국어로 답하는 응급 분류(triage) 도우미다.',
@@ -357,6 +363,412 @@ const TRIAGE_PROMPT = [
 ].join('\n');
 
 
+/* =====================================================================
+ * 텔레그램 봇 (/telegram)
+ *
+ * 본인 전용이다. TELEGRAM_ALLOWED_IDS 에 적힌 사용자 ID 만 응답한다.
+ * 그 외에는 조용히 무시한다(봇의 존재조차 알리지 않는다).
+ * 이 방어선이 없으면 봇을 찾은 누구나 크레딧을 태울 수 있다.
+ *
+ * 웹앱과 달리 스트리밍을 쓰지 않는다. 텔레그램은 완성된 문장을 한 번에
+ * 보내는 구조라, 스트림을 받아 모은 뒤 sendMessage 로 한 번 보낸다.
+ * ===================================================================== */
+
+const TG_API = 'https://api.telegram.org/bot';
+const TG_MAX_CHARS = 3500;      // 텔레그램 한 메시지 상한(4096)보다 여유를 둔다
+const TG_HISTORY = 20;          // 기억할 최근 메시지 수
+
+// 대화 기록은 메모리에만 둔다. 재시작하면 사라진다 —
+// "대화를 저장하지 않는다"는 이 프록시의 원칙을 텔레그램에서도 지키기 위함이다.
+const tgChats = new Map();
+
+const CASUAL_PROMPT = [
+  '# 이번 대화의 분야: 잡담',
+  '지금은 상담이 아니라 그냥 편하게 떠드는 자리다.',
+  '- 친구처럼 가볍게 말한다. 존댓말을 쓰되 딱딱하지 않게.',
+  '- 짧게 말한다. 2~4문장. 길게 늘어놓지 않는다.',
+  '- 무겁게 파고들지 않는다. 가볍게 던진 말을 분석하려 들지 않는다.',
+  '- 맞장구치고, 궁금한 걸 되묻고, 가끔 농담도 한다.',
+  '- 모르는 건 모른다고 한다. 아는 척하지 않는다.',
+  '- 다만 상대가 진짜 힘든 얘기를 꺼내면 그때는 진지하게 듣는다.',
+  '  (위기 신호가 보이면 공통 원칙의 위기 절차를 그대로 따른다.)'
+].join('\n');
+
+// 텔레그램에서 쓸 수 있는 모드: 잡담 + 마음톡 8개 분야 + 응급
+function tgModes() {
+  const list = [{ cmd: 'chat', name: '잡담', prompt: CASUAL_PROMPT }];
+  for (const m of MODES) list.push({ cmd: m.id, name: m.name, prompt: m.prompt });
+  list.push({ cmd: 'triage', name: '응급 판단', prompt: null });
+  return list;
+}
+
+function tgFindMode(cmd) {
+  for (const m of tgModes()) if (m.cmd === cmd) return m;
+  return null;
+}
+
+async function tgCall(token, method, payload) {
+  try {
+    return await fetch(TG_API + token + '/' + method, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (_e) { return null; }
+}
+
+function tgHelp() {
+  const names = tgModes().map((m) => '/' + m.cmd + ' - ' + m.name).join('\n');
+  return [
+    '무슨 얘기든 그냥 보내면 됩니다.',
+    '',
+    '모드 바꾸기:',
+    names,
+    '',
+    '/새로 - 지금까지 대화 잊기',
+    '/도움 - 이 안내',
+    '',
+    '※ AI가 만든 답변입니다. 실제 상담·의료 행위가 아닙니다.'
+  ].join('\n');
+}
+
+// 완성된 답변 한 덩어리를 받아온다 (스트림을 모아서 반환)
+async function askAnthropic(apiKey, systemBlocks, messages, maxTokens) {
+  const body = {
+    model: MODEL,
+    max_tokens: maxTokens,
+    stream: true,
+    system: systemBlocks,
+    thinking: { type: 'adaptive' },
+    output_config: { effort: EFFORT },
+    fallbacks: 'default',
+    messages
+  };
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+    'anthropic-version': API_VERSION,
+    'anthropic-beta': FALLBACK_BETA
+  };
+
+  let res = await fetch(ANTHROPIC_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+  if (!res.ok && res.status === 400) {
+    const raw = await res.clone().text();
+    if (/fallback|beta/i.test(raw)) {
+      delete body.fallbacks;
+      delete headers['anthropic-beta'];
+      res = await fetch(ANTHROPIC_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+    }
+  }
+  if (!res.ok) return { error: '(' + res.status + ')' };
+
+  let text = '';
+  let refused = false;
+  const reader = res.body.getReader();
+  const dec = new TextDecoder('utf-8');
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const p = line.slice(5).trim();
+      if (!p || p === '[DONE]') continue;
+      try {
+        const j = JSON.parse(p);
+        if (j.type === 'content_block_delta' && j.delta && j.delta.type === 'text_delta') text += j.delta.text;
+        if (j.type === 'message_delta' && j.delta && j.delta.stop_reason === 'refusal') refused = true;
+      } catch (_e) { /* 조각난 줄은 버린다 */ }
+    }
+  }
+  if (refused) return { error: 'refusal' };
+  return { text: text.trim() };
+}
+
+async function handleTelegram(request) {
+  const token = Deno.env.get('TELEGRAM_TOKEN');
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  // 텔레그램이 재시도하지 않도록, 문제가 있어도 200 을 돌려준다
+  const ok = () => new Response('ok', { status: 200 });
+
+  if (!token || !apiKey) return ok();
+
+  // setWebhook 때 등록한 비밀값을 텔레그램이 헤더로 보내준다. 위조 요청 차단.
+  const secret = Deno.env.get('TELEGRAM_SECRET');
+  if (secret && request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== secret) return ok();
+
+  let update;
+  try { update = await request.json(); } catch (_e) { return ok(); }
+
+  const msg = update && (update.message || update.edited_message);
+  if (!msg || !msg.text || !msg.chat) return ok();
+
+  const chatId = msg.chat.id;
+  const userId = String(msg.from && msg.from.id);
+  const text = msg.text.trim();
+
+  const allowed = (Deno.env.get('TELEGRAM_ALLOWED_IDS') || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+
+  if (allowed.length === 0) {
+    // 최초 설정용: 화이트리스트가 비어 있으면 본인 ID 를 알려준다
+    await tgCall(token, 'sendMessage', {
+      chat_id: chatId,
+      text: '아직 사용자 등록이 안 됐습니다.' + '\n' + '\n' +
+            '환경변수 TELEGRAM_ALLOWED_IDS 에 아래 값을 넣고 재배포하세요:' + '\n' + userId
+    });
+    return ok();
+  }
+  // 등록되지 않은 사람에게는 아무 반응도 하지 않는다
+  if (!allowed.includes(userId)) return ok();
+
+  let state = tgChats.get(chatId);
+  if (!state) { state = { mode: 'chat', history: [] }; tgChats.set(chatId, state); }
+
+  // ---- 명령어 ----
+  if (text === '/start' || text === '/도움' || text === '/help') {
+    await tgCall(token, 'sendMessage', { chat_id: chatId, text: tgHelp() });
+    return ok();
+  }
+  if (text === '/새로' || text === '/reset') {
+    state.history = [];
+    await tgCall(token, 'sendMessage', { chat_id: chatId, text: '대화를 잊었습니다. 새로 시작해요.' });
+    return ok();
+  }
+  if (text.startsWith('/')) {
+    const found = tgFindMode(text.slice(1).split(/[\s@]/)[0]);
+    if (found) {
+      state.mode = found.cmd;
+      state.history = [];
+      await tgCall(token, 'sendMessage', { chat_id: chatId, text: '«' + found.name + '» 모드로 바꿨습니다. 대화도 새로 시작해요.' });
+    } else {
+      await tgCall(token, 'sendMessage', { chat_id: chatId, text: '모르는 명령입니다.' + '\n' + '\n' + tgHelp() });
+    }
+    return ok();
+  }
+
+  if (text.length > MAX_CHARS_PER_MSG) {
+    await tgCall(token, 'sendMessage', { chat_id: chatId, text: '너무 깁니다. ' + MAX_CHARS_PER_MSG + '자 이내로 나눠서 보내 주세요.' });
+    return ok();
+  }
+
+  // 생각하는 동안 "입력 중" 표시
+  await tgCall(token, 'sendChatAction', { chat_id: chatId, action: 'typing' });
+
+  state.history.push({ role: 'user', content: text });
+  if (state.history.length > TG_HISTORY) state.history = state.history.slice(-TG_HISTORY);
+
+  const mode = tgFindMode(state.mode) || tgFindMode('chat');
+  const isTriage = mode.cmd === 'triage';
+  const systemBlocks = isTriage
+    ? [{ type: 'text', text: TRIAGE_PROMPT, cache_control: { type: 'ephemeral' } }]
+    : [
+        { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: mode.prompt }
+      ];
+
+  const out = await askAnthropic(apiKey, systemBlocks, state.history, isTriage ? TRIAGE_MAX_TOKENS : MAX_TOKENS);
+
+  if (out.error === 'refusal') {
+    await tgCall(token, 'sendMessage', { chat_id: chatId, text: '이 내용에는 답하지 못했어요. 다르게 말해 주시겠어요?' });
+    state.history.pop();
+    return ok();
+  }
+  if (out.error || !out.text) {
+    await tgCall(token, 'sendMessage', { chat_id: chatId, text: '답변을 받지 못했습니다. ' + (out.error || '') + ' 잠시 뒤 다시 보내 주세요.' });
+    state.history.pop();
+    return ok();
+  }
+
+  state.history.push({ role: 'assistant', content: out.text });
+
+  // 긴 답변은 잘라서 여러 번 보낸다
+  for (let i = 0; i < out.text.length; i += TG_MAX_CHARS) {
+    await tgCall(token, 'sendMessage', { chat_id: chatId, text: out.text.slice(i, i + TG_MAX_CHARS) });
+  }
+  return ok();
+}
+
+
+/* =====================================================================
+ * 카카오톡 챗봇 스킬 (/kakao)
+ *
+ * 카카오는 스킬 서버가 5초 안에 응답해야 한다. 우리 AI 는 4~11초 걸린다.
+ * 그래서 콜백 방식을 쓴다:
+ *   1) 즉시 useCallback:true 로 "생각 중" 을 돌려준다 (5초 안에 끝난다)
+ *   2) 답이 완성되면 카카오가 준 callbackUrl 로 따로 POST 한다 (5분 유효, 1회용)
+ *
+ * 본인 전용이다. KAKAO_ALLOWED_USERS 에 적힌 botUserKey 만 응답한다.
+ * 비워 두면 최초 1회에 한해 본인 키를 알려준다(등록용).
+ * ===================================================================== */
+
+const KAKAO_MAX_CHARS = 1000;   // 카카오 말풍선 한 개 상한(1000자)
+const KAKAO_HISTORY = 20;
+
+// 대화 기록은 메모리에만 둔다. 재시작하면 사라진다 —
+// "대화를 저장하지 않는다"는 이 프록시의 원칙을 카카오에서도 지키기 위함이다.
+const kakaoChats = new Map();
+
+// 카카오 스킬 응답 포맷 (simpleText). 1000자를 넘으면 말풍선을 나눈다.
+function kakaoText(text) {
+  const outputs = [];
+  const t = String(text || '').trim() || '답변이 비어 있습니다.';
+  for (let i = 0; i < t.length && outputs.length < 3; i += KAKAO_MAX_CHARS) {
+    outputs.push({ simpleText: { text: t.slice(i, i + KAKAO_MAX_CHARS) } });
+  }
+  return { version: '2.0', template: { outputs } };
+}
+
+function kakaoJson(payload) {
+  return new Response(JSON.stringify(payload), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' }
+  });
+}
+
+// 사용자가 "/cbt" 처럼 보내면 모드를 바꾼다. 카카오에는 명령어 UI 가 없어서
+// 발화 자체를 명령으로 해석한다.
+function kakaoCommand(utterance) {
+  const t = utterance.trim();
+  if (t === '도움' || t === '/도움' || t === '도움말') return { kind: 'help' };
+  if (t === '새로' || t === '/새로' || t === '초기화') return { kind: 'reset' };
+  const m = t.match(/^\/?([a-zA-Z]+)$/);
+  if (m) {
+    const found = tgFindMode(m[1].toLowerCase());
+    if (found) return { kind: 'mode', mode: found };
+  }
+  return null;
+}
+
+function kakaoHelp() {
+  const names = tgModes().map((m) => m.cmd + ' - ' + m.name).join('\n');
+  return [
+    '무슨 얘기든 그냥 보내면 됩니다.',
+    '',
+    '모드를 바꾸려면 아래 단어만 보내세요:',
+    names,
+    '',
+    '새로 - 지금까지 대화 잊기',
+    '도움 - 이 안내',
+    '',
+    '※ AI가 만든 답변입니다. 실제 상담·의료 행위가 아닙니다.'
+  ].join('\n');
+}
+
+// 콜백으로 실제 답변을 밀어 넣는다. 실패해도 조용히 넘어간다
+// (이미 사용자에게는 "생각 중" 이 나간 뒤라 여기서 할 수 있는 게 없다).
+async function kakaoPushCallback(callbackUrl, text) {
+  try {
+    await fetch(callbackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(kakaoText(text))
+    });
+  } catch (_e) { /* 콜백 URL 은 5분·1회용이라 재시도해도 의미가 적다 */ }
+}
+
+async function handleKakao(request) {
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) return kakaoJson(kakaoText('서버에 API 키가 설정되지 않았습니다.'));
+
+  let body;
+  try { body = await request.json(); } catch (_e) { return kakaoJson(kakaoText('요청을 이해하지 못했습니다.')); }
+
+  const ur = (body && body.userRequest) || {};
+  const utterance = String(ur.utterance || '').trim();
+  const userKey = String((ur.user && ur.user.id) || '');
+  const callbackUrl = ur.callbackUrl;
+
+  if (!utterance) return kakaoJson(kakaoText('내용을 입력해 주세요.'));
+
+  const allowed = (Deno.env.get('KAKAO_ALLOWED_USERS') || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+
+  if (allowed.length === 0) {
+    // 최초 설정용: 화이트리스트가 비어 있으면 본인 키를 알려준다
+    return kakaoJson(kakaoText(
+      '아직 사용자 등록이 안 됐습니다.' + '\n' + '\n' +
+      '환경변수 KAKAO_ALLOWED_USERS 에 아래 값을 넣고 재배포하세요:' + '\n' + userKey));
+  }
+  if (!allowed.includes(userKey)) {
+    return kakaoJson(kakaoText('이 봇은 개인용입니다.'));
+  }
+
+  let state = kakaoChats.get(userKey);
+  if (!state) { state = { mode: 'chat', history: [] }; kakaoChats.set(userKey, state); }
+
+  // ---- 명령어는 즉시 응답 (AI 를 부르지 않는다) ----
+  const cmd = kakaoCommand(utterance);
+  if (cmd) {
+    if (cmd.kind === 'help') return kakaoJson(kakaoText(kakaoHelp()));
+    if (cmd.kind === 'reset') {
+      state.history = [];
+      return kakaoJson(kakaoText('대화를 잊었습니다. 새로 시작해요.'));
+    }
+    state.mode = cmd.mode.cmd;
+    state.history = [];
+    return kakaoJson(kakaoText('«' + cmd.mode.name + '» 모드로 바꿨습니다. 대화도 새로 시작해요.'));
+  }
+
+  if (utterance.length > MAX_CHARS_PER_MSG) {
+    return kakaoJson(kakaoText('너무 깁니다. ' + MAX_CHARS_PER_MSG + '자 이내로 나눠서 보내 주세요.'));
+  }
+
+  state.history.push({ role: 'user', content: utterance });
+  if (state.history.length > KAKAO_HISTORY) state.history = state.history.slice(-KAKAO_HISTORY);
+
+  const mode = tgFindMode(state.mode) || tgFindMode('chat');
+  const isTriage = mode.cmd === 'triage';
+  const systemBlocks = isTriage
+    ? [{ type: 'text', text: TRIAGE_PROMPT, cache_control: { type: 'ephemeral' } }]
+    : [
+        { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: mode.prompt }
+      ];
+  const maxTokens = isTriage ? TRIAGE_MAX_TOKENS : MAX_TOKENS;
+
+  // ---- 콜백을 쓸 수 없는 경우 (블록에 콜백 옵션이 꺼져 있음) ----
+  // 5초 안에 끝내야 하므로 그냥 기다려 본다. 늦으면 카카오가 끊는다.
+  if (!callbackUrl) {
+    const out = await askAnthropic(apiKey, systemBlocks, state.history, maxTokens);
+    if (out.error || !out.text) {
+      state.history.pop();
+      return kakaoJson(kakaoText('답변을 받지 못했습니다. 잠시 뒤 다시 보내 주세요.'));
+    }
+    state.history.push({ role: 'assistant', content: out.text });
+    return kakaoJson(kakaoText(out.text));
+  }
+
+  // ---- 콜백 방식 (정상 경로) ----
+  // 답변 생성은 응답을 돌려준 뒤에도 계속 돌아간다.
+  (async () => {
+    const out = await askAnthropic(apiKey, systemBlocks, state.history, maxTokens);
+    if (out.error === 'refusal') {
+      state.history.pop();
+      await kakaoPushCallback(callbackUrl, '이 내용에는 답하지 못했어요. 다르게 말해 주시겠어요?');
+      return;
+    }
+    if (out.error || !out.text) {
+      state.history.pop();
+      await kakaoPushCallback(callbackUrl, '답변을 받지 못했습니다. 잠시 뒤 다시 보내 주세요.');
+      return;
+    }
+    state.history.push({ role: 'assistant', content: out.text });
+    await kakaoPushCallback(callbackUrl, out.text);
+  })();
+
+  // 5초 안에 끝나야 하는 응답. template 없이 useCallback 만 돌려준다.
+  return kakaoJson({
+    version: '2.0',
+    useCallback: true,
+    data: { text: isTriage ? '증상을 살펴보고 있어요...' : '생각하고 있어요...' }
+  });
+}
+
+
 function allowedOrigins() {
   return (Deno.env.get('ALLOWED_ORIGINS') || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
@@ -380,6 +792,19 @@ function jsonError(status, message, origin) {
 }
 
 Deno.serve(async (request) => {
+  // 텔레그램은 브라우저가 아니라 텔레그램 서버가 호출한다.
+  // Origin 검사 대신 secret 헤더와 사용자 ID 화이트리스트로 막는다.
+  if (request.method === 'POST' &&
+      new URL(request.url).pathname.replace(/\/+$/, '') === '/telegram') {
+    return await handleTelegram(request);
+  }
+
+  // 카카오도 서버가 호출한다. botUserKey 화이트리스트로 막는다.
+  if (request.method === 'POST' &&
+      new URL(request.url).pathname.replace(/\/+$/, '') === '/kakao') {
+    return await handleKakao(request);
+  }
+
   const origin = request.headers.get('Origin') || '';
   const allow = allowedOrigins();
   const originOk = allow.length === 0 || allow.includes(origin);
@@ -392,7 +817,7 @@ Deno.serve(async (request) => {
     return jsonError(405, '지원하지 않는 요청입니다.', echoOrigin);
   }
 
-  // 경로로 앱을 가른다. /triage = 구급대원, 그 외 = 마음결 상담
+  // 경로로 앱을 가른다. /triage = 구급대원, 그 외 = 마음톡 상담
   const isTriage = new URL(request.url).pathname.replace(/\/+$/, '') === '/triage';
   if (!originOk) {
     return jsonError(403, '허용되지 않은 접근입니다.', echoOrigin);
@@ -446,21 +871,36 @@ Deno.serve(async (request) => {
           { type: 'text', text: modeById(body.mode).prompt }
         ],
     // 응급 판단은 대충 넘길 일이 아니다. 상담보다 한 단계 올린다.
-    output_config: { effort: isTriage ? 'medium' : 'low' },
+    // Opus 5 는 생각(thinking)이 기본으로 켜져 있다. effort 가 그 깊이를 정한다.
+    thinking: { type: 'adaptive' },
+    output_config: { effort: EFFORT },
+    // 안전 분류기가 거절하면 서버가 알아서 다른 모델로 이어받는다.
+    // 상담·응급은 민감한 주제라 대화가 통째로 끊기는 것을 막아야 한다.
+    fallbacks: 'default',
     messages
   };
 
+  function callUpstream(withFallback) {
+    const body = Object.assign({}, upstreamBody);
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': API_VERSION
+    };
+    if (withFallback) headers['anthropic-beta'] = FALLBACK_BETA;
+    else delete body.fallbacks;
+    return fetch(ANTHROPIC_URL, { method: 'POST', headers, body: JSON.stringify(body) });
+  }
+
   let upstream;
   try {
-    upstream = await fetch(ANTHROPIC_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': API_VERSION
-      },
-      body: JSON.stringify(upstreamBody)
-    });
+    upstream = await callUpstream(true);
+    // fallbacks 는 베타다. 서버가 거부하면 그것만 빼고 한 번 재시도한다.
+    // 베타 하나 때문에 서비스 전체가 죽지 않게 하려는 것.
+    if (!upstream.ok && upstream.status === 400) {
+      const raw = await upstream.clone().text();
+      if (/fallback|beta/i.test(raw)) upstream = await callUpstream(false);
+    }
   } catch (_e) {
     return jsonError(502, '상담 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.', echoOrigin);
   }

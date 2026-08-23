@@ -12,7 +12,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 /**
- * 마음결(AI 상담 대화)을 감싸는 WebView 셸.
+ * 마음톡(AI 상담 대화)을 감싸는 WebView 셸.
  *
  * HTML/JS 는 APK 안 assets/ 에 있고, 인터넷은 Anthropic API 호출에만 쓴다.
  * 게임 셸과 달리 전체화면 몰입 모드를 쓰지 않는다 — 키보드가 올라오는 앱이라

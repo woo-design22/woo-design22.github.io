@@ -1,4 +1,4 @@
-﻿# 마음결(AI 상담) APK 빌드 (Gradle 없이 Android SDK 도구만 사용)
+﻿# 마음톡(AI 상담) APK 빌드 (Gradle 없이 Android SDK 도구만 사용)
 #
 #   aapt2 compile/link  ->  리소스 + AndroidManifest 를 base APK 로
 #   javac + d8          ->  MainActivity.java 를 classes.dex 로
@@ -107,7 +107,7 @@ Invoke-Step "   zipalign" "$BT\zipalign.exe" @(
     "-f", "-p", "4", "$BUILD\unsigned.apk", "$BUILD\aligned.apk"
 )
 
-$APK = "$OUT\maeumgyeol.apk"
+$APK = "$OUT\maeumtalk.apk"
 Invoke-Step "   apksigner" "$BT\apksigner.bat" @(
     "sign",
     "--ks", $KS, "--ks-pass", "pass:android", "--key-pass", "pass:android",

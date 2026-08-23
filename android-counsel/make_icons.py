@@ -1,4 +1,4 @@
-"""마음결 런처 아이콘 생성 — 잔잔한 물결 위의 대화 방울.
+"""마음톡 런처 아이콘 생성 — 잔잔한 물결 위의 대화 방울.
 
 실행:  python make_icons.py   (PIL 필요)
 res/mipmap-*/ic_launcher.png 을 다섯 밀도로 만든다.
@@ -29,7 +29,7 @@ def draw_icon(size):
         c = tuple(int(BG[i] + (BG_DEEP[i] - BG[i]) * t) for i in range(3))
         d.line([(0, y), (S, y)], fill=c)
 
-    # 물결 두 줄 — "마음결"의 결
+    # 물결 두 줄 — "마음톡"의 결
     for k, amp, yy, w in ((0, S * 0.030, 0.70, S // 26), (1, S * 0.022, 0.815, S // 34)):
         pts = []
         for x in range(0, S + 1, max(1, S // 120)):

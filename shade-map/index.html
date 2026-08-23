@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>그늘 지도 — 지금 어디가 그늘인가</title>
+<style>
+  :root {
+    --bg: #f3f2ef;
+    --surface: #ffffff;
+    --surface-2: #e8e6e1;
+    --line: #d8d5ce;
+    --ink: #1d1f22;
+    --ink-2: #575b61;
+    --ink-3: #8a8f96;
+    --accent: #2b6ea8;
+    --accent-ink: #ffffff;
+    --sun: #e8a33d;
+    --shade: #2b3a55;
+    --font: 'Segoe UI', Pretendard, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171a;
+      --surface: #1e2126;
+      --surface-2: #272b31;
+      --line: #343941;
+      --ink: #ecedef;
+      --ink-2: #adb2b9;
+      --ink-3: #7c828a;
+      --accent: #5ea0dd;
+      --accent-ink: #0c1620;
+      --sun: #f0b357;
+      --shade: #8fa4c8;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.6;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-width: 860px;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ---------- 상단 ---------- */
+  #topbar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+
+  #topbar .title { font-weight: 700; font-size: 16px; flex: 1; letter-spacing: -0.01em; }
+  #topbar .title small { display: block; font-weight: 400; font-size: 11px; color: var(--ink-3); }
+
+  .beta {
+    font-size: 10px; font-weight: 700; letter-spacing: .04em;
+    color: var(--accent); background: var(--surface-2);
+    border-radius: 5px; padding: 2px 6px; vertical-align: 2px;
+  }
+
+  .tbtn {
+    font: inherit; font-size: 13px; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 6px 12px; cursor: pointer; flex: none; white-space: nowrap;
+  }
+
+  .tbtn:active { transform: scale(.96); }
+  .tbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+  /* ---------- 지도 ---------- */
+  #mapWrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--surface-2); }
+  #map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #map:active { cursor: grabbing; }
+
+  #sunDial {
+    position: absolute; right: 12px; top: 12px;
+    width: 74px; height: 74px;
+    background: rgba(255,255,255,.86);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    #sunDial { background: rgba(30,33,38,.86); }
+  }
+
+  #status {
+    position: absolute; left: 12px; top: 12px;
+    background: rgba(255,255,255,.92);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 7px 11px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 62%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    #status { background: rgba(30,33,38,.92); }
+  }
+
+  #status b { color: var(--ink); }
+  #status .warn { color: var(--sun); }
+
+  #zoomBtns {
+    position: absolute; right: 12px; bottom: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+
+  #zoomBtns button {
+    width: 38px; height: 38px;
+    font: inherit; font-size: 19px; font-weight: 700;
+    color: var(--ink); background: rgba(255,255,255,.92);
+    border: 1px solid var(--line); border-radius: 10px; cursor: pointer;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    #zoomBtns button { background: rgba(30,33,38,.92); }
+  }
+
+  #zoomBtns button:active { transform: scale(.94); }
+
+  /* ---------- 시간 조절 ---------- */
+  #controls {
+    flex: none;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .row { display: flex; align-items: center; gap: 10px; }
+
+  .row label {
+    font-size: 12px; color: var(--ink-3); flex: none;
+    letter-spacing: .04em;
+  }
+
+  #timeOut {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700; font-size: 15px; flex: none; min-width: 106px;
+  }
+
+  #timeRange { flex: 1; accent-color: var(--accent); cursor: pointer; }
+
+  .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+
+  .chip {
+    font: inherit; font-size: 12.5px; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 12px; cursor: pointer; flex: none; white-space: nowrap;
+  }
+
+  .chip:active { transform: scale(.96); }
+  .chip:focus-visible, .tbtn:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  .legend {
+    display: flex; gap: 14px; font-size: 11.5px; color: var(--ink-3); align-items: center;
+  }
+
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-right: 4px; vertical-align: -1px; }
+
+  /* ---------- 안내 시트 ---------- */
+  .sheet {
+    position: fixed; inset: 0; z-index: 30; background: var(--bg);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: calc(24px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));
+  }
+
+  .sheet.hidden { display: none; }
+  .sheet .inner { max-width: 540px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .sheet h1 { font-size: 24px; letter-spacing: -.02em; }
+  .sheet h1 .sub { display: block; font-size: 13px; font-weight: 400; color: var(--ink-3); margin-top: 6px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 15px; font-size: 14px; line-height: 1.7; color: var(--ink-2);
+  }
+
+  .card h2 { font-size: 14.5px; color: var(--ink); margin-bottom: 5px; }
+  .card ul { margin: 5px 0 0 17px; }
+  .card li { margin-bottom: 4px; }
+  .card b { color: var(--ink); }
+
+  .primary {
+    font: inherit; font-weight: 700; font-size: 16px; color: var(--accent-ink);
+    background: var(--accent); border: 0; border-radius: 14px; padding: 13px; cursor: pointer; width: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button:active, .chip:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="title">그늘 지도 <span class="beta">실험</span><small id="placeName">지금 어디가 그늘인가</small></div>
+    <button class="tbtn" id="locBtn">내 위치</button>
+    <button class="tbtn" id="infoBtn">안내</button>
+  </div>
+
+  <div id="mapWrap">
+    <canvas id="map"></canvas>
+    <div id="status">불러오는 중…</div>
+    <canvas id="sunDial" width="148" height="148"></canvas>
+    <div id="zoomBtns">
+      <button id="zoomIn" aria-label="확대">+</button>
+      <button id="zoomOut" aria-label="축소">−</button>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="row">
+      <label for="timeRange">시각</label>
+      <output id="timeOut">--:--</output>
+      <input type="range" id="timeRange" min="0" max="1439" step="5" value="720">
+    </div>
+    <div class="chips">
+      <button class="chip" data-jump="now">지금</button>
+      <button class="chip" data-jump="540">09시</button>
+      <button class="chip" data-jump="720">12시</button>
+      <button class="chip" data-jump="900">15시</button>
+      <button class="chip" data-jump="1080">18시</button>
+      <button class="chip" id="playBtn">▶ 하루 재생</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--shade)"></i>그늘</span>
+      <span><i style="background:var(--sun)"></i>건물</span>
+      <span id="coverage"></span>
+    </div>
+  </div>
+</div>
+
+<div class="sheet" id="introSheet">
+  <div class="inner">
+    <h1>그늘 지도<span class="sub">건물 그림자를 계산해 지금 그늘인 곳을 보여줍니다</span></h1>
+
+    <div class="card">
+      <h2>어떻게 계산하나</h2>
+      <ul>
+        <li><b>태양 위치</b>는 날짜·시각·좌표로 직접 계산합니다(천문 공식).</li>
+        <li><b>건물 모양과 높이</b>는 OpenStreetMap에서 실시간으로 가져옵니다.</li>
+        <li>건물 외곽선을 <b>높이 ÷ tan(태양고도)</b> 만큼 태양 반대편으로 밀어 그림자를 만듭니다.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>한계 — 반드시 알아 두세요</h2>
+      <ul>
+        <li>건물 정보는 <b>OpenStreetMap 공용 서버</b>에서 가져옵니다. 무료 서버라
+          <b>혼잡하면 응답하지 않을 수 있습니다.</b> 그럴 땐 잠시 뒤 지도를 조금 움직여 보세요.</li>
+        <li>OSM에 <b>높이 정보가 있는 건물은 절반 이하</b>입니다(서울 기준 23~55%).
+          없으면 층수×3m로 추정하고, 그것도 없으면 기본값을 씁니다.</li>
+        <li><b>가로수·육교·구름은 반영되지 않습니다.</b> 실제 그늘과 다를 수 있습니다.</li>
+        <li>지형 높낮이를 무시한 평지 가정입니다.</li>
+        <li>참고용 실험 서비스이며 <b>정확성을 보장하지 않습니다.</b></li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>쓰는 법</h2>
+      지도를 끌어 이동하고, 손가락 두 개로 오므리면 축소됩니다.
+      아래 <b>시각 막대</b>를 움직이면 그 시간의 그림자가 바로 다시 그려집니다.
+      <b>하루 재생</b>을 누르면 해가 도는 모습을 볼 수 있습니다.
+    </div>
+
+    <button class="primary" id="introStart">시작</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 저장 래퍼 ---------- */
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  /* ---------- 상수 ---------- */
+  // Overpass 는 무료 공용 서버라 자주 느려지거나 막힌다. 미러를 순서대로 시도한다.
+  const OVERPASS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter'
+  ];
+  const FETCH_TIMEOUT = 12000;
+  const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const TILE = 256;
+  const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
+  const FETCH_Z = 16;                 // 이 줌 이상에서만 건물을 불러온다
+  const DEFAULT_H = 9;                // 높이 정보가 전혀 없을 때 (3층 가정)
+  const LEVEL_H = 3.1;                // 한 층 높이
+
+  /* ---------- 상태 ---------- */
+  let view = store.get('shade_view', { lat: 37.5665, lon: 126.9780, z: 16 });  // 서울시청
+  let minutes = nowMinutes();
+  let buildings = [];        // [{pts:[[lat,lon]...], h}]
+  let loadedKey = null;      // 마지막으로 불러온 영역
+  let playing = false, playTimer = null;
+  let heightStat = { total: 0, known: 0 };
+  // 화면 좌표는 지도를 움직일 때만 다시 계산한다. 시각만 바뀔 때 재계산하면
+  // 건물 1500개 × 꼭짓점 10개를 매 프레임 투영하게 되어 재생이 버벅인다.
+  let projected = null;
+
+  const $ = (id) => document.getElementById(id);
+  const cv = $('map'), ctx = cv.getContext('2d');
+  const dial = $('sunDial'), dctx = dial.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const color = (n) => css.getPropertyValue(n).trim();
+
+  function nowMinutes() {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
+  /* =====================================================================
+   * 태양 위치 계산 (NOAA 근사식)
+   * 외부 라이브러리 없이 날짜·시각·좌표만으로 고도와 방위를 구한다.
+   * 반환: { alt: 고도(라디안), az: 방위(라디안, 북=0, 동=π/2) }
+   * ===================================================================== */
+  const RAD = Math.PI / 180;
+
+  function sunPosition(date, lat, lon) {
+    // 율리우스일
+    const jd = date.getTime() / 86400000 + 2440587.5;
+    const n = jd - 2451545.0;
+
+    const L = (280.460 + 0.9856474 * n) % 360;              // 평균황경
+    const g = ((357.528 + 0.9856003 * n) % 360) * RAD;      // 평균근점이각
+    const lambda = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * RAD;  // 황경
+    const eps = (23.439 - 0.0000004 * n) * RAD;             // 황도경사
+
+    const ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda));  // 적경
+    const dec = Math.asin(Math.sin(eps) * Math.sin(lambda));                    // 적위
+
+    // 그리니치 항성시 → 지방 시간각
+    const gmst = (18.697374558 + 24.06570982441908 * n) % 24;
+    const lst = ((gmst * 15 + lon) % 360) * RAD;
+    let H = lst - ra;
+    while (H < -Math.PI) H += 2 * Math.PI;
+    while (H > Math.PI) H -= 2 * Math.PI;
+
+    const phi = lat * RAD;
+    const alt = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H));
+    let az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi));
+    az = az + Math.PI;   // 남=0 기준을 북=0 기준으로
+    if (az < 0) az += 2 * Math.PI;
+    if (az >= 2 * Math.PI) az -= 2 * Math.PI;
+    return { alt: alt, az: az };
+  }
+
+  function selectedDate() {
+    const d = new Date();
+    d.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    return d;
+  }
+
+  /* ---------- 웹 메르카토르 투영 ---------- */
+  function lonToX(lon, z) { return (lon + 180) / 360 * Math.pow(2, z) * TILE; }
+  function latToY(lat, z) {
+    const s = Math.sin(lat * RAD);
+    return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * Math.pow(2, z) * TILE;
+  }
+  function xToLon(x, z) { return x / (Math.pow(2, z) * TILE) * 360 - 180; }
+  function yToLat(y, z) {
+    const n = Math.PI - 2 * Math.PI * y / (Math.pow(2, z) * TILE);
+    return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  }
+
+  // 화면 중앙 기준 픽셀 좌표
+  function project(lat, lon) {
+    const cx = lonToX(view.lon, view.z), cy = latToY(view.lat, view.z);
+    return [lonToX(lon, view.z) - cx + cv.width / dpr() / 2,
+            latToY(lat, view.z) - cy + cv.height / dpr() / 2];
+  }
+
+  function dpr() { return Math.min(window.devicePixelRatio || 1, 2); }
+
+  /* ---------- 타일 ---------- */
+  const tileCache = new Map();
+
+  function getTile(z, x, y) {
+    const key = z + '/' + x + '/' + y;
+    if (tileCache.has(key)) return tileCache.get(key);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { img._ok = true; draw(); };
+    img.onerror = () => { img._bad = true; };
+    img.src = TILE_URL.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+    tileCache.set(key, img);
+    if (tileCache.size > 400) {   // 메모리가 무한정 늘지 않게
+      const first = tileCache.keys().next().value;
+      tileCache.delete(first);
+    }
+    return img;
+  }
+
+  /* ---------- 건물 불러오기 ---------- */
+  function viewBounds() {
+    const w = cv.width / dpr(), h = cv.height / dpr();
+    const cx = lonToX(view.lon, view.z), cy = latToY(view.lat, view.z);
+    return {
+      s: yToLat(cy + h / 2, view.z), n: yToLat(cy - h / 2, view.z),
+      w: xToLon(cx - w / 2, view.z), e: xToLon(cx + w / 2, view.z)
+    };
+  }
+
+  function parseHeight(tags) {
+    if (!tags) return null;
+    if (tags.height) {
+      const v = parseFloat(String(tags.height).replace(/[^0-9.]/g, ''));
+      if (v > 0) return v;
+    }
+    if (tags['building:levels']) {
+      const v = parseFloat(tags['building:levels']);
+      if (v > 0) return v * LEVEL_H;
+    }
+    return null;
+  }
+
+  // 미러 하나를 정해진 시간 안에 시도한다. 실패하면 null.
+  // ctrl 을 밖에서 넘겨받아, 새 요청이 들어오면 이전 요청을 끊을 수 있게 한다.
+  async function tryOverpass(url, q, ctrl) {
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+    try {
+      const res = await fetch(url + '?data=' + encodeURIComponent(q), { signal: ctrl.signal });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 요청 세대 번호. 지도를 움직이면 번호가 올라가고, 뒤늦게 도착한 옛 응답은 버린다.
+  // 이게 없으면 느린 요청이 끝날 때까지 새 영역을 아예 못 불러온다.
+  let reqSeq = 0;
+  let inflight = null;
+
+  async function loadBuildings() {
+    if (view.z < FETCH_Z) {
+      buildings = []; loadedKey = null; projected = null;
+      setStatus('지도를 더 확대하면 건물 그림자를 계산합니다.');
+      draw();
+      return;
+    }
+    const b = viewBounds();
+    // 화면보다 조금 넓게 불러와 살짝 움직여도 다시 안 부르게 한다
+    const pad = 0.15;
+    const dLat = (b.n - b.s) * pad, dLon = (b.e - b.w) * pad;
+    const box = [(b.s - dLat).toFixed(4), (b.w - dLon).toFixed(4),
+                 (b.n + dLat).toFixed(4), (b.e + dLon).toFixed(4)].join(',');
+    if (box === loadedKey) return;
+
+    // 진행 중이던 요청은 끊는다
+    if (inflight) { try { inflight.abort(); } catch (e) {} }
+    const ctrl = new AbortController();
+    inflight = ctrl;
+    const seq = ++reqSeq;
+
+    const q = '[out:json][timeout:20];way["building"](' + box + ');out geom;';
+    let data = null;
+    for (let i = 0; i < OVERPASS.length; i++) {
+      if (seq !== reqSeq) return;          // 그 사이 새 요청이 생겼으면 조용히 물러난다
+      setStatus('건물 정보를 불러오는 중…' + (i ? ' (' + (i + 1) + '/' + OVERPASS.length + ')' : ''));
+      draw();
+      data = await tryOverpass(OVERPASS[i], q, ctrl);
+      if (data) break;
+    }
+    if (seq !== reqSeq) return;
+    inflight = null;
+
+    if (!data) {
+      // 무료 공용 서버라 몰리면 막힌다. 사용자가 원인을 알 수 있게 한다.
+      setStatus('건물 정보를 가져오지 못했습니다.<br>' +
+                '<b>OpenStreetMap 공용 서버가 혼잡</b>할 때 생깁니다. 잠시 뒤 지도를 조금 움직여 보세요.');
+      draw();
+      return;
+    }
+
+    const list = [];
+    let known = 0;
+    for (const el of (data.elements || [])) {
+      if (!el.geometry || el.geometry.length < 3) continue;
+      const h = parseHeight(el.tags);
+      if (h !== null) known++;
+      list.push({ pts: el.geometry.map(function (g) { return [g.lat, g.lon]; }), h: h === null ? DEFAULT_H : h });
+    }
+    buildings = list;
+    heightStat = { total: list.length, known: known };
+    projectAll();
+    loadedKey = box;
+    setStatus(list.length ? null : '이 지역에는 등록된 건물이 없습니다. 다른 곳으로 옮겨 보세요.');
+    draw();
+  }
+
+  // 건물 꼭짓점을 화면 좌표로 미리 변환해 둔다.
+  // 시각만 바뀔 때 매번 투영하면 건물 1500개 × 꼭짓점 10개를 다시 계산하게 되어
+  // 재생이 버벅인다. 지도를 움직일 때만 갱신한다.
+  function projectAll() {
+    const cx = lonToX(view.lon, view.z), cy = latToY(view.lat, view.z);
+    const ox = cv.width / dpr() / 2, oy = cv.height / dpr() / 2;
+    projected = buildings.map(function (b) {
+      const n = b.pts.length;
+      const xs = new Float32Array(n), ys = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        xs[i] = lonToX(b.pts[i][1], view.z) - cx + ox;
+        ys[i] = latToY(b.pts[i][0], view.z) - cy + oy;
+      }
+      return { xs: xs, ys: ys, h: b.h };
+    });
+  }
+
+  // 이 줌·위도에서 1미터가 몇 픽셀인가 (메르카토르는 등각이라 x·y 동일)
+  function pixelsPerMeter() {
+    const mPerPx = 156543.03392 * Math.cos(view.lat * RAD) / Math.pow(2, view.z);
+    return 1 / mPerPx;
+  }
+
+  /* ---------- 그리기 ---------- */
+  function resize() {
+    const wrap = $('mapWrap');
+    const r = dpr();
+    cv.width = Math.round(wrap.clientWidth * r);
+    cv.height = Math.round(wrap.clientHeight * r);
+    ctx.setTransform(r, 0, 0, r, 0, 0);
+    projectAll();
+    draw();
+  }
+
+  function drawTiles() {
+    const w = cv.width / dpr(), h = cv.height / dpr();
+    const z = view.z;
+    const cx = lonToX(view.lon, z), cy = latToY(view.lat, z);
+    const left = cx - w / 2, top = cy - h / 2;
+    const x0 = Math.floor(left / TILE), x1 = Math.floor((left + w) / TILE);
+    const y0 = Math.floor(top / TILE), y1 = Math.floor((top + h) / TILE);
+    const max = Math.pow(2, z);
+
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        if (y < 0 || y >= max) continue;
+        const tx = ((x % max) + max) % max;
+        const img = getTile(z, tx, y);
+        if (!img._ok) continue;
+        ctx.drawImage(img, Math.round(x * TILE - left), Math.round(y * TILE - top), TILE, TILE);
+      }
+    }
+  }
+
+  function drawShadows(sun) {
+    if (!projected || !projected.length) return;
+
+    // 태양이 지평선 아래면 그림자가 아니라 전체가 그늘이다
+    if (sun.alt <= 0.02) {
+      ctx.fillStyle = 'rgba(43,58,85,0.34)';
+      ctx.fillRect(0, 0, cv.width / dpr(), cv.height / dpr());
+      return;
+    }
+
+    // 그림자 길이(m) = 높이 / tan(고도). 방향은 태양 반대편.
+    // 픽셀 오프셋은 건물마다 높이만 다르므로 단위벡터를 한 번만 구해 곱한다.
+    const cot = 1 / Math.tan(sun.alt);
+    const dirAz = sun.az + Math.PI;
+    const ppm = pixelsPerMeter();
+    const ux = Math.sin(dirAz) * ppm;     // 동쪽이 화면 +x
+    const uy = -Math.cos(dirAz) * ppm;    // 북쪽이 화면 -y
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(43,58,85,0.42)';
+    ctx.beginPath();
+
+    for (const b of projected) {
+      const len = b.h * cot;
+      if (len > 400) continue;            // 해질 무렵의 비현실적인 그림자는 자른다
+      const dx = len * ux, dy = len * uy;
+      const xs = b.xs, ys = b.ys, n = xs.length;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        ctx.moveTo(xs[i], ys[i]);
+        ctx.lineTo(xs[j], ys[j]);
+        ctx.lineTo(xs[j] + dx, ys[j] + dy);
+        ctx.lineTo(xs[i] + dx, ys[i] + dy);
+        ctx.closePath();
+      }
+    }
+    ctx.fill('nonzero');
+    ctx.restore();
+  }
+
+  function drawBuildings() {
+    if (!projected || !projected.length) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(232,163,61,0.55)';
+    ctx.strokeStyle = 'rgba(160,100,20,0.7)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const b of projected) {
+      const xs = b.xs, ys = b.ys;
+      ctx.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], ys[i]);
+      ctx.closePath();
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawSunDial(sun) {
+    const s = dial.width, c = s / 2, r = s / 2 - 14;
+    dctx.clearRect(0, 0, s, s);
+
+    dctx.strokeStyle = 'rgba(120,130,145,.5)';
+    dctx.lineWidth = 2;
+    dctx.beginPath(); dctx.arc(c, c, r, 0, Math.PI * 2); dctx.stroke();
+
+    dctx.fillStyle = 'rgba(120,130,145,.9)';
+    dctx.font = 'bold 16px sans-serif';
+    dctx.textAlign = 'center'; dctx.textBaseline = 'middle';
+    dctx.fillText('N', c, c - r - 1);
+
+    if (sun.alt > 0) {
+      // 방위를 화면 각도로 (북이 위, 시계 방향)
+      const ang = sun.az - Math.PI / 2;
+      const rr = r * (1 - sun.alt / (Math.PI / 2)) * 0.86 + r * 0.14;
+      const x = c + Math.cos(ang) * rr, y = c + Math.sin(ang) * rr;
+      dctx.strokeStyle = 'rgba(232,163,61,.85)';
+      dctx.lineWidth = 3;
+      dctx.beginPath(); dctx.moveTo(c, c); dctx.lineTo(x, y); dctx.stroke();
+      dctx.fillStyle = '#e8a33d';
+      dctx.beginPath(); dctx.arc(x, y, 9, 0, Math.PI * 2); dctx.fill();
+    } else {
+      dctx.fillStyle = 'rgba(120,130,145,.85)';
+      dctx.font = 'bold 15px sans-serif';
+      dctx.fillText('밤', c, c);
+    }
+  }
+
+  let statusOverride = null;
+  function setStatus(t) { statusOverride = t; }
+
+  function draw() {
+    const w = cv.width / dpr(), h = cv.height / dpr();
+    ctx.clearRect(0, 0, w, h);
+    drawTiles();
+
+    const sun = sunPosition(selectedDate(), view.lat, view.lon);
+    drawShadows(sun);
+    drawBuildings();
+    drawSunDial(sun);
+
+    // 상태 문구
+    const alt = Math.round(sun.alt / RAD);
+    const az = Math.round(sun.az / RAD);
+    const dirName = ['북', '북동', '동', '남동', '남', '남서', '서', '북서'][Math.round(az / 45) % 8];
+    let msg;
+    if (statusOverride) {
+      msg = statusOverride;
+    } else if (sun.alt <= 0) {
+      msg = '<b>해가 진 시각</b>입니다. 전체가 그늘입니다.';
+    } else {
+      const ratio = 1 / Math.tan(sun.alt);
+      // 해 뜨고 지는 무렵엔 배율이 수백 배로 튄다. 숫자로 보여줄 의미가 없다.
+      const lenTxt = ratio > 12
+        ? '그림자가 <b>아주 길게</b> 늘어집니다. 이 시간대는 대부분 그늘입니다.'
+        : '건물 높이의 <b>' + ratio.toFixed(1) + '배</b> 길이로 그림자가 집니다.';
+      msg = '태양 고도 <b>' + alt + '°</b> · <b>' + dirName + '</b>쪽<br>' + lenTxt;
+    }
+    $('status').innerHTML = msg;
+
+    // 높이 정보 커버리지
+    const cov = $('coverage');
+    if (heightStat.total) {
+      const pct = Math.round(100 * heightStat.known / heightStat.total);
+      cov.innerHTML = '건물 ' + heightStat.total + '개 · 실제 높이 <b>' + pct + '%</b>' +
+                      (pct < 60 ? ' <span class="warn">(나머지는 추정)</span>' : '');
+    } else {
+      cov.textContent = '';
+    }
+
+    // 시각 표시
+    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+    const mm = String(minutes % 60).padStart(2, '0');
+    $('timeOut').textContent = hh + ':' + mm;
+  }
+
+  /* ---------- 입력: 드래그 + 핀치 (마우스·터치 양쪽) ---------- */
+  let drag = null, pinch = null;
+
+  function panBy(dxPx, dyPx) {
+    const cx = lonToX(view.lon, view.z) - dxPx;
+    const cy = latToY(view.lat, view.z) - dyPx;
+    view.lon = xToLon(cx, view.z);
+    view.lat = Math.max(-85, Math.min(85, yToLat(cy, view.z)));
+  }
+
+  function endGesture() {
+    drag = null; pinch = null;
+    store.set('shade_view', view);
+    loadBuildings();
+  }
+
+  cv.addEventListener('mousedown', (e) => { drag = { x: e.clientX, y: e.clientY }; });
+  window.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    panBy(e.clientX - drag.x, e.clientY - drag.y);
+    drag = { x: e.clientX, y: e.clientY };
+    projectAll();
+    draw();
+  });
+  window.addEventListener('mouseup', () => { if (drag) endGesture(); });
+
+  cv.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      drag = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      pinch = null;
+    } else if (e.touches.length === 2) {
+      drag = null;
+      pinch = { d: touchDist(e.touches) };
+    }
+  }, { passive: false });
+
+  cv.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (drag && e.touches.length === 1) {
+      panBy(e.touches[0].clientX - drag.x, e.touches[0].clientY - drag.y);
+      drag = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      projectAll();
+      draw();
+    } else if (pinch && e.touches.length === 2) {
+      const d = touchDist(e.touches);
+      if (d / pinch.d > 1.5) { zoom(1); pinch.d = d; }
+      else if (d / pinch.d < 0.67) { zoom(-1); pinch.d = d; }
+    }
+  }, { passive: false });
+
+  cv.addEventListener('touchend', (e) => { e.preventDefault(); if (!e.touches.length) endGesture(); }, { passive: false });
+
+  function touchDist(t) {
+    return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  }
+
+  cv.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoom(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
+  function zoom(d) {
+    const z = Math.max(MIN_Z, Math.min(MAX_Z, view.z + d));
+    if (z === view.z) return;
+    view.z = z;
+    loadedKey = null;
+    projectAll();
+    draw();
+    store.set('shade_view', view);
+    loadBuildings();
+  }
+
+  $('zoomIn').addEventListener('click', () => zoom(1));
+  $('zoomOut').addEventListener('click', () => zoom(-1));
+
+  /* ---------- 시간 ---------- */
+  const range = $('timeRange');
+  range.value = minutes;
+
+  range.addEventListener('input', () => {
+    minutes = parseInt(range.value, 10);
+    stopPlay();
+    draw();
+  });
+
+  for (const chip of document.querySelectorAll('.chip[data-jump]')) {
+    chip.addEventListener('click', () => {
+      minutes = chip.dataset.jump === 'now' ? nowMinutes() : parseInt(chip.dataset.jump, 10);
+      range.value = minutes;
+      stopPlay();
+      draw();
+    });
+  }
+
+  function stopPlay() {
+    playing = false;
+    if (playTimer) { clearInterval(playTimer); playTimer = null; }
+    $('playBtn').textContent = '▶ 하루 재생';
+  }
+
+  $('playBtn').addEventListener('click', () => {
+    if (playing) { stopPlay(); return; }
+    playing = true;
+    $('playBtn').textContent = '■ 정지';
+    // 해가 떠 있는 시간대만 돈다. 새벽부터 돌리면 한동안 화면이 그대로라
+    // "안 바뀐다"고 느끼게 된다.
+    minutes = 390;   // 06:30
+    playTimer = setInterval(() => {
+      minutes += 15;
+      if (minutes > 1170) { minutes = 390; }   // 19:30 에서 되감기
+      range.value = minutes;
+      draw();
+    }, 130);
+  });
+
+  /* ---------- 내 위치 ---------- */
+  $('locBtn').addEventListener('click', () => {
+    if (!navigator.geolocation) { setStatus('이 브라우저는 위치를 지원하지 않습니다.'); draw(); return; }
+    setStatus('위치를 확인하는 중…'); draw();
+    navigator.geolocation.getCurrentPosition((pos) => {
+      view.lat = pos.coords.latitude;
+      view.lon = pos.coords.longitude;
+      view.z = Math.max(view.z, 17);
+      loadedKey = null;
+      setStatus(null);
+      store.set('shade_view', view);
+      projectAll();
+      draw();
+      loadBuildings();
+    }, () => {
+      setStatus('위치를 가져오지 못했습니다. 권한을 확인해 주세요.');
+      draw();
+    }, { timeout: 10000 });
+  });
+
+  /* ---------- 안내 ---------- */
+  $('infoBtn').addEventListener('click', () => $('introSheet').classList.remove('hidden'));
+  $('introStart').addEventListener('click', () => {
+    store.set('shade_seen', true);
+    $('introSheet').classList.add('hidden');
+    resize();
+    loadBuildings();
+  });
+
+  /* ---------- 부팅 ---------- */
+  window.addEventListener('resize', resize);
+  if (store.get('shade_seen', false)) {
+    $('introSheet').classList.add('hidden');
+    resize();
+    loadBuildings();
+  } else {
+    resize();
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

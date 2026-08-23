@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>지금바로 구급대원 — 응급인지 물어보기</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #e9ecf0;
+    --line: #d5dae1;
+    --ink: #16191d;
+    --ink-2: #4e555e;
+    --ink-3: #838b95;
+    --accent: #1f5fbf;
+    --accent-ink: #ffffff;
+    --bubble-me: #1f5fbf;
+    --bubble-me-ink: #ffffff;
+    --bubble-you: #ffffff;
+    --emg: #c62828;          /* 119 */
+    --emg-soft: #fdeaea;
+    --warn: #b26a00;         /* 응급실 */
+    --warn-soft: #fdf1de;
+    --ok: #2c7a4b;           /* 경과 관찰 */
+    --ok-soft: #e6f2ea;
+    --radius: 16px;
+    --font: 'Segoe UI', Pretendard, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a;
+      --surface: #1e2328;
+      --surface-2: #272d34;
+      --line: #343b43;
+      --ink: #eceef0;
+      --ink-2: #adb4bd;
+      --ink-3: #7d858e;
+      --accent: #5b9bf0;
+      --accent-ink: #0d1622;
+      --bubble-me: #2b5c9e;
+      --bubble-me-ink: #f0f6ff;
+      --bubble-you: #1e2328;
+      --emg: #ef6b6b;
+      --emg-soft: #34201f;
+      --warn: #e0a24a;
+      --warn-soft: #322616;
+      --ok: #6cc48c;
+      --ok-soft: #1b2c22;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.7;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  #app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-width: 760px;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* ---------- 항상 보이는 119 막대 ---------- */
+  #callBar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 14px;
+    background: var(--emg);
+    color: #fff;
+  }
+
+  #callBar .msg { flex: 1; font-size: 13px; line-height: 1.45; }
+  #callBar .msg b { font-weight: 700; }
+
+  #callBar a {
+    flex: none;
+    background: #fff;
+    color: var(--emg);
+    font-weight: 800;
+    font-size: 16px;
+    text-decoration: none;
+    border-radius: 10px;
+    padding: 7px 16px;
+    letter-spacing: 0.02em;
+  }
+
+  #callBar a:active { transform: scale(0.96); }
+
+  /* ---------- 상단 바 ---------- */
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    flex: none;
+  }
+
+  #topbar .title { font-weight: 700; font-size: 16px; flex: 1; letter-spacing: -0.01em; }
+  #topbar .title small { display: block; font-weight: 400; font-size: 11px; color: var(--ink-3); }
+
+  .beta {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    color: var(--emg); background: var(--emg-soft);
+    border-radius: 6px; padding: 2px 6px; vertical-align: 2px;
+  }
+
+  .tbtn {
+    font: inherit; font-size: 13px; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 6px 12px; cursor: pointer; flex: none; white-space: nowrap;
+  }
+
+  .tbtn:active { transform: scale(0.96); }
+
+  /* ---------- 대화 ---------- */
+  #log {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 16px 14px 8px; display: flex; flex-direction: column; gap: 12px;
+  }
+
+  .msg-row { display: flex; }
+  .msg-row.me { justify-content: flex-end; }
+
+  .bubble {
+    max-width: 84%; padding: 11px 15px; border-radius: var(--radius);
+    white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere;
+  }
+
+  .msg-row.you .bubble { background: var(--bubble-you); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+  .msg-row.me .bubble { background: var(--bubble-me); color: var(--bubble-me-ink); border-bottom-right-radius: 5px; }
+
+  .msg-row.note .bubble {
+    background: transparent; border: 1px dashed var(--line); color: var(--ink-3);
+    font-size: 13.5px; max-width: 100%; text-align: center; border-radius: 12px;
+  }
+
+  .typing { display: inline-flex; gap: 4px; align-items: center; height: 20px; }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); animation: blink 1.2s infinite ease-in-out; }
+  .typing i:nth-child(2) { animation-delay: .2s; }
+  .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,60%,100% { opacity:.25 } 30% { opacity:1 } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .typing i { animation: none; opacity: .6 }
+    button:active, a:active { transform: none }
+  }
+
+  /* ---------- 위험 신호 카드 ---------- */
+  .alertCard {
+    background: var(--emg-soft);
+    border: 2px solid var(--emg);
+    border-radius: 14px;
+    padding: 15px 16px;
+    font-size: 14.5px;
+    line-height: 1.6;
+  }
+
+  .alertCard h3 { font-size: 17px; color: var(--emg); margin-bottom: 8px; }
+  .alertCard .why { color: var(--ink-2); font-size: 13.5px; margin-top: 6px; }
+
+  .alertCard .callBig {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-top: 12px; background: var(--emg); color: #fff;
+    font-size: 20px; font-weight: 800; letter-spacing: 0.03em;
+    border-radius: 12px; padding: 14px; text-decoration: none;
+  }
+
+  .alertCard .callBig:active { transform: scale(.98) }
+
+  .alertCard .sub {
+    display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;
+  }
+
+  .alertCard .sub a {
+    flex: 1; min-width: 130px; text-align: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px; font-size: 13.5px; color: var(--ink); text-decoration: none;
+  }
+
+  /* ---------- 입력 ---------- */
+  #composer {
+    flex: none; display: flex; gap: 8px; align-items: flex-end;
+    padding: 10px 12px 12px; border-top: 1px solid var(--line); background: var(--surface);
+  }
+
+  #input {
+    flex: 1; font: inherit; font-size: 16px; line-height: 1.5;
+    color: var(--ink); background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 14px; padding: 11px 14px; resize: none; max-height: 140px; overflow-y: auto;
+  }
+
+  #input:focus { outline: 2px solid var(--accent); outline-offset: -1px }
+  #input::placeholder { color: var(--ink-3) }
+
+  #sendBtn {
+    font: inherit; font-weight: 700; font-size: 15px; color: var(--accent-ink);
+    background: var(--accent); border: 0; border-radius: 14px; padding: 12px 18px; cursor: pointer; flex: none;
+  }
+
+  #sendBtn:disabled { opacity: .4; cursor: default }
+  #sendBtn:active:not(:disabled) { transform: scale(.96) }
+
+  .disclaimer {
+    font-size: 12px; color: var(--ink-3); text-align: center;
+    padding: 0 14px 8px; line-height: 1.55; flex: none;
+  }
+
+  /* ---------- 안내 시트 ---------- */
+  .sheet {
+    position: fixed; inset: 0; z-index: 20; background: var(--bg);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: calc(24px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));
+  }
+
+  .sheet.hidden, .hidden { display: none }
+  .sheet .inner { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px }
+  .sheet h1 { font-size: 25px; letter-spacing: -.02em }
+  .sheet h1 .sub { display: block; font-size: 13px; font-weight: 400; color: var(--ink-3); margin-top: 6px }
+  .sheet h2 { font-size: 15px; margin-bottom: 6px }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; font-size: 14px; line-height: 1.7; color: var(--ink-2);
+  }
+
+  .card ul { margin: 6px 0 0 18px } .card li { margin-bottom: 4px } .card b { color: var(--ink) }
+
+  .warnCard {
+    background: var(--emg-soft); border: 1px solid var(--emg); border-radius: 14px;
+    padding: 16px; font-size: 14px; line-height: 1.7; color: var(--ink-2);
+  }
+
+  .warnCard h2 { font-size: 15px; color: var(--emg); margin-bottom: 6px }
+  .warnCard ul { margin: 6px 0 0 18px } .warnCard li { margin-bottom: 5px } .warnCard b { color: var(--ink) }
+
+  .primary {
+    font: inherit; font-weight: 700; font-size: 16px; color: var(--accent-ink);
+    background: var(--accent); border: 0; border-radius: 14px; padding: 14px; cursor: pointer; width: 100%;
+  }
+
+  .primary:active { transform: scale(.98) }
+
+  .ghost {
+    font: inherit; font-size: 14px; color: var(--ink-2); background: transparent;
+    border: 1px solid var(--line); border-radius: 12px; padding: 11px; cursor: pointer; width: 100%;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 어떤 화면에서도 119 는 한 번에 눌린다 -->
+  <div id="callBar">
+    <div class="msg"><b>판단이 안 서면 그냥 거세요.</b> 물어보는 것만으로 혼나지 않습니다.</div>
+    <a href="tel:119">119</a>
+  </div>
+
+  <div id="topbar">
+    <div class="title">지금바로 구급대원 <span class="beta">개발 중</span><small>응급인지 같이 확인해요</small></div>
+    <button class="tbtn" id="newBtn">처음부터</button>
+    <button class="tbtn" id="infoBtn">안내</button>
+  </div>
+
+  <div id="log"></div>
+
+  <div class="disclaimer">
+    이 앱은 의료기기가 아니며 어떤 질환도 진단·치료·예방하지 않습니다.
+    AI가 생성한 참고 정보이며 제작자는 이용 결과에 책임지지 않습니다.
+  </div>
+
+  <div id="composer">
+    <textarea id="input" rows="1" placeholder="어떤 증상인지 적어 주세요 (예: 30분째 가슴이 답답해요)"></textarea>
+    <button id="sendBtn">보내기</button>
+  </div>
+</div>
+
+<div class="sheet" id="introSheet">
+  <div class="inner">
+    <h1>지금바로 구급대원<span class="sub">119에 전화하기 망설여질 때, 먼저 물어보는 곳</span></h1>
+
+    <div class="warnCard">
+      <h2>먼저 읽어 주세요</h2>
+      <ul>
+        <li><b>이 앱은 의료기기가 아닙니다.</b> 어떤 질환도 진단·치료·예방하지 않습니다.</li>
+        <li><b>개발 중인 실험 서비스</b>이며 답변은 AI가 만든 것으로 <b>틀릴 수 있습니다.</b></li>
+        <li><b>응급 판단을 대신하지 않습니다.</b> 최종 판단은 119 상황요원과 의료진의 몫입니다.</li>
+        <li>이용으로 생긴 어떤 결과에 대해서도 <b>제작자는 책임지지 않습니다.</b></li>
+        <li><b>위급하면 이 앱을 끄고 즉시 119에 전화하세요.</b> 앱을 쓰느라 시간을 쓰지 마세요.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>이런 분을 위해 만들었습니다</h2>
+      "이 정도로 119를 불러도 되나" 싶어 망설이다 때를 놓치는 경우가 많습니다.
+      응급의학·구급 지식을 학습한 AI가 증상을 물어보고 <b>지금 급한지 아닌지 함께 판단</b>합니다.
+      애매하면 <b>무조건 119 쪽으로 안내</b>하도록 만들었습니다.
+    </div>
+
+    <div class="card">
+      <h2>119는 원래 물어봐도 되는 곳입니다</h2>
+      119에는 <b>상담 기능</b>이 있습니다. 구급차를 부를지 판단이 안 설 때 전화해서 물어보는 것은
+      정상적인 이용이며, 장난전화가 아닙니다. 밤에 아이가 아플 때, 증상이 애매할 때도 마찬가지입니다.
+    </div>
+
+    <button class="primary" id="introStart">동의하고 시작</button>
+    <p style="font-size:12px;text-align:center;color:var(--ink-3)">
+      [동의하고 시작]을 누르면 위 내용에 동의한 것으로 봅니다.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- 저장 래퍼 ---------- */
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+
+  /* ---------- 배포 설정 ---------- */
+  // 마음결과 같은 프록시를 쓰되 경로만 다르다.
+  const PROXY_URL = 'https://stormy-cuttlefish-2376.woo-design22.deno.net/triage';
+
+  const MAX_CHARS = 1500;
+
+  /* ---------- 위험 신호 (클라이언트 즉시 판정) ----------
+   * 모델 응답을 기다리지 않는다. 이 목록에 걸리면 그 자리에서 119 카드를 띄운다.
+   * 놓치는 것보다 몇 번 더 뜨는 편이 안전하므로 넓게 잡았다.
+   * 각 항목: [정규식, 이유 문구]
+   */
+  const RED_FLAGS = [
+    [/의식(이)?\s*(없|잃|혼미|흐)|반응(이)?\s*없|쓰러[지졌져진셨시]|기절|정신을?\s*잃|의식\s*저하/, '의식이 떨어진 상태'],
+    [/숨(을|이)?\s*(안|못|막|가빠|차|쉬기)|호흡곤란|숨쉬기\s*힘|헐떡|청색|입술(이)?\s*파/, '호흡이 힘든 상태'],
+    [/가슴(이|을)?\s*(아프|답답|조이|눌리|쥐어|찢)|흉통|심장(이)?\s*(아프|조이)/, '가슴 통증·압박'],
+    [/한쪽(이)?\s*(마비|저림|힘이)|말이\s*(어눌|안\s*나)|발음(이)?\s*(이상|어눌)|입(이|꼬리가)?\s*돌아|얼굴(이)?\s*처|팔(이)?\s*안\s*올라/, '뇌졸중 의심 신호'],
+    [/피가\s*(멈추지|안\s*멈|계속)|출혈(이)?\s*(심|많)|대량\s*출혈|피를\s*(토|많이)/, '멈추지 않는 출혈'],
+    [/경련|발작|뒤틀|눈이\s*돌아가/, '경련·발작'],
+    [/아나필|전신\s*두드러기|목(이)?\s*(붓|조여)|혀가\s*붓|알레르기.*(숨|호흡)/, '심한 알레르기 반응'],
+    [/약(을)?\s*.{0,10}(많이|한꺼번에|과다|털어)\s*.{0,6}(먹|복용|삼)|음독|농약|수면제.*먹|표백제|자살\s*시도|극단적\s*선택|독(을|극물)/, '약물·독성물질 섭취'],
+    [/(심하게|크게)\s*(다치|부딪|넘어)|교통사고|추락|떨어졌|뼈가\s*보|골절.*튀어/, '큰 외상'],
+    [/화상.*(넓|심|물집)|끓는|불에\s*(데|탔)/, '심한 화상'],
+    [/임신.*(출혈|피|배가\s*아프)|하혈/, '임신 중 출혈'],
+    [/(아기|신생아|영아|아이).*(축\s*처|늘어|청색|경련|열이\s*안\s*떨어)|생후.*(개월|주).*열/, '영유아 위험 신호'],
+    [/열.*(경련|목이\s*뻣뻣)|목(이)?\s*뻣뻣.*열/, '고열과 목 경직'],
+    [/토(를)?\s*(계속|멈추지)|피\s*섞인\s*(토|변)|검은\s*변|커피\s*찌꺼기/, '지속 구토·소화관 출혈 의심']
+  ];
+
+  const RESOURCES = [
+    { name: '응급실 찾기 (E-Gen)', href: 'https://www.e-gen.or.kr' },
+    { name: '보건복지상담 129', href: 'tel:129' }
+  ];
+
+  /* ---------- 상태 ---------- */
+  let messages = store.get('emg_messages', []);
+  let sending = false, streamText = '', noticeText = '';
+  let alertShown = false;
+
+  const $ = (id) => document.getElementById(id);
+  const logEl = $('log'), inputEl = $('input'), sendBtn = $('sendBtn');
+
+  const HELLO = '어떤 증상인지 알려 주세요.\n\n' +
+    '누가(본인/다른 사람), 언제부터, 어떻게 아픈지 아는 만큼만 적으시면 됩니다.\n' +
+    '급하면 지금 바로 위의 119 버튼을 누르세요.';
+
+  /* ---------- 렌더 ---------- */
+  function bubble(cls, text) {
+    const row = document.createElement('div');
+    row.className = 'msg-row ' + cls;
+    const b = document.createElement('div');
+    b.className = 'bubble';
+    b.textContent = text;
+    row.appendChild(b);
+    return row;
+  }
+
+  function alertCard(reason) {
+    const d = document.createElement('div');
+    d.className = 'alertCard';
+
+    const h = document.createElement('h3');
+    h.textContent = '지금 119에 전화하세요';
+    d.appendChild(h);
+
+    const p = document.createElement('div');
+    p.textContent = '적어 주신 내용에 응급일 수 있는 신호가 있습니다. AI 답변을 기다리지 마세요.';
+    d.appendChild(p);
+
+    if (reason) {
+      const w = document.createElement('div');
+      w.className = 'why';
+      w.textContent = '걸린 신호: ' + reason;
+      d.appendChild(w);
+    }
+
+    const a = document.createElement('a');
+    a.className = 'callBig';
+    a.href = 'tel:119';
+    a.textContent = '119 전화 걸기';
+    d.appendChild(a);
+
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    for (const r of RESOURCES) {
+      const x = document.createElement('a');
+      x.href = r.href;
+      x.textContent = r.name;
+      if (r.href.indexOf('http') === 0) { x.target = '_blank'; x.rel = 'noopener'; }
+      sub.appendChild(x);
+    }
+    d.appendChild(sub);
+    return d;
+  }
+
+  function render(forceBottom) {
+    const atBottom = forceBottom || (logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 60);
+    logEl.textContent = '';
+
+    if (messages.length === 0) logEl.appendChild(bubble('you', HELLO));
+
+    for (const m of messages) {
+      if (m.role === 'alert') { logEl.appendChild(alertCard(m.reason)); continue; }
+      if (m.role === 'note') { logEl.appendChild(bubble('note', m.text)); continue; }
+      logEl.appendChild(bubble(m.role === 'user' ? 'me' : 'you', m.text));
+    }
+
+    if (sending) {
+      const row = document.createElement('div');
+      row.className = 'msg-row you';
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      if (streamText) b.textContent = streamText;
+      else {
+        const t = document.createElement('span');
+        t.className = 'typing';
+        t.appendChild(document.createElement('i'));
+        t.appendChild(document.createElement('i'));
+        t.appendChild(document.createElement('i'));
+        b.appendChild(t);
+      }
+      row.appendChild(b);
+      logEl.appendChild(row);
+    }
+
+    if (noticeText) logEl.appendChild(bubble('note', noticeText));
+
+    if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+    sendBtn.disabled = sending || !inputEl.value.trim();
+  }
+
+  function save() {
+    store.set('emg_messages', messages.filter(m => m.role !== 'note'));
+  }
+
+  /* ---------- 위험 신호 판정 ---------- */
+  function redFlag(text) {
+    const t = text.replace(/\s+/g, ' ');
+    for (const [re, why] of RED_FLAGS) if (re.test(t)) return why;
+    return null;
+  }
+
+  /* ---------- API ---------- */
+  function apiMessages() {
+    return messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.text }));
+  }
+
+  function friendlyError(status) {
+    if (status === 429) return '너무 빠르게 여러 번 보냈습니다. 잠시 뒤 다시 보내 주세요.\n급하시면 119로 전화하세요.';
+    if (status === 403) return '지금은 이 주소에서 이용할 수 없습니다.';
+    return '응답을 받지 못했습니다. (' + status + ')\n판단이 급하면 기다리지 말고 119로 전화하세요.';
+  }
+
+  function handleEvent(json, state) {
+    if (json.type === 'content_block_delta' && json.delta && json.delta.type === 'text_delta') {
+      streamText += json.delta.text;
+      render();
+    } else if (json.type === 'message_delta' && json.delta && json.delta.stop_reason) {
+      state.stopReason = json.delta.stop_reason;
+    } else if (json.type === 'error') {
+      state.errorText = (json.error && json.error.message) || '스트림 오류';
+    }
+  }
+
+  async function readStream(res) {
+    const state = { stopReason: null, errorText: null };
+    if (!res.body || !res.body.getReader) {
+      const txt = await res.text();
+      for (const line of txt.split('\n')) {
+        if (!line.startsWith('data:')) continue;
+        const p = line.slice(5).trim();
+        if (!p || p === '[DONE]') continue;
+        try { handleEvent(JSON.parse(p), state); } catch (e) {}
+      }
+      return state;
+    }
+    const reader = res.body.getReader();
+    const dec = new TextDecoder('utf-8');
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const p = line.slice(5).trim();
+        if (!p || p === '[DONE]') continue;
+        try { handleEvent(JSON.parse(p), state); } catch (e) {}
+      }
+    }
+    return state;
+  }
+
+  async function send() {
+    const text = inputEl.value.trim();
+    if (!text || sending) return;
+
+    if (text.length > MAX_CHARS) {
+      noticeText = '한 번에 ' + MAX_CHARS + '자까지 보낼 수 있습니다. 나눠서 보내 주세요.';
+      render(true);
+      return;
+    }
+
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    messages.push({ role: 'user', text: text });
+
+    // 위험 신호는 모델을 기다리지 않고 즉시 띄운다
+    const why = redFlag(text);
+    if (why && !alertShown) {
+      messages.push({ role: 'alert', reason: why });
+      alertShown = true;
+    }
+
+    save();
+    sending = true; streamText = ''; noticeText = '';
+    render(true);
+
+    let res;
+    try {
+      res = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: apiMessages() })
+      });
+      if (!res.ok) throw { status: res.status };
+    } catch (e) {
+      sending = false;
+      noticeText = (e && e.status)
+        ? friendlyError(e.status)
+        : '연결하지 못했습니다. 인터넷을 확인하세요.\n급하면 바로 119로 전화하세요.';
+      render(true);
+      return;
+    }
+
+    let state;
+    try { state = await readStream(res); }
+    catch (e) { state = { errorText: '응답이 중간에 끊겼습니다. 급하면 119로 전화하세요.' }; }
+
+    sending = false;
+    if (streamText.trim()) { messages.push({ role: 'assistant', text: streamText.trim() }); save(); }
+    streamText = '';
+
+    if (state.stopReason === 'refusal') {
+      noticeText = '이 내용에는 답하지 못했습니다. 판단이 필요하면 119로 전화해 물어보세요.';
+    } else if (state.errorText) {
+      noticeText = state.errorText;
+    }
+    render(true);
+  }
+
+  /* ---------- 입력 (키보드 + 터치) ---------- */
+  function autoGrow() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+  }
+
+  inputEl.addEventListener('input', () => { autoGrow(); render(); });
+
+  inputEl.addEventListener('keydown', (e) => {
+    const desktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (e.key === 'Enter' && !e.shiftKey && desktop) { e.preventDefault(); send(); }
+  });
+
+  sendBtn.addEventListener('click', send);
+
+  $('newBtn').addEventListener('click', () => {
+    if (messages.length && !confirm('지금 내용을 지우고 처음부터 다시 물어볼까요?')) return;
+    messages = []; alertShown = false; noticeText = '';
+    store.del('emg_messages');
+    render(true);
+  });
+
+  $('infoBtn').addEventListener('click', () => $('introSheet').classList.remove('hidden'));
+
+  $('introStart').addEventListener('click', () => {
+    store.set('emg_consent', true);
+    $('introSheet').classList.add('hidden');
+    render(true);
+    inputEl.focus();
+  });
+
+  /* ---------- 부팅 ---------- */
+  if (store.get('emg_consent', false)) $('introSheet').classList.add('hidden');
+  render(true);
+})();
+</script>
+</body>
+</html>

@@ -278,7 +278,9 @@
     <div class="card">
       <h2>한계 — 반드시 알아 두세요</h2>
       <ul>
-        <li>OSM에 <b>높이 정보가 있는 건물은 절반 이하</b>입니다(서울 기준 42~55%).
+        <li>건물 정보는 <b>OpenStreetMap 공용 서버</b>에서 가져옵니다. 무료 서버라
+          <b>혼잡하면 응답하지 않을 수 있습니다.</b> 그럴 땐 잠시 뒤 지도를 조금 움직여 보세요.</li>
+        <li>OSM에 <b>높이 정보가 있는 건물은 절반 이하</b>입니다(서울 기준 23~55%).
           없으면 층수×3m로 추정하고, 그것도 없으면 기본값을 씁니다.</li>
         <li><b>가로수·육교·구름은 반영되지 않습니다.</b> 실제 그늘과 다를 수 있습니다.</li>
         <li>지형 높낮이를 무시한 평지 가정입니다.</li>
@@ -308,7 +310,13 @@
   };
 
   /* ---------- 상수 ---------- */
-  const OVERPASS = 'https://overpass-api.de/api/interpreter';
+  // Overpass 는 무료 공용 서버라 자주 느려지거나 막힌다. 미러를 순서대로 시도한다.
+  const OVERPASS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter'
+  ];
+  const FETCH_TIMEOUT = 12000;
   const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   const TILE = 256;
   const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
@@ -321,9 +329,11 @@
   let minutes = nowMinutes();
   let buildings = [];        // [{pts:[[lat,lon]...], h}]
   let loadedKey = null;      // 마지막으로 불러온 영역
-  let loading = false;
   let playing = false, playTimer = null;
   let heightStat = { total: 0, known: 0 };
+  // 화면 좌표는 지도를 움직일 때만 다시 계산한다. 시각만 바뀔 때 재계산하면
+  // 건물 1500개 × 꼭짓점 10개를 매 프레임 투영하게 되어 재생이 버벅인다.
+  let projected = null;
 
   const $ = (id) => document.getElementById(id);
   const cv = $('map'), ctx = cv.getContext('2d');
@@ -441,9 +451,29 @@
     return null;
   }
 
+  // 미러 하나를 정해진 시간 안에 시도한다. 실패하면 null.
+  // ctrl 을 밖에서 넘겨받아, 새 요청이 들어오면 이전 요청을 끊을 수 있게 한다.
+  async function tryOverpass(url, q, ctrl) {
+    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+    try {
+      const res = await fetch(url + '?data=' + encodeURIComponent(q), { signal: ctrl.signal });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // 요청 세대 번호. 지도를 움직이면 번호가 올라가고, 뒤늦게 도착한 옛 응답은 버린다.
+  // 이게 없으면 느린 요청이 끝날 때까지 새 영역을 아예 못 불러온다.
+  let reqSeq = 0;
+  let inflight = null;
+
   async function loadBuildings() {
     if (view.z < FETCH_Z) {
-      buildings = []; loadedKey = null;
+      buildings = []; loadedKey = null; projected = null;
       setStatus('지도를 더 확대하면 건물 그림자를 계산합니다.');
       draw();
       return;
@@ -454,32 +484,71 @@
     const dLat = (b.n - b.s) * pad, dLon = (b.e - b.w) * pad;
     const box = [(b.s - dLat).toFixed(4), (b.w - dLon).toFixed(4),
                  (b.n + dLat).toFixed(4), (b.e + dLon).toFixed(4)].join(',');
-    if (box === loadedKey || loading) return;
+    if (box === loadedKey) return;
 
-    loading = true;
-    setStatus('건물 정보를 불러오는 중…');
-    const q = '[out:json][timeout:25];way["building"](' + box + ');out geom;';
-    try {
-      const res = await fetch(OVERPASS + '?data=' + encodeURIComponent(q));
-      if (!res.ok) throw new Error(res.status);
-      const data = await res.json();
-      const list = [];
-      let known = 0;
-      for (const el of (data.elements || [])) {
-        if (!el.geometry || el.geometry.length < 3) continue;
-        const h = parseHeight(el.tags);
-        if (h !== null) known++;
-        list.push({ pts: el.geometry.map((g) => [g.lat, g.lon]), h: h === null ? DEFAULT_H : h });
-      }
-      buildings = list;
-      heightStat = { total: list.length, known: known };
-      loadedKey = box;
-      setStatus(null);
-    } catch (e) {
-      setStatus('건물 정보를 불러오지 못했습니다. 잠시 뒤 다시 시도해 주세요.');
+    // 진행 중이던 요청은 끊는다
+    if (inflight) { try { inflight.abort(); } catch (e) {} }
+    const ctrl = new AbortController();
+    inflight = ctrl;
+    const seq = ++reqSeq;
+
+    const q = '[out:json][timeout:20];way["building"](' + box + ');out geom;';
+    let data = null;
+    for (let i = 0; i < OVERPASS.length; i++) {
+      if (seq !== reqSeq) return;          // 그 사이 새 요청이 생겼으면 조용히 물러난다
+      setStatus('건물 정보를 불러오는 중…' + (i ? ' (' + (i + 1) + '/' + OVERPASS.length + ')' : ''));
+      draw();
+      data = await tryOverpass(OVERPASS[i], q, ctrl);
+      if (data) break;
     }
-    loading = false;
+    if (seq !== reqSeq) return;
+    inflight = null;
+
+    if (!data) {
+      // 무료 공용 서버라 몰리면 막힌다. 사용자가 원인을 알 수 있게 한다.
+      setStatus('건물 정보를 가져오지 못했습니다.<br>' +
+                '<b>OpenStreetMap 공용 서버가 혼잡</b>할 때 생깁니다. 잠시 뒤 지도를 조금 움직여 보세요.');
+      draw();
+      return;
+    }
+
+    const list = [];
+    let known = 0;
+    for (const el of (data.elements || [])) {
+      if (!el.geometry || el.geometry.length < 3) continue;
+      const h = parseHeight(el.tags);
+      if (h !== null) known++;
+      list.push({ pts: el.geometry.map(function (g) { return [g.lat, g.lon]; }), h: h === null ? DEFAULT_H : h });
+    }
+    buildings = list;
+    heightStat = { total: list.length, known: known };
+    projectAll();
+    loadedKey = box;
+    setStatus(list.length ? null : '이 지역에는 등록된 건물이 없습니다. 다른 곳으로 옮겨 보세요.');
     draw();
+  }
+
+  // 건물 꼭짓점을 화면 좌표로 미리 변환해 둔다.
+  // 시각만 바뀔 때 매번 투영하면 건물 1500개 × 꼭짓점 10개를 다시 계산하게 되어
+  // 재생이 버벅인다. 지도를 움직일 때만 갱신한다.
+  function projectAll() {
+    const cx = lonToX(view.lon, view.z), cy = latToY(view.lat, view.z);
+    const ox = cv.width / dpr() / 2, oy = cv.height / dpr() / 2;
+    projected = buildings.map(function (b) {
+      const n = b.pts.length;
+      const xs = new Float32Array(n), ys = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        xs[i] = lonToX(b.pts[i][1], view.z) - cx + ox;
+        ys[i] = latToY(b.pts[i][0], view.z) - cy + oy;
+      }
+      return { xs: xs, ys: ys, h: b.h };
+    });
+  }
+
+  // 이 줌·위도에서 1미터가 몇 픽셀인가 (메르카토르는 등각이라 x·y 동일)
+  function pixelsPerMeter() {
+    const mPerPx = 156543.03392 * Math.cos(view.lat * RAD) / Math.pow(2, view.z);
+    return 1 / mPerPx;
   }
 
   /* ---------- 그리기 ---------- */
@@ -489,6 +558,7 @@
     cv.width = Math.round(wrap.clientWidth * r);
     cv.height = Math.round(wrap.clientHeight * r);
     ctx.setTransform(r, 0, 0, r, 0, 0);
+    projectAll();
     draw();
   }
 
@@ -513,7 +583,7 @@
   }
 
   function drawShadows(sun) {
-    if (!buildings.length) return;
+    if (!projected || !projected.length) return;
 
     // 태양이 지평선 아래면 그림자가 아니라 전체가 그늘이다
     if (sun.alt <= 0.02) {
@@ -522,36 +592,29 @@
       return;
     }
 
-    // 그림자 길이(미터) = 높이 / tan(고도). 태양 반대 방향으로 민다.
+    // 그림자 길이(m) = 높이 / tan(고도). 방향은 태양 반대편.
+    // 픽셀 오프셋은 건물마다 높이만 다르므로 단위벡터를 한 번만 구해 곱한다.
     const cot = 1 / Math.tan(sun.alt);
-    const dirAz = sun.az + Math.PI;            // 그림자가 뻗는 방위
-    const mPerDegLat = 111320;
-    const mPerDegLon = 111320 * Math.cos(view.lat * RAD);
+    const dirAz = sun.az + Math.PI;
+    const ppm = pixelsPerMeter();
+    const ux = Math.sin(dirAz) * ppm;     // 동쪽이 화면 +x
+    const uy = -Math.cos(dirAz) * ppm;    // 북쪽이 화면 -y
 
-    // 겹치는 그림자가 진해지지 않도록 한 겹으로 합쳐 그린다
     ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
     ctx.fillStyle = 'rgba(43,58,85,0.42)';
     ctx.beginPath();
 
-    for (const b of buildings) {
+    for (const b of projected) {
       const len = b.h * cot;
-      if (len > 400) continue;                 // 해질 무렵 비현실적으로 긴 그림자는 자른다
-      const dLat = (len * Math.cos(dirAz)) / mPerDegLat;
-      const dLon = (len * Math.sin(dirAz)) / mPerDegLon;
-
-      // 원래 외곽선과 밀어낸 외곽선을 잇는 볼록껍질 대신,
-      // 각 변마다 사각형을 만들어 채운다(간단하고 충분히 정확하다).
-      for (let i = 0; i < b.pts.length; i++) {
-        const p = b.pts[i], q = b.pts[(i + 1) % b.pts.length];
-        const a1 = project(p[0], p[1]);
-        const a2 = project(q[0], q[1]);
-        const a3 = project(q[0] + dLat, q[1] + dLon);
-        const a4 = project(p[0] + dLat, p[1] + dLon);
-        ctx.moveTo(a1[0], a1[1]);
-        ctx.lineTo(a2[0], a2[1]);
-        ctx.lineTo(a3[0], a3[1]);
-        ctx.lineTo(a4[0], a4[1]);
+      if (len > 400) continue;            // 해질 무렵의 비현실적인 그림자는 자른다
+      const dx = len * ux, dy = len * uy;
+      const xs = b.xs, ys = b.ys, n = xs.length;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        ctx.moveTo(xs[i], ys[i]);
+        ctx.lineTo(xs[j], ys[j]);
+        ctx.lineTo(xs[j] + dx, ys[j] + dy);
+        ctx.lineTo(xs[i] + dx, ys[i] + dy);
         ctx.closePath();
       }
     }
@@ -560,21 +623,20 @@
   }
 
   function drawBuildings() {
-    if (!buildings.length) return;
+    if (!projected || !projected.length) return;
     ctx.save();
     ctx.fillStyle = 'rgba(232,163,61,0.55)';
     ctx.strokeStyle = 'rgba(160,100,20,0.7)';
     ctx.lineWidth = 1;
-    for (const b of buildings) {
-      ctx.beginPath();
-      for (let i = 0; i < b.pts.length; i++) {
-        const p = project(b.pts[i][0], b.pts[i][1]);
-        if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
-      }
+    ctx.beginPath();
+    for (const b of projected) {
+      const xs = b.xs, ys = b.ys;
+      ctx.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], ys[i]);
       ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
     }
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -677,6 +739,7 @@
     if (!drag) return;
     panBy(e.clientX - drag.x, e.clientY - drag.y);
     drag = { x: e.clientX, y: e.clientY };
+    projectAll();
     draw();
   });
   window.addEventListener('mouseup', () => { if (drag) endGesture(); });
@@ -697,6 +760,7 @@
     if (drag && e.touches.length === 1) {
       panBy(e.touches[0].clientX - drag.x, e.touches[0].clientY - drag.y);
       drag = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      projectAll();
       draw();
     } else if (pinch && e.touches.length === 2) {
       const d = touchDist(e.touches);
@@ -721,6 +785,7 @@
     if (z === view.z) return;
     view.z = z;
     loadedKey = null;
+    projectAll();
     draw();
     store.set('shade_view', view);
     loadBuildings();
@@ -758,13 +823,15 @@
     if (playing) { stopPlay(); return; }
     playing = true;
     $('playBtn').textContent = '■ 정지';
-    minutes = 300;   // 새벽 5시부터
+    // 해가 떠 있는 시간대만 돈다. 새벽부터 돌리면 한동안 화면이 그대로라
+    // "안 바뀐다"고 느끼게 된다.
+    minutes = 390;   // 06:30
     playTimer = setInterval(() => {
-      minutes += 10;
-      if (minutes > 1200) { minutes = 300; }   // 20시에서 되감기
+      minutes += 15;
+      if (minutes > 1170) { minutes = 390; }   // 19:30 에서 되감기
       range.value = minutes;
       draw();
-    }, 90);
+    }, 130);
   });
 
   /* ---------- 내 위치 ---------- */
@@ -778,6 +845,7 @@
       loadedKey = null;
       setStatus(null);
       store.set('shade_view', view);
+      projectAll();
       draw();
       loadBuildings();
     }, () => {

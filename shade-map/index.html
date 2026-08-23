@@ -255,7 +255,10 @@
       <button class="chip" id="playBtn">▶ 하루 재생</button>
     </div>
     <div class="legend">
-      <span><i style="background:var(--shade)"></i>그늘</span>
+      <span><i style="background:#16233d"></i>그늘</span>
+      <span><i style="background:#8b95a6"></i>건물</span>
+      <span><i style="background:#d1373c;border-radius:50%"></i>지하철</span>
+      <span><i style="background:#1f9d55;border-radius:50%"></i>버스</span>
       <span id="coverage"></span>
     </div>
   </div>
@@ -333,7 +336,8 @@
   /* ---------- 상태 ---------- */
   let view = store.get('shade_view', { lat: 37.5665, lon: 126.9780, z: 16 });  // 서울시청
   let minutes = nowMinutes();
-  let buildings = [];        // [{pts:[[lat,lon]...], h}]
+  let buildings = [];        // [{pts:[[lat,lon]...], h, name}]
+  let pois = [];             // [{kind:'subway'|'bus', lat, lon, name}]
   let loadedKey = null;      // 마지막으로 불러온 영역
   let playing = false, playTimer = null;
   let heightStat = { total: 0, known: 0 };
@@ -496,6 +500,15 @@
         nodes.set(n.getAttribute('id'), [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))]);
       }
       const elements = [];
+      // 지하철역·버스정류장은 node 에 태그가 붙어 있다
+      for (const n of xml.getElementsByTagName('node')) {
+        const tags = {};
+        for (const t of n.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
+        if (tags.railway === 'station' || tags.highway === 'bus_stop') {
+          elements.push({ type: 'node', tags: tags,
+            lat: parseFloat(n.getAttribute('lat')), lon: parseFloat(n.getAttribute('lon')) });
+        }
+      }
       for (const w of xml.getElementsByTagName('way')) {
         const tags = {};
         for (const t of w.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
@@ -522,7 +535,7 @@
 
   async function loadBuildings() {
     if (view.z < FETCH_Z) {
-      buildings = []; loadedKey = null; projected = null;
+      buildings = []; pois = []; loadedKey = null; projected = null;
       setStatus('지도를 더 확대하면 건물 그림자를 계산합니다.');
       draw();
       return;
@@ -539,7 +552,11 @@
     if (currentCtrl) { try { currentCtrl.abort(); } catch (e) {} }
     const seq = ++reqSeq;
 
-    const q = '[out:json][timeout:20];way["building"](' + box + ');out geom;';
+    const q = '[out:json][timeout:20];(' +
+      'way["building"](' + box + ');' +
+      'node["railway"="station"](' + box + ');' +
+      'node["highway"="bus_stop"](' + box + ');' +
+      ');out geom;';
     let data = null;
     for (let i = 0; i < OVERPASS.length; i++) {
       if (seq !== reqSeq) return;          // 그 사이 새 요청이 생겼으면 조용히 물러난다
@@ -567,14 +584,27 @@
     }
 
     const list = [];
+    const poiList = [];
     let known = 0;
     for (const el of (data.elements || [])) {
+      const tg = el.tags || {};
+      if (el.type === 'node') {
+        if (el.lat === undefined) continue;
+        if (tg.railway === 'station') {
+          poiList.push({ kind: 'subway', lat: el.lat, lon: el.lon, name: tg.name || '역' });
+        } else if (tg.highway === 'bus_stop') {
+          poiList.push({ kind: 'bus', lat: el.lat, lon: el.lon, name: tg.name || '' });
+        }
+        continue;
+      }
       if (!el.geometry || el.geometry.length < 3) continue;
-      const h = parseHeight(el.tags);
+      const h = parseHeight(tg);
       if (h !== null) known++;
-      list.push({ pts: el.geometry.map(function (g) { return [g.lat, g.lon]; }), h: h === null ? DEFAULT_H : h });
+      const pts = el.geometry.map(function (g) { return [g.lat, g.lon]; });
+      list.push({ pts: pts, h: h === null ? DEFAULT_H : h, name: tg.name || null });
     }
     buildings = list;
+    pois = poiList;
     heightStat = { total: list.length, known: known };
     projectAll();
     loadedKey = box;
@@ -642,7 +672,7 @@
 
     // 태양이 지평선 아래면 그림자가 아니라 전체가 그늘이다
     if (sun.alt <= 0.02) {
-      ctx.fillStyle = 'rgba(28,40,62,0.40)';
+      ctx.fillStyle = 'rgba(22,35,61,0.55)';
       ctx.fillRect(0, 0, w, h);
       return;
     }
@@ -664,9 +694,10 @@
     lc.scale(dpr(), dpr());
 
     // 태양이 낮을수록 그림자 경계가 흐려진다(반영). 실제로도 그렇다.
-    const soft = Math.min(6, Math.max(1.2, 2.5 * cot));
+    // 흐리게 하면 안 보인다. 아주 살짝만 부드럽게 한다.
+    const soft = Math.min(2.2, Math.max(0.6, 0.9 * cot));
     lc.filter = 'blur(' + soft.toFixed(1) + 'px)';
-    lc.fillStyle = '#1c283e';
+    lc.fillStyle = '#16233d';
     lc.beginPath();
 
     for (const b of projected) {
@@ -683,17 +714,13 @@
         lc.lineTo(xs[i] + dx, ys[i] + dy);
         lc.closePath();
       }
-      // 건물 바닥면 자체도 그늘이다
-      lc.moveTo(xs[0], ys[0]);
-      for (let i = 1; i < n; i++) lc.lineTo(xs[i], ys[i]);
-      lc.closePath();
     }
     lc.fill('nonzero');
     lc.filter = 'none';
 
     // 완성된 그림자 레이어를 한 겹으로 얹는다
     ctx.save();
-    ctx.globalAlpha = 0.52;
+    ctx.globalAlpha = 0.78;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(lay, 0, 0);
     ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0);
@@ -712,7 +739,99 @@
 
   // 건물을 따로 칠하지 않는다. 주황색 외곽선이 화면을 어지럽히고,
   // 건물 바닥면은 이미 drawShadows 에서 그늘로 처리된다.
-  function drawBuildings() { /* 의도적으로 비워 둠 */ }
+  // 건물은 옅게 칠한다. 진한 남색 그림자(= 실제로 걸을 수 있는 그늘)와
+  // 건물 자리를 눈으로 구분하기 위해서다. 건물 안은 그늘이 아니다.
+  function drawBuildings() {
+    if (!projected || !projected.length) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(120,132,150,0.34)';
+    ctx.beginPath();
+    for (const b of projected) {
+      const xs = b.xs, ys = b.ys;
+      ctx.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], ys[i]);
+      ctx.closePath();
+    }
+    ctx.fill('nonzero');
+    ctx.restore();
+  }
+
+  // 그림자 위에 얹는 표시들. 그늘을 가리지 않게 작게, 대신 색으로 구분한다.
+  function drawPois() {
+    const w = cv.width / dpr(), h = cv.height / dpr();
+
+    // 건물 이름 — 충분히 확대했을 때만, 그리고 겹치지 않게 골라서
+    if (view.z >= 17 && projected) {
+      const placed = [];
+      ctx.save();
+      ctx.font = '600 11px ' + css.getPropertyValue('--font');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < projected.length && placed.length < 26; i++) {
+        const name = buildings[i] && buildings[i].name;
+        if (!name) continue;
+        const xs = projected[i].xs, ys = projected[i].ys;
+        let cx = 0, cy = 0;
+        for (let k = 0; k < xs.length; k++) { cx += xs[k]; cy += ys[k]; }
+        cx /= xs.length; cy /= ys.length;
+        if (cx < 30 || cx > w - 30 || cy < 24 || cy > h - 24) continue;
+        // 라벨끼리 너무 붙으면 건너뛴다
+        let clash = false;
+        for (const q of placed) if (Math.abs(q[0] - cx) < 68 && Math.abs(q[1] - cy) < 15) { clash = true; break; }
+        if (clash) continue;
+        placed.push([cx, cy]);
+        const t = name.length > 11 ? name.slice(0, 10) + '…' : name;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,.92)';
+        ctx.strokeText(t, cx, cy);
+        ctx.fillStyle = '#2c3138';
+        ctx.fillText(t, cx, cy);
+      }
+      ctx.restore();
+    }
+
+    if (!pois.length) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // 버스정류장 — 작은 점. 많아서 이름은 크게 확대했을 때만.
+    for (const p of pois) {
+      if (p.kind !== 'bus') continue;
+      const s2 = project(p.lat, p.lon);
+      if (s2[0] < -20 || s2[0] > w + 20 || s2[1] < -20 || s2[1] > h + 20) continue;
+      ctx.beginPath();
+      ctx.arc(s2[0], s2[1], 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#1f9d55';
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+    }
+
+    // 지하철역 — 크게, 이름과 함께. 가장 중요한 기준점이다.
+    ctx.font = '700 12px ' + css.getPropertyValue('--font');
+    for (const p of pois) {
+      if (p.kind !== 'subway') continue;
+      const s2 = project(p.lat, p.lon);
+      if (s2[0] < -40 || s2[0] > w + 40 || s2[1] < -40 || s2[1] > h + 40) continue;
+      ctx.beginPath();
+      ctx.arc(s2[0], s2[1], 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#d1373c';
+      ctx.fill();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      if (p.name) {
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(255,255,255,.95)';
+        ctx.strokeText(p.name, s2[0], s2[1] - 16);
+        ctx.fillStyle = '#a51f24';
+        ctx.fillText(p.name, s2[0], s2[1] - 16);
+      }
+    }
+    ctx.restore();
+  }
 
   function drawSunDial(sun) {
     const s = dial.width, c = s / 2, r = s / 2 - 14;
@@ -755,6 +874,7 @@
     const sun = sunPosition(selectedDate(), view.lat, view.lon);
     drawShadows(sun);
     drawBuildings();
+    drawPois();
     drawSunDial(sun);
 
     // 상태 문구

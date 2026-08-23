@@ -248,6 +248,7 @@
     </div>
     <div class="chips">
       <button class="chip" data-jump="now">지금</button>
+      <button class="chip" data-jump="360">06시</button>
       <button class="chip" data-jump="540">09시</button>
       <button class="chip" data-jump="720">12시</button>
       <button class="chip" data-jump="900">15시</button>
@@ -256,7 +257,9 @@
     </div>
     <div class="legend">
       <span><i style="background:#16233d"></i>그늘</span>
-      <span><i style="background:#8b95a6"></i>건물</span>
+      <span><i style="background:#b9c0cb"></i>건물</span>
+      <span><i style="background:#e2c98f"></i>주요건물</span>
+      <span><i style="background:#3a5fa8;height:4px;border-radius:2px"></i>지하철선</span>
       <span><i style="background:#d1373c;border-radius:50%"></i>지하철</span>
       <span><i style="background:#1f9d55;border-radius:50%"></i>버스</span>
       <span id="coverage"></span>
@@ -335,6 +338,8 @@
   const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
   const FETCH_Z = 16;                 // 이 줌 이상에서만 건물을 불러온다
   const SHADE_COLOR = 'rgba(24,37,64,0.62)';   // 그늘 색·농도. 레이어에서 한 번만 칠한다
+  const BUILDING_COLOR = '#b9c0cb';            // 건물 면(불투명). 그림자를 덮어 경계를 맞춘다
+  const LANDMARK_COLOR = '#e2c98f';            // 이름 있는 주요 건물
   const DEFAULT_H = 15;               // 높이 정보가 없을 때. 서울 도심 평균 5층 가정.
   const LEVEL_H = 3.1;                // 한 층 높이
 
@@ -343,6 +348,7 @@
   let minutes = nowMinutes();
   let buildings = [];        // [{pts:[[lat,lon]...], h, name}]
   let pois = [];             // [{kind:'subway'|'bus', lat, lon, name}]
+  let rails = [];            // [{pts:[[lat,lon]...], color, name}] 지하철 노선
   let windows = null;        // 밤 불빛 위치 (뷰가 바뀔 때만 다시 만든다)
   let loadedKey = null;      // 마지막으로 불러온 영역
   let playing = false, playTimer = null;
@@ -454,6 +460,17 @@
     };
   }
 
+  // OSM colour 태그는 '#0052A4' 같은 헥스일 수도, 'blue' 같은 이름일 수도 있다.
+  function normalizeColor(c) {
+    if (!c) return null;
+    const t = String(c).trim();
+    if (/^#[0-9a-fA-F]{3,8}$/.test(t)) return t;
+    const named = { red:'#d32f2f', blue:'#1565c0', green:'#2e7d32', orange:'#ef6c00',
+                    purple:'#6a1b9a', brown:'#5d4037', yellow:'#f9a825', gray:'#616161',
+                    grey:'#616161', black:'#333333', pink:'#c2185b' };
+    return named[t.toLowerCase()] || null;
+  }
+
   function parseHeight(tags) {
     if (!tags) return null;
     if (tags.height) {
@@ -518,13 +535,15 @@
       for (const w of xml.getElementsByTagName('way')) {
         const tags = {};
         for (const t of w.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
-        if (!tags.building) continue;
+        const isRail = tags.railway === 'subway' || tags.railway === 'light_rail';
+        if (!tags.building && !isRail) continue;
         const geometry = [];
         for (const nd of w.getElementsByTagName('nd')) {
           const c = nodes.get(nd.getAttribute('ref'));
           if (c) geometry.push({ lat: c[0], lon: c[1] });
         }
-        if (geometry.length >= 3) elements.push({ type: 'way', tags: tags, geometry: geometry });
+        const need = isRail ? 2 : 3;
+        if (geometry.length >= need) elements.push({ type: 'way', tags: tags, geometry: geometry });
       }
       return { elements: elements };
     } catch (e) {
@@ -541,7 +560,7 @@
 
   async function loadBuildings() {
     if (view.z < FETCH_Z) {
-      buildings = []; pois = []; loadedKey = null; projected = null;
+      buildings = []; pois = []; rails = []; loadedKey = null; projected = null;
       setStatus('지도를 더 확대하면 건물 그림자를 계산합니다.');
       draw();
       return;
@@ -560,6 +579,7 @@
 
     const q = '[out:json][timeout:20];(' +
       'way["building"](' + box + ');' +
+      'way["railway"~"^(subway|light_rail)$"](' + box + ');' +
       'node["railway"="station"](' + box + ');' +
       'node["highway"="bus_stop"](' + box + ');' +
       ');out geom;';
@@ -591,6 +611,7 @@
 
     const list = [];
     const poiList = [];
+    const railList = [];
     let known = 0;
     for (const el of (data.elements || [])) {
       const tg = el.tags || {};
@@ -603,6 +624,17 @@
         }
         continue;
       }
+      // 지하철 노선 — 선이라 건물과 따로 모은다. colour 태그가 있으면 그 색을 쓴다.
+      if (tg.railway === 'subway' || tg.railway === 'light_rail') {
+        if (el.geometry && el.geometry.length >= 2) {
+          railList.push({
+            pts: el.geometry.map(function (g) { return [g.lat, g.lon]; }),
+            color: normalizeColor(tg.colour || tg.color),
+            name: tg.name || null
+          });
+        }
+        continue;
+      }
       if (!el.geometry || el.geometry.length < 3) continue;
       const h = parseHeight(tg);
       if (h !== null) known++;
@@ -611,6 +643,7 @@
     }
     buildings = list;
     pois = poiList;
+    rails = railList;
     heightStat = { total: list.length, known: known };
     projectAll();
     loadedKey = box;
@@ -639,7 +672,15 @@
         area2 += xs[i] * ys[j] - xs[j] * ys[i];
       }
       if (area2 < 0) { xs.reverse(); ys.reverse(); }
-      return { xs: xs, ys: ys, h: b.h };
+      // 경계상자를 미리 구해 둔다. 화면 밖 건물을 걸러낼 때 쓴다.
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < n; i++) {
+        if (xs[i] < minX) minX = xs[i];
+        if (xs[i] > maxX) maxX = xs[i];
+        if (ys[i] < minY) minY = ys[i];
+        if (ys[i] > maxY) maxY = ys[i];
+      }
+      return { xs: xs, ys: ys, h: b.h, minX: minX, maxX: maxX, minY: minY, maxY: maxY };
     });
     buildWindows();
   }
@@ -721,6 +762,17 @@
       const len = b.h * cot;
       if (len > 900) continue;            // 일출·일몰 직전의 무한대에 가까운 그림자는 자른다
       const dx = len * ux, dy = len * uy;
+
+      // 건물과 그 그림자가 통째로 화면 밖이면 경로를 만들지 않는다.
+      // 1500개를 매 프레임 다 그리면 한 장에 800ms 가 넘는다.
+      const lo = Math.min(0, dx), hi = Math.max(0, dx);
+      const lo2 = Math.min(0, dy), hi2 = Math.max(0, dy);
+      if (b.maxX + hi < 0 || b.minX + lo > w || b.maxY + hi2 < 0 || b.minY + lo2 > h) continue;
+
+      // 화면에서 점만 한 건물은 그림자도 점만 하다. 경로를 만드는 값이 없다.
+      const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
+      if (bw * bh < 12 && len * ppm < 6) continue;
+
       const xs = b.xs, ys = b.ys, n = xs.length;
 
       // ① 바닥면 P
@@ -754,18 +806,9 @@
     }
     lc.fill('nonzero');
 
-    // 건물 안은 걸을 수 없으므로 그늘에서 도려낸다.
-    // 위에서 P 를 넣은 것은 어디까지나 채우기 규칙을 성립시키기 위해서다.
-    lc.globalCompositeOperation = 'destination-out';
-    lc.beginPath();
-    for (const b of projected) {
-      const xs = b.xs, ys = b.ys;
-      lc.moveTo(xs[0], ys[0]);
-      for (let i = 1; i < xs.length; i++) lc.lineTo(xs[i], ys[i]);
-      lc.closePath();
-    }
-    lc.fill('nonzero');
-    lc.globalCompositeOperation = 'source-over';
+    // 건물 바닥면을 도려내지 않는다. 도려내면 그림자가 건물에서 한 겹 떨어져
+    // 보인다. 그림자는 건물 아래에서 시작해 뻗어 나가는 것이 맞고,
+    // 건물 자체는 이 위에 불투명하게 덮어 가린다(drawBuildings).
 
     // 완성된 그림자를 한 겹으로 얹는다. 레이어 안에서 이미 합쳐졌으므로
     // 몇 겹이 겹쳤든 농도는 어디서나 똑같다.
@@ -793,12 +836,71 @@
   function drawBuildings() {
     if (!projected || !projected.length) return;
     ctx.save();
-    ctx.fillStyle = 'rgba(120,132,150,0.34)';
+    // 불투명해야 아래 그림자를 가려 건물과 그림자의 경계가 정확히 맞는다
+    ctx.fillStyle = BUILDING_COLOR;
+    const w = cv.width / dpr(), h = cv.height / dpr();
     ctx.beginPath();
     for (const b of projected) {
+      if (b.maxX < 0 || b.minX > w || b.maxY < 0 || b.minY > h) continue;
       const xs = b.xs, ys = b.ys;
       ctx.moveTo(xs[0], ys[0]);
       for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], ys[i]);
+      ctx.closePath();
+    }
+    ctx.fill('nonzero');
+    ctx.restore();
+  }
+
+  // 지하철 노선. 지하라 실제로는 안 보이지만, 길을 가늠하는 기준선이 된다.
+  function drawRails() {
+    if (!rails.length) return;
+    const w = cv.width / dpr(), h = cv.height / dpr();
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const r of rails) {
+      const pts = [];
+      let visible = false;
+      for (const p of r.pts) {
+        const q = project(p[0], p[1]);
+        pts.push(q);
+        if (q[0] > -60 && q[0] < w + 60 && q[1] > -60 && q[1] < h + 60) visible = true;
+      }
+      if (!visible || pts.length < 2) continue;
+      // 흰 테두리를 먼저 깔아 배경과 분리한다
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+      // 노선 색 (태그가 없으면 기본 남색)
+      ctx.strokeStyle = r.color || '#3a5fa8';
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 이름이 있고 충분히 큰 건물은 눈에 띄게 칠한다. 길을 찾을 때 기준이 된다.
+  function drawLandmarks() {
+    if (!projected || !projected.length) return;
+    ctx.save();
+    const w2 = cv.width / dpr(), h2 = cv.height / dpr();
+    ctx.fillStyle = LANDMARK_COLOR;
+    ctx.beginPath();
+    for (let i = 0; i < projected.length; i++) {
+      if (!buildings[i] || !buildings[i].name) continue;
+      const b = projected[i];
+      if (b.maxX < 0 || b.minX > w2 || b.maxY < 0 || b.minY > h2) continue;
+      // 화면에서 너무 작은 건물은 강조해도 안 보인다
+      if ((b.maxX - b.minX) * (b.maxY - b.minY) < 220) continue;
+      const xs = b.xs, ys = b.ys;
+      ctx.moveTo(xs[0], ys[0]);
+      for (let k = 1; k < xs.length; k++) ctx.lineTo(xs[k], ys[k]);
       ctx.closePath();
     }
     ctx.fill('nonzero');
@@ -1028,6 +1130,8 @@
     const sun = sunPosition(selectedDate(), view.lat, view.lon);
     drawShadows(sun);
     drawBuildings();
+    drawLandmarks();
+    drawRails();
     drawNight(sun);
     drawPois();
     drawSunDial(sun);
@@ -1174,15 +1278,16 @@
     if (playing) { stopPlay(); return; }
     playing = true;
     $('playBtn').textContent = '■ 정지';
-    // 해가 떠 있는 시간대만 돈다. 새벽부터 돌리면 한동안 화면이 그대로라
-    // "안 바뀐다"고 느끼게 된다.
-    minutes = 390;   // 06:30
+    // 06시에서 시작해 자정을 넘겨 다음날 06시까지, 하루를 온전히 한 바퀴 돈다.
+    minutes = 360;                    // 06:00
+    let elapsed = 0;                  // 시작점부터 흐른 분
     playTimer = setInterval(() => {
-      minutes += 15;
-      if (minutes > 1170) { minutes = 390; }   // 19:30 에서 되감기
+      elapsed += 20;
+      if (elapsed >= 1440) elapsed = 0;         // 24시간 돌면 처음으로
+      minutes = (360 + elapsed) % 1440;         // 자정을 넘어가면 0시로 감긴다
       range.value = minutes;
       draw();
-    }, 130);
+    }, 60);
   });
 
   /* ---------- 내 위치 ---------- */

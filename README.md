@@ -10,7 +10,7 @@
 | [game-2048](game-2048/index.html) | 4×4 2048 퍼즐. 방향키 + 스와이프 조작 | 최고 점수 |
 | [pomodoro-todo](pomodoro-todo/index.html) | 뽀모도로 타이머(25/5/15분) + 할 일 목록. 할 일별 🍅 카운트 | 세션 수, 할 일, 활성 작업 |
 | [particle-playground](particle-playground/index.html) | 캔버스 파티클 드로잉. 폭죽 / 트레일 / 오비트 3가지 모드 | 없음 |
-| [mood-log](mood-log/index.html) | 기분·수면·통증·에너지 일지. 본인/배우자 프로필, 14일 요약, 패턴 힌트, 진료용 인쇄·복사, JSON 백업 | 프로필별 기록, 마지막 프로필 |
+| [mood-log](mood-log/index.html) | 기분·수면·통증·에너지 일지. 본인/배우자 프로필, 14·30·90일 그래프, 주간·월간 통계, 패턴 힌트, 진료용 인쇄·복사, JSON 백업 | 프로필별 기록, 마지막 프로필 |
 
 ## 실행 방법
 
@@ -25,6 +25,13 @@ python -m http.server 8765
 - <http://localhost:8765/pomodoro-todo/>
 - <http://localhost:8765/particle-playground/>
 - <http://localhost:8765/mood-log/>
+
+## 안드로이드 APK (mood-log)
+
+`android-mood-log/build.ps1`을 실행하면 `mood-log/index.html`을 WebView로 감싼
+`android-mood-log/dist/mood-log.apk`가 만들어집니다 (Android SDK build-tools 34 + JDK 17 필요,
+Gradle 불필요). 디버그 키로 서명된 개인 설치용이며 스토어 배포용이 아닙니다.
+기록은 앱 안에만 저장되므로 앱을 삭제하기 전에 JSON 내보내기로 백업하세요.
 
 ## 브라우저 지원
 

@@ -111,3 +111,18 @@ python -m http.server 8765
   진단이 아니라는 문구를 항상 마지막에 붙인다. 통계 기법을 더하더라도 이 문구는 유지.
 - 인쇄(`@media print`)는 진료실 제출용이다. 입력 폼·탭·도구 버튼을 숨기고 요약·패턴·
   기록만 남긴다. 새 섹션을 추가하면 인쇄에 포함할지 결정해야 한다.
+- 주간·월간 통계(`periods`, `renderStats`)는 주를 월요일 시작으로 잡고, 진행 중인
+  기간의 분모는 오늘까지의 날 수다. 그래프 기간(14/30/90일)과 통계 단위(주/월)는
+  `chartDays`, `statsKind` 메모리 상태일 뿐 `store`에 남기지 않는다.
+- **APK 브리지**: `window.AndroidBridge`(`saveFile`, `copyText`, `print`)가 있으면
+  내보내기·복사·인쇄를 그쪽으로 보낸다. 없으면 브라우저 경로. 브리지 메서드를 바꾸면
+  `android-mood-log/java/.../MainActivity.java`의 `Bridge` 클래스도 같이 바꿔야 한다.
+
+### android-mood-log (APK 셸)
+
+`mood-log/index.html`을 WebView로 감싼 안드로이드 앱. Gradle 없이
+`build.ps1`(aapt2 → javac → d8 → zipalign → apksigner)로 빌드하며, 실행 시
+`mood-log/index.html`을 `assets/`로 복사하므로 **웹과 APK의 원본은 항상 같은 파일**이다.
+네트워크 권한이 없고, JSON 저장/불러오기는 시스템 문서 선택기(SAF)로 처리한다.
+기록은 WebView의 localStorage에 남으므로 앱을 지우면 기록도 사라진다(JSON 백업 안내 필수).
+`build/`, `dist/`, `assets/`, `debug.keystore`는 커밋하지 않는다(폴더 안 `.gitignore`).

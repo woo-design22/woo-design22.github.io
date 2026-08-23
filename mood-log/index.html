@@ -69,6 +69,12 @@
     margin-bottom: 20px;
   }
   .card h2 { font-size: 1rem; margin: 0 0 12px; color: var(--muted); font-weight: 600; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .card-head h2 { margin: 0; }
+  /* 기간 전환 토글 (14/30/90일, 주간/월간) */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button { background: transparent; border: none; color: var(--muted); padding: 6px 12px; min-height: 32px; font-size: 0.78rem; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 
   /* 입력 폼 */
   .row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -117,6 +123,9 @@
     .row { flex-wrap: wrap; }
     .row label, .row .label { flex-basis: 100%; }
     .hint { margin-left: 0; }
+    /* 통계 표: 기분 숫자 아래에 범위 띠를 내려 폭을 아낀다 */
+    .stats-table .mood-cell { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .stats-table .mood-v { min-width: 0; }
   }
   .actions { display: flex; gap: 10px; margin-top: 4px; }
   .actions button {
@@ -153,6 +162,28 @@
   .bar.empty { background: transparent; border: 1px dashed var(--line); cursor: default; }
   .chart-label { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
   .chart-pick { font-size: 0.8rem; color: var(--text); min-height: 1.2em; margin-top: 6px; text-align: center; }
+  .chart.dense { gap: 1px; }
+  .chart.dense .bar { border-radius: 1px 1px 0 0; }
+
+  /* 주간·월간 통계 표 */
+  .table-wrap { overflow-x: auto; }
+  .stats-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+  .stats-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 6px 4px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .stats-table td { padding: 7px 3px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .stats-table td.period { color: var(--muted); }
+  .stats-table td.dim { color: var(--muted); }
+  .stats-table .mood-cell { display: flex; align-items: center; gap: 6px; }
+  .stats-table .mood-v { min-width: 2.6em; font-weight: 700; }
+  .stats-table .mood-v.low, .stats-table .mood-v.high { color: var(--bad); }
+  .stats-table .mood-v.ok { color: var(--good); }
+  /* -3~+3 트랙 위에 최소~최대 범위를 띠로 표시 */
+  .range { position: relative; width: 44px; height: 8px; background: var(--card2); border-radius: 4px; }
+  .range::after { content: ''; position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: var(--line); }
+  .range .span { position: absolute; top: 0; height: 100%; border-radius: 4px; background: var(--accent); opacity: .85; }
+  .stats-table .dist { color: var(--muted); font-size: 0.72rem; }
+  .stats-table .dist b { color: var(--bad); font-weight: 600; }
+  .stats-note { font-size: 0.72rem; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
 
   /* 기록 목록 */
   .entries { list-style: none; padding: 0; margin: 0; }
@@ -191,7 +222,12 @@
     .card { box-shadow: none; background: var(--print-bg); border: 1px solid var(--print-line); border-radius: 0; page-break-inside: avoid; }
     .card h2, .subtitle, .entry .d, .entry .nums, .stat .k, .patterns li, .patterns li.muted, .chart-label, .chart-pick { color: var(--print-text); }
     .patterns li.warn { color: var(--print-text); font-weight: 700; }
-    .tabs, #formCard, .tools, .saved-msg, .entry .btns, .privacy { display: none; }
+    .tabs, #formCard, .tools, .saved-msg, .entry .btns, .privacy, .seg { display: none; }
+    .stats-table th, .stats-table td, .stats-table td.period, .stats-table td.dim, .stats-table .dist, .stats-note { color: var(--print-text); }
+    .stats-table .mood-v.low, .stats-table .mood-v.high { color: var(--print-text); text-decoration: underline; }
+    .stats-table .mood-v.ok { color: var(--print-text); }
+    .range { background: var(--print-stat); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .range .span { background: var(--print-bar-strong); }
     .entry .note { white-space: normal; }
     .stat { background: var(--print-stat); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .bar, .entry .dot { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -248,11 +284,25 @@
   </div>
 
   <div class="card">
-    <h2 id="summaryTitle">최근 14일</h2>
+    <div class="card-head">
+      <h2 id="summaryTitle">최근 14일</h2>
+      <div class="seg" id="rangeSeg" role="group" aria-label="그래프 기간"></div>
+    </div>
     <div class="stats" id="stats"></div>
     <div class="chart" id="chart"></div>
     <div class="chart-label"><span id="chartFrom"></span><span>기분 (위 = 들뜸, 아래 = 가라앉음)</span><span id="chartTo"></span></div>
     <div class="chart-pick" id="chartPick"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2 id="statsTitle">주간 통계</h2>
+      <div class="seg" id="kindSeg" role="group" aria-label="통계 단위"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="stats-table" id="statsTable"></table>
+    </div>
+    <p class="stats-note">기분 칸의 띠는 그 기간의 최저~최고 범위(-3~+3), 가운데 선이 0. ↓는 -2 이하, ↑는 +2 이상이었던 날 수.</p>
   </div>
 
   <div class="card">
@@ -314,6 +364,12 @@
   let entries = [];          // { date:'YYYY-MM-DD', mood, sleep, pain, energy, note }
   let draft;                 // 입력 폼 상태. 항상 draftFor()로 만든다.
   let renderedDay = null;    // 마지막 전체 렌더 시점의 날짜. 자정을 넘기면 다시 그린다.
+  let chartDays = 14;        // 요약 그래프 기간 (14 / 30 / 90). 영속하지 않는다.
+  let statsKind = 'week';    // 통계 단위 ('week' / 'month'). 영속하지 않는다.
+  const CHART_RANGES = [14, 30, 90];
+  const STATS_KINDS = [['week', '주간'], ['month', '월간']];
+  // APK 안에서는 MainActivity가 window.AndroidBridge 로 파일 저장·복사·인쇄를 대신한다
+  const native = typeof window.AndroidBridge === 'object' && window.AndroidBridge ? window.AndroidBridge : null;
 
   function emptyDraft(date) {
     return { date: date || todayStr(), mood: null, sleep: null, pain: null, energy: null, note: '' };
@@ -358,7 +414,8 @@
         noteInput = $('noteInput'), savedMsg = $('savedMsg'),
         summaryTitle = $('summaryTitle'), statsEl = $('stats'), chartEl = $('chart'),
         chartFrom = $('chartFrom'), chartTo = $('chartTo'), chartPick = $('chartPick'),
-        patternsEl = $('patterns'), entriesTitle = $('entriesTitle'), entriesEl = $('entries'), importFile = $('importFile');
+        patternsEl = $('patterns'), entriesTitle = $('entriesTitle'), entriesEl = $('entries'), importFile = $('importFile'),
+        rangeSeg = $('rangeSeg'), kindSeg = $('kindSeg'), statsTitle = $('statsTitle'), statsTable = $('statsTable');
   const scaleEls = { mood: $('moodScale'), sleep: $('sleepScale'), pain: $('painScale'), energy: $('energyScale') };
 
   // ── 렌더: 상태가 바뀌면 전부 다시 그린다 ───────────────
@@ -367,8 +424,21 @@
     renderTabs();
     renderForm();
     renderSummary();
+    renderStats();
     renderPatterns();
     renderEntries();
+  }
+
+  // 토글 버튼 묶음. 값이 바뀌면 해당 카드만 다시 그린다.
+  function renderSeg(el, items, current, onPick) {
+    el.innerHTML = '';
+    items.forEach(([value, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.setAttribute('aria-pressed', value === current ? 'true' : 'false');
+      b.addEventListener('click', () => onPick(value));
+      el.appendChild(b);
+    });
   }
 
   function renderTabs() {
@@ -424,9 +494,11 @@
   const num = (e, k) => typeof e[k] === 'number' ? e[k] : null;
 
   function renderSummary() {
-    const days = 14;
+    const days = chartDays;
     const list = windowEntries(days);
     summaryTitle.textContent = `${labelOf(profile)} · 최근 ${days}일 · ${list.length}일 기록`;
+    renderSeg(rangeSeg, CHART_RANGES.map(n => [n, n + '일']), days, n => { chartDays = n; renderSummary(); });
+    chartEl.classList.toggle('dense', days > 31);
     statsEl.innerHTML = '';
     [
       ['기분 평균', fmtMoodAvg(avg(list, 'mood'))],
@@ -471,6 +543,94 @@
         bar.addEventListener('click', () => { chartPick.textContent = text; });
       }
       chartEl.appendChild(bar);
+    }
+  }
+
+  // ── 주간·월간 통계 ─────────────────────────────────────
+  // 주는 월요일 시작. 기간은 오늘을 포함하는 구간부터 거꾸로 센다.
+  function periods(kind, count) {
+    const today = todayStr();
+    const out = [];
+    if (kind === 'week') {
+      const [y, m, d] = today.split('-').map(Number);
+      const dow = (new Date(y, m - 1, d).getDay() + 6) % 7; // 월=0 … 일=6
+      let start = addDays(today, -dow);
+      for (let i = 0; i < count; i++) {
+        const end = addDays(start, 6);
+        const short = d => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
+        out.push({ from: start, to: end, label: `${short(start)}~${short(end)}`, days: 7 });
+        start = addDays(start, -7);
+      }
+    } else {
+      let [y, m] = today.split('-').map(Number);
+      for (let i = 0; i < count; i++) {
+        const p = String(m).padStart(2, '0');
+        const from = `${y}-${p}-01`;
+        const daysIn = new Date(y, m, 0).getDate();
+        out.push({ from, to: `${y}-${p}-${String(daysIn).padStart(2, '0')}`, label: `${y}.${p}`, days: daysIn });
+        m -= 1; if (m === 0) { m = 12; y -= 1; }
+      }
+    }
+    return out;
+  }
+
+  function renderStats() {
+    const count = statsKind === 'week' ? 8 : 6;
+    statsTitle.textContent = `${labelOf(profile)} · ${statsKind === 'week' ? '주간' : '월간'} 통계`;
+    renderSeg(kindSeg, STATS_KINDS, statsKind, k => { statsKind = k; renderStats(); });
+    const today = todayStr();
+    statsTable.innerHTML = '';
+    const thead = document.createElement('thead');
+    const hr = document.createElement('tr');
+    ['기간', '기록', '기분', '수면', '통증', '에너지', '↓ ↑'].forEach(t => { const th = document.createElement('th'); th.textContent = t; hr.appendChild(th); });
+    thead.appendChild(hr); statsTable.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    let any = false;
+    periods(statsKind, count).forEach(pd => {
+      const list = entries.filter(e => e.date >= pd.from && e.date <= pd.to && e.date <= today);
+      const tr = document.createElement('tr');
+      const td = (text, cls) => { const c = document.createElement('td'); c.textContent = text; if (cls) c.className = cls; tr.appendChild(c); return c; };
+      // 진행 중인 기간은 오늘까지의 날 수로 분모를 잡는다
+      let denom = pd.days;
+      if (pd.to > today) { denom = 0; for (let d = pd.from; d <= today; d = addDays(d, 1)) denom++; }
+      td(pd.label, 'period');
+      if (!list.length) {
+        td(`0/${denom}`, 'dim'); td('–', 'dim'); td('–', 'dim'); td('–', 'dim'); td('–', 'dim'); td('', 'dim');
+        tbody.appendChild(tr); return;
+      }
+      any = true;
+      td(`${list.length}/${denom}`);
+      const moods = list.map(e => e.mood).filter(v => typeof v === 'number');
+      const mAvg = avg(list, 'mood');
+      const cell = document.createElement('td');
+      const wrap = document.createElement('span'); wrap.className = 'mood-cell';
+      const mv = document.createElement('span'); mv.className = 'mood-v ' + (mAvg === null ? '' : mAvg >= 1.5 ? 'high' : mAvg <= -1.5 ? 'low' : 'ok');
+      mv.textContent = fmtMoodAvg(mAvg);
+      wrap.appendChild(mv);
+      if (moods.length) {
+        const lo = Math.min(...moods), hi = Math.max(...moods);
+        const range = document.createElement('span'); range.className = 'range';
+        range.title = `최저 ${fmtMood(lo)} · 최고 ${fmtMood(hi)}`;
+        const span = document.createElement('span'); span.className = 'span';
+        // -3 → 0%, +3 → 100%. 최소 폭을 줘서 한 점도 보이게
+        span.style.left = ((lo + 3) / 6 * 100) + '%';
+        span.style.width = Math.max(6, (hi - lo) / 6 * 100) + '%';
+        range.appendChild(span); wrap.appendChild(range);
+      }
+      cell.appendChild(wrap); tr.appendChild(cell);
+      td(fmt(avg(list, 'sleep')));
+      td(fmt(avg(list, 'pain')));
+      td(fmt(avg(list, 'energy')));
+      const low = moods.filter(v => v <= -2).length, high = moods.filter(v => v >= 2).length;
+      const dist = td('', 'dist');
+      const lowEl = document.createElement(low ? 'b' : 'span'); lowEl.textContent = `↓${low}`;
+      const highEl = document.createElement(high ? 'b' : 'span'); highEl.textContent = ` ↑${high}`;
+      dist.append(lowEl, highEl);
+      tbody.appendChild(tr);
+    });
+    statsTable.appendChild(tbody);
+    if (!any) {
+      const tr = document.createElement('tr'); const c = document.createElement('td'); c.colSpan = 7; c.className = 'empty'; c.textContent = '이 기간에 기록이 없다.'; tr.appendChild(c); tbody.appendChild(tr);
     }
   }
 
@@ -646,6 +806,7 @@
     const text = toText();
     const done = () => flash('복사됨 — 메모장이나 AI에 붙여넣기');
     const fail = () => flash('복사 실패 — 인쇄나 JSON 내보내기를 써볼 것');
+    if (native && native.copyText) { native.copyText(text); done(); return; }
     // http(비보안) 접속이나 구형 WebView에는 clipboard API가 없다. execCommand는 실패해도 예외 대신 false.
     const fallback = () => {
       const ta = document.createElement('textarea');
@@ -662,6 +823,12 @@
   }
 
   function exportJson() {
+    const name = `mood-log-${profile}-${todayStr()}.json`;
+    if (native && native.saveFile) {
+      native.saveFile(name, JSON.stringify({ profile, exportedAt: todayStr(), entries }, null, 2));
+      flash('저장할 위치를 고르면 된다');
+      return;
+    }
     // 카카오톡·네이버 인앱 브라우저는 blob 다운로드를 처리하지 못하고 아무 반응이 없다
     if (/KAKAOTALK|NAVER\(inapp/i.test(navigator.userAgent)) {
       flash('인앱 브라우저에서는 내보내기가 안 된다 — Chrome/Safari로 열 것');
@@ -670,7 +837,7 @@
     const blob = new Blob([JSON.stringify({ profile, exportedAt: todayStr(), entries }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `mood-log-${profile}-${todayStr()}.json`;
+    a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     // iOS Safari는 다운로드 확인 시트에서 사용자가 누를 때 URL을 읽으므로 바로 해제하면 실패한다
     setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
@@ -741,7 +908,7 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEntry(); }
   });
   $('copyBtn').addEventListener('click', copyText);
-  $('printBtn').addEventListener('click', () => window.print());
+  $('printBtn').addEventListener('click', () => { if (native && native.print) native.print(); else window.print(); });
   $('exportBtn').addEventListener('click', exportJson);
   $('importBtn').addEventListener('click', () => importFile.click());
   importFile.addEventListener('change', () => {

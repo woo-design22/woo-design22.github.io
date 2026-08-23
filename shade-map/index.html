@@ -91,7 +91,7 @@
   .tbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 
   /* ---------- 지도 ---------- */
-  #mapWrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--surface-2); }
+  #mapWrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #eae7e2; }
   #map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
   #map:active { cursor: grabbing; }
 
@@ -248,6 +248,7 @@
     </div>
     <div class="chips">
       <button class="chip" data-jump="now">지금</button>
+      <button class="chip" data-jump="360">06시</button>
       <button class="chip" data-jump="540">09시</button>
       <button class="chip" data-jump="720">12시</button>
       <button class="chip" data-jump="900">15시</button>
@@ -255,8 +256,12 @@
       <button class="chip" id="playBtn">▶ 하루 재생</button>
     </div>
     <div class="legend">
-      <span><i style="background:var(--shade)"></i>그늘</span>
-      <span><i style="background:var(--sun)"></i>건물</span>
+      <span><i style="background:#16233d"></i>그늘</span>
+      <span><i style="background:#b9c0cb"></i>건물</span>
+      <span><i style="background:#e2c98f"></i>주요건물</span>
+      <span><i style="background:#3a5fa8;height:4px;border-radius:2px"></i>지하철선</span>
+      <span><i style="background:#d1373c;border-radius:50%"></i>지하철</span>
+      <span><i style="background:#1f9d55;border-radius:50%"></i>버스</span>
       <span id="coverage"></span>
     </div>
   </div>
@@ -271,7 +276,10 @@
       <ul>
         <li><b>태양 위치</b>는 날짜·시각·좌표로 직접 계산합니다(천문 공식).</li>
         <li><b>건물 모양과 높이</b>는 OpenStreetMap에서 실시간으로 가져옵니다.</li>
-        <li>건물 외곽선을 <b>높이 ÷ tan(태양고도)</b> 만큼 태양 반대편으로 밀어 그림자를 만듭니다.</li>
+        <li>그림자는 건물 바닥면을 <b>높이 ÷ tan(태양고도)</b> 만큼 태양 반대편으로
+          쓸어낸 영역입니다. 해가 낮을수록 <b>길게 늘어납니다</b>
+          (정오 0.5배 → 저녁 7배 이상).</li>
+        <li><b>밤에는 건물에 불이 켜집니다.</b> 초저녁에 가장 많고 새벽 4시경 가장 적습니다.</li>
       </ul>
     </div>
 
@@ -281,6 +289,7 @@
         <li>건물 정보는 <b>OpenStreetMap 공용 서버</b>에서 가져옵니다. 무료 서버라
           <b>혼잡하면 응답하지 않을 수 있습니다.</b> 그럴 땐 잠시 뒤 지도를 조금 움직여 보세요.</li>
         <li>OSM에 <b>높이 정보가 있는 건물은 절반 이하</b>입니다(서울 기준 23~55%).
+          없으면 층수×3.1m, 그것도 없으면 5층(15m)으로 추정합니다.
           없으면 층수×3m로 추정하고, 그것도 없으면 기본값을 씁니다.</li>
         <li><b>가로수·육교·구름은 반영되지 않습니다.</b> 실제 그늘과 다를 수 있습니다.</li>
         <li>지형 높낮이를 무시한 평지 가정입니다.</li>
@@ -314,20 +323,33 @@
   const OVERPASS = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter'
+    'https://overpass.private.coffee/api/interpreter',
+    // osm.ch 는 200 을 주면서 빈 결과를 돌려주는 일이 있어 뒤로 뺐다
+    'https://overpass.osm.ch/api/interpreter'
   ];
-  const FETCH_TIMEOUT = 12000;
-  const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  // Overpass 가 전부 막혔을 때 쓰는 마지막 경로. OSM 본 API 는 완전히 다른
+  // 인프라라 함께 죽는 일이 드물다. XML 이라 직접 파싱해야 한다.
+  const OSM_API = 'https://api.openstreetmap.org/api/0.6/map?bbox=';
+  const FETCH_TIMEOUT = 7000;    // Overpass 미러 하나당
+  const OSM_TIMEOUT = 20000;     // OSM 본 API 는 응답이 커서 넉넉히
+  // 라벨 없는 밝은 지도. 식당·상호 같은 표시가 없어 그림자가 잘 보인다.
+  const TILE_URL = 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png';
   const TILE = 256;
   const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
   const FETCH_Z = 16;                 // 이 줌 이상에서만 건물을 불러온다
-  const DEFAULT_H = 9;                // 높이 정보가 전혀 없을 때 (3층 가정)
+  const SHADE_COLOR = 'rgba(24,37,64,0.62)';   // 그늘 색·농도. 레이어에서 한 번만 칠한다
+  const BUILDING_COLOR = '#b9c0cb';            // 건물 면(불투명). 그림자를 덮어 경계를 맞춘다
+  const LANDMARK_COLOR = '#e2c98f';            // 이름 있는 주요 건물
+  const DEFAULT_H = 15;               // 높이 정보가 없을 때. 서울 도심 평균 5층 가정.
   const LEVEL_H = 3.1;                // 한 층 높이
 
   /* ---------- 상태 ---------- */
   let view = store.get('shade_view', { lat: 37.5665, lon: 126.9780, z: 16 });  // 서울시청
   let minutes = nowMinutes();
-  let buildings = [];        // [{pts:[[lat,lon]...], h}]
+  let buildings = [];        // [{pts:[[lat,lon]...], h, name}]
+  let pois = [];             // [{kind:'subway'|'bus', lat, lon, name}]
+  let rails = [];            // [{pts:[[lat,lon]...], color, name}] 지하철 노선
+  let windows = null;        // 밤 불빛 위치 (뷰가 바뀔 때만 다시 만든다)
   let loadedKey = null;      // 마지막으로 불러온 영역
   let playing = false, playTimer = null;
   let heightStat = { total: 0, known: 0 };
@@ -438,6 +460,17 @@
     };
   }
 
+  // OSM colour 태그는 '#0052A4' 같은 헥스일 수도, 'blue' 같은 이름일 수도 있다.
+  function normalizeColor(c) {
+    if (!c) return null;
+    const t = String(c).trim();
+    if (/^#[0-9a-fA-F]{3,8}$/.test(t)) return t;
+    const named = { red:'#d32f2f', blue:'#1565c0', green:'#2e7d32', orange:'#ef6c00',
+                    purple:'#6a1b9a', brown:'#5d4037', yellow:'#f9a825', gray:'#616161',
+                    grey:'#616161', black:'#333333', pink:'#c2185b' };
+    return named[t.toLowerCase()] || null;
+  }
+
   function parseHeight(tags) {
     if (!tags) return null;
     if (tags.height) {
@@ -453,7 +486,11 @@
 
   // 미러 하나를 정해진 시간 안에 시도한다. 실패하면 null.
   // ctrl 을 밖에서 넘겨받아, 새 요청이 들어오면 이전 요청을 끊을 수 있게 한다.
-  async function tryOverpass(url, q, ctrl) {
+  // 시도마다 새 컨트롤러를 만든다. 하나를 돌려 쓰면 첫 타임아웃이 컨트롤러를
+  // 영구히 취소시켜 이후 시도가 전부 즉시 실패한다.
+  async function tryOverpass(url, q) {
+    const ctrl = new AbortController();
+    currentCtrl = ctrl;
     const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
     try {
       const res = await fetch(url + '?data=' + encodeURIComponent(q), { signal: ctrl.signal });
@@ -466,14 +503,64 @@
     }
   }
 
+  // Overpass 가 전부 막혔을 때: OSM 본 API 의 XML 을 직접 파싱한다.
+  // way 는 node 참조만 갖고 있어서, node 좌표표를 먼저 모은 뒤 이어 붙인다.
+  async function tryOsmApi(box) {
+    // Overpass 는 (남,서,북,동) 순서인데 OSM API 는 (서,남,동,북) 이다
+    const p = box.split(',');
+    const bbox = [p[1], p[0], p[3], p[2]].join(',');
+    const ctrl = new AbortController();
+    currentCtrl = ctrl;
+    const timer = setTimeout(() => ctrl.abort(), OSM_TIMEOUT);
+    try {
+      const res = await fetch(OSM_API + bbox, { signal: ctrl.signal });
+      if (!res.ok) return null;
+      const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+      if (xml.querySelector('parsererror')) return null;
+
+      const nodes = new Map();
+      for (const n of xml.getElementsByTagName('node')) {
+        nodes.set(n.getAttribute('id'), [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))]);
+      }
+      const elements = [];
+      // 지하철역·버스정류장은 node 에 태그가 붙어 있다
+      for (const n of xml.getElementsByTagName('node')) {
+        const tags = {};
+        for (const t of n.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
+        if (tags.railway === 'station' || tags.highway === 'bus_stop') {
+          elements.push({ type: 'node', tags: tags,
+            lat: parseFloat(n.getAttribute('lat')), lon: parseFloat(n.getAttribute('lon')) });
+        }
+      }
+      for (const w of xml.getElementsByTagName('way')) {
+        const tags = {};
+        for (const t of w.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
+        const isRail = tags.railway === 'subway' || tags.railway === 'light_rail';
+        if (!tags.building && !isRail) continue;
+        const geometry = [];
+        for (const nd of w.getElementsByTagName('nd')) {
+          const c = nodes.get(nd.getAttribute('ref'));
+          if (c) geometry.push({ lat: c[0], lon: c[1] });
+        }
+        const need = isRail ? 2 : 3;
+        if (geometry.length >= need) elements.push({ type: 'way', tags: tags, geometry: geometry });
+      }
+      return { elements: elements };
+    } catch (e) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // 요청 세대 번호. 지도를 움직이면 번호가 올라가고, 뒤늦게 도착한 옛 응답은 버린다.
   // 이게 없으면 느린 요청이 끝날 때까지 새 영역을 아예 못 불러온다.
   let reqSeq = 0;
-  let inflight = null;
+  let currentCtrl = null;
 
   async function loadBuildings() {
     if (view.z < FETCH_Z) {
-      buildings = []; loadedKey = null; projected = null;
+      buildings = []; pois = []; rails = []; loadedKey = null; projected = null;
       setStatus('지도를 더 확대하면 건물 그림자를 계산합니다.');
       draw();
       return;
@@ -487,22 +574,32 @@
     if (box === loadedKey) return;
 
     // 진행 중이던 요청은 끊는다
-    if (inflight) { try { inflight.abort(); } catch (e) {} }
-    const ctrl = new AbortController();
-    inflight = ctrl;
+    if (currentCtrl) { try { currentCtrl.abort(); } catch (e) {} }
     const seq = ++reqSeq;
 
-    const q = '[out:json][timeout:20];way["building"](' + box + ');out geom;';
+    const q = '[out:json][timeout:20];(' +
+      'way["building"](' + box + ');' +
+      'way["railway"~"^(subway|light_rail)$"](' + box + ');' +
+      'node["railway"="station"](' + box + ');' +
+      'node["highway"="bus_stop"](' + box + ');' +
+      ');out geom;';
     let data = null;
     for (let i = 0; i < OVERPASS.length; i++) {
       if (seq !== reqSeq) return;          // 그 사이 새 요청이 생겼으면 조용히 물러난다
       setStatus('건물 정보를 불러오는 중…' + (i ? ' (' + (i + 1) + '/' + OVERPASS.length + ')' : ''));
       draw();
-      data = await tryOverpass(OVERPASS[i], q, ctrl);
-      if (data) break;
+      data = await tryOverpass(OVERPASS[i], q);
+      // 200 을 주면서 빈 결과를 돌려주는 미러가 있다. 그것도 실패로 보고 넘어간다.
+      if (data && data.elements && data.elements.length) break;
+      data = null;
+    }
+    if (!data && seq === reqSeq) {
+      setStatus('다른 경로로 시도하는 중…');
+      draw();
+      data = await tryOsmApi(box);
     }
     if (seq !== reqSeq) return;
-    inflight = null;
+    currentCtrl = null;
 
     if (!data) {
       // 무료 공용 서버라 몰리면 막힌다. 사용자가 원인을 알 수 있게 한다.
@@ -513,14 +610,40 @@
     }
 
     const list = [];
+    const poiList = [];
+    const railList = [];
     let known = 0;
     for (const el of (data.elements || [])) {
+      const tg = el.tags || {};
+      if (el.type === 'node') {
+        if (el.lat === undefined) continue;
+        if (tg.railway === 'station') {
+          poiList.push({ kind: 'subway', lat: el.lat, lon: el.lon, name: tg.name || '역' });
+        } else if (tg.highway === 'bus_stop') {
+          poiList.push({ kind: 'bus', lat: el.lat, lon: el.lon, name: tg.name || '' });
+        }
+        continue;
+      }
+      // 지하철 노선 — 선이라 건물과 따로 모은다. colour 태그가 있으면 그 색을 쓴다.
+      if (tg.railway === 'subway' || tg.railway === 'light_rail') {
+        if (el.geometry && el.geometry.length >= 2) {
+          railList.push({
+            pts: el.geometry.map(function (g) { return [g.lat, g.lon]; }),
+            color: normalizeColor(tg.colour || tg.color),
+            name: tg.name || null
+          });
+        }
+        continue;
+      }
       if (!el.geometry || el.geometry.length < 3) continue;
-      const h = parseHeight(el.tags);
+      const h = parseHeight(tg);
       if (h !== null) known++;
-      list.push({ pts: el.geometry.map(function (g) { return [g.lat, g.lon]; }), h: h === null ? DEFAULT_H : h });
+      const pts = el.geometry.map(function (g) { return [g.lat, g.lon]; });
+      list.push({ pts: pts, h: h === null ? DEFAULT_H : h, name: tg.name || null });
     }
     buildings = list;
+    pois = poiList;
+    rails = railList;
     heightStat = { total: list.length, known: known };
     projectAll();
     loadedKey = box;
@@ -541,8 +664,25 @@
         xs[i] = lonToX(b.pts[i][1], view.z) - cx + ox;
         ys[i] = latToY(b.pts[i][0], view.z) - cy + oy;
       }
-      return { xs: xs, ys: ys, h: b.h };
+      // 감김 방향을 하나로 맞춘다. 섞여 있으면 nonzero 채우기에서 서로 상쇄돼
+      // 그림자에 구멍이 생긴다(실측: 쓸고 간 면적 4460px 중 1600px 만 칠해짐).
+      let area2 = 0;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        area2 += xs[i] * ys[j] - xs[j] * ys[i];
+      }
+      if (area2 < 0) { xs.reverse(); ys.reverse(); }
+      // 경계상자를 미리 구해 둔다. 화면 밖 건물을 걸러낼 때 쓴다.
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < n; i++) {
+        if (xs[i] < minX) minX = xs[i];
+        if (xs[i] > maxX) maxX = xs[i];
+        if (ys[i] < minY) minY = ys[i];
+        if (ys[i] > maxY) maxY = ys[i];
+      }
+      return { xs: xs, ys: ys, h: b.h, minX: minX, maxX: maxX, minY: minY, maxY: maxY };
     });
+    buildWindows();
   }
 
   // 이 줌·위도에서 1미터가 몇 픽셀인가 (메르카토르는 등각이라 x·y 동일)
@@ -584,59 +724,368 @@
 
   function drawShadows(sun) {
     if (!projected || !projected.length) return;
+    const w = cv.width / dpr(), h = cv.height / dpr();
 
-    // 태양이 지평선 아래면 그림자가 아니라 전체가 그늘이다
-    if (sun.alt <= 0.02) {
-      ctx.fillStyle = 'rgba(43,58,85,0.34)';
-      ctx.fillRect(0, 0, cv.width / dpr(), cv.height / dpr());
-      return;
-    }
+    if (sun.alt <= 0.02) return;   // 밤은 drawNight() 이 따로 처리한다
 
-    // 그림자 길이(m) = 높이 / tan(고도). 방향은 태양 반대편.
-    // 픽셀 오프셋은 건물마다 높이만 다르므로 단위벡터를 한 번만 구해 곱한다.
+    /* ── 그림자 기하 ──────────────────────────────────────────────
+     * 그림자는 평행 이동이 아니라 "쓸고 지나간 영역"이다.
+     * 수학적으로는 건물 바닥면 P 와 선분 d = (그림자 벡터) 의 민코프스키 합:
+     *
+     *     Shadow = P ⊕ {t·d | 0 ≤ t ≤ 1}
+     *            = P ∪ (P+d) ∪ ⋃(각 변을 d 만큼 쓸어낸 사각형)
+     *
+     * 길이는 |d| = 높이 / tan(태양고도) 이므로 해가 낮아질수록 늘어난다.
+     * 방향은 태양의 정반대(방위각 + 180°).
+     *
+     * 중요: nonzero 채우기가 성립하려면 P 와 P+d 를 반드시 함께 넣어야 한다.
+     * 변 사각형만 넣으면 감김 수가 상쇄되어 겹치는 곳에 구멍이 생긴다.
+     * (이전 판이 "면적이 넓어지면 희미해진다"고 보였던 원인)
+     * ──────────────────────────────────────────────────────────── */
     const cot = 1 / Math.tan(sun.alt);
     const dirAz = sun.az + Math.PI;
     const ppm = pixelsPerMeter();
     const ux = Math.sin(dirAz) * ppm;     // 동쪽이 화면 +x
     const uy = -Math.cos(dirAz) * ppm;    // 북쪽이 화면 -y
 
-    ctx.save();
-    ctx.fillStyle = 'rgba(43,58,85,0.42)';
-    ctx.beginPath();
+    const lay = shadowLayer(w, h);
+    const lc = lay.getContext('2d');
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.clearRect(0, 0, lay.width, lay.height);
+    lc.scale(dpr(), dpr());
+
+    lc.globalCompositeOperation = 'source-over';
+    lc.fillStyle = SHADE_COLOR;
+    lc.beginPath();
 
     for (const b of projected) {
       const len = b.h * cot;
-      if (len > 400) continue;            // 해질 무렵의 비현실적인 그림자는 자른다
+      if (len > 900) continue;            // 일출·일몰 직전의 무한대에 가까운 그림자는 자른다
       const dx = len * ux, dy = len * uy;
+
+      // 건물과 그 그림자가 통째로 화면 밖이면 경로를 만들지 않는다.
+      // 1500개를 매 프레임 다 그리면 한 장에 800ms 가 넘는다.
+      const lo = Math.min(0, dx), hi = Math.max(0, dx);
+      const lo2 = Math.min(0, dy), hi2 = Math.max(0, dy);
+      if (b.maxX + hi < 0 || b.minX + lo > w || b.maxY + hi2 < 0 || b.minY + lo2 > h) continue;
+
+      // 화면에서 점만 한 건물은 그림자도 점만 하다. 경로를 만드는 값이 없다.
+      const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
+      if (bw * bh < 12 && len * ppm < 6) continue;
+
       const xs = b.xs, ys = b.ys, n = xs.length;
+
+      // ① 바닥면 P
+      lc.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < n; i++) lc.lineTo(xs[i], ys[i]);
+      lc.closePath();
+
+      // ② 밀어낸 면 P+d
+      lc.moveTo(xs[0] + dx, ys[0] + dy);
+      for (let i = 1; i < n; i++) lc.lineTo(xs[i] + dx, ys[i] + dy);
+      lc.closePath();
+
+      // ③ 각 변이 쓸고 간 사각형.
+      //    변의 방향과 그림자 벡터의 외적 부호에 따라 감김이 뒤집히므로,
+      //    부호를 보고 꼭짓점 순서를 맞춰 항상 같은 방향으로 만든다.
       for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
-        ctx.moveTo(xs[i], ys[i]);
-        ctx.lineTo(xs[j], ys[j]);
-        ctx.lineTo(xs[j] + dx, ys[j] + dy);
-        ctx.lineTo(xs[i] + dx, ys[i] + dy);
-        ctx.closePath();
+        const cross = (xs[j] - xs[i]) * dy - (ys[j] - ys[i]) * dx;
+        lc.moveTo(xs[i], ys[i]);
+        if (cross >= 0) {
+          lc.lineTo(xs[j], ys[j]);
+          lc.lineTo(xs[j] + dx, ys[j] + dy);
+          lc.lineTo(xs[i] + dx, ys[i] + dy);
+        } else {
+          lc.lineTo(xs[i] + dx, ys[i] + dy);
+          lc.lineTo(xs[j] + dx, ys[j] + dy);
+          lc.lineTo(xs[j], ys[j]);
+        }
+        lc.closePath();
       }
     }
-    ctx.fill('nonzero');
+    lc.fill('nonzero');
+
+    // 건물 바닥면을 도려내지 않는다. 도려내면 그림자가 건물에서 한 겹 떨어져
+    // 보인다. 그림자는 건물 아래에서 시작해 뻗어 나가는 것이 맞고,
+    // 건물 자체는 이 위에 불투명하게 덮어 가린다(drawBuildings).
+
+    // 완성된 그림자를 한 겹으로 얹는다. 레이어 안에서 이미 합쳐졌으므로
+    // 몇 겹이 겹쳤든 농도는 어디서나 똑같다.
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(lay, 0, 0);
+    ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0);
     ctx.restore();
   }
 
+  // 그림자 전용 오프스크린 캔버스 (크기가 바뀔 때만 다시 만든다)
+  let _lay = null;
+  function shadowLayer(w, h) {
+    const r = dpr();
+    const W = Math.round(w * r), H = Math.round(h * r);
+    if (!_lay) _lay = document.createElement('canvas');
+    if (_lay.width !== W || _lay.height !== H) { _lay.width = W; _lay.height = H; }
+    return _lay;
+  }
+
+  // 건물을 따로 칠하지 않는다. 주황색 외곽선이 화면을 어지럽히고,
+  // 건물 바닥면은 이미 drawShadows 에서 그늘로 처리된다.
+  // 건물은 옅게 칠한다. 진한 남색 그림자(= 실제로 걸을 수 있는 그늘)와
+  // 건물 자리를 눈으로 구분하기 위해서다. 건물 안은 그늘이 아니다.
   function drawBuildings() {
     if (!projected || !projected.length) return;
     ctx.save();
-    ctx.fillStyle = 'rgba(232,163,61,0.55)';
-    ctx.strokeStyle = 'rgba(160,100,20,0.7)';
-    ctx.lineWidth = 1;
+    // 불투명해야 아래 그림자를 가려 건물과 그림자의 경계가 정확히 맞는다
+    ctx.fillStyle = BUILDING_COLOR;
+    const w = cv.width / dpr(), h = cv.height / dpr();
     ctx.beginPath();
     for (const b of projected) {
+      if (b.maxX < 0 || b.minX > w || b.maxY < 0 || b.minY > h) continue;
       const xs = b.xs, ys = b.ys;
       ctx.moveTo(xs[0], ys[0]);
       for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], ys[i]);
       ctx.closePath();
     }
-    ctx.fill();
-    ctx.stroke();
+    ctx.fill('nonzero');
+    ctx.restore();
+  }
+
+  // 지하철 노선. 지하라 실제로는 안 보이지만, 길을 가늠하는 기준선이 된다.
+  function drawRails() {
+    if (!rails.length) return;
+    const w = cv.width / dpr(), h = cv.height / dpr();
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const r of rails) {
+      const pts = [];
+      let visible = false;
+      for (const p of r.pts) {
+        const q = project(p[0], p[1]);
+        pts.push(q);
+        if (q[0] > -60 && q[0] < w + 60 && q[1] > -60 && q[1] < h + 60) visible = true;
+      }
+      if (!visible || pts.length < 2) continue;
+      // 흰 테두리를 먼저 깔아 배경과 분리한다
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+      // 노선 색 (태그가 없으면 기본 남색)
+      ctx.strokeStyle = r.color || '#3a5fa8';
+      ctx.lineWidth = 3.6;
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 이름이 있고 충분히 큰 건물은 눈에 띄게 칠한다. 길을 찾을 때 기준이 된다.
+  function drawLandmarks() {
+    if (!projected || !projected.length) return;
+    ctx.save();
+    const w2 = cv.width / dpr(), h2 = cv.height / dpr();
+    ctx.fillStyle = LANDMARK_COLOR;
+    ctx.beginPath();
+    for (let i = 0; i < projected.length; i++) {
+      if (!buildings[i] || !buildings[i].name) continue;
+      const b = projected[i];
+      if (b.maxX < 0 || b.minX > w2 || b.maxY < 0 || b.minY > h2) continue;
+      // 화면에서 너무 작은 건물은 강조해도 안 보인다
+      if ((b.maxX - b.minX) * (b.maxY - b.minY) < 220) continue;
+      const xs = b.xs, ys = b.ys;
+      ctx.moveTo(xs[0], ys[0]);
+      for (let k = 1; k < xs.length; k++) ctx.lineTo(xs[k], ys[k]);
+      ctx.closePath();
+    }
+    ctx.fill('nonzero');
+    ctx.restore();
+  }
+
+  // 그림자 위에 얹는 표시들. 그늘을 가리지 않게 작게, 대신 색으로 구분한다.
+  function drawPois() {
+    const w = cv.width / dpr(), h = cv.height / dpr();
+
+    // 건물 이름 — 충분히 확대했을 때만, 그리고 겹치지 않게 골라서
+    if (view.z >= 17 && projected) {
+      const placed = [];
+      ctx.save();
+      ctx.font = '600 11px ' + css.getPropertyValue('--font');
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < projected.length && placed.length < 26; i++) {
+        const name = buildings[i] && buildings[i].name;
+        if (!name) continue;
+        const xs = projected[i].xs, ys = projected[i].ys;
+        let cx = 0, cy = 0;
+        for (let k = 0; k < xs.length; k++) { cx += xs[k]; cy += ys[k]; }
+        cx /= xs.length; cy /= ys.length;
+        if (cx < 30 || cx > w - 30 || cy < 24 || cy > h - 24) continue;
+        // 라벨끼리 너무 붙으면 건너뛴다
+        let clash = false;
+        for (const q of placed) if (Math.abs(q[0] - cx) < 68 && Math.abs(q[1] - cy) < 15) { clash = true; break; }
+        if (clash) continue;
+        placed.push([cx, cy]);
+        const t = name.length > 11 ? name.slice(0, 10) + '…' : name;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(255,255,255,.92)';
+        ctx.strokeText(t, cx, cy);
+        ctx.fillStyle = '#2c3138';
+        ctx.fillText(t, cx, cy);
+      }
+      ctx.restore();
+    }
+
+    if (!pois.length) return;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // 버스정류장 — 작은 점. 많아서 이름은 크게 확대했을 때만.
+    for (const p of pois) {
+      if (p.kind !== 'bus') continue;
+      const s2 = project(p.lat, p.lon);
+      if (s2[0] < -20 || s2[0] > w + 20 || s2[1] < -20 || s2[1] > h + 20) continue;
+      ctx.beginPath();
+      ctx.arc(s2[0], s2[1], 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#1f9d55';
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+    }
+
+    // 지하철역 — 크게, 이름과 함께. 가장 중요한 기준점이다.
+    ctx.font = '700 12px ' + css.getPropertyValue('--font');
+    for (const p of pois) {
+      if (p.kind !== 'subway') continue;
+      const s2 = project(p.lat, p.lon);
+      if (s2[0] < -40 || s2[0] > w + 40 || s2[1] < -40 || s2[1] > h + 40) continue;
+      ctx.beginPath();
+      ctx.arc(s2[0], s2[1], 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#d1373c';
+      ctx.fill();
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      if (p.name) {
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(255,255,255,.95)';
+        ctx.strokeText(p.name, s2[0], s2[1] - 16);
+        ctx.fillStyle = '#a51f24';
+        ctx.fillText(p.name, s2[0], s2[1] - 16);
+      }
+    }
+    ctx.restore();
+  }
+
+  /* =====================================================================
+   * 밤 — 건물 창문 불빛
+   *
+   * 시각에 따라 "깨어 있는 집"의 비율이 달라진다. 초저녁엔 거의 다 켜져 있고
+   * 새벽 3~4시엔 드문드문 남는다. 아래 곡선은 그 감각을 따라 만든 값이다.
+   * 불빛 위치는 건물마다 고정(시드 난수)이라 시간을 옮겨도 자리가 튀지 않고,
+   * 켜짐/꺼짐만 바뀐다.
+   * ===================================================================== */
+
+  // 분 단위 시각 → 불이 켜져 있을 확률
+  function litFraction(min) {
+    const t = ((min % 1440) + 1440) % 1440;
+    // 구간별 선형 보간 [시각(분), 비율]
+    const curve = [
+      [0,    0.30],   // 자정
+      [120,  0.14],   // 02시
+      [240,  0.07],   // 04시 — 가장 적다
+      [330,  0.12],   // 05:30 기상 시작
+      [420,  0.35],   // 07시
+      [1080, 0.55],   // 18시
+      [1170, 0.92],   // 19:30 — 가장 많다
+      [1320, 0.78],   // 22시
+      [1440, 0.30]    // 자정
+    ];
+    for (let i = 0; i < curve.length - 1; i++) {
+      const a = curve[i], b = curve[i + 1];
+      if (t >= a[0] && t <= b[0]) {
+        const k = (t - a[0]) / (b[0] - a[0]);
+        return a[1] + (b[1] - a[1]) * k;
+      }
+    }
+    return 0.2;
+  }
+
+  // 건물마다 같은 자리에 창을 두기 위한 결정적 난수 (xorshift)
+  function seeded(n) {
+    let x = (n * 2654435761) >>> 0;
+    return function () {
+      x ^= x << 13; x >>>= 0;
+      x ^= x >> 17;
+      x ^= x << 5;  x >>>= 0;
+      return x / 4294967296;
+    };
+  }
+
+  // 건물 안쪽에 창 위치를 미리 뿌려 둔다. 지도를 움직일 때만 다시 만든다.
+  function buildWindows() {
+    if (!projected) { windows = null; return; }
+    const list = [];
+    for (let bi = 0; bi < projected.length; bi++) {
+      const b = projected[bi];
+      const xs = b.xs, ys = b.ys;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < xs.length; i++) {
+        if (xs[i] < minX) minX = xs[i];
+        if (xs[i] > maxX) maxX = xs[i];
+        if (ys[i] < minY) minY = ys[i];
+        if (ys[i] > maxY) maxY = ys[i];
+      }
+      const wpx = maxX - minX, hpx = maxY - minY;
+      if (wpx < 6 || hpx < 6) continue;               // 너무 작으면 창을 못 그린다
+      // 넓고 높은 건물일수록 창이 많다
+      const area = wpx * hpx;
+      const count = Math.max(1, Math.min(14, Math.round(area / 260 + b.h / 14)));
+      const rnd = seeded(bi + 1);
+      for (let k = 0; k < count; k++) {
+        // 외곽선에 딱 붙지 않게 안쪽으로 조금 당긴다
+        const x = minX + wpx * (0.18 + rnd() * 0.64);
+        const y = minY + hpx * (0.18 + rnd() * 0.64);
+        list.push({ x: x, y: y, phase: rnd() * Math.PI * 2, rank: rnd() });
+      }
+    }
+    windows = list;
+  }
+
+  function drawNight(sun) {
+    // 해가 완전히 지기 전부터 서서히 어두워진다 (박명)
+    const dusk = Math.max(0, Math.min(1, (0.09 - sun.alt) / 0.19));
+    if (dusk <= 0) return;
+
+    const w = cv.width / dpr(), h = cv.height / dpr();
+
+    // 밤하늘 톤을 전체에 얹는다
+    ctx.save();
+    ctx.fillStyle = 'rgba(18,28,50,' + (0.62 * dusk).toFixed(3) + ')';
+    ctx.fillRect(0, 0, w, h);
+
+    if (windows && windows.length) {
+      const frac = litFraction(minutes);
+      const t = performance.now() / 1000;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const win of windows) {
+        if (win.rank > frac) continue;                 // 이 시각엔 꺼진 집
+        if (win.x < -4 || win.x > w + 4 || win.y < -4 || win.y > h + 4) continue;
+        // 아주 느리게 깜빡인다. 사람이 움직이는 정도의 흔들림.
+        const tw = 0.72 + 0.28 * Math.sin(t * 0.9 + win.phase);
+        const a = (0.55 + 0.45 * tw) * dusk;
+        ctx.fillStyle = 'rgba(255,214,130,' + a.toFixed(3) + ')';
+        ctx.fillRect(win.x - 1.3, win.y - 1.3, 2.6, 2.6);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.restore();
   }
 
@@ -681,6 +1130,10 @@
     const sun = sunPosition(selectedDate(), view.lat, view.lon);
     drawShadows(sun);
     drawBuildings();
+    drawLandmarks();
+    drawRails();
+    drawNight(sun);
+    drawPois();
     drawSunDial(sun);
 
     // 상태 문구
@@ -802,6 +1255,7 @@
     minutes = parseInt(range.value, 10);
     stopPlay();
     draw();
+    ensureAnim();
   });
 
   for (const chip of document.querySelectorAll('.chip[data-jump]')) {
@@ -810,6 +1264,7 @@
       range.value = minutes;
       stopPlay();
       draw();
+      ensureAnim();
     });
   }
 
@@ -823,15 +1278,16 @@
     if (playing) { stopPlay(); return; }
     playing = true;
     $('playBtn').textContent = '■ 정지';
-    // 해가 떠 있는 시간대만 돈다. 새벽부터 돌리면 한동안 화면이 그대로라
-    // "안 바뀐다"고 느끼게 된다.
-    minutes = 390;   // 06:30
+    // 06시에서 시작해 자정을 넘겨 다음날 06시까지, 하루를 온전히 한 바퀴 돈다.
+    minutes = 360;                    // 06:00
+    let elapsed = 0;                  // 시작점부터 흐른 분
     playTimer = setInterval(() => {
-      minutes += 15;
-      if (minutes > 1170) { minutes = 390; }   // 19:30 에서 되감기
+      elapsed += 20;
+      if (elapsed >= 1440) elapsed = 0;         // 24시간 돌면 처음으로
+      minutes = (360 + elapsed) % 1440;         // 자정을 넘어가면 0시로 감긴다
       range.value = minutes;
       draw();
-    }, 130);
+    }, 60);
   });
 
   /* ---------- 내 위치 ---------- */
@@ -863,6 +1319,31 @@
     loadBuildings();
   });
 
+  /* ---------- 밤 불빛 애니메이션 ----------
+   * 밤일 때만 프레임을 돌린다. 낮에는 멈춰서 배터리를 쓰지 않는다. */
+  let animId = null;
+  function tickLights() {
+    animId = null;
+    const sun = sunPosition(selectedDate(), view.lat, view.lon);
+    if (sun.alt < 0.09 && !document.hidden) {
+      draw();
+      animId = requestAnimationFrame(tickLights);
+    }
+  }
+  function ensureAnim() {
+    const sun = sunPosition(selectedDate(), view.lat, view.lon);
+    if (sun.alt < 0.09 && animId === null && !document.hidden) {
+      animId = requestAnimationFrame(tickLights);
+    }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      if (animId !== null) { cancelAnimationFrame(animId); animId = null; }
+    } else {
+      ensureAnim();
+    }
+  });
+
   /* ---------- 부팅 ---------- */
   window.addEventListener('resize', resize);
   if (store.get('shade_seen', false)) {
@@ -873,6 +1354,7 @@
     resize();
   }
   draw();
+  ensureAnim();
 })();
 </script>
 </body>

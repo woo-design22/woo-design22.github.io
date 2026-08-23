@@ -11,6 +11,7 @@
 | [pomodoro-todo](pomodoro-todo/index.html) | 뽀모도로 타이머(25/5/15분) + 할 일 목록. 할 일별 🍅 카운트 | 세션 수, 할 일, 활성 작업 |
 | [particle-playground](particle-playground/index.html) | 캔버스 파티클 드로잉. 폭죽 / 트레일 / 오비트 3가지 모드 | 없음 |
 | [mood-log](mood-log/index.html) | 기분·수면·통증·에너지 일지. 본인/배우자 프로필, 14·30·90일 그래프, 주간·월간 통계, 패턴 힌트, 진료용 인쇄·복사, JSON 백업 | 프로필별 기록, 마지막 프로필 |
+| [fly-brain](fly-brain/index.html) | 초파리에게 설탕 주기. 바닥을 클릭해 각설탕을 놓으면 초파리가 걸어가 혀를 대고, 실제 배선도로 만든 뇌 회로(448뉴런)가 반짝이며 MN9 운동뉴런이 발화하는 만큼 주둥이를 뻗어 먹는다. 뉴런을 꺼서 못 먹게 하는 실험실 포함. Brian2로 돌린 전뇌 모델(Shiu 2024) 기록 재생 모드 | 없음 |
 
 ## 실행 방법
 
@@ -25,6 +26,7 @@ python -m http.server 8765
 - <http://localhost:8765/pomodoro-todo/>
 - <http://localhost:8765/particle-playground/>
 - <http://localhost:8765/mood-log/>
+- <http://localhost:8765/fly-brain/>
 
 ## 안드로이드 APK (mood-log)
 

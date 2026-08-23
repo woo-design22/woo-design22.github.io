@@ -1,0 +1,5 @@
+# Shiu et al. 2024 모델 저장소 복제본(200MB 데이터 포함) — git clone으로 다시 받는다
+model/
+# 시뮬레이션 원본 출력(수십 MB~GB)
+results/*.parquet
+__pycache__/

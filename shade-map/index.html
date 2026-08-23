@@ -91,7 +91,7 @@
   .tbtn.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 
   /* ---------- 지도 ---------- */
-  #mapWrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: var(--surface-2); }
+  #mapWrap { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #eae7e2; }
   #map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
   #map:active { cursor: grabbing; }
 
@@ -256,7 +256,6 @@
     </div>
     <div class="legend">
       <span><i style="background:var(--shade)"></i>그늘</span>
-      <span><i style="background:var(--sun)"></i>건물</span>
       <span id="coverage"></span>
     </div>
   </div>
@@ -314,10 +313,17 @@
   const OVERPASS = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter'
+    'https://overpass.private.coffee/api/interpreter',
+    // osm.ch 는 200 을 주면서 빈 결과를 돌려주는 일이 있어 뒤로 뺐다
+    'https://overpass.osm.ch/api/interpreter'
   ];
-  const FETCH_TIMEOUT = 12000;
-  const TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  // Overpass 가 전부 막혔을 때 쓰는 마지막 경로. OSM 본 API 는 완전히 다른
+  // 인프라라 함께 죽는 일이 드물다. XML 이라 직접 파싱해야 한다.
+  const OSM_API = 'https://api.openstreetmap.org/api/0.6/map?bbox=';
+  const FETCH_TIMEOUT = 7000;    // Overpass 미러 하나당
+  const OSM_TIMEOUT = 20000;     // OSM 본 API 는 응답이 커서 넉넉히
+  // 라벨 없는 밝은 지도. 식당·상호 같은 표시가 없어 그림자가 잘 보인다.
+  const TILE_URL = 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png';
   const TILE = 256;
   const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
   const FETCH_Z = 16;                 // 이 줌 이상에서만 건물을 불러온다
@@ -453,7 +459,11 @@
 
   // 미러 하나를 정해진 시간 안에 시도한다. 실패하면 null.
   // ctrl 을 밖에서 넘겨받아, 새 요청이 들어오면 이전 요청을 끊을 수 있게 한다.
-  async function tryOverpass(url, q, ctrl) {
+  // 시도마다 새 컨트롤러를 만든다. 하나를 돌려 쓰면 첫 타임아웃이 컨트롤러를
+  // 영구히 취소시켜 이후 시도가 전부 즉시 실패한다.
+  async function tryOverpass(url, q) {
+    const ctrl = new AbortController();
+    currentCtrl = ctrl;
     const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
     try {
       const res = await fetch(url + '?data=' + encodeURIComponent(q), { signal: ctrl.signal });
@@ -466,10 +476,49 @@
     }
   }
 
+  // Overpass 가 전부 막혔을 때: OSM 본 API 의 XML 을 직접 파싱한다.
+  // way 는 node 참조만 갖고 있어서, node 좌표표를 먼저 모은 뒤 이어 붙인다.
+  async function tryOsmApi(box) {
+    // Overpass 는 (남,서,북,동) 순서인데 OSM API 는 (서,남,동,북) 이다
+    const p = box.split(',');
+    const bbox = [p[1], p[0], p[3], p[2]].join(',');
+    const ctrl = new AbortController();
+    currentCtrl = ctrl;
+    const timer = setTimeout(() => ctrl.abort(), OSM_TIMEOUT);
+    try {
+      const res = await fetch(OSM_API + bbox, { signal: ctrl.signal });
+      if (!res.ok) return null;
+      const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+      if (xml.querySelector('parsererror')) return null;
+
+      const nodes = new Map();
+      for (const n of xml.getElementsByTagName('node')) {
+        nodes.set(n.getAttribute('id'), [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))]);
+      }
+      const elements = [];
+      for (const w of xml.getElementsByTagName('way')) {
+        const tags = {};
+        for (const t of w.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
+        if (!tags.building) continue;
+        const geometry = [];
+        for (const nd of w.getElementsByTagName('nd')) {
+          const c = nodes.get(nd.getAttribute('ref'));
+          if (c) geometry.push({ lat: c[0], lon: c[1] });
+        }
+        if (geometry.length >= 3) elements.push({ type: 'way', tags: tags, geometry: geometry });
+      }
+      return { elements: elements };
+    } catch (e) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   // 요청 세대 번호. 지도를 움직이면 번호가 올라가고, 뒤늦게 도착한 옛 응답은 버린다.
   // 이게 없으면 느린 요청이 끝날 때까지 새 영역을 아예 못 불러온다.
   let reqSeq = 0;
-  let inflight = null;
+  let currentCtrl = null;
 
   async function loadBuildings() {
     if (view.z < FETCH_Z) {
@@ -487,9 +536,7 @@
     if (box === loadedKey) return;
 
     // 진행 중이던 요청은 끊는다
-    if (inflight) { try { inflight.abort(); } catch (e) {} }
-    const ctrl = new AbortController();
-    inflight = ctrl;
+    if (currentCtrl) { try { currentCtrl.abort(); } catch (e) {} }
     const seq = ++reqSeq;
 
     const q = '[out:json][timeout:20];way["building"](' + box + ');out geom;';
@@ -498,11 +545,18 @@
       if (seq !== reqSeq) return;          // 그 사이 새 요청이 생겼으면 조용히 물러난다
       setStatus('건물 정보를 불러오는 중…' + (i ? ' (' + (i + 1) + '/' + OVERPASS.length + ')' : ''));
       draw();
-      data = await tryOverpass(OVERPASS[i], q, ctrl);
-      if (data) break;
+      data = await tryOverpass(OVERPASS[i], q);
+      // 200 을 주면서 빈 결과를 돌려주는 미러가 있다. 그것도 실패로 보고 넘어간다.
+      if (data && data.elements && data.elements.length) break;
+      data = null;
+    }
+    if (!data && seq === reqSeq) {
+      setStatus('다른 경로로 시도하는 중…');
+      draw();
+      data = await tryOsmApi(box);
     }
     if (seq !== reqSeq) return;
-    inflight = null;
+    currentCtrl = null;
 
     if (!data) {
       // 무료 공용 서버라 몰리면 막힌다. 사용자가 원인을 알 수 있게 한다.
@@ -584,11 +638,12 @@
 
   function drawShadows(sun) {
     if (!projected || !projected.length) return;
+    const w = cv.width / dpr(), h = cv.height / dpr();
 
     // 태양이 지평선 아래면 그림자가 아니라 전체가 그늘이다
     if (sun.alt <= 0.02) {
-      ctx.fillStyle = 'rgba(43,58,85,0.34)';
-      ctx.fillRect(0, 0, cv.width / dpr(), cv.height / dpr());
+      ctx.fillStyle = 'rgba(28,40,62,0.40)';
+      ctx.fillRect(0, 0, w, h);
       return;
     }
 
@@ -600,45 +655,64 @@
     const ux = Math.sin(dirAz) * ppm;     // 동쪽이 화면 +x
     const uy = -Math.cos(dirAz) * ppm;    // 북쪽이 화면 -y
 
-    ctx.save();
-    ctx.fillStyle = 'rgba(43,58,85,0.42)';
-    ctx.beginPath();
+    // 그림자를 별도 레이어에 그린다. 겹쳐도 진해지지 않게 한 번에 합친 뒤
+    // 통째로 얹어야 실제 그늘처럼 균일한 농도가 나온다.
+    const lay = shadowLayer(w, h);
+    const lc = lay.getContext('2d');
+    lc.setTransform(1, 0, 0, 1, 0, 0);
+    lc.clearRect(0, 0, lay.width, lay.height);
+    lc.scale(dpr(), dpr());
+
+    // 태양이 낮을수록 그림자 경계가 흐려진다(반영). 실제로도 그렇다.
+    const soft = Math.min(6, Math.max(1.2, 2.5 * cot));
+    lc.filter = 'blur(' + soft.toFixed(1) + 'px)';
+    lc.fillStyle = '#1c283e';
+    lc.beginPath();
 
     for (const b of projected) {
       const len = b.h * cot;
-      if (len > 400) continue;            // 해질 무렵의 비현실적인 그림자는 자른다
+      if (len > 500) continue;            // 해질 무렵의 비현실적인 그림자는 자른다
       const dx = len * ux, dy = len * uy;
       const xs = b.xs, ys = b.ys, n = xs.length;
+      // 건물 자리 + 밀어낸 자리 + 그 사이를 모두 채운다
       for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
-        ctx.moveTo(xs[i], ys[i]);
-        ctx.lineTo(xs[j], ys[j]);
-        ctx.lineTo(xs[j] + dx, ys[j] + dy);
-        ctx.lineTo(xs[i] + dx, ys[i] + dy);
-        ctx.closePath();
+        lc.moveTo(xs[i], ys[i]);
+        lc.lineTo(xs[j], ys[j]);
+        lc.lineTo(xs[j] + dx, ys[j] + dy);
+        lc.lineTo(xs[i] + dx, ys[i] + dy);
+        lc.closePath();
       }
+      // 건물 바닥면 자체도 그늘이다
+      lc.moveTo(xs[0], ys[0]);
+      for (let i = 1; i < n; i++) lc.lineTo(xs[i], ys[i]);
+      lc.closePath();
     }
-    ctx.fill('nonzero');
+    lc.fill('nonzero');
+    lc.filter = 'none';
+
+    // 완성된 그림자 레이어를 한 겹으로 얹는다
+    ctx.save();
+    ctx.globalAlpha = 0.52;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(lay, 0, 0);
+    ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0);
     ctx.restore();
   }
 
-  function drawBuildings() {
-    if (!projected || !projected.length) return;
-    ctx.save();
-    ctx.fillStyle = 'rgba(232,163,61,0.55)';
-    ctx.strokeStyle = 'rgba(160,100,20,0.7)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (const b of projected) {
-      const xs = b.xs, ys = b.ys;
-      ctx.moveTo(xs[0], ys[0]);
-      for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], ys[i]);
-      ctx.closePath();
-    }
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+  // 그림자 전용 오프스크린 캔버스 (크기가 바뀔 때만 다시 만든다)
+  let _lay = null;
+  function shadowLayer(w, h) {
+    const r = dpr();
+    const W = Math.round(w * r), H = Math.round(h * r);
+    if (!_lay) _lay = document.createElement('canvas');
+    if (_lay.width !== W || _lay.height !== H) { _lay.width = W; _lay.height = H; }
+    return _lay;
   }
+
+  // 건물을 따로 칠하지 않는다. 주황색 외곽선이 화면을 어지럽히고,
+  // 건물 바닥면은 이미 drawShadows 에서 그늘로 처리된다.
+  function drawBuildings() { /* 의도적으로 비워 둠 */ }
 
   function drawSunDial(sun) {
     const s = dial.width, c = s / 2, r = s / 2 - 14;

@@ -188,7 +188,74 @@
     display: flex; gap: 14px; font-size: 11.5px; color: var(--ink-3); align-items: center;
   }
 
+  .legend .attrib { margin-left: auto; font-size: 10.5px; white-space: nowrap; }
   .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-right: 4px; vertical-align: -1px; }
+
+
+  /* ---------- 길찾기 패널 ---------- */
+  #routePanel {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 12;
+    max-height: 78%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--surface); border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0; padding: 12px 14px 14px;
+    box-shadow: 0 -6px 24px rgba(0,0,0,.12);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #routePanel.hidden { display: none; }
+  #routePanel .ph { display: flex; align-items: center; gap: 8px; }
+  #routePanel .ph b { flex: 1; font-size: 15px; }
+  .field { display: flex; align-items: center; gap: 6px; position: relative; }
+  .field label { flex: none; width: 34px; font-size: 12px; color: var(--ink-3); text-align: center; }
+  .field input {
+    flex: 1; min-width: 0; font: inherit; font-size: 15px; color: var(--ink);
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+  }
+  .field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .field .mini {
+    flex: none; font: inherit; font-size: 12px; color: var(--ink-2);
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; cursor: pointer;
+  }
+  .geoList { position: absolute; left: 40px; right: 0; top: 100%; z-index: 5;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.14); display: flex; flex-direction: column; overflow: hidden; }
+  .geoList.hidden { display: none; }
+  .geoItem { font: inherit; font-size: 13.5px; text-align: left; color: var(--ink);
+    background: transparent; border: 0; border-bottom: 1px solid var(--line); padding: 9px 12px; cursor: pointer; }
+  .geoItem:last-child { border-bottom: 0; }
+  .geoItem:hover, .geoItem:focus-visible { background: var(--surface-2); outline: none; }
+  .rtabs { display: flex; gap: 6px; }
+  .rtab { flex: 1; font: inherit; font-size: 13.5px; color: var(--ink-2); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px; cursor: pointer; }
+  .rtab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  #goBtn { font: inherit; font-weight: 700; font-size: 15px; color: var(--accent-ink);
+    background: var(--accent); border: 0; border-radius: 12px; padding: 12px; cursor: pointer; }
+  #goBtn:disabled { opacity: .5; cursor: default; }
+  #routeResult { display: flex; flex-direction: column; gap: 8px; }
+  .hint { font-size: 13px; color: var(--ink-3); line-height: 1.6; }
+  .hint.small { font-size: 11.5px; }
+  .hint a { color: var(--accent); }
+  .rcard { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--surface-2); }
+  .rcard.shade { border-color: #1f8a5a; background: rgba(31,138,90,.08); }
+  .rhead { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .rhead .pct { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rsub { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; }
+  .sw { display: inline-block; width: 18px; height: 5px; border-radius: 3px; background: #1f8a5a; }
+  .sw.dashed { background: repeating-linear-gradient(90deg, #6b7280 0 4px, transparent 4px 7px); }
+  .tpick { font: inherit; font-size: 14px; text-align: left; width: 100%; color: var(--ink);
+    background: transparent; border: 0; padding: 0 0 4px; cursor: pointer; }
+  .legs { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
+  .leg { padding-left: 8px; border-left: 3px solid var(--line); color: var(--ink-2); }
+  .leg.bus { border-left-color: #2f6fd6; }
+  .leg.subway { border-left-color: #444; }
+  .leg .sw { width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+  .seat { margin-top: 3px; font-weight: 700; color: var(--ink); }
+  .seat.left, .seat.right { color: #1f8a5a; }
+  .seat.none { font-weight: 400; color: var(--ink-3); }
+  .keyRow { display: flex; gap: 6px; }
+  .keyRow input { flex: 1; min-width: 0; font: inherit; font-size: 14px; background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; color: var(--ink); }
+  .keyRow button { font: inherit; font-size: 13px; color: var(--accent-ink); background: var(--accent);
+    border: 0; border-radius: 9px; padding: 8px 14px; cursor: pointer; }
 
   /* ---------- 안내 시트 ---------- */
   .sheet {
@@ -226,6 +293,7 @@
 <div id="app">
   <div id="topbar">
     <div class="title">그늘 지도 <span class="beta">실험</span><small id="placeName">지금 어디가 그늘인가</small></div>
+    <button class="tbtn on" id="routeBtn">길찾기</button>
     <button class="tbtn" id="locBtn">내 위치</button>
     <button class="tbtn" id="infoBtn">안내</button>
   </div>
@@ -237,6 +305,25 @@
     <div id="zoomBtns">
       <button id="zoomIn" aria-label="확대">+</button>
       <button id="zoomOut" aria-label="축소">−</button>
+    </div>
+
+    <div id="routePanel" class="hidden">
+      <div class="ph"><b>길찾기</b>
+        <button class="tbtn" id="swapBtn" title="출발·도착 바꾸기">⇅</button>
+        <button class="tbtn" id="routeClose">닫기</button></div>
+      <div class="field"><label for="startInput">출발</label>
+        <input type="text" id="startInput" placeholder="도로명주소, 역 이름, 건물·장소명" autocomplete="off">
+        <button type="button" class="mini" id="startHere">내 위치</button>
+        <div class="geoList hidden" id="startList"></div></div>
+      <div class="field"><label for="endInput">도착</label>
+        <input type="text" id="endInput" placeholder="도로명주소, 역 이름, 건물·장소명" autocomplete="off">
+        <div class="geoList hidden" id="endList"></div></div>
+      <div class="rtabs" role="tablist">
+        <button type="button" class="rtab" role="tab" data-tab="walk" aria-selected="true">도보</button>
+        <button type="button" class="rtab" role="tab" data-tab="transit" aria-selected="false">대중교통</button>
+      </div>
+      <button type="button" id="goBtn">도보 경로 찾기</button>
+      <div id="routeResult"></div>
     </div>
   </div>
 
@@ -263,6 +350,7 @@
       <span><i style="background:#d1373c;border-radius:50%"></i>지하철</span>
       <span><i style="background:#1f9d55;border-radius:50%"></i>버스</span>
       <span id="coverage"></span>
+      <span class="attrib">© OpenStreetMap contributors · © CARTO</span>
     </div>
   </div>
 </div>
@@ -321,11 +409,11 @@
   /* ---------- 상수 ---------- */
   // Overpass 는 무료 공용 서버라 자주 느려지거나 막힌다. 미러를 순서대로 시도한다.
   const OVERPASS = [
+    'https://z.overpass-api.de/api/interpreter',     // 실측 가장 빠름 (6초 vs 24초)
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter',
-    // osm.ch 는 200 을 주면서 빈 결과를 돌려주는 일이 있어 뒤로 뺐다
-    'https://overpass.osm.ch/api/interpreter'
+    'https://overpass.private.coffee/api/interpreter'
+    // overpass.osm.ch 는 스위스 전용 추출본이라 서울 데이터가 0건이다. 넣지 말 것.
   ];
   // Overpass 가 전부 막혔을 때 쓰는 마지막 경로. OSM 본 API 는 완전히 다른
   // 인프라라 함께 죽는 일이 드물다. XML 이라 직접 파싱해야 한다.
@@ -334,6 +422,7 @@
   const OSM_TIMEOUT = 20000;     // OSM 본 API 는 응답이 커서 넉넉히
   // 라벨 없는 밝은 지도. 식당·상호 같은 표시가 없어 그림자가 잘 보인다.
   const TILE_URL = 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png';
+  const GEOCODE_URL = 'https://nominatim.openstreetmap.org/search';
   const TILE = 256;
   const MIN_Z = 14, MAX_Z = 19;       // 14 미만은 건물이 너무 많아 의미가 없다
   const FETCH_Z = 16;                 // 이 줌 이상에서만 건물을 불러온다
@@ -484,14 +573,86 @@
     return null;
   }
 
+  /* ---------- 건물 높이 추정 ----------
+   * OSM 에 높이가 적힌 건물은 서울에서 1/4 뿐이다. 나머지에 일괄 15m 를 주면
+   * 구멍가게도 5층처럼 긴 그림자를 드리운다. 그래서 두 단서로 층수를 추정한다.
+   *   ① 용도 태그 (building=house/apartments/office …)
+   *   ② 바닥 면적 (작은 발자국 = 낮은 건물, 큰 발자국 = 높은 건물인 경향)
+   * 정확하진 않지만 "작은 건물은 작게, 큰 건물은 크게" 라는 방향은 맞춘다.
+   * 높이 = 층수 × 3.1m + 1m(기단). */
+
+  // 외곽선의 바닥 면적(m²). 위경도를 국소 평면 미터로 바꿔 신발끈 공식.
+  function footprintArea(pts) {
+    if (!pts || pts.length < 3) return 0;
+    const lat0 = pts[0][0] * RAD;
+    const kx = 111320 * Math.cos(lat0), ky = 111320;
+    let a = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[(i + 1) % pts.length];
+      const x1 = (p[1] - pts[0][1]) * kx, y1 = (p[0] - pts[0][0]) * ky;
+      const x2 = (q[1] - pts[0][1]) * kx, y2 = (q[0] - pts[0][0]) * ky;
+      a += x1 * y2 - x2 * y1;
+    }
+    return Math.abs(a) / 2;
+  }
+
+  // 면적 구간별 층수 (단서가 용도밖에 없을 때의 기본 곡선)
+  function levelsByArea(area, profile) {
+    // profile: 'low' 주거 / 'mid' 일반 / 'high' 상업·업무
+    if (profile === 'low') return area < 120 ? 2 : area < 300 ? 3 : area < 600 ? 4 : 5;
+    if (profile === 'high') return area < 200 ? 3 : area < 600 ? 5 : area < 1500 ? 8 : area < 4000 ? 12 : 18;
+    return area < 80 ? 1 : area < 200 ? 2 : area < 500 ? 3 : area < 1200 ? 5 : area < 3000 ? 8 : 12;
+  }
+
+  function estimateHeight(tags, pts) {
+    tags = tags || {};
+    // ① 명시된 값이 있으면 그대로
+    const explicit = parseHeight(tags);
+    if (explicit !== null) return { h: explicit, known: true };
+
+    const t = String(tags.building || 'yes').toLowerCase();
+    const area = footprintArea(pts);
+    let levels;
+
+    if (/^(hut|shed|garage|garages|roof|carport|kiosk|cabin|greenhouse|farm_auxiliary|container|tent|toilets|service|transformer_tower|bunker)$/.test(t)) {
+      levels = 1;
+    } else if (/^(house|detached|semidetached_house|bungalow|terrace|static_caravan|villa)$/.test(t)) {
+      levels = 2;
+    } else if (/^(apartments)$/.test(t)) {
+      // 한국 아파트는 대개 12~25층. 발자국이 크면 더 높게 본다.
+      levels = area < 400 ? 6 : area < 900 ? 12 : area < 2000 ? 15 : 20;
+    } else if (/^(residential|dormitory)$/.test(t)) {
+      levels = levelsByArea(area, 'low');
+    } else if (/^(commercial|office|retail|hotel|supermarket|mall|bank)$/.test(t)) {
+      levels = levelsByArea(area, 'high');
+      if (t === 'hotel') levels = Math.max(levels, 8);
+      if (t === 'retail' || t === 'supermarket') levels = Math.min(levels, 5);
+    } else if (/^(hospital|clinic)$/.test(t)) {
+      levels = area < 500 ? 3 : 8;
+    } else if (/^(school|kindergarten|college|university|public|civic|government|townhall|library|museum|courthouse|fire_station|police)$/.test(t)) {
+      levels = area < 300 ? 2 : 4;
+    } else if (/^(church|temple|chapel|cathedral|mosque|shrine|religious)$/.test(t)) {
+      levels = 3;
+    } else if (/^(industrial|warehouse|factory|manufacture|hangar|depot|storage_tank|silo)$/.test(t)) {
+      levels = 2;   // 층은 적지만 천장이 높다 → 아래에서 층고를 키운다
+      return { h: 9, known: false };
+    } else if (/^(train_station|transportation|parking|stadium|sports_hall|grandstand|pavilion)$/.test(t)) {
+      levels = 3;
+    } else {
+      // building=yes 등 단서 없음 → 면적만으로
+      levels = levelsByArea(area, 'mid');
+    }
+    return { h: levels * LEVEL_H + 1, known: false };
+  }
+
   // 미러 하나를 정해진 시간 안에 시도한다. 실패하면 null.
   // ctrl 을 밖에서 넘겨받아, 새 요청이 들어오면 이전 요청을 끊을 수 있게 한다.
   // 시도마다 새 컨트롤러를 만든다. 하나를 돌려 쓰면 첫 타임아웃이 컨트롤러를
   // 영구히 취소시켜 이후 시도가 전부 즉시 실패한다.
-  async function tryOverpass(url, q) {
+  async function tryOverpass(url, q, timeoutMs) {
     const ctrl = new AbortController();
     currentCtrl = ctrl;
-    const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs || FETCH_TIMEOUT);
     try {
       const res = await fetch(url + '?data=' + encodeURIComponent(q), { signal: ctrl.signal });
       if (!res.ok) return null;
@@ -505,7 +666,8 @@
 
   // Overpass 가 전부 막혔을 때: OSM 본 API 의 XML 을 직접 파싱한다.
   // way 는 node 참조만 갖고 있어서, node 좌표표를 먼저 모은 뒤 이어 붙인다.
-  async function tryOsmApi(box) {
+  async function tryOsmApi(box, opts) {
+    const wantHighways = !!(opts && opts.highways);
     // Overpass 는 (남,서,북,동) 순서인데 OSM API 는 (서,남,동,북) 이다
     const p = box.split(',');
     const bbox = [p[1], p[0], p[3], p[2]].join(',');
@@ -536,14 +698,16 @@
         const tags = {};
         for (const t of w.getElementsByTagName('tag')) tags[t.getAttribute('k')] = t.getAttribute('v');
         const isRail = tags.railway === 'subway' || tags.railway === 'light_rail';
-        if (!tags.building && !isRail) continue;
-        const geometry = [];
+        const isWay = wantHighways && !!tags.highway;
+        if (!tags.building && !isRail && !isWay) continue;
+        const geometry = [], ids = [];
         for (const nd of w.getElementsByTagName('nd')) {
-          const c = nodes.get(nd.getAttribute('ref'));
-          if (c) geometry.push({ lat: c[0], lon: c[1] });
+          const ref = nd.getAttribute('ref');
+          const c = nodes.get(ref);
+          if (c) { geometry.push({ lat: c[0], lon: c[1] }); ids.push(Number(ref)); }
         }
-        const need = isRail ? 2 : 3;
-        if (geometry.length >= need) elements.push({ type: 'way', tags: tags, geometry: geometry });
+        const need = (isRail || isWay) ? 2 : 3;
+        if (geometry.length >= need) elements.push({ type: 'way', tags: tags, geometry: geometry, nodes: ids });
       }
       return { elements: elements };
     } catch (e) {
@@ -636,10 +800,10 @@
         continue;
       }
       if (!el.geometry || el.geometry.length < 3) continue;
-      const h = parseHeight(tg);
-      if (h !== null) known++;
       const pts = el.geometry.map(function (g) { return [g.lat, g.lon]; });
-      list.push({ pts: pts, h: h === null ? DEFAULT_H : h, name: tg.name || null });
+      const est = estimateHeight(tg, pts);
+      if (est.known) known++;
+      list.push({ pts: pts, h: est.h, name: tg.name || null });
     }
     buildings = list;
     pois = poiList;
@@ -722,6 +886,36 @@
     }
   }
 
+  // 건물 바닥면(xs,ys: CCW) 이 벡터 (dx,dy) 만큼 쓸고 간 영역을 경로에 더한다.
+  // = P ∪ (P+d) ∪ 변 사각형들. nonzero 채우기가 성립하도록 감김을 맞춘다.
+  function appendShadowPath(c, xs, ys, dx, dy) {
+    const n = xs.length;
+    // ① 바닥면 P
+    c.moveTo(xs[0], ys[0]);
+    for (let i = 1; i < n; i++) c.lineTo(xs[i], ys[i]);
+    c.closePath();
+    // ② 밀어낸 면 P+d
+    c.moveTo(xs[0] + dx, ys[0] + dy);
+    for (let i = 1; i < n; i++) c.lineTo(xs[i] + dx, ys[i] + dy);
+    c.closePath();
+    // ③ 각 변이 쓸고 간 사각형. (변 방향 × d) 의 부호로 꼭짓점 순서를 맞춘다.
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const cross = (xs[j] - xs[i]) * dy - (ys[j] - ys[i]) * dx;
+      c.moveTo(xs[i], ys[i]);
+      if (cross >= 0) {
+        c.lineTo(xs[j], ys[j]);
+        c.lineTo(xs[j] + dx, ys[j] + dy);
+        c.lineTo(xs[i] + dx, ys[i] + dy);
+      } else {
+        c.lineTo(xs[i] + dx, ys[i] + dy);
+        c.lineTo(xs[j] + dx, ys[j] + dy);
+        c.lineTo(xs[j], ys[j]);
+      }
+      c.closePath();
+    }
+  }
+
   function drawShadows(sun) {
     if (!projected || !projected.length) return;
     const w = cv.width / dpr(), h = cv.height / dpr();
@@ -773,36 +967,7 @@
       const bw = b.maxX - b.minX, bh = b.maxY - b.minY;
       if (bw * bh < 12 && len * ppm < 6) continue;
 
-      const xs = b.xs, ys = b.ys, n = xs.length;
-
-      // ① 바닥면 P
-      lc.moveTo(xs[0], ys[0]);
-      for (let i = 1; i < n; i++) lc.lineTo(xs[i], ys[i]);
-      lc.closePath();
-
-      // ② 밀어낸 면 P+d
-      lc.moveTo(xs[0] + dx, ys[0] + dy);
-      for (let i = 1; i < n; i++) lc.lineTo(xs[i] + dx, ys[i] + dy);
-      lc.closePath();
-
-      // ③ 각 변이 쓸고 간 사각형.
-      //    변의 방향과 그림자 벡터의 외적 부호에 따라 감김이 뒤집히므로,
-      //    부호를 보고 꼭짓점 순서를 맞춰 항상 같은 방향으로 만든다.
-      for (let i = 0; i < n; i++) {
-        const j = (i + 1) % n;
-        const cross = (xs[j] - xs[i]) * dy - (ys[j] - ys[i]) * dx;
-        lc.moveTo(xs[i], ys[i]);
-        if (cross >= 0) {
-          lc.lineTo(xs[j], ys[j]);
-          lc.lineTo(xs[j] + dx, ys[j] + dy);
-          lc.lineTo(xs[i] + dx, ys[i] + dy);
-        } else {
-          lc.lineTo(xs[i] + dx, ys[i] + dy);
-          lc.lineTo(xs[j] + dx, ys[j] + dy);
-          lc.lineTo(xs[j], ys[j]);
-        }
-        lc.closePath();
-      }
+      appendShadowPath(lc, b.xs, b.ys, dx, dy);
     }
     lc.fill('nonzero');
 
@@ -1089,6 +1254,456 @@
     ctx.restore();
   }
 
+  /* =====================================================================
+   * 길찾기 — 출발·도착을 정해 도보 경로(최단 / 그늘)와 대중교통 경로를 구한다.
+   *
+   * 도보 경로는 외부 라우터를 쓰지 않는다. 그늘을 비용에 넣으려면 간선마다
+   * "이 시각에 그늘인 비율"을 알아야 하는데, 그건 우리만 계산할 수 있다.
+   * 그래서 OSM 보행로를 받아 그래프를 만들고 A* 를 직접 돌린다.
+   *
+   * 흐름: 주소 검색 → 좌표 → 경로 상자 → 건물+보행로 한 번에 받기
+   *       → 이 시각의 그늘 마스크(오프스크린 래스터) → 간선마다 그늘 비율
+   *       → A* 두 번(최단 / 그늘 가중) → 두 경로의 그늘 % 비교
+   * ===================================================================== */
+  const ROUTE_MAX_KM = 3.5;        // 도보 그래프를 만드는 최대 직선거리
+  const ROUTE_PAD_M = 180;         // 경로 상자 여유 (우회로가 들어올 공간)
+  const SUN_PENALTY = 1.6;         // 햇빛 100m 를 (1+1.6)×100m 로 친다. 클수록 그늘을 더 돌아감
+  const SAMPLE_M = 4;              // 간선을 몇 m 간격으로 표본해 그늘을 재나
+  const WALK_SPEED = 1.25;         // m/s ≈ 4.5 km/h
+  const SNAP_M = 200;              // 출발·도착을 보행로에 붙일 때 허용 거리
+  const ROUTE_TIMEOUT = 32000;     // 경로용 Overpass 질의. 대기열이 20초를 넘기도 한다
+  const STEPS_PENALTY = 1.5;       // 계단은 같은 길이라도 힘들다
+  const WALKABLE = /^(footway|pedestrian|path|steps|residential|living_street|service|unclassified|tertiary|tertiary_link|secondary|secondary_link|primary|primary_link|track|cycleway|corridor)$/;
+
+  let route = { start: null, end: null, walk: null, transit: null, busy: false, note: null };
+  let corridor = null;   // { box, key, buildings:[{pts,h}], nodes: Map } — 마지막 경로 데이터
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371000, dLat = (lat2 - lat1) * RAD, dLon = (lon2 - lon1) * RAD;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  // 북=0, 시계방향 (태양 방위각과 같은 기준)
+  function bearing(lat1, lon1, lat2, lon2) {
+    const dLon = (lon2 - lon1) * RAD;
+    const y = Math.sin(dLon) * Math.cos(lat2 * RAD);
+    const x = Math.cos(lat1 * RAD) * Math.sin(lat2 * RAD) - Math.sin(lat1 * RAD) * Math.cos(lat2 * RAD) * Math.cos(dLon);
+    let b = Math.atan2(y, x);
+    if (b < 0) b += 2 * Math.PI;
+    return b;
+  }
+
+  function routeBox(a, b) {
+    const midLat = (a.lat + b.lat) / 2;
+    const padLat = ROUTE_PAD_M / 111320;
+    const padLon = ROUTE_PAD_M / (111320 * Math.cos(midLat * RAD));
+    return {
+      s: Math.min(a.lat, b.lat) - padLat, n: Math.max(a.lat, b.lat) + padLat,
+      w: Math.min(a.lon, b.lon) - padLon, e: Math.max(a.lon, b.lon) + padLon
+    };
+  }
+
+  /* ---------- 경로 상자의 건물 + 보행로를 한 번에 받는다 ---------- */
+  async function fetchCorridor(box) {
+    const bb = [box.s.toFixed(5), box.w.toFixed(5), box.n.toFixed(5), box.e.toFixed(5)].join(',');
+    const q = '[out:json][timeout:25];(' +
+      'way["building"](' + bb + ');' +
+      'way["highway"](' + bb + ');' +
+      ');out geom;';
+    let data = null;
+    for (let i = 0; i < OVERPASS.length; i++) {
+      data = await tryOverpass(OVERPASS[i], q, ROUTE_TIMEOUT);
+      if (data && data.elements && data.elements.length) break;
+      data = null;
+    }
+    if (!data) data = await tryOsmApi(bb, { highways: true });
+    if (!data) return null;
+
+    const bldgs = [];
+    const ways = [];
+    for (const el of data.elements || []) {
+      if (el.type !== 'way' || !el.tags) continue;
+      if (el.tags.building) {
+        if (!el.geometry || el.geometry.length < 3) continue;
+        const pts = el.geometry.map(function (g) { return [g.lat, g.lon]; });
+        bldgs.push({ pts: pts, h: estimateHeight(el.tags, pts).h });
+      } else if (el.tags.highway && WALKABLE.test(el.tags.highway)) {
+        if (el.tags.foot === 'no' || el.tags.access === 'private' || el.tags.access === 'no') continue;
+        if (!el.nodes || !el.geometry || el.nodes.length !== el.geometry.length) continue;
+        ways.push(el);
+      }
+    }
+    return { buildings: bldgs, ways: ways };
+  }
+
+  /* ---------- 보행 그래프 ----------
+   * 노드는 OSM node id 로 식별한다. 두 길이 같은 node 를 공유하면 거기가 교차점이다.
+   * (out geom 은 좌표와 node id 를 함께 준다.) */
+  function buildGraph(ways) {
+    const nodes = new Map();
+    for (const w of ways) {
+      for (let i = 0; i < w.nodes.length; i++) {
+        const id = w.nodes[i];
+        if (!nodes.has(id)) nodes.set(id, { lat: w.geometry[i].lat, lon: w.geometry[i].lon, adj: [] });
+        if (i > 0) {
+          const a = w.nodes[i - 1], b = id;
+          const na = nodes.get(a), nb = nodes.get(b);
+          const len = haversine(na.lat, na.lon, nb.lat, nb.lon);
+          if (len <= 0) continue;
+          const tunnel = !!(w.tags.tunnel && w.tags.tunnel !== 'no') || w.tags.highway === 'corridor';
+          const steps = w.tags.highway === 'steps';
+          na.adj.push({ to: b, len: len, shade: -1, tunnel: tunnel, steps: steps });
+          nb.adj.push({ to: a, len: len, shade: -1, tunnel: tunnel, steps: steps });
+        }
+      }
+    }
+    return nodes;
+  }
+
+  function nearestNode(nodes, lat, lon) {
+    let best = null, bestD = Infinity;
+    for (const [id, n] of nodes) {
+      // 빠른 1차 거르기: 위경도 차이로
+      const dLat = Math.abs(n.lat - lat) * 111320;
+      if (dLat > bestD) continue;
+      const d = haversine(lat, lon, n.lat, n.lon);
+      if (d < bestD) { bestD = d; best = id; }
+    }
+    return bestD <= SNAP_M ? { id: best, dist: bestD } : null;
+  }
+
+  /* ---------- 그늘 마스크 ----------
+   * 경로 상자 전체를 오프스크린 캔버스에 이 시각의 그림자로 칠해 두고,
+   * 좌표 → 픽셀 알파값으로 "그늘인가" 를 O(1) 에 답한다.
+   * 화면용 drawShadows 와 같은 기하를 쓰되 뷰포트가 아니라 상자 기준이다. */
+  function buildShadeMask(box, bldgs, sun) {
+    let z = 17;
+    while (z > 14 && (lonToX(box.e, z) - lonToX(box.w, z) > 2000 || latToY(box.s, z) - latToY(box.n, z) > 2000)) z--;
+    const ox = lonToX(box.w, z), oy = latToY(box.n, z);
+    const w = Math.max(1, Math.ceil(lonToX(box.e, z) - ox));
+    const h = Math.max(1, Math.ceil(latToY(box.s, z) - oy));
+    const night = sun.alt <= 0.02;
+    let data = null;
+
+    if (!night) {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      const cot = 1 / Math.tan(sun.alt);
+      const dirAz = sun.az + Math.PI;
+      const mPerPx = 156543.03392 * Math.cos(((box.n + box.s) / 2) * RAD) / Math.pow(2, z);
+      const ux = Math.sin(dirAz) / mPerPx, uy = -Math.cos(dirAz) / mPerPx;
+      g.fillStyle = '#000';
+      g.beginPath();
+      for (const b of bldgs) {
+        const len = b.h * cot;
+        if (len > 900) continue;
+        const n = b.pts.length;
+        const xs = new Float32Array(n), ys = new Float32Array(n);
+        let area2 = 0;
+        for (let i = 0; i < n; i++) {
+          xs[i] = lonToX(b.pts[i][1], z) - ox;
+          ys[i] = latToY(b.pts[i][0], z) - oy;
+        }
+        for (let i = 0; i < n; i++) { const j = (i + 1) % n; area2 += xs[i] * ys[j] - xs[j] * ys[i]; }
+        if (area2 < 0) { xs.reverse(); ys.reverse(); }
+        appendShadowPath(g, xs, ys, len * ux, len * uy);
+      }
+      g.fill('nonzero');
+      data = g.getImageData(0, 0, w, h).data;
+    }
+
+    return {
+      night: night,
+      shaded: function (lat, lon) {
+        if (night) return true;
+        const x = (lonToX(lon, z) - ox) | 0, y = (latToY(lat, z) - oy) | 0;
+        if (x < 0 || y < 0 || x >= w || y >= h) return false;
+        return data[(y * w + x) * 4 + 3] > 0;
+      }
+    };
+  }
+
+  // 간선을 SAMPLE_M 간격으로 표본해 그늘 비율을 구한다 (0~1)
+  function edgeShadeFraction(mask, a, b, len) {
+    const n = Math.max(1, Math.round(len / SAMPLE_M));
+    let hit = 0;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      if (mask.shaded(a.lat + (b.lat - a.lat) * t, a.lon + (b.lon - a.lon) * t)) hit++;
+    }
+    return hit / (n + 1);
+  }
+
+  function annotateShade(nodes, mask) {
+    for (const [id, n] of nodes) {
+      for (const e of n.adj) {
+        if (e.shade >= 0) continue;
+        const m = nodes.get(e.to);
+        const f = e.tunnel ? 1 : edgeShadeFraction(mask, n, m, e.len);
+        e.shade = f;
+        // 반대 방향 간선에도 같은 값
+        for (const r of m.adj) if (r.to === id && r.shade < 0) r.shade = f;
+      }
+    }
+  }
+
+  /* ---------- A* ---------- */
+  function MinHeap() { this.a = []; }
+  MinHeap.prototype.push = function (id, p) {
+    const a = this.a; a.push([p, id]);
+    let i = a.length - 1;
+    while (i > 0) { const q = (i - 1) >> 1; if (a[q][0] <= a[i][0]) break; const t = a[q]; a[q] = a[i]; a[i] = t; i = q; }
+  };
+  MinHeap.prototype.pop = function () {
+    const a = this.a, top = a[0], last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < a.length && a[l][0] < a[m][0]) m = l;
+        if (r < a.length && a[r][0] < a[m][0]) m = r;
+        if (m === i) break;
+        const t = a[m]; a[m] = a[i]; a[i] = t; i = m;
+      }
+    }
+    return top[1];
+  };
+  Object.defineProperty(MinHeap.prototype, 'size', { get: function () { return this.a.length; } });
+
+  // costFn(edge) ≥ edge.len 이어야 직선거리 휴리스틱이 과대평가하지 않는다
+  function astar(nodes, s, t, costFn) {
+    if (s === t) return [s];
+    const tn = nodes.get(t);
+    const heur = (id) => { const n = nodes.get(id); return haversine(n.lat, n.lon, tn.lat, tn.lon); };
+    const g = new Map(); g.set(s, 0);
+    const prev = new Map();
+    const closed = new Set();
+    const open = new MinHeap();
+    open.push(s, heur(s));
+    while (open.size) {
+      const cur = open.pop();
+      if (cur === t) break;
+      if (closed.has(cur)) continue;
+      closed.add(cur);
+      const gc = g.get(cur);
+      for (const e of nodes.get(cur).adj) {
+        if (closed.has(e.to)) continue;
+        const ng = gc + costFn(e);
+        const old = g.get(e.to);
+        if (old === undefined || ng < old) {
+          g.set(e.to, ng); prev.set(e.to, cur);
+          open.push(e.to, ng + heur(e.to));
+        }
+      }
+    }
+    if (!prev.has(t)) return null;
+    const path = [t];
+    let c = t;
+    while (c !== s) { c = prev.get(c); path.push(c); }
+    path.reverse();
+    return path;
+  }
+
+  function summarize(nodes, path) {
+    let len = 0, shadeLen = 0;
+    const pts = [];
+    for (let i = 0; i < path.length; i++) {
+      const n = nodes.get(path[i]);
+      pts.push([n.lat, n.lon]);
+      if (i > 0) {
+        const p = nodes.get(path[i - 1]);
+        for (const e of p.adj) if (e.to === path[i]) { len += e.len; shadeLen += e.len * Math.max(0, e.shade); break; }
+      }
+    }
+    return { pts: pts, meters: len, shadeMeters: shadeLen,
+             shadePct: len ? Math.round(100 * shadeLen / len) : 0,
+             minutes: Math.round(len / WALK_SPEED / 60) };
+  }
+
+  /* ---------- 도보 경로 계산 (전체) ---------- */
+  async function computeWalk() {
+    const a = route.start, b = route.end;
+    if (!a || !b) return;
+    const dist = haversine(a.lat, a.lon, b.lat, b.lon);
+    if (dist > ROUTE_MAX_KM * 1000) {
+      route.walk = null;
+      route.note = '도보 경로는 직선거리 ' + ROUTE_MAX_KM + 'km 이내에서만 계산합니다. (지금 ' + (dist / 1000).toFixed(1) + 'km)';
+      renderRoutePanel(); draw();
+      return;
+    }
+    const box = routeBox(a, b);
+    const key = [box.s, box.w, box.n, box.e].map((v) => v.toFixed(4)).join(',');
+
+    route.busy = true; route.note = '보행로와 건물을 불러오는 중…'; renderRoutePanel();
+    if (!corridor || corridor.key !== key) {
+      const data = await fetchCorridor(box);
+      if (!data) {
+        // 지도 서버가 다 막혔다. 외부 보행 라우터로 최단 경로만이라도 받아 보여준다.
+        const fb = await fallbackWalk(a, b);
+        route.busy = false;
+        if (fb) {
+          route.walk = { shortest: fb, shaded: fb, night: false, fallback: true };
+          route.note = null;
+        } else {
+          route.walk = null;
+          route.note = '지도 서버가 응답하지 않습니다. 잠시 뒤 다시 시도해 주세요.';
+        }
+        renderRoutePanel(); draw(); return;
+      }
+      corridor = { key: key, box: box, buildings: data.buildings, nodes: buildGraph(data.ways), maskMinutes: -1 };
+    }
+
+    const nodes = corridor.nodes;
+    const sn = nearestNode(nodes, a.lat, a.lon), en = nearestNode(nodes, b.lat, b.lon);
+    if (!sn || !en) {
+      route.busy = false; route.walk = null;
+      route.note = (sn ? '도착지' : '출발지') + ' 근처 ' + SNAP_M + 'm 안에 보행로가 없습니다. 지점을 조금 옮겨 보세요.';
+      renderRoutePanel(); return;
+    }
+
+    route.note = '그늘을 계산하는 중…'; renderRoutePanel();
+    await new Promise((r) => setTimeout(r, 0));   // 화면이 갱신될 틈
+
+    const sun = sunPosition(selectedDate(), (a.lat + b.lat) / 2, (a.lon + b.lon) / 2);
+    if (corridor.maskMinutes !== minutes) {
+      const mask = buildShadeMask(box, corridor.buildings, sun);
+      for (const [, n] of nodes) for (const e of n.adj) e.shade = -1;
+      annotateShade(nodes, mask);
+      corridor.maskMinutes = minutes;
+      corridor.night = mask.night;
+    }
+
+    const stepsK = (e) => (e.steps ? STEPS_PENALTY : 1);
+    const shortest = astar(nodes, sn.id, en.id, (e) => e.len * stepsK(e));
+    const shaded = astar(nodes, sn.id, en.id, (e) => e.len * stepsK(e) * (1 + SUN_PENALTY * (1 - Math.max(0, e.shade))));
+    route.busy = false;
+    if (!shortest) {
+      route.walk = null;
+      route.note = '두 지점을 잇는 보행로를 찾지 못했습니다.';
+      renderRoutePanel(); draw(); return;
+    }
+    const S = summarize(nodes, shortest);
+    const H = shaded ? summarize(nodes, shaded) : S;
+    // 출발·도착 실제 지점까지의 자투리 거리
+    S.meters += sn.dist + en.dist; H.meters += sn.dist + en.dist;
+    S.minutes = Math.round(S.meters / WALK_SPEED / 60); H.minutes = Math.round(H.meters / WALK_SPEED / 60);
+    route.walk = { shortest: S, shaded: H, night: corridor.night, sunAlt: sun.alt };
+    route.note = null;
+    renderRoutePanel();
+    draw();
+  }
+
+  // FOSSGIS 의 공개 보행 라우터. 키 없음, CORS 열림, 초당 1회.
+  // 그늘 가중치는 못 주지만 Overpass 가 죽었을 때 최단 경로는 보여줄 수 있다.
+  async function fallbackWalk(a, b) {
+    try {
+      const url = 'https://routing.openstreetmap.de/routed-foot/route/v1/driving/' +
+        a.lon.toFixed(6) + ',' + a.lat.toFixed(6) + ';' + b.lon.toFixed(6) + ',' + b.lat.toFixed(6) +
+        '?overview=full&geometries=geojson';
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const j = await res.json();
+      const r = j.routes && j.routes[0];
+      if (!r || !r.geometry) return null;
+      const pts = r.geometry.coordinates.map((c) => [c[1], c[0]]);
+      return { pts: pts, meters: r.distance, shadeMeters: 0, shadePct: -1,
+               minutes: Math.round(r.distance / WALK_SPEED / 60) };
+    } catch (e) { return null; }
+  }
+
+  /* ---------- 버스 좌석 방향 ----------
+   * 진행 방향 기준으로 해가 오른쪽에 있으면 왼쪽 자리가 그늘이다.
+   * 구간마다 (정류장 사이) 방위를 구해 길이·각도로 가중 평균한다.
+   * 해가 정면·정후방이면 어느 쪽도 아니므로 |sin| 로 힘을 뺀다. */
+  function seatSide(stops, sun) {
+    if (!stops || stops.length < 2) return null;
+    if (sun.alt <= 0.02) return { side: null, text: '해가 진 시각 — 어느 쪽이든 같습니다' };
+    let left = 0, right = 0, total = 0;
+    for (let i = 1; i < stops.length; i++) {
+      const p = stops[i - 1], q = stops[i];
+      const len = haversine(p.lat, p.lon, q.lat, q.lon);
+      if (len <= 0) continue;
+      total += len;
+      const hdg = bearing(p.lat, p.lon, q.lat, q.lon);
+      let rel = sun.az - hdg;
+      while (rel > Math.PI) rel -= 2 * Math.PI;
+      while (rel < -Math.PI) rel += 2 * Math.PI;
+      const s = Math.sin(rel);           // +: 해가 오른쪽 → 왼쪽 자리가 그늘
+      if (s > 0) left += len * s; else right += len * (-s);
+    }
+    const tot = left + right;
+    // 해가 진행 방향의 정면·정후방에 있으면 어느 쪽도 그늘이 아니다
+    if (total <= 0 || tot < total * 0.2) return { side: null, text: '해가 앞뒤에 있어 양쪽이 비슷합니다' };
+    const lp = Math.round(100 * left / tot);
+    if (lp >= 58) return { side: 'left', pct: lp, text: '왼쪽 자리 추천 — 구간의 ' + lp + '%에서 그늘' };
+    if (lp <= 42) return { side: 'right', pct: 100 - lp, text: '오른쪽 자리 추천 — 구간의 ' + (100 - lp) + '%에서 그늘' };
+    return { side: null, pct: lp, text: '양쪽 비슷합니다 (왼쪽 ' + lp + '%)' };
+  }
+
+  /* ---------- 경로 그리기 ---------- */
+  function drawRoutes() {
+    if (!route.start && !route.end) return;
+    const w = cv.width / dpr(), h = cv.height / dpr();
+
+    function line(pts, color, width, dash) {
+      ctx.save();
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.setLineDash(dash || []);
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = width + 3;
+      ctx.beginPath();
+      for (let i = 0; i < pts.length; i++) { const p = project(pts[i][0], pts[i][1]); if (i) ctx.lineTo(p[0], p[1]); else ctx.moveTo(p[0], p[1]); }
+      ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = width;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (route.walk) {
+      line(route.walk.shortest.pts, '#6b7280', 4, [7, 6]);
+      line(route.walk.shaded.pts, '#1f8a5a', 5);
+    }
+    if (route.transitPath) {
+      for (const seg of route.transitPath) line(seg.pts, seg.color, seg.width, seg.dash);
+    }
+
+    function pin(p, label, color) {
+      if (!p) return;
+      const q = project(p.lat, p.lon);
+      if (q[0] < -30 || q[0] > w + 30 || q[1] < -30 || q[1] > h + 30) return;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(q[0], q[1], 11, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = '700 12px ' + css.getPropertyValue('--font');
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, q[0], q[1] + 0.5);
+      ctx.restore();
+    }
+    pin(route.start, '출', '#1f5fbf');
+    pin(route.end, '도', '#c62828');
+  }
+
+  // 두 지점이 다 보이도록 지도를 맞춘다
+  function fitRoute() {
+    if (!route.start || !route.end) return;
+    const box = routeBox(route.start, route.end);
+    const w = cv.width / dpr(), h = cv.height / dpr();
+    let z = MAX_Z;
+    while (z > MIN_Z && (lonToX(box.e, z) - lonToX(box.w, z) > w * 0.86 || latToY(box.s, z) - latToY(box.n, z) > h * 0.86)) z--;
+    view.z = z;
+    view.lat = (box.n + box.s) / 2;
+    view.lon = (box.e + box.w) / 2;
+    loadedKey = null;
+    store.set('shade_view', view);
+    projectAll();
+    draw();
+    loadBuildings();
+  }
+
   function drawSunDial(sun) {
     const s = dial.width, c = s / 2, r = s / 2 - 14;
     dctx.clearRect(0, 0, s, s);
@@ -1134,6 +1749,7 @@
     drawRails();
     drawNight(sun);
     drawPois();
+    drawRoutes();
     drawSunDial(sun);
 
     // 상태 문구
@@ -1160,7 +1776,7 @@
     if (heightStat.total) {
       const pct = Math.round(100 * heightStat.known / heightStat.total);
       cov.innerHTML = '건물 ' + heightStat.total + '개 · 실제 높이 <b>' + pct + '%</b>' +
-                      (pct < 60 ? ' <span class="warn">(나머지는 추정)</span>' : '');
+                      (pct < 60 ? ' <span class="warn">(나머지는 면적·용도로 추정)</span>' : '');
     } else {
       cov.textContent = '';
     }
@@ -1256,6 +1872,7 @@
     stopPlay();
     draw();
     ensureAnim();
+    scheduleRecalc();
   });
 
   for (const chip of document.querySelectorAll('.chip[data-jump]')) {
@@ -1265,11 +1882,14 @@
       stopPlay();
       draw();
       ensureAnim();
+      scheduleRecalc();
     });
   }
 
   function stopPlay() {
+    const was = playing;
     playing = false;
+    if (was) scheduleRecalc();
     if (playTimer) { clearInterval(playTimer); playTimer = null; }
     $('playBtn').textContent = '▶ 하루 재생';
   }
@@ -1318,6 +1938,493 @@
     resize();
     loadBuildings();
   });
+
+  /* ---------- 대중교통 ----------
+   * 기본: Transitous (MOTIS). 키가 없고 CORS 가 열려 있으며 서울 버스·지하철이 들어 있다.
+   *       조건은 비영리·오픈소스 용도. 시각표가 2025-05 KTDB 기준이라 배차 시각은 참고만.
+   * 선택: ODsay. lab.odsay.com 에서 개인 무료 키(URI 플랫폼 = 도메인 제한형).
+   *       정확한 시각표지만 무료 한도가 하루 30건이라 기본으로 쓰기엔 적다.
+   * 두 응답을 같은 모양으로 정규화해 한 렌더러로 그린다:
+   *   { totalMin, transfers, fare, walkM, legs:[{mode, name, from, to, minutes, meters, pts:[[lat,lon]], color}] }
+   */
+  const TRANSITOUS_URL = 'https://api.transitous.org/api/v1/plan';
+  const ODSAY_URL = 'https://api.odsay.com/v1/api/searchPubTransPathT';
+  function TRANSIT_READY() { return true; }   // Transitous 는 키가 필요 없다
+  function odsayKey() { return store.get('shade_odsay', ''); }
+
+  // 서울 지하철 노선색 (ODsay subwayCode / 노선 이름)
+  const SUBWAY_COLOR = {
+    1: '#0052A4', 2: '#00A84D', 3: '#EF7C1C', 4: '#00A5DE', 5: '#996CAC', 6: '#CD7C2F',
+    7: '#747F00', 8: '#E6186C', 9: '#BDB092', 100: '#2D6E3E', 101: '#0090D2', 104: '#77C4A3',
+    107: '#F5A200', 108: '#D4003B', 109: '#C82127', 110: '#B0CE18', 112: '#7CA8D5', 113: '#6789CA'
+  };
+  function lineColor(name, code) {
+    if (code !== undefined && SUBWAY_COLOR[code]) return SUBWAY_COLOR[code];
+    const m = String(name || '').match(/^(\d)호선/);
+    if (m) return SUBWAY_COLOR[parseInt(m[1], 10)] || '#444';
+    const t = String(name || '');
+    if (/신분당/.test(t)) return '#D4003B';
+    if (/분당|수인/.test(t)) return '#F5A200';
+    if (/경의|중앙/.test(t)) return '#77C4A3';
+    if (/공항/.test(t)) return '#0090D2';
+    if (/경춘/.test(t)) return '#0C8E72';
+    if (/우이|신설/.test(t)) return '#B0CE18';
+    if (/김포/.test(t)) return '#A17800';
+    if (/신림/.test(t)) return '#6789CA';
+    return '#555';
+  }
+
+  // Google encoded polyline 디코더 (precision 5 또는 7)
+  // 주의: 흔한 구현은 비트 시프트(<<)를 쓰는데, precision 7 에서는 경도 126.97×10⁷×2 가
+  // 2³¹ 을 넘어 32비트로 잘린다(실측: 126.975 → −87.773). 그래서 산술 연산으로 푼다.
+  function decodePolyline(str, precision) {
+    const factor = Math.pow(10, precision || 5);
+    let index = 0, lat = 0, lon = 0;
+    const out = [];
+    function next() {
+      let b, mult = 1, result = 0;
+      do {
+        b = str.charCodeAt(index++) - 63;
+        result += (b & 0x1f) * mult;
+        mult *= 32;
+      } while (b >= 0x20);
+      // zigzag: 홀수면 음수
+      return (result % 2 === 1) ? -(Math.floor(result / 2)) - 1 : result / 2;
+    }
+    while (index < str.length) {
+      lat += next();
+      lon += next();
+      out.push([lat / factor, lon / factor]);
+    }
+    return out;
+  }
+
+  // ---- Transitous → 공통 모양 ----
+  function fromTransitous(j) {
+    const its = (j && j.itineraries) || [];
+    return its.slice(0, 5).map((it) => {
+      const legs = [];
+      for (const lg of it.legs || []) {
+        const mode = lg.mode === 'WALK' ? 'walk'
+          : (lg.mode === 'SUBWAY' || lg.routeType === 1 || /^(METRO|RAIL)$/.test(lg.mode)) ? 'subway'
+          : 'bus';   // 서울 버스는 TRAM/routeType 0 으로 들어온다
+        let pts = [];
+        if (lg.legGeometry && lg.legGeometry.points) {
+          try { pts = decodePolyline(lg.legGeometry.points, lg.legGeometry.precision || 7); } catch (e) { pts = []; }
+        }
+        if (pts.length < 2) {
+          pts = [[lg.from.lat, lg.from.lon]].concat((lg.intermediateStops || []).map((s) => [s.lat, s.lon]), [[lg.to.lat, lg.to.lon]]);
+        }
+        const stops = [[lg.from.lat, lg.from.lon]].concat((lg.intermediateStops || []).map((s) => [s.lat, s.lon]), [[lg.to.lat, lg.to.lon]]);
+        const name = lg.routeShortName || lg.routeLongName || '';
+        legs.push({
+          mode: mode, name: name,
+          from: (lg.from && lg.from.name) || '', to: (lg.to && lg.to.name) || '',
+          minutes: Math.round((lg.duration || 0) / 60), meters: lg.distance || 0,
+          stopCount: (lg.intermediateStops || []).length + 1,
+          pts: pts, stops: stops,
+          color: mode === 'subway' ? lineColor(name) : (mode === 'bus' ? '#2f6fd6' : '#6b7280')
+        });
+      }
+      return { totalMin: Math.round((it.duration || 0) / 60), transfers: it.transfers || 0,
+               fare: null, walkM: legs.filter((l) => l.mode === 'walk').reduce((s, l) => s + l.meters, 0), legs: legs };
+    });
+  }
+
+  // ---- ODsay → 공통 모양 ----
+  function fromOdsay(j) {
+    const paths = (j.result && j.result.path) || [];
+    return paths.slice(0, 5).map((p) => {
+      const info = p.info || {};
+      const legs = [];
+      for (const sp of p.subPath || []) {
+        const st = (sp.passStopList && sp.passStopList.stations) || [];
+        const stops = st.length >= 2 ? st.map((s) => [parseFloat(s.y), parseFloat(s.x)])
+          : (sp.startX !== undefined ? [[parseFloat(sp.startY), parseFloat(sp.startX)], [parseFloat(sp.endY), parseFloat(sp.endX)]] : []);
+        const mode = sp.trafficType === 3 ? 'walk' : sp.trafficType === 2 ? 'bus' : 'subway';
+        const lane = sp.lane && sp.lane[0];
+        const name = lane ? (lane.busNo || lane.name || '') : '';
+        legs.push({
+          mode: mode, name: name, from: sp.startName || '', to: sp.endName || '',
+          minutes: sp.sectionTime || 0, meters: sp.distance || 0, stopCount: sp.stationCount || 0,
+          pts: stops, stops: stops,
+          color: mode === 'subway' ? lineColor(name, lane && lane.subwayCode) : (mode === 'bus' ? '#2f6fd6' : '#6b7280')
+        });
+      }
+      const tr = Math.max(0, (info.busTransitCount || 0) + (info.subwayTransitCount || 0) - 1);
+      return { totalMin: info.totalTime || 0, transfers: tr, fare: info.payment || null, walkM: info.totalWalk || 0, legs: legs };
+    });
+  }
+
+  async function computeTransit() {
+    const a = route.start, b = route.end;
+    route.busy = true; route.note = '대중교통 경로를 찾는 중…'; renderRoutePanel();
+    try {
+      let list;
+      const key = odsayKey();
+      if (key) {
+        const url = ODSAY_URL + '?apiKey=' + encodeURIComponent(key) +
+          '&SX=' + a.lon.toFixed(6) + '&SY=' + a.lat.toFixed(6) +
+          '&EX=' + b.lon.toFixed(6) + '&EY=' + b.lat.toFixed(6) + '&OPT=0&SearchPathType=0&lang=0&output=json';
+        const res = await fetch(url);
+        const j = await res.json();
+        const err = j.error && (Array.isArray(j.error) ? j.error[0] : j.error);
+        if (err) throw new Error('ODsay: ' + (err.message || err.msg || ('코드 ' + (err.code || '?'))));
+        list = fromOdsay(j);
+        route.transitSource = 'ODsay';
+      } else {
+        const when = selectedDate().toISOString();
+        const url = TRANSITOUS_URL + '?fromPlace=' + a.lat.toFixed(6) + ',' + a.lon.toFixed(6) +
+          '&toPlace=' + b.lat.toFixed(6) + ',' + b.lon.toFixed(6) + '&time=' + encodeURIComponent(when) + '&numItineraries=5';
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('서버 응답 ' + res.status);
+        list = fromTransitous(await res.json());
+        route.transitSource = 'Transitous';
+      }
+      if (!list.length) throw new Error('경로가 없습니다. 두 지점이 너무 가깝거나 멀 수 있습니다.');
+      route.transit = list;
+      route.transitIdx = 0;
+      route.note = null;
+      annotateTransitSeats();
+      buildTransitPath();
+    } catch (e) {
+      route.transit = null; route.transitPath = null;
+      route.note = '대중교통 경로를 받지 못했습니다: ' + e.message;
+    }
+    route.busy = false;
+    renderRoutePanel();
+    draw();
+  }
+
+  // 각 버스 구간에 좌석 추천을 붙인다 (시각이 바뀌면 다시)
+  function annotateTransitSeats() {
+    if (!route.transit) return;
+    for (const it of route.transit) {
+      let t = minutes;
+      for (const lg of it.legs) {
+        if (lg.mode === 'bus' && lg.pts.length >= 2) {
+          const mid = t + lg.minutes / 2;
+          const d = new Date(); d.setHours(Math.floor(mid / 60) % 24, Math.round(mid % 60), 0, 0);
+          const sun = sunPosition(d, lg.pts[0][0], lg.pts[0][1]);
+          lg.seat = seatSide(lg.pts.map((p) => ({ lat: p[0], lon: p[1] })), sun);
+        } else {
+          lg.seat = null;
+        }
+        t += lg.minutes;
+      }
+    }
+  }
+
+  // 선택된 경로를 지도에 그릴 선분들로 바꾼다
+  function buildTransitPath() {
+    if (!route.transit) { route.transitPath = null; return; }
+    const it = route.transit[route.transitIdx || 0];
+    route.transitPath = it.legs.filter((l) => l.pts.length >= 2).map((l) => ({
+      pts: l.pts, color: l.color, width: l.mode === 'walk' ? 4 : 5, dash: l.mode === 'walk' ? [6, 6] : null
+    }));
+  }
+
+  function renderTransit(list) {
+    let html = '';
+    list.forEach((it, i) => {
+      const sel = i === (route.transitIdx || 0);
+      html += '<div class="rcard' + (sel ? ' shade' : '') + '">';
+      html += '<button type="button" class="tpick" data-i="' + i + '">' +
+              '<b>' + it.totalMin + '분</b> · 환승 ' + it.transfers + '회' +
+              (it.fare ? ' · ' + it.fare.toLocaleString() + '원' : '') +
+              (it.walkM ? ' · 도보 ' + fmtM(it.walkM) : '') + '</button>';
+      html += '<div class="legs">';
+      for (const lg of it.legs) {
+        if (lg.mode === 'walk') {
+          if (lg.meters < 30) continue;
+          html += '<div class="leg walk">도보 ' + fmtM(lg.meters) + ' (' + lg.minutes + '분)</div>';
+        } else if (lg.mode === 'bus') {
+          html += '<div class="leg bus"><b>버스 ' + esc(lg.name) + '</b> ' + esc(lg.from) + ' → ' + esc(lg.to) +
+                  ' (' + lg.stopCount + '정류장, ' + lg.minutes + '분)';
+          if (lg.seat) {
+            html += '<div class="seat' + (lg.seat.side ? ' ' + lg.seat.side : '') + '">' +
+                    (lg.seat.side === 'left' ? '◀ ' : lg.seat.side === 'right' ? '▶ ' : '') + esc(lg.seat.text) + '</div>';
+          }
+          html += '</div>';
+        } else {
+          html += '<div class="leg subway"><span class="sw" style="background:' + lg.color + '"></span><b>' + esc(lg.name) + '</b> ' +
+                  esc(lg.from) + ' → ' + esc(lg.to) + ' (' + lg.stopCount + '역, ' + lg.minutes + '분)' +
+                  '<div class="seat none">지하 구간 — 좌석 방향 해당 없음</div></div>';
+        }
+      }
+      html += '</div></div>';
+    });
+    html += '<div class="hint small">좌석 추천은 구간의 진행 방향과 태양 위치로 계산한 값이며, 버스가 실제로 도는 길과 다를 수 있습니다.' +
+            (route.transitSource === 'Transitous'
+              ? ' 경로: <a href="https://transitous.org" target="_blank" rel="noopener">Transitous</a> (비영리·오픈소스용, 시각표는 참고만).'
+              : ' 경로: ODsay.') + '</div>';
+    html += '<div class="hint small">정확한 시각표가 필요하면 <a href="https://lab.odsay.com" target="_blank" rel="noopener">ODsay</a> 키(무료·하루 30건)를 넣을 수 있습니다.' +
+            '<div class="keyRow"><input type="text" id="odsayKey" placeholder="ODsay API 키 (선택)" autocomplete="off" spellcheck="false" value="' + esc(odsayKey()) + '">' +
+            '<button type="button" id="odsaySave">저장</button></div></div>';
+    return html;
+  }
+
+  /* ---------- 길찾기 패널 ---------- */
+  const panel = $('routePanel');
+  let routeTab = 'walk';
+  let geoTimer = null, geoBusy = false, geoLast = 0;
+
+  function openPanel() { panel.classList.remove('hidden'); renderRoutePanel(); }
+  function closePanel() { panel.classList.add('hidden'); }
+
+  $('routeBtn').addEventListener('click', () => {
+    if (panel.classList.contains('hidden')) openPanel(); else closePanel();
+  });
+  $('routeClose').addEventListener('click', closePanel);
+
+  /* ---------- 지오코딩 ----------
+   * 타이핑 중(자동완성) = Photon. Nominatim 은 자동완성을 정책으로 금지한다.
+   * Enter/검색 = Nominatim (정확도 높음, 초당 1회, 같은 질의는 캐시).
+   * OSM 에서 지하철역 이름에는 '역' 이 없다("강남"). 그래서 '○○역' 은 '역' 을 떼고
+   * railway=station 을 따로 찾아 맨 위에 올린다. 안 그러면 버스정류장이 먼저 잡힌다. */
+  const PHOTON_URL = 'https://photon.komoot.io/api/';
+  const KR_BBOX = '124.5,33.0,131.9,38.7';     // minLon,minLat,maxLon,maxLat
+  const geoCache = new Map();
+
+  function stationQuery(q) {
+    const m = q.match(/^(.+?)\s*역$/);
+    return m ? m[1] : null;
+  }
+
+  async function photon(q, extra) {
+    const url = PHOTON_URL + '?q=' + encodeURIComponent(q) + '&limit=6&lat=' + view.lat.toFixed(4) +
+      '&lon=' + view.lon.toFixed(4) + '&bbox=' + KR_BBOX + (extra || '');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('photon ' + res.status);
+    const j = await res.json();
+    return (j.features || []).map((f) => {
+      const pr = f.properties || {};
+      const isSt = pr.osm_key === 'railway' && pr.osm_value === 'station';
+      const name = (pr.name || pr.street || '') + (isSt ? '역' : '');
+      const sub = [pr.street && pr.street !== pr.name ? pr.street : null, pr.district, pr.city].filter(Boolean).join(' ');
+      return { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0],
+               name: name + (sub ? ' · ' + sub : ''), station: isSt };
+    }).filter((r) => r.name);
+  }
+
+  let nomLast = 0;
+  async function nominatim(q) {
+    const wait = 1100 - (Date.now() - nomLast);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    nomLast = Date.now();
+    const b = viewBounds();
+    const url = GEOCODE_URL + '?format=jsonv2&limit=6&countrycodes=kr&accept-language=ko&dedupe=1' +
+      '&viewbox=' + [b.w, b.n, b.e, b.s].map((v) => v.toFixed(4)).join(',') + '&bounded=0' +
+      '&q=' + encodeURIComponent(q);
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('nominatim ' + res.status);
+    const arr = await res.json();
+    return arr.map((r) => ({
+      lat: parseFloat(r.lat), lon: parseFloat(r.lon),
+      name: shortName(r.display_name), station: r.category === 'railway' && r.type === 'station'
+    }));
+  }
+
+  // 자동완성용: Photon. 역 질의면 역을 먼저.
+  async function suggest(q) {
+    if (geoCache.has('p:' + q)) return geoCache.get('p:' + q);
+    const st = stationQuery(q);
+    const jobs = [photon(q)];
+    if (st) jobs.unshift(photon(st, '&osm_tag=railway:station'));
+    const parts = await Promise.all(jobs.map((j) => j.catch(() => [])));
+    const out = dedupe([].concat.apply([], parts));
+    geoCache.set('p:' + q, out);
+    return out;
+  }
+
+  // 확정용: Nominatim, 실패하면 Photon.
+  async function geocode(q) {
+    if (geoCache.has('n:' + q)) return geoCache.get('n:' + q);
+    let out = [];
+    try {
+      const st = stationQuery(q);
+      const a = await nominatim(st || q);
+      out = st ? a.filter((r) => r.station).concat(a.filter((r) => !r.station)) : a;
+    } catch (e) { /* 아래 폴백 */ }
+    if (!out.length) out = await suggest(q);
+    out = dedupe(out);
+    geoCache.set('n:' + q, out);
+    return out;
+  }
+
+  // 같은 역이 노선마다 따로 나오는 것을 40m 안이면 하나로 합친다
+  function dedupe(list) {
+    const out = [];
+    for (const r of list) {
+      if (!out.some((o) => haversine(o.lat, o.lon, r.lat, r.lon) < 40)) out.push(r);
+    }
+    return out.slice(0, 6);
+  }
+
+  // "서울특별시청, 110, 세종대로, 태평로1가, 명동, 중구, 서울특별시, 04524, 대한민국" → 앞 세 토막
+  function shortName(full) {
+    const parts = String(full || '').split(',').map((t) => t.trim()).filter(Boolean);
+    return parts.slice(0, 3).join(', ');
+  }
+
+  function bindSearch(which) {
+    const input = $(which + 'Input'), list = $(which + 'List');
+    input.addEventListener('input', () => {
+      clearTimeout(geoTimer);
+      const q = input.value.trim();
+      if (q.length < 2) { list.innerHTML = ''; list.classList.add('hidden'); return; }
+      geoTimer = setTimeout(() => runSearch(which, q, false), 350);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); clearTimeout(geoTimer); runSearch(which, input.value.trim(), true); }
+    });
+  }
+
+  let searchSeq = 0;
+  async function runSearch(which, q, confirm) {
+    const list = $(which + 'List');
+    if (!q) return;
+    const seq = ++searchSeq;
+    list.innerHTML = '<div class="hint">찾는 중…</div>';
+    list.classList.remove('hidden');
+    try {
+      const results = confirm ? await geocode(q) : await suggest(q);
+      if (seq !== searchSeq) return;     // 그 사이 더 친 글자가 있으면 버린다
+      list.innerHTML = '';
+      if (!results.length) {
+        list.innerHTML = '<div class="hint">결과가 없습니다. 도로명 주소나 역 이름으로 다시 검색해 보세요.</div>';
+        return;
+      }
+      for (const r of results) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'geoItem';
+        b.textContent = (r.station ? '🚇 ' : '') + r.name;
+        b.addEventListener('click', () => {
+          setPoint(which, { lat: r.lat, lon: r.lon, name: r.name });
+          $(which + 'Input').value = r.name;
+          list.innerHTML = ''; list.classList.add('hidden');
+        });
+        list.appendChild(b);
+      }
+    } catch (e) {
+      list.innerHTML = '<div class="hint">검색 서버에 연결하지 못했습니다. 잠시 뒤 다시 시도해 주세요.</div>';
+    }
+  }
+
+  function setPoint(which, p) {
+    route[which] = p;
+    route.walk = null; route.transit = null; route.transitPath = null; route.note = null;
+    if (route.start && route.end) fitRoute();
+    renderRoutePanel();
+    draw();
+  }
+
+  $('startHere').addEventListener('click', () => {
+    if (!navigator.geolocation) return;
+    $('startInput').value = '내 위치를 찾는 중…';
+    navigator.geolocation.getCurrentPosition((pos) => {
+      setPoint('start', { lat: pos.coords.latitude, lon: pos.coords.longitude, name: '내 위치' });
+      $('startInput').value = '내 위치';
+    }, () => { $('startInput').value = ''; route.note = '위치 권한을 확인해 주세요.'; renderRoutePanel(); }, { timeout: 10000 });
+  });
+
+  $('swapBtn').addEventListener('click', () => {
+    const a = route.start, b = route.end;
+    route.start = b; route.end = a;
+    $('startInput').value = b ? b.name : '';
+    $('endInput').value = a ? a.name : '';
+    route.walk = null; route.transit = null; route.transitPath = null;
+    renderRoutePanel(); draw();
+  });
+
+  bindSearch('start');
+  bindSearch('end');
+
+  for (const t of document.querySelectorAll('.rtab')) {
+    t.addEventListener('click', () => {
+      routeTab = t.dataset.tab;
+      for (const u of document.querySelectorAll('.rtab')) u.setAttribute('aria-selected', u === t ? 'true' : 'false');
+      renderRoutePanel();
+    });
+  }
+
+  $('goBtn').addEventListener('click', () => {
+    if (!route.start || !route.end) { route.note = '출발지와 도착지를 모두 정해 주세요.'; renderRoutePanel(); return; }
+    if (routeTab === 'walk') computeWalk(); else computeTransit();
+  });
+
+  // 시각이 바뀌면 그늘도 바뀐다 — 경로가 있으면 다시 계산 (재생 중엔 쉬고 멈추면 한 번)
+  let recalcTimer = null;
+  function scheduleRecalc() {
+    if (!route.start || !route.end) return;
+    clearTimeout(recalcTimer);
+    recalcTimer = setTimeout(() => {
+      if (playing) return;
+      if (routeTab === 'walk' && route.walk) computeWalk();
+      if (routeTab === 'transit' && route.transit) annotateTransitSeats();
+    }, 350);
+  }
+
+  function fmtM(m) { return m >= 1000 ? (m / 1000).toFixed(1) + 'km' : Math.round(m) + 'm'; }
+
+  function renderRoutePanel() {
+    const out = $('routeResult');
+    const go = $('goBtn');
+    go.disabled = route.busy;
+    go.textContent = route.busy ? '계산 중…' : (routeTab === 'walk' ? '도보 경로 찾기' : '대중교통 경로 찾기');
+
+    if (route.note && !(routeTab === 'walk' && route.walk) && !(routeTab === 'transit' && route.transit)) {
+      out.innerHTML = '<div class="hint">' + esc(route.note) + '</div>';
+      return;
+    }
+
+    if (routeTab === 'walk') {
+      if (!route.walk) { out.innerHTML = '<div class="hint">출발·도착을 정하고 [도보 경로 찾기]를 누르세요.</div>'; return; }
+      const S = route.walk.shortest, H = route.walk.shaded;
+      const diff = H.shadePct - S.shadePct;
+      const extra = H.meters - S.meters;
+      let html = '';
+      if (route.walk.fallback) {
+        html += '<div class="hint">지도 서버가 혼잡해 <b>최단 경로만</b> 외부 라우터로 받았습니다. 그늘 계산은 잠시 뒤 다시 시도해 주세요.</div>';
+        html += '<div class="rcard"><div class="rhead"><span class="sw dashed"></span><b>최단 경로</b></div>' +
+                '<div class="rsub">' + fmtM(S.meters) + ' · 약 ' + S.minutes + '분</div></div>';
+        out.innerHTML = html;
+        return;
+      }
+      if (route.walk.night) {
+        html += '<div class="hint">해가 진 시각이라 그늘 구분이 없습니다. 최단 경로만 의미가 있어요.</div>';
+      }
+      html += '<div class="rcard shade"><div class="rhead"><span class="sw" style="background:#1f8a5a"></span><b>그늘 경로</b>' +
+              '<span class="pct">' + H.shadePct + '% 그늘</span></div>' +
+              '<div class="rsub">' + fmtM(H.meters) + ' · 약 ' + H.minutes + '분' +
+              (extra > 10
+                ? ' · 최단보다 <b>' + fmtM(extra) + '</b> 더 걷고 그늘이 <b>' + (diff >= 0 ? '+' : '') + diff + '%p</b>'
+                : diff > 0 ? ' · 거리는 같고 그늘이 <b>+' + diff + '%p</b>' : ' · 최단 경로와 같습니다') +
+              '</div></div>';
+      html += '<div class="rcard"><div class="rhead"><span class="sw dashed"></span><b>최단 경로</b>' +
+              '<span class="pct">' + S.shadePct + '% 그늘</span></div>' +
+              '<div class="rsub">' + fmtM(S.meters) + ' · 약 ' + S.minutes + '분</div></div>';
+      html += '<div class="hint small">건물 그림자만 계산합니다. 가로수·처마·아케이드는 반영되지 않습니다. 시각 막대를 움직이면 다시 계산됩니다.</div>';
+      out.innerHTML = html;
+      return;
+    }
+
+    // 대중교통
+    if (!route.transit) {
+      out.innerHTML = '<div class="hint">출발·도착을 정하고 [대중교통 경로 찾기]를 누르세요.<br>' +
+        '버스 구간마다 <b>어느 쪽 자리가 그늘인지</b> 알려 드립니다.</div>';
+      return;
+    }
+    out.innerHTML = renderTransit(route.transit);
+    for (const b of out.querySelectorAll('.tpick')) {
+      b.addEventListener('click', () => { route.transitIdx = parseInt(b.dataset.i, 10); buildTransitPath(); renderRoutePanel(); draw(); });
+    }
+    const ks = $('odsaySave');
+    if (ks) ks.addEventListener('click', () => { store.set('shade_odsay', $('odsayKey').value.trim()); route.transit = null; renderRoutePanel(); });
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
   /* ---------- 밤 불빛 애니메이션 ----------
    * 밤일 때만 프레임을 돌린다. 낮에는 멈춰서 배터리를 쓰지 않는다. */

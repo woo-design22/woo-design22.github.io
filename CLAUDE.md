@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pomodoro-todo/index.html` — 뽀모도로 타이머 + 할 일 목록
 - `particle-playground/index.html` — 캔버스 파티클 드로잉 툴
 - `mood-log/index.html` — 기분·수면·통증 일지 (본인/배우자 2프로필)
+- `fly-brain/index.html` — 초파리에게 설탕 주기: 각설탕을 놓으면 초파리가 걸어가 먹고, 그 뇌 회로(Shiu 2024 전뇌 LIF 모델)를 같은 화면에서 봄. 웹 게시용
 
 각 앱은 폴더 하나에 `index.html` 한 개가 전부다. 서로 코드를 공유하지 않으며,
 공유 라이브러리·번들러·패키지 매니저·CDN 의존성이 없다.
@@ -27,6 +28,7 @@ python -m http.server 8765
 - http://localhost:8765/pomodoro-todo/
 - http://localhost:8765/particle-playground/
 - http://localhost:8765/mood-log/
+- http://localhost:8765/fly-brain/
 
 테스트 스위트, 린터, 타입 체커가 없다. 변경 검증은 브라우저에서 직접 구동해
 콘솔 에러 확인 + 조작 테스트로 한다. `file://`로 직접 열어도 동작하도록 작성돼
@@ -117,6 +119,38 @@ python -m http.server 8765
 - **APK 브리지**: `window.AndroidBridge`(`saveFile`, `copyText`, `print`)가 있으면
   내보내기·복사·인쇄를 그쪽으로 보낸다. 없으면 브라우저 경로. 브리지 메서드를 바꾸면
   `android-mood-log/java/.../MainActivity.java`의 `Bridge` 클래스도 같이 바꿔야 한다.
+
+### fly-brain
+
+다른 앱과 달리 **파이썬 파이프라인이 앞에 붙는다**. `index.html`은 단독 실행되지만, 그 안의
+`<script id="fly-data" type="application/json">` 블록은 `build_app.py`가 채운다.
+
+- `model/` — Shiu et al. 2024(Nature) 저장소(`philshiu/Drosophila_brain_model`)의 clone.
+  FlyWire v630 커넥톰(127,400뉴런, 1,470만 연결 쌍)이 parquet로 들어 있어 별도 계정이 필요 없다.
+  `.gitignore`로 제외되므로 없으면 `git clone --depth 1 https://github.com/philshiu/Drosophila_brain_model model`.
+- 실행 환경은 conda env `flybrain`(`C:\Users\User\anaconda3\envs\flybrain`, Brian2 2.5.1).
+  `model/environment.yml`로 만들고 `pip install "setuptools<70"`을 추가해야 `pkg_resources` 오류가 안 난다.
+  C++ 컴파일러가 없어 numpy 백엔드로 돌며 1회(1초 시뮬레이션)에 코어당 약 50초, 30회·4프로세스는 약 14분.
+- `run_sugar.py --trials 30 --procs 4` → `results/<exp>.parquet`(전체 스파이크), `_rates.csv`,
+  `_summary.json`(발화한 뉴런 + 설탕 GRN + MN9의 부분 회로, 1회차 스파이크). 같은 이름의 parquet가
+  있으면 시뮬레이션은 건너뛰고 분석·내보내기만 다시 한다.
+- `build_app.py results/<exp>_summary.json` → `index.html`의 데이터 블록 교체. **앱의 수치를 바꾸려면
+  parquet를 지우고 다시 돌리거나 다른 `--name`으로 돌린 뒤 이 스크립트를 다시 실행**한다.
+- 브라우저 LIF(`stepLive`)는 `model.py`의 식·상수를 그대로 옮겼다. 한 가지 비직관적 규칙: Brian2는
+  `(unless refractory)`가 붙은 변수에 **불응기 중 시냅스 증분(`g += w`)을 적용하지 않는다.** 이 검사를
+  빼면 발화율이 약 30% 높아진다(Brian2와 직접 대조해 확인). 부분 회로는 자극 200Hz 조건에서 전뇌와
+  통계적으로 같지만(Brian2로 검증), 주파수를 바꾸거나 뉴런을 차단하면 빠진 뉴런이 발화할 수 있어 근사다.
+- 화면 구성: 왼쪽 무대(SVG 초파리 + 각설탕) / 오른쪽 뇌 회로(canvas) / 조작부 / 통계 / 래스터 / 설명 / 실험실(details).
+  무대는 **탭 판정**(`tapDetector`: 8px·350ms 이내)으로만 각설탕을 놓고, `touch-action: pan-y`라 모바일 스크롤을 막지 않는다.
+  초파리 좌표계는 원점 = 발 밑 중앙(`GROUND` y=262), 기본 왼쪽 보기, `scale(dir,1)`로 반전. 혀 끝이 닿는 자리는
+  원점에서 바라보는 쪽 `MOUTH_DX`=114. 걷기는 실제 시간 기준(`WALK_SPEED`), 먹기는 `ext`(주둥이 뻗음)에 비례.
+  **주둥이 길이는 MN9 좌우 평균 발화율(200ms 창)/70Hz**로만 정해지므로 "먹느냐"는 전적으로 뇌 계산 결과다.
+- 체험 모드는 1초 제한 없이 계속 돌고(`WINDOW`=1초 래스터, `popHist`는 `advanceBins`로 시각 기준 비움),
+  재생 모드만 1초(`T_REPLAY`)에서 멈춘다. 단축키는 `e.code`로 판별(한글 IME 상태 대응), 버튼은 클릭 후 `blur()`.
+- 실험실 프리셋: `roundup_1/2`를 끄면 MN9 오른쪽이 거의 멈춰 아주 느리게 먹고, 1단계 뉴런 전부를 끄면 주둥이가 안 나온다(둘 다 확인됨).
+- 게시할 때 `<head>`의 주석 처리된 `og:url`·`og:image`를 실제 주소로 채운다. 파비콘은 인라인 SVG. 영속 상태 없음(`store` 미사용).
+  애니메이션은 `requestAnimationFrame` + IntersectionObserver라 탭이 숨겨지거나 화면 밖이면 멈춘다.
+
 
 ### android-mood-log (APK 셸)
 

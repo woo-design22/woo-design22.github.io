@@ -11,7 +11,8 @@
 | [pomodoro-todo](pomodoro-todo/index.html) | 뽀모도로 타이머(25/5/15분) + 할 일 목록. 할 일별 🍅 카운트 | 세션 수, 할 일, 활성 작업 |
 | [particle-playground](particle-playground/index.html) | 캔버스 파티클 드로잉. 폭죽 / 트레일 / 오비트 3가지 모드 | 없음 |
 | [mood-log](mood-log/index.html) | 기분·수면·통증·에너지 일지. 본인/배우자 프로필, 14·30·90일 그래프, 주간·월간 통계, 패턴 힌트, 진료용 인쇄·복사, JSON 백업 | 프로필별 기록, 마지막 프로필 |
-| [fly-brain](fly-brain/index.html) | 초파리에게 설탕 주기. 바닥을 클릭해 각설탕을 놓으면 초파리가 걸어가 혀를 대고, 실제 배선도로 만든 뇌 회로(448뉴런)가 반짝이며 MN9 운동뉴런이 발화하는 만큼 주둥이를 뻗어 먹는다. 뉴런을 꺼서 못 먹게 하는 실험실 포함. Brian2로 돌린 전뇌 모델(Shiu 2024) 기록 재생 모드 | 없음 |
+| [fly-brain](fly-brain/index.html) | 초파리에게 설탕 주기 🔊. 각설탕·쓴 약·물을 놓거나 더듬이를 간지럽히면, 실제 배선도로 만든 뇌 회로(1,295뉴런)가 반짝이며 소리를 내고 초파리가 먹거나 거부하거나 더듬이를 닦는다. 뉴런 외과의 퍼즐, 결과 카드 공유, 뇌 연주 모드. 아이콘 8개 중 3개는 무료, 나머지는 광고를 보면 열림 | 광고 해제 기록, 퍼즐 최고 기록 |
+| [namsan-rpg](namsan-rpg/index.html) | 「남산중 6인방」— 친구들에게 선물하는 모바일 도트 RPG. 부산 남산중학교와 학교 앞 동네(급식실·매점·운동장·언덕·슈퍼·만화방·피자헛·피씨방)를 돌며 여섯 친구의 하루를 한 명씩 플레이, 여섯이 다 끝나면 엔딩. 세로 화면 + 가상 패드, PC는 방향키·Z·X | 완료한 친구, 진행 중인 친구의 위치·퀘스트 |
 
 ## 실행 방법
 
@@ -27,6 +28,7 @@ python -m http.server 8765
 - <http://localhost:8765/particle-playground/>
 - <http://localhost:8765/mood-log/>
 - <http://localhost:8765/fly-brain/>
+- <http://localhost:8765/namsan-rpg/> (휴대폰 세로 화면 기준)
 
 ## 안드로이드 APK (mood-log)
 

@@ -150,9 +150,14 @@ button { font-family: inherit; }
 .careMsg.ai { align-self: flex-start; background: var(--panel); border: 1px solid var(--panel-edge); border-bottom-left-radius: 4px; }
 .careMsg.note { align-self: center; background: none; color: var(--muted); font-size: 12px; text-align: center; }
 .careMsg.crisis { align-self: stretch; max-width: none; background: #3d2222; border: 2px solid var(--danger); font-size: 13px; }
-#careInputRow { flex: 0 0 auto; display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 2px solid var(--panel-edge); }
-#careInput { flex: 1 1 auto; resize: none; background: var(--panel); color: var(--text); border: 2px solid var(--panel-edge); border-radius: 10px; padding: 10px 12px; font-family: inherit; font-size: 15px; }
-#careSend { background: var(--accent); color: #2a1d00; font-weight: 700; border: 0; border-radius: 10px; padding: 0 16px; font-size: 15px; cursor: pointer; }
+#careInputRow { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 2px solid var(--panel-edge); }
+#careInput {
+  flex: 1 1 auto; resize: none; background: var(--panel); color: var(--text);
+  border: 2px solid var(--panel-edge); border-radius: 10px; padding: 10px 12px;
+  font-family: inherit; font-size: 16px; line-height: 1.55;
+  min-height: 88px; max-height: 45vh; overflow-y: auto;
+}
+#careSend { flex: 0 0 auto; height: 48px; background: var(--accent); color: #2a1d00; font-weight: 700; border: 0; border-radius: 10px; padding: 0 16px; font-size: 15px; cursor: pointer; }
 #careSend:disabled { opacity: 0.5; }
 
 /* 전환 페이드 */
@@ -362,7 +367,7 @@ button { font-family: inherit; }
       <div id="careChat" class="carePane" style="display:none">
         <div id="careLog"></div>
         <div id="careInputRow">
-          <textarea id="careInput" rows="1" maxlength="2000" placeholder="지금 마음을 편하게 적어 보세요"></textarea>
+          <textarea id="careInput" rows="3" maxlength="2000" placeholder="지금 마음을 편하게 적어 보세요"></textarea>
           <button id="careSend" type="button">보내기</button>
         </div>
       </div>
@@ -2193,7 +2198,7 @@ async function careSend() {
   const list = careMsgs();
   list.push({ r: 'user', t, ts: Date.now() });
   if (CARE_CRISIS.some(w => t.includes(w))) list.push({ r: 'crisis', t: CARE_HOTLINE, ts: Date.now() });
-  careSave(list); $('careInput').value = '';
+  careSave(list); $('careInput').value = ''; $('careInput').style.height = '';
   CARE.busy = true; $('careSend').disabled = true;
   careRender('');
   try {
@@ -2234,6 +2239,14 @@ async function careSend() {
   CARE.busy = false; $('careSend').disabled = false;
   careRender();
 }
+// 길게 쓰면 입력칸이 따라 늘어난다(화면 45%까지). 보낸 뒤에는 기본 크기로 돌아온다.
+function careAutosize() {
+  const el = $('careInput');
+  el.style.height = 'auto';
+  const cap = Math.round(window.innerHeight * 0.45);
+  el.style.height = Math.min(el.scrollHeight + 4, cap) + 'px';
+}
+$('careInput').addEventListener('input', careAutosize);
 $('careSend').addEventListener('click', careSend);
 $('careInput').addEventListener('keydown', e => {
   e.stopPropagation();

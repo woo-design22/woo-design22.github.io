@@ -21,3 +21,10 @@ android-counsel/build/
 android-counsel/dist/
 android-counsel/assets/
 android-counsel/debug.keystore
+
+# 로컬 작업 메모 폴더 — 저장소에 두지 않는다.
+docs/
+
+# 판매용 데모 발드 도구 — 로컬에서만 쓴다.
+# 생성물 love-rpg/index.html 은 커밋된다.
+love-rpg/build_love.py

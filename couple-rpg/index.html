@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1b1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>철우와 수지</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'%3E%3Crect width='16' height='16' fill='%231b1a2e'/%3E%3Crect x='5' y='2' width='6' height='3' fill='%23222'/%3E%3Crect x='5' y='5' width='6' height='4' fill='%23f1c7a3'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%23222'/%3E%3Crect x='9' y='6' width='1' height='1' fill='%23222'/%3E%3Crect x='4' y='9' width='8' height='4' fill='%23ff8fb1'/%3E%3Crect x='5' y='13' width='2' height='2' fill='%23345'/%3E%3Crect x='9' y='13' width='2' height='2' fill='%23345'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #1b1a2e;
+  --stage-bg: #0e0d1a;
+  --panel: #2a2942;
+  --panel-edge: #6d6a9a;
+  --text: #f4f1ff;
+  --muted: #a7a3c9;
+  --accent: #ffd166;
+  --accent-2: #7bd389;
+  --danger: #ef6f6c;
+  --pad: #35345a;
+  --pad-press: #575593;
+  --btn-a: #d94b4b;
+  --btn-b: #3f7fd9;
+  --dlg: rgba(18, 17, 34, 0.96);
+  --dlg-edge: #ffffff;
+  --shadow: rgba(0,0,0,0.45);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Segoe UI', Pretendard, sans-serif; overflow: hidden;
+  overscroll-behavior: none;
+}
+body { position: fixed; inset: 0; -webkit-user-select: none; user-select: none; }
+button { font-family: inherit; }
+
+#app {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+  max-width: 560px; margin: 0 auto;
+}
+#stage {
+  position: relative; flex: 1 1 auto; min-height: 0; background: var(--stage-bg);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  touch-action: none;
+}
+#cv { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+
+/* 상단 표시: 현재 친구 + 목표 */
+#hud {
+  position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: flex-start;
+  gap: 6px; padding: 6px; pointer-events: none; font-size: 13px;
+}
+#hud .who {
+  background: var(--dlg); border: 2px solid var(--dlg-edge); border-radius: 6px;
+  padding: 4px 8px; line-height: 1.3; max-width: 78%; box-shadow: 0 2px 0 var(--shadow);
+}
+#hud .who b { color: var(--accent); }
+#hud .who span { color: var(--muted); display: block; font-size: 12px; }
+#hud .menu + .menu { margin-left: 6px !important; }
+#hud .menu {
+  margin-left: auto; pointer-events: auto; background: var(--dlg); color: var(--text);
+  border: 2px solid var(--dlg-edge); border-radius: 6px; width: 36px; height: 32px;
+  font-size: 18px; line-height: 1; cursor: pointer; box-shadow: 0 2px 0 var(--shadow);
+}
+
+/* 대화창 */
+#dlg {
+  position: absolute; left: 6px; right: 6px; bottom: 6px; display: none;
+  background: var(--dlg); border: 3px solid var(--dlg-edge); border-radius: 8px;
+  padding: 10px 12px 12px; min-height: 88px; font-size: 16px; line-height: 1.45;
+  box-shadow: 0 3px 0 var(--shadow); cursor: pointer;
+}
+#dlg.show { display: block; }
+#dlg .name { color: var(--accent); font-weight: 700; font-size: 14px; margin-bottom: 3px; }
+#dlg .text { white-space: pre-wrap; word-break: keep-all; }
+#dlg .more { position: absolute; right: 10px; bottom: 6px; color: var(--accent); animation: bob 0.7s infinite alternate; }
+#dlg .more.hide { display: none; }
+@keyframes bob { from { transform: translateY(0); } to { transform: translateY(3px); } }
+#choices { display: none; margin-top: 8px; flex-direction: column; gap: 6px; }
+#choices.show { display: flex; }
+#choices button {
+  text-align: left; background: var(--panel); color: var(--text); border: 2px solid var(--panel-edge);
+  border-radius: 6px; padding: 8px 10px; font-size: 15px; cursor: pointer;
+}
+#choices button.sel, #choices button:active { background: var(--pad-press); border-color: var(--accent); }
+
+/* 건물 이름표 (캔버스 위 DOM — 저해상도 캔버스보다 글자가 또렷하다) */
+#labels { position: absolute; overflow: hidden; pointer-events: none; left: 0; top: 0; }
+#labels .lb {
+  position: absolute; transform: translate(-50%, -100%); background: rgba(18,17,34,0.82); color: #fff;
+  font-size: 11px; line-height: 1.15; padding: 2px 6px 3px; border-radius: 4px; white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+#labels .lb.exit { background: rgba(255,209,102,0.94); color: #2a1d00; font-weight: 700; border-color: #fff1c2; }
+
+/* 미니맵 */
+#mini { position: absolute; right: 6px; top: 44px; image-rendering: pixelated; border: 2px solid var(--dlg-edge); border-radius: 4px; background: #0e0d1a; opacity: 0.92; }
+
+/* 사진 연출 (추억 사진 몇 초 보여주기) */
+#photo {
+  position: absolute; inset: 0; z-index: 9; background: #000; display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px; padding: 16px; opacity: 0; transition: opacity 0.35s;
+}
+#photo.on { display: flex; }
+#photo.show { opacity: 1; }
+#photo img { max-width: 100%; max-height: 78%; border: 3px solid #fff; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.6); }
+#photoCap { color: #fff; font-size: 15px; text-align: center; white-space: pre-line; line-height: 1.5; word-break: keep-all; }
+
+/* 미니게임(샐러드 쌓기) 오버레이 */
+#mg {
+  position: absolute; inset: 0; z-index: 7; background: rgba(10,9,20,0.93); display: none;
+  flex-direction: column; align-items: center; justify-content: center; gap: 10px; touch-action: none;
+}
+#mg.show { display: flex; }
+#mgCv { image-rendering: pixelated; border: 3px solid var(--dlg-edge); border-radius: 8px; background: #17162c; }
+#mgInfo { color: var(--text); font-size: 14px; text-align: center; white-space: pre-line; line-height: 1.5; }
+
+/* 비밀번호 잠금 */
+#lockDots { display: flex; gap: 14px; margin: 6px 0 4px; }
+#lockDots i, #careDots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--panel-edge); background: transparent; }
+#lockDots i.on, #careDots i.on { background: var(--accent); border-color: var(--accent); }
+#lockDots.bad i { border-color: var(--danger); animation: shake 0.3s; }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+#lockPad, #carePad { display: grid; grid-template-columns: repeat(3, 72px); gap: 10px; }
+#lockPad button, #carePad button {
+  height: 58px; font-size: 22px; font-weight: 700; background: var(--panel); color: var(--text);
+  border: 3px solid var(--panel-edge); border-radius: 12px; cursor: pointer; box-shadow: 0 3px 0 var(--shadow);
+}
+#lockPad button:active, #carePad button:active { transform: translateY(2px); }
+
+/* 마음결 상담 오버레이 */
+#care { position: absolute; inset: 0; z-index: 12; background: var(--bg); display: none; flex-direction: column; }
+#care.show { display: flex; }
+#careTop { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 2px solid var(--panel-edge); }
+#careTop b { font-size: 17px; color: var(--accent); }
+#careTop span { font-size: 12px; color: var(--muted); }
+#careTop button { margin-left: auto; background: var(--panel); color: var(--text); border: 2px solid var(--panel-edge); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+#careBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.carePane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
+.careBtns { display: flex; gap: 12px; }
+.careTip {
+  background: var(--panel); border: 2px solid var(--accent); border-radius: 10px;
+  padding: 10px 14px; color: var(--accent); font-size: 13px; line-height: 1.5; text-align: center;
+}
+#careChat { justify-content: flex-start; padding: 0; }
+#careLog { flex: 1 1 auto; min-height: 0; overflow-y: auto; width: 100%; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+.careMsg { max-width: 86%; padding: 10px 12px; border-radius: 14px; font-size: 15px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.careMsg.user { align-self: flex-end; background: var(--accent); color: #2a1d00; border-bottom-right-radius: 4px; }
+.careMsg.ai { align-self: flex-start; background: var(--panel); border: 1px solid var(--panel-edge); border-bottom-left-radius: 4px; }
+.careMsg.note { align-self: center; background: none; color: var(--muted); font-size: 12px; text-align: center; }
+.careMsg.crisis { align-self: stretch; max-width: none; background: #3d2222; border: 2px solid var(--danger); font-size: 13px; }
+#careInputRow { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border-top: 2px solid var(--panel-edge); }
+#careInput {
+  flex: 1 1 auto; resize: none; background: var(--panel); color: var(--text);
+  border: 2px solid var(--panel-edge); border-radius: 10px; padding: 10px 12px;
+  font-family: inherit; font-size: 16px; line-height: 1.55;
+  min-height: 88px; max-height: 45vh; overflow-y: auto;
+}
+#careSend { flex: 0 0 auto; height: 48px; background: var(--accent); color: #2a1d00; font-weight: 700; border: 0; border-radius: 10px; padding: 0 16px; font-size: 15px; cursor: pointer; }
+#careSend:disabled { opacity: 0.5; }
+
+/* 전환 페이드 */
+#fade {
+  position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s;
+}
+#fade.on { opacity: 1; }
+
+/* 토스트(짧은 알림) */
+#toast {
+  position: absolute; left: 50%; top: 52px; transform: translateX(-50%); display: none;
+  background: var(--accent); color: #2a1d00; font-weight: 700; font-size: 14px;
+  padding: 6px 12px; border-radius: 999px; box-shadow: 0 2px 0 var(--shadow); white-space: nowrap;
+}
+#toast.show { display: block; animation: toastin 2.2s forwards; }
+@keyframes toastin { 0% { opacity: 0; transform: translate(-50%, -6px); } 12% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 가상 패드 */
+#pad {
+  flex: 0 0 auto; height: 186px; display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 18px; touch-action: none; background: var(--bg);
+}
+#dpad { position: relative; width: 156px; height: 156px; }
+#dpad .k {
+  position: absolute; width: 52px; height: 52px; background: var(--pad); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 20px;
+  box-shadow: 0 3px 0 var(--shadow);
+}
+#dpad .k.on { background: var(--pad-press); color: var(--text); transform: translateY(2px); box-shadow: 0 1px 0 var(--shadow); }
+#dpad .up { left: 52px; top: 0; } #dpad .down { left: 52px; top: 104px; }
+#dpad .left { left: 0; top: 52px; } #dpad .right { left: 104px; top: 52px; }
+#dpad .mid { left: 52px; top: 52px; background: var(--panel); box-shadow: none; border-radius: 0; }
+#btns { display: flex; gap: 14px; align-items: flex-end; }
+#btns button {
+  width: 68px; height: 68px; border-radius: 50%; border: 0; color: #fff; font-weight: 800; font-size: 18px;
+  box-shadow: 0 4px 0 var(--shadow); cursor: pointer; touch-action: none;
+}
+#btns button small { display: block; font-size: 10px; font-weight: 600; opacity: 0.85; }
+#btnA { background: var(--btn-a); }
+#btns #btnB { background: var(--btn-b); width: 56px; height: 56px; font-size: 15px; margin-bottom: 4px; }
+#btns button.on { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
+
+/* 전체 화면 스크린(타이틀·친구 선택·메뉴·엔딩) */
+.screen {
+  position: absolute; inset: 0; display: none; flex-direction: column; align-items: center;
+  justify-content: center; gap: 14px; padding: 20px; background: var(--bg); z-index: 5; overflow: auto;
+  text-align: center;
+}
+.screen.show { display: flex; }
+.screen h1 {
+  margin: 0; font-size: 40px; letter-spacing: 2px; color: var(--accent);
+  text-shadow: 3px 3px 0 #7a3b00, 6px 6px 0 rgba(0,0,0,0.4); line-height: 1.1;
+}
+.screen h1 small { display: block; font-size: 15px; letter-spacing: 6px; color: var(--muted); text-shadow: none; margin-bottom: 6px; }
+.screen p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; word-break: keep-all; }
+.screen .big {
+  background: var(--panel); color: var(--text); border: 3px solid var(--panel-edge); border-radius: 10px;
+  padding: 12px 28px; font-size: 18px; font-weight: 700; min-width: 200px; cursor: pointer; box-shadow: 0 4px 0 var(--shadow);
+}
+.screen .big:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
+.screen .big.primary { background: var(--accent); color: #2a1d00; border-color: #fff1c2; }
+.screen .big:disabled { opacity: 0.4; cursor: default; }
+#titleCv { image-rendering: pixelated; width: 264px; height: 96px; }
+
+#roster { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 400px; }
+#roster button {
+  background: var(--panel); border: 3px solid var(--panel-edge); border-radius: 10px; color: var(--text);
+  padding: 8px 4px 10px; cursor: pointer; position: relative; box-shadow: 0 3px 0 var(--shadow);
+}
+#roster button:active { transform: translateY(2px); }
+#roster button.done { border-color: var(--accent-2); }
+#roster button.done::after { content: '✔'; position: absolute; right: 6px; top: 4px; color: var(--accent-2); font-weight: 800; }
+#roster canvas { image-rendering: pixelated; width: 48px; height: 48px; display: block; margin: 0 auto 4px; }
+#roster b { display: block; font-size: 15px; }
+#roster span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.3; word-break: keep-all; }
+
+#giftGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 400px; }
+#giftGrid button {
+  background: var(--panel); border: 3px solid var(--panel-edge); border-radius: 10px; color: var(--text);
+  padding: 10px 4px 12px; cursor: pointer; box-shadow: 0 3px 0 var(--shadow); font-size: 13px; line-height: 1.35;
+}
+#giftGrid button.own { border-color: var(--accent); }
+#giftGrid button:disabled { opacity: 0.45; cursor: default; }
+#giftGrid button .gi { display: block; font-size: 22px; margin-bottom: 4px; }
+#menuList { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
+#goalBox {
+  background: var(--panel); border: 2px solid var(--panel-edge); border-radius: 8px; padding: 10px 12px;
+  width: 100%; max-width: 300px; text-align: left; font-size: 14px; line-height: 1.5; word-break: keep-all;
+}
+#goalBox b { color: var(--accent); }
+
+#credits { max-width: 360px; font-size: 15px; line-height: 1.7; color: var(--text); word-break: keep-all; }
+#credits .names { color: var(--accent); font-weight: 700; font-size: 17px; }
+
+@media (min-height: 760px) { #pad { height: 210px; } }
+@media (max-height: 600px) { #pad { height: 150px; } #dpad { width: 132px; height: 132px; } #dpad .k { width: 44px; height: 44px; }
+  #dpad .up,#dpad .mid,#dpad .down { left: 44px; } #dpad .down { top: 88px; } #dpad .left,#dpad .right,#dpad .mid { top: 44px; } #dpad .right { left: 88px; }
+  #btns button { width: 58px; height: 58px; } #btns #btnB { width: 48px; height: 48px; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv" width="176" height="208"></canvas>
+    <div id="hud"><div class="who"><b id="hudName">—</b><span id="hudGoal"></span></div><button class="menu" id="btnBgm" aria-label="배경음악">🔊</button><button class="menu" id="btnMenu" aria-label="메뉴">☰</button></div>
+    <div id="toast"></div>
+    <div id="labels"></div>
+    <canvas id="mini" width="24" height="18"></canvas>
+    <div id="dlg"><div class="name" id="dlgName"></div><div class="text" id="dlgText"></div><div class="more" id="dlgMore">▼</div><div id="choices"></div></div>
+    <div id="mg"><canvas id="mgCv" width="160" height="200"></canvas><div id="mgInfo"></div></div>
+    <div id="fade"></div>
+    <div id="photo"><img id="photoImg" alt="추억 사진"><div id="photoCap"></div></div>
+  </div>
+  <div id="pad">
+    <div id="dpad">
+      <div class="k up" data-d="up">▲</div><div class="k left" data-d="left">◀</div><div class="k mid"></div>
+      <div class="k right" data-d="right">▶</div><div class="k down" data-d="down">▼</div>
+    </div>
+    <div id="btns">
+      <button id="btnB">B<small>메뉴</small></button>
+      <button id="btnA">A<small>말하기</small></button>
+    </div>
+  </div>
+
+  <div class="screen" id="scrTitle">
+    <h1><small>어느 주민센터에서 시작된</small>철우와<br>수지</h1>
+    <canvas id="titleCv" width="88" height="32"></canvas>
+    <p>처음 만난 날부터 우리 집 마련까지,<br>일곱 장면을 차례대로 플레이하는 두 사람의 이야기.</p>
+    <button class="big primary" id="btnNew">처음부터</button>
+    <button class="big" id="btnContinue">이어하기</button>
+    <p id="titleHint" style="font-size:12px">휴대폰 세로 화면에 맞춰져 있습니다. PC에서는 방향키 + Z(말하기) + X(메뉴)</p>
+  </div>
+
+  <div class="screen" id="scrSelect">
+    <h1 style="font-size:26px">우리의 장면들</h1>
+    <p>순서대로 열립니다. 끝낸 장면은 다시 볼 수 있어요.</p>
+    <div id="roster"></div>
+    <button class="big primary" id="btnEnding" style="display:none">엔딩 보기 ★</button>
+    <button class="big" id="btnGift">보상함 🎁 <span id="giftCount"></span></button>
+    <button class="big" id="btnCare">마음결 상담 💬</button>
+    <button class="big" id="btnToTitle">타이틀로</button>
+    <p id="careHint" style="font-size:12px">마음결 상담: 둘이 싸우면 꼭 해보세요. 평소 마음 돌보기도 있어요.</p>
+  </div>
+
+  <div class="screen" id="scrMenu">
+    <h1 style="font-size:26px">메뉴</h1>
+    <div id="goalBox"></div>
+    <div id="menuList">
+      <button class="big primary" id="btnResume">계속하기</button>
+      <button class="big" id="btnSwitch">장면 선택으로</button>
+      <button class="big" id="btnRestartQuest">이 장면 처음부터</button>
+    </div>
+    <p style="font-size:12px">진행은 이 휴대폰(브라우저)에 자동 저장됩니다.</p>
+  </div>
+
+  <div class="screen" id="scrEnd">
+    <h1 style="font-size:28px">그리고 지금</h1>
+    <div id="credits"></div>
+    <button class="big" id="btnEndClose">장면 선택으로</button>
+  </div>
+
+  <div class="screen" id="scrGift">
+    <h1 style="font-size:26px">보상함 🎁</h1>
+    <p>장면을 끝낼 때마다 추억이 하나씩 열립니다. 눌러서 크게 보세요.</p>
+    <div id="giftGrid"></div>
+    <button class="big" id="btnGiftClose">장면 선택으로</button>
+  </div>
+
+  <div class="screen show" id="scrLock">
+    <h1 style="font-size:26px">🔒 두 사람만의 이야기</h1>
+    <p>비밀번호 네 자리를 눌러 주세요.</p>
+    <div id="lockDots"><i></i><i></i><i></i><i></i></div>
+    <div id="lockPad"></div>
+  </div>
+
+  <div id="care">
+    <div id="careTop">
+      <b>마음결 상담 · CBT</b>
+      <span>둘이 싸우면 꼭 해보세요</span>
+      <button id="careClose" type="button">닫기 ✕</button>
+    </div>
+    <div id="careBody">
+      <div id="careWho" class="carePane">
+        <p class="careTip">게임을 끝까지 완료한 뒤에 이용하시길 추천합니다.</p>
+        <p>누구의 마음인가요?</p>
+        <div class="careBtns">
+          <button class="big" data-who="sj" type="button">수지</button>
+          <button class="big" data-who="cw" type="button">철우</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted)">대화는 이 휴대폰에만 저장되고, 이어서 할 때 AI가 기억합니다.</p>
+      </div>
+      <div id="carePw" class="carePane" style="display:none">
+        <p id="carePwMsg">비밀번호 네 자리</p>
+        <div id="careDots"><i></i><i></i><i></i><i></i></div>
+        <div id="carePad"></div>
+        <button class="big" id="careBack" type="button">← 뒤로</button>
+      </div>
+      <div id="careMode" class="carePane" style="display:none">
+        <p id="careModeHi"></p>
+        <div class="careBtns" style="flex-direction:column;gap:10px">
+          <button class="big" data-mode="fight" type="button">🌧 다투고 난 뒤 — 마음 풀기</button>
+          <button class="big" data-mode="daily" type="button">🌤 평소 마음 돌보기</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted)">대화는 보통 20~30번 주고받아요.<br>시작했다면 하루 안에 끝까지 마치는 게 좋아요.</p>
+        <button class="big" id="careBack2" type="button">← 뒤로</button>
+      </div>
+      <div id="careChat" class="carePane" style="display:none">
+        <div id="careLog"></div>
+        <div id="careInputRow">
+          <textarea id="careInput" rows="3" maxlength="2000" placeholder="지금 마음을 편하게 적어 보세요"></textarea>
+          <button id="careSend" type="button">보내기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+'use strict';
+/* ===== 남산중 6인방 — 모바일용 도트 RPG =====
+   단일 파일. 그림은 전부 코드 안의 픽셀 배열·도형으로 그린다(외부 파일 없음).
+   구조: store → 상수/캐릭터 → 스프라이트 → 타일 → 맵 → 엔진(입력·이동·그리기) → 대화 UI → 퀘스트 대본 → 화면 전환/부팅 */
+
+// ----- 영속 저장: localStorage가 막힌 환경에서도 앱이 죽지 않게 감싼다 -----
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* 무시 */ } }
+};
+const SAVE_KEY = 'cs_save';
+
+// ----- 선물하는 사람이 바꾸기 쉬운 것들 -----
+// 게임 비밀번호 (관계자 전용)
+const PASSWORD = '0316';
+// 엔딩 크레딧 마지막 메시지. 줄바꿈은 \n
+const FINAL_MESSAGE = '처음 만난 주민센터에서 지금 우리 집까지.\n이렇게 보고 있으면, 고맙고 사랑해.\n앞으로도 잘 부탁해.';
+const ERA = '장충동에서 시작된 이야기';
+const MAKER = '철우가 수지에게';
+
+// ----- 상수 -----
+const T = 16;            // 타일 한 변(px)
+const VIEW_W = 11;       // 가로 타일 수(고정). 세로는 화면 높이에 맞춰 계산
+const WALK_MS = 160;     // 한 칸 이동 시간
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+// ----- 두 주인공 -----
+// pal: 스프라이트 색 교체표. s 피부, h 머리, t 윗옷, p 바지, b 신발, a 포인트(깃·무늬)
+const FRIENDS = [
+  { id: 'cw', name: '철우', tag: '중구 공무원 · 예쁜 눈, 다정한 성격',
+    pal: { s: '#f1c7a3', h: '#1c1c24', t: '#3f7fd9', p: '#2f3f73', b: '#2b2b33', a: '#ffffff' } },
+  { id: 'sj', name: '수지', tag: '사회복지 공무원 · 귀여운 목소리', female: true,
+    pal: { s: '#f7d3b3', h: '#4a2f24', t: '#ff9eb5', p: '#6b5a8c', b: '#f4f4f4', a: '#fff1f4' } }
+];
+const F = {}; FRIENDS.forEach(f => { F[f.id] = f; });
+
+// 일곱 장면 (순서대로 열림)
+const CHAPTERS = [
+  { id: 'c1', hero: 'cw', title: '처음 만난 날', sub: '장충동 주민센터' },
+  { id: 'c2', hero: 'cw', title: '드론 데이트', sub: '한강공원' },
+  { id: 'c3', hero: 'cw', title: '우리, 사귀자', sub: '장충동 철우집' },
+  { id: 'c4', hero: 'cw', title: '결혼식', sub: '부산 목장원' },
+  { id: 'c5', hero: 'cw', title: '화해의 기술', sub: '성수동 신혼집' },
+  { id: 'c6', hero: 'sj', title: '저녁 메뉴의 신', sub: '성수동 신혼집' },
+  { id: 'c7', hero: 'cw', title: '내 집 마련', sub: '월곡 두산위브' }
+];
+const CH = {}; CHAPTERS.forEach(c => { CH[c.id] = c; });
+
+// 주변 사람들 (같은 스프라이트, 색만 다름)
+const NPC_PAL = {
+  boss:    { s: '#f1c7a3', h: '#5a5a5a', t: '#6c6f7a', p: '#2e2e36', b: '#1e1e22', a: '#ffffff' },   // 팀장님
+  coA:     { s: '#f1c7a3', h: '#2a2a2a', t: '#8a94a6', p: '#3a3a4a', b: '#2b2b33', a: '#ffffff' },   // 동료
+  coB:     { s: '#f1c7a3', h: '#3a2a20', t: '#b8c9a6', p: '#5a4a3f', b: '#2b2b33', a: '#ffffff', female: true }, // 동료(여)
+  civil:   { s: '#e6b48f', h: '#777777', t: '#4c7a3f', p: '#3a3a3a', b: '#2b2b33', a: '#d9e8c9' },   // 민원인 아저씨
+  civil2:  { s: '#f1c7a3', h: '#8a8a8a', t: '#c95c8a', p: '#4a3a3a', b: '#2b2b33', a: '#ffffff', female: true }, // 민원인 아주머니
+  fil:     { s: '#e6b48f', h: '#9a9a9a', t: '#3a3f52', p: '#2e2e36', b: '#1e1e22', a: '#ffd166' },   // 장인어른
+  mil:     { s: '#f1c7a3', h: '#8a8a8a', t: '#d9b8c9', p: '#6b5a6a', b: '#2b2b33', a: '#ffffff', female: true }, // 장모님
+  officiant:{ s: '#f1c7a3', h: '#4a4a4a', t: '#f4f4f4', p: '#2e2e36', b: '#1e1e22', a: '#3a3f52' },  // 주례
+  guestA:  { s: '#f1c7a3', h: '#2a2a2a', t: '#9bb5e0', p: '#3a3a4a', b: '#2b2b33', a: '#ffffff' },
+  guestB:  { s: '#f1c7a3', h: '#3a2a20', t: '#e9c44c', p: '#4a5d8c', b: '#2b2b33', a: '#fff7d6', female: true },
+  guestC:  { s: '#e6b48f', h: '#1c1c24', t: '#d94b4b', p: '#2f3f73', b: '#f4f4f4', a: '#ffffff' },
+  agent:   { s: '#f1c7a3', h: '#3a2a20', t: '#c95c8a', p: '#4a3a3a', b: '#2b2b33', a: '#ffffff', female: true }, // 중개인
+  senior:  { s: '#e6c8a8', h: '#c9c9c9', t: '#8a6a4a', p: '#5a5a5a', b: '#2b2b33', a: '#d9c9a8' },   // 어르신
+  runner:  { s: '#f1c7a3', h: '#2a2a2a', t: '#7bd389', p: '#3a3a4a', b: '#f4f4f4', a: '#ffffff' },   // 한강 러너
+  // 결혼식 예복 (철우 턱시도 / 수지 드레스)
+  cwTux:   { s: '#f1c7a3', h: '#1c1c24', t: '#22242c', p: '#22242c', b: '#1e1e22', a: '#ffffff' },
+  sjDress: { s: '#f7d3b3', h: '#4a2f24', t: '#ffffff', p: '#ffffff', b: '#ffffff', a: '#ffd166', female: true }
+};
+const OUTLINE = '#1d1a2b';
+
+// ----- 캐릭터 픽셀 도안 (16×16). . 투명, k 외곽선, e 눈, 나머지는 pal 글자 -----
+const SPR = {
+  down0: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '...khhhhhhhhk...',
+    '...khsssssshk...',
+    '...kssssssssk...',
+    '...ksessssesk...',
+    '...kssssssssk...',
+    '....kssssssk....',
+    '...ktttaatttk...',
+    '..ksttttttttsk..',
+    '..ksttttttttsk..',
+    '...kppppppppk...',
+    '...kpppkkpppk...',
+    '...kbbk..kbbk...',
+    '................'
+  ],
+  down1: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '...khhhhhhhhk...',
+    '...khsssssshk...',
+    '...kssssssssk...',
+    '...ksessssesk...',
+    '...kssssssssk...',
+    '....kssssssk....',
+    '...ktttaatttk...',
+    '..ksttttttttsk..',
+    '..ksttttttttsk..',
+    '...kppppppppk...',
+    '...kpppk.kppk...',
+    '..kbbk...kbbk...',
+    '................'
+  ],
+  up0: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...kshhhhhhsk...',
+    '....khhhhhhk....',
+    '...kttttttttk...',
+    '..ksttttttttsk..',
+    '..ksttttttttsk..',
+    '...kppppppppk...',
+    '...kpppkkpppk...',
+    '...kbbk..kbbk...',
+    '................'
+  ],
+  up1: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...khhhhhhhhk...',
+    '...kshhhhhhsk...',
+    '....khhhhhhk....',
+    '...kttttttttk...',
+    '..ksttttttttsk..',
+    '..ksttttttttsk..',
+    '...kppppppppk...',
+    '...kpppk.kppk...',
+    '..kbbk...kbbk...',
+    '................'
+  ],
+  left0: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '...khhhhhhhhk...',
+    '...kshhhhhhhk...',
+    '...ksssshhhhk...',
+    '...ksesshhhhk...',
+    '...ksssshhhhk...',
+    '....ksssshhk....',
+    '...kttttttttk...',
+    '...ksttttttk....',
+    '...ksttttttk....',
+    '...kppppppppk...',
+    '....kppppppk....',
+    '....kbbbbbbk....',
+    '................'
+  ],
+  left1: [
+    '................',
+    '.....kkkkkk.....',
+    '....khhhhhhk....',
+    '...khhhhhhhhk...',
+    '...kshhhhhhhk...',
+    '...ksssshhhhk...',
+    '...ksesshhhhk...',
+    '...ksssshhhhk...',
+    '....ksssshhk....',
+    '...kttttttttk...',
+    '...ksttttttk....',
+    '...ksttttttk....',
+    '...kppppppppk...',
+    '..kppk..kppk....',
+    '..kbbk..kbbk....',
+    '................'
+  ]
+};
+
+// 여성(단발) 도안: 남성 도안에서 얼굴 줄만 바꾼다
+const SPR_F = JSON.parse(JSON.stringify(SPR));
+SPR_F.down0 = SPR.down0.slice(); SPR_F.down1 = SPR.down1.slice();
+[SPR_F.down0, SPR_F.down1].forEach(r => {
+  r[5] = '...khsssssshk...';
+  r[6] = '...khsesseshk...';
+  r[7] = '...khsssssshk...';
+  r[8] = '...khhsssshhk...';
+  r[9] = '...khtttatthk...';
+});
+[SPR_F.up0, SPR_F.up1] = [SPR.up0.slice(), SPR.up1.slice()];
+[SPR_F.up0, SPR_F.up1].forEach(r => {
+  r[8] = '...khhhhhhhhk...';
+  r[9] = '...khhtttthhk...';
+});
+SPR_F.left0 = SPR.left0.slice(); SPR_F.left1 = SPR.left1.slice();
+[SPR_F.left0, SPR_F.left1].forEach(r => {
+  r[8] = '....kssshhhk....';
+  r[9] = '...ktttttthhk...';
+});
+
+// 도안 → 캔버스. 같은 도안을 색만 바꿔 여러 인물에 쓴다.
+function drawPix(rows, pal, mirror) {
+  const c = document.createElement('canvas'); c.width = T; c.height = T;
+  const g = c.getContext('2d');
+  for (let y = 0; y < rows.length; y++) {
+    const r = rows[y];
+    for (let x = 0; x < r.length; x++) {
+      const ch = r[x]; if (ch === '.') continue;
+      let col = ch === 'k' || ch === 'e' ? OUTLINE : pal[ch];
+      if (!col) continue;
+      g.fillStyle = col;
+      g.fillRect(mirror ? T - 1 - x : x, y, 1, 1);
+    }
+  }
+  return c;
+}
+// 인물 하나의 프레임 묶음: frames[dir] = [서기, 걷기1, 서기, 걷기2]
+function buildFrames(pal, sheet) {
+  const src = sheet || SPR;
+  const mk = (k, m) => drawPix(src[k], pal, m);
+  const d0 = mk('down0'), d1 = mk('down1'), d2 = mk('down1', true);
+  const u0 = mk('up0'), u1 = mk('up1'), u2 = mk('up1', true);
+  const l0 = mk('left0'), l1 = mk('left1');
+  const r0 = mk('left0', true), r1 = mk('left1', true);
+  return { down: [d0, d1, d0, d2], up: [u0, u1, u0, u2], left: [l0, l1, l0, l1], right: [r0, r1, r0, r1] };
+}
+const SPRITES = {};
+FRIENDS.forEach(f => { SPRITES[f.id] = buildFrames(f.pal, f.female ? SPR_F : SPR); });
+Object.keys(NPC_PAL).forEach(k => { SPRITES[k] = buildFrames(NPC_PAL[k], NPC_PAL[k].female ? SPR_F : SPR); });
+
+// ----- 타일 -----
+// 글자 하나 = 타일 하나. solid: 못 지나감, over: 바닥(맵의 base) 위에 겹쳐 그림
+const TILES = {
+  '.': { name: '잔디' }, ',': { name: '풀꽃' }, '-': { name: '흙길' }, '=': { name: '도로' }, ':': { name: '도로(세로)' }, '_': { name: '보도' },
+  '~': { name: '운동장' }, 'H': { name: '언덕' }, 'S': { name: '계단' },
+  'T': { name: '나무', solid: true, over: true }, 't': { name: '덤불', solid: true, over: true },
+  '#': { name: '울타리', solid: true, over: true }, 'L': { name: '가로등', solid: true, over: true },
+  'W': { name: '벽', solid: true }, 'w': { name: '창문', solid: true }, 'R': { name: '지붕', solid: true },
+  'b': { name: '벽돌', solid: true }, 'P': { name: '문기둥', solid: true, over: true },
+  'D': { name: '문', over: true }, 'Q': { name: '교문', over: true }, 's': { name: '간판', solid: true, over: true },
+  'G': { name: '골대', solid: true, over: true }, 'n': { name: '골망', over: true },
+  'f': { name: '마루' }, 'F': { name: '타일바닥' }, 'r': { name: '매트' }, '|': { name: '실내벽', solid: true },
+  'B': { name: '칠판', solid: true }, 'X': { name: '공간밖', solid: true },
+  'd': { name: '책상', solid: true, over: true }, 'C': { name: '의자', solid: true, over: true },
+  'A': { name: '식탁', solid: true, over: true }, 'K': { name: '계산대', solid: true, over: true },
+  'h': { name: '진열대', solid: true, over: true }, 'k': { name: '책장', solid: true, over: true },
+  'm': { name: '컴퓨터', solid: true, over: true }, 'e': { name: '침대', solid: true, over: true },
+  'o': { name: '소파', solid: true, over: true }, 'v': { name: '자판기', solid: true, over: true },
+  'i': { name: '화분', solid: true, over: true }, 'z': { name: '조리대', solid: true, over: true },
+  'u': { name: '배식대', solid: true, over: true }, 'E': { name: '이젤', solid: true, over: true },
+  'p': { name: '피자오븐', solid: true, over: true }, 'c': { name: '닭꼬치판', solid: true, over: true },
+  '%': { name: '아스팔트' }, 'J': { name: '축대', solid: true }, 'j': { name: '흰울타리', solid: true, over: true },
+  'N': { name: '고깔', solid: true, over: true }, 'q': { name: '경비실', solid: true, over: true }, 'I': { name: '신호등', solid: true, over: true },
+  '&': { name: '차양', solid: true }, 'O': { name: '벽화', solid: true }, 'Z': { name: '붉은벽돌', solid: true },
+  'g': { name: '연두벽', solid: true }, '@': { name: '옥상', solid: true }, 'Y': { name: '주차차량', solid: true, over: true },
+  'M': { name: '현금인출기', solid: true, over: true }, 'l': { name: '옷장', solid: true, over: true },
+  '0': { name: '물', solid: true }, 'a': { name: '샐러드바', solid: true, over: true },
+  '1': { name: '꽃아치', solid: true, over: true }
+};
+const ATLAS = {};
+(function buildAtlas() {
+  // 고정 난수: 잔디 점 같은 무늬가 매번 같게
+  let seed = 7; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const mk = () => { const c = document.createElement('canvas'); c.width = T; c.height = T; return [c, c.getContext('2d')]; };
+  const R = (g, x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  const dots = (g, n, col) => { for (let i = 0; i < n; i++) R(g, (rnd() * T) | 0, (rnd() * T) | 0, 1, 1, col); };
+  const def = (ch, fn) => { const [c, g] = mk(); fn(g); ATLAS[ch] = c; };
+
+  def('.', g => { R(g, 0, 0, T, T, '#5fae4a'); dots(g, 7, '#4f9a3d'); dots(g, 3, '#74c25c'); });
+  def(',', g => { R(g, 0, 0, T, T, '#5fae4a'); dots(g, 6, '#4f9a3d'); R(g, 3, 4, 2, 2, '#ffd166'); R(g, 10, 9, 2, 2, '#ff8fb1'); R(g, 12, 3, 1, 1, '#ffffff'); });
+  def('-', g => { R(g, 0, 0, T, T, '#c9a56b'); dots(g, 8, '#b8925a'); dots(g, 3, '#dcbb84'); });
+  def('=', g => { R(g, 0, 0, T, T, '#55565e'); dots(g, 5, '#4a4b52'); R(g, 0, 7, 6, 2, '#d9d2a3'); });
+  def(':', g => { R(g, 0, 0, T, T, '#55565e'); dots(g, 5, '#4a4b52'); R(g, 7, 0, 2, 6, '#d9d2a3'); });
+  def('_', g => { R(g, 0, 0, T, T, '#b9b4a8'); R(g, 0, 0, T, 1, '#d2cdc0'); R(g, 0, 0, 1, T, '#d2cdc0'); R(g, 8, 0, 1, T, '#a39e92'); R(g, 0, 8, T, 1, '#a39e92'); });
+  def('~', g => { R(g, 0, 0, T, T, '#d9b57a'); dots(g, 9, '#c9a366'); dots(g, 3, '#e8c78f'); });
+  def('H', g => { R(g, 0, 0, T, T, '#5fae4a'); for (let i = 0; i < 4; i++) R(g, i * 4, 12 - i * 3, 4, 1, '#4f9a3d'); dots(g, 4, '#74c25c'); });
+  def('S', g => { R(g, 0, 0, T, T, '#9a948a'); for (let i = 0; i < 4; i++) { R(g, 0, i * 4, T, 1, '#cfc9bd'); R(g, 0, i * 4 + 3, T, 1, '#6f6a62'); } });
+  def('T', g => { R(g, 6, 10, 4, 6, '#6b4226'); R(g, 2, 2, 12, 9, '#2f7a33'); R(g, 1, 4, 14, 5, '#2f7a33'); R(g, 4, 1, 8, 2, '#3d9442'); R(g, 3, 3, 4, 3, '#49a84f'); R(g, 9, 5, 3, 2, '#49a84f'); R(g, 5, 8, 7, 2, '#256629'); });
+  def('t', g => { R(g, 2, 6, 12, 8, '#3d8a3f'); R(g, 4, 4, 8, 3, '#3d8a3f'); R(g, 4, 6, 3, 2, '#5cb15e'); R(g, 9, 8, 3, 2, '#5cb15e'); R(g, 3, 12, 10, 2, '#2c6b2e'); });
+  def('#', g => { R(g, 0, 6, T, 2, '#8a6a3c'); R(g, 0, 11, T, 2, '#8a6a3c'); R(g, 2, 3, 2, 12, '#a8845a'); R(g, 12, 3, 2, 12, '#a8845a'); R(g, 2, 3, 2, 1, '#5e4526'); R(g, 12, 3, 2, 1, '#5e4526'); });
+  def('L', g => { R(g, 7, 4, 2, 12, '#44464f'); R(g, 5, 1, 6, 4, '#ffe9a3'); R(g, 6, 0, 4, 1, '#44464f'); });
+  def('W', g => { R(g, 0, 0, T, T, '#e9e2d3'); R(g, 0, 0, T, 1, '#c9c2b2'); R(g, 0, 15, T, 1, '#bdb6a6'); R(g, 0, 8, T, 1, '#d8d1c1'); });
+  def('w', g => { R(g, 0, 0, T, T, '#e9e2d3'); R(g, 0, 15, T, 1, '#bdb6a6'); R(g, 2, 2, 12, 11, '#4f5a6a'); R(g, 3, 3, 10, 9, '#9fd0ea'); R(g, 8, 3, 1, 9, '#4f5a6a'); R(g, 3, 7, 10, 1, '#4f5a6a'); R(g, 4, 4, 3, 2, '#d6f0fb'); });
+  def('R', g => { R(g, 0, 0, T, T, '#b0473d'); for (let y = 0; y < T; y += 4) { R(g, 0, y, T, 1, '#8e3a31'); for (let x = (y / 4) % 2 ? 0 : 4; x < T; x += 8) R(g, x, y + 1, 1, 3, '#8e3a31'); } });
+  def('b', g => { R(g, 0, 0, T, T, '#b5886a'); for (let y = 0; y < T; y += 4) { R(g, 0, y + 3, T, 1, '#8f6a50'); for (let x = (y / 4) % 2 ? 2 : 6; x < T; x += 8) R(g, x, y, 1, 3, '#8f6a50'); } });
+  def('P', g => { R(g, 4, 0, 8, 16, '#8c8c94'); R(g, 4, 0, 8, 2, '#b4b4bc'); R(g, 5, 0, 1, 16, '#a9a9b1'); });
+  def('D', g => { R(g, 0, 0, T, T, '#4a3a30'); R(g, 2, 1, 12, 15, '#6b4226'); R(g, 3, 2, 10, 14, '#8a5a33'); R(g, 7, 2, 2, 14, '#6b4226'); R(g, 10, 8, 1, 2, '#ffd166'); R(g, 5, 8, 1, 2, '#ffd166'); });
+  def('Q', g => { R(g, 0, 1, T, 2, '#44464f'); R(g, 0, 8, T, 1, '#44464f'); for (let x = 1; x < T; x += 3) R(g, x, 1, 1, 12, '#5b5d68'); });
+  def('s', g => { R(g, 7, 8, 2, 8, '#6b4226'); R(g, 1, 2, 14, 7, '#f4e8c1'); R(g, 1, 2, 14, 1, '#6b4226'); R(g, 1, 8, 14, 1, '#6b4226'); R(g, 3, 4, 10, 1, '#8a5a33'); R(g, 3, 6, 7, 1, '#8a5a33'); });
+  def('G', g => { R(g, 6, 0, 4, 16, '#f4f4f4'); R(g, 6, 0, 4, 1, '#cfcfcf'); });
+  def('n', g => { R(g, 0, 0, T, T, '#d9b57a'); for (let i = 0; i < T; i += 3) { R(g, i, 0, 1, T, '#f4f4f4'); R(g, 0, i, T, 1, '#f4f4f4'); } });
+  def('f', g => { R(g, 0, 0, T, T, '#c99a5b'); for (let y = 0; y < T; y += 4) { R(g, 0, y, T, 1, '#b4874d'); R(g, (y / 4) % 2 ? 3 : 10, y + 1, 1, 3, '#b4874d'); } });
+  def('F', g => { R(g, 0, 0, T, T, '#d8d6cf'); R(g, 0, 0, 8, 8, '#e6e4dd'); R(g, 8, 8, 8, 8, '#e6e4dd'); R(g, 0, 0, T, 1, '#c1bfb7'); R(g, 0, 0, 1, T, '#c1bfb7'); });
+  def('r', g => { R(g, 0, 0, T, T, '#c06464'); R(g, 2, 2, 12, 12, '#d97a7a'); R(g, 4, 4, 8, 8, '#c06464'); });
+  def('|', g => { R(g, 0, 0, T, T, '#8f8aa8'); R(g, 0, 10, T, 6, '#6f6a8a'); R(g, 0, 0, T, 1, '#aaa4c4'); R(g, 0, 10, T, 1, '#5a5672'); });
+  def('B', g => { R(g, 0, 0, T, T, '#8f8aa8'); R(g, 1, 2, 14, 10, '#2e5a3e'); R(g, 0, 1, T, 1, '#5e4526'); R(g, 0, 12, T, 1, '#5e4526'); R(g, 3, 4, 6, 1, '#ffffff'); R(g, 3, 7, 9, 1, '#ffffff'); });
+  def('X', g => { R(g, 0, 0, T, T, '#0e0d1a'); });
+  def('d', g => { R(g, 1, 3, 14, 9, '#a8744a'); R(g, 1, 3, 14, 1, '#c68e5e'); R(g, 2, 12, 2, 3, '#6b4226'); R(g, 12, 12, 2, 3, '#6b4226'); R(g, 4, 5, 6, 4, '#f4f1e6'); R(g, 5, 6, 3, 1, '#8a8a8a'); });
+  def('C', g => { R(g, 4, 2, 8, 2, '#8a5a33'); R(g, 4, 4, 2, 6, '#8a5a33'); R(g, 10, 4, 2, 6, '#8a5a33'); R(g, 3, 8, 10, 4, '#a8744a'); R(g, 4, 12, 2, 3, '#6b4226'); R(g, 10, 12, 2, 3, '#6b4226'); });
+  def('A', g => { R(g, 0, 4, T, 8, '#a8744a'); R(g, 0, 4, T, 1, '#c68e5e'); R(g, 1, 12, 2, 3, '#6b4226'); R(g, 13, 12, 2, 3, '#6b4226'); R(g, 3, 6, 4, 4, '#e9e2d3'); R(g, 9, 6, 4, 4, '#e9e2d3'); });
+  def('K', g => { R(g, 0, 3, T, 11, '#7a5a3c'); R(g, 0, 3, T, 2, '#a07a52'); R(g, 2, 7, 4, 3, '#e9e2d3'); R(g, 9, 7, 5, 5, '#3a3a3a'); R(g, 10, 8, 3, 2, '#7bd389'); });
+  def('h', g => { R(g, 0, 1, T, 14, '#8a6a3c'); R(g, 1, 2, 14, 4, '#6b4226'); R(g, 1, 8, 14, 4, '#6b4226'); R(g, 2, 3, 3, 3, '#ef6f6c'); R(g, 6, 3, 3, 3, '#ffd166'); R(g, 10, 3, 3, 3, '#7bd389'); R(g, 2, 9, 3, 3, '#3f7fd9'); R(g, 6, 9, 3, 3, '#ffffff'); R(g, 10, 9, 3, 3, '#ff8fb1'); });
+  def('k', g => { R(g, 0, 0, T, 16, '#6b4226'); for (let y = 1; y < 15; y += 5) { R(g, 1, y, 14, 4, '#4a2f1c'); for (let x = 1; x < 15; x += 2) R(g, x, y, 1, 4, ['#ef6f6c', '#ffd166', '#7bd389', '#3f7fd9', '#ff8fb1', '#ffffff', '#ffa94d'][(x / 2 + y) % 7]); } });
+  def('m', g => { R(g, 0, 6, T, 8, '#5b6473'); R(g, 0, 6, T, 1, '#8a94a6'); R(g, 3, 0, 10, 7, '#22242c'); R(g, 4, 1, 8, 5, '#58c4ff'); R(g, 5, 2, 3, 1, '#ffffff'); R(g, 6, 9, 4, 2, '#d9d9d9'); R(g, 11, 9, 2, 2, '#d9d9d9'); });
+  def('e', g => { R(g, 1, 0, 14, 16, '#8a5a33'); R(g, 2, 1, 12, 14, '#f1f1f1'); R(g, 2, 1, 12, 4, '#e0e0e0'); R(g, 3, 2, 10, 2, '#ffffff'); R(g, 2, 6, 12, 9, '#3f7fd9'); R(g, 2, 6, 12, 1, '#6aa0ea'); });
+  def('o', g => { R(g, 0, 3, T, 11, '#b04a5a'); R(g, 0, 3, T, 3, '#c75f70'); R(g, 0, 9, T, 4, '#9a3f4e'); R(g, 1, 14, 2, 2, '#3a2a20'); R(g, 13, 14, 2, 2, '#3a2a20'); });
+  def('v', g => { R(g, 2, 0, 12, 16, '#d83b2e'); R(g, 3, 1, 10, 7, '#9fd0ea'); R(g, 4, 2, 2, 5, '#ffd166'); R(g, 7, 2, 2, 5, '#7bd389'); R(g, 10, 2, 2, 5, '#ffffff'); R(g, 4, 10, 8, 4, '#2a2a2a'); });
+  def('i', g => { R(g, 5, 9, 6, 6, '#b5573f'); R(g, 4, 9, 8, 1, '#d9704f'); R(g, 4, 2, 8, 7, '#3d8a3f'); R(g, 6, 0, 4, 3, '#49a84f'); R(g, 2, 4, 3, 3, '#49a84f'); R(g, 11, 5, 3, 3, '#49a84f'); });
+  def('z', g => { R(g, 0, 3, T, 11, '#9aa0a6'); R(g, 0, 3, T, 2, '#c7ccd1'); R(g, 2, 7, 5, 5, '#3a3a3a'); R(g, 3, 8, 3, 3, '#ff6b35'); R(g, 9, 7, 5, 5, '#3a3a3a'); R(g, 10, 8, 3, 3, '#555'); });
+  def('u', g => { R(g, 0, 3, T, 11, '#bfc3c9'); R(g, 0, 3, T, 2, '#e0e3e7'); R(g, 1, 7, 4, 4, '#e9a15b'); R(g, 6, 7, 4, 4, '#7bd389'); R(g, 11, 7, 4, 4, '#ffffff'); R(g, 1, 11, 14, 2, '#8e949b'); });
+  def('E', g => { R(g, 3, 1, 10, 10, '#f4f1e6'); R(g, 2, 0, 12, 1, '#8a5a33'); R(g, 2, 11, 12, 1, '#8a5a33'); R(g, 4, 11, 2, 5, '#8a5a33'); R(g, 10, 11, 2, 5, '#8a5a33'); R(g, 5, 3, 3, 3, '#ef6f6c'); R(g, 8, 5, 3, 3, '#3f7fd9'); R(g, 6, 7, 2, 2, '#ffd166'); });
+  def('p', g => { R(g, 0, 2, T, 12, '#5b5b5b'); R(g, 0, 2, T, 2, '#7a7a7a'); R(g, 2, 6, 12, 5, '#1a1a1a'); R(g, 3, 7, 10, 3, '#ff8c3b'); R(g, 5, 8, 6, 1, '#ffd166'); });
+  def('c', g => { R(g, 0, 4, T, 9, '#3a3a3a'); R(g, 0, 4, T, 1, '#666'); for (let x = 2; x < 14; x += 4) { R(g, x, 2, 1, 9, '#e9e2d3'); R(g, x - 1, 6, 3, 4, '#c4673a'); R(g, x - 1, 6, 3, 1, '#e08a4e'); } });
+  def('%', g => { R(g, 0, 0, T, T, '#4b4c54'); dots(g, 6, '#414249'); dots(g, 2, '#585960'); });
+  def('J', g => { R(g, 0, 0, T, T, '#9a948a'); for (let y = 0; y < T; y += 5) { R(g, 0, y, T, 1, '#7c766c'); for (let x = (y / 5) % 2 ? 3 : 8; x < T; x += 8) R(g, x, y, 1, 5, '#7c766c'); } dots(g, 4, '#6d9a5f'); });
+  def('j', g => { R(g, 0, 5, T, 1, '#f4f4f4'); R(g, 0, 12, T, 1, '#f4f4f4'); R(g, 1, 3, 2, 11, '#f4f4f4'); R(g, 7, 3, 2, 11, '#f4f4f4'); R(g, 13, 3, 2, 11, '#f4f4f4'); R(g, 4, 7, 2, 2, '#3f7fd9'); R(g, 10, 7, 2, 2, '#3f7fd9'); });
+  def('N', g => { R(g, 6, 4, 4, 10, '#ff7f2a'); R(g, 5, 8, 6, 2, '#f4f4f4'); R(g, 4, 13, 8, 2, '#ff7f2a'); R(g, 7, 2, 2, 2, '#ff7f2a'); });
+  def('q', g => { R(g, 1, 2, 14, 13, '#c9c4b8'); R(g, 1, 2, 14, 2, '#8a948a'); R(g, 3, 6, 6, 5, '#4f5a6a'); R(g, 10, 6, 3, 9, '#7a746a'); R(g, 5, 0, 6, 2, '#3a3f4a'); });
+  def('I', g => { R(g, 7, 3, 2, 13, '#44464f'); R(g, 3, 0, 10, 4, '#2a2c33'); R(g, 4, 1, 2, 2, '#3a3'); R(g, 7, 1, 2, 2, '#7bd389'); R(g, 10, 1, 2, 2, '#333'); });
+  def('&', g => { for (let x = 0; x < T; x += 4) { R(g, x, 0, 2, 16, '#3d8a4a'); R(g, x + 2, 0, 2, 16, '#e8d44c'); } R(g, 0, 13, T, 3, '#2f6b3a'); });
+  def('O', g => { R(g, 0, 0, T, T, '#3f6fa8'); R(g, 2, 2, 5, 4, '#d94b4b'); R(g, 8, 5, 6, 5, '#f4f4f4'); R(g, 9, 10, 4, 2, '#8a5a33'); R(g, 1, 11, 14, 3, '#7db8d9'); dots(g, 4, '#5a8ac0'); });
+  def('Z', g => { R(g, 0, 0, T, T, '#8a3a30'); for (let y = 0; y < T; y += 4) { R(g, 0, y + 3, T, 1, '#6b2a22'); for (let x = (y / 4) % 2 ? 2 : 6; x < T; x += 8) R(g, x, y, 1, 3, '#6b2a22'); } });
+  def('g', g => { R(g, 0, 0, T, T, '#b8d4a8'); R(g, 0, 4, T, 1, '#9dbb8c'); R(g, 0, 9, T, 1, '#9dbb8c'); R(g, 0, 14, T, 1, '#9dbb8c'); R(g, 0, 15, T, 1, '#88a677'); });
+  def('@', g => { R(g, 0, 0, T, T, '#a8a49a'); R(g, 0, 0, T, 2, '#c2beb2'); dots(g, 5, '#96928a'); R(g, 11, 4, 4, 4, '#8a948a'); });
+  def('Y', g => { R(g, 1, 6, 14, 6, '#d9d9de'); R(g, 3, 3, 9, 4, '#d9d9de'); R(g, 4, 4, 3, 3, '#7db8d9'); R(g, 8, 4, 3, 3, '#7db8d9'); R(g, 2, 12, 3, 3, '#2a2a2a'); R(g, 11, 12, 3, 3, '#2a2a2a'); R(g, 1, 8, 1, 2, '#f4d0d0'); });
+  def('M', g => { R(g, 2, 0, 12, 16, '#3f7fd9'); R(g, 3, 2, 10, 6, '#9fd0ea'); R(g, 4, 3, 6, 2, '#ffffff'); R(g, 4, 10, 8, 2, '#2a2a2a'); R(g, 4, 13, 5, 2, '#ffd166'); });
+  def('l', g => { R(g, 0, 0, T, 16, '#a8825a'); R(g, 1, 1, 6, 14, '#8a6a42'); R(g, 9, 1, 6, 14, '#8a6a42'); R(g, 5, 7, 1, 2, '#ffd166'); R(g, 13, 7, 1, 2, '#ffd166'); R(g, 1, 1, 6, 1, '#6b4e2e'); R(g, 9, 1, 6, 1, '#6b4e2e'); });
+  def('0', g => { R(g, 0, 0, T, T, '#7db8d9'); R(g, 0, 0, T, 2, '#a8d2e8'); for (let y = 4; y < T; y += 5) R(g, (y % 2) * 3, y, 10, 1, '#a8d2e8'); dots(g, 3, '#5a9ac0'); });
+  def('1', g => { R(g, 0, 5, T, 4, '#e8f4e0'); R(g, 1, 4, 3, 3, '#ff8fb1'); R(g, 6, 5, 3, 3, '#ffd166'); R(g, 11, 4, 3, 3, '#ff8fb1'); R(g, 4, 7, 2, 2, '#7bd389'); R(g, 9, 7, 2, 2, '#7bd389'); R(g, 14, 6, 2, 2, '#ffffff'); });
+  def('a', g => { R(g, 0, 3, T, 11, '#7a5a3c'); R(g, 0, 3, T, 2, '#a07a52'); R(g, 1, 6, 4, 4, '#7bd389'); R(g, 6, 6, 4, 4, '#ef6f6c'); R(g, 11, 6, 4, 4, '#ffd166'); R(g, 1, 11, 14, 2, '#5e4526'); });
+})();
+
+// ----- 맵 -----
+// rows: 글자 = TILES 키. exits: 그 칸을 밟으면 to 맵의 (tx,ty)로 이동(도착 칸은 출구가 아닌 칸으로 잡는다).
+// edge: 'bottom'이면 맨 아랫줄 전체가 출구(언덕↔동네 도로)
+const MAPS = {
+  office: { name: '장충동 주민센터', base: 'F', rows: [
+    '||||||||||||||||||',
+    '|FFdmFFdmFFdmFFFB|',
+    '|FFFFFFFFFFFFFFFF|',
+    '|KKKKKKKKKKKKKFFF|',
+    '|FFFFFFFFFFFFFFFF|',
+    '|FCCFFCCFFCCFFFFi|',
+    '|FFFFFFFFFFFFFFFF|',
+    '|vFFFFFFFFFFFFFFi|',
+    '|||||||||D||||||||'
+  ], exits: [], signs: { '16,1': '게시판\n「이달의 친절 직원: 설수지」' },
+  labels: [ { x: 6, y: 3, t: '민원 창구' }, { x: 9, y: 8, t: '정문' } ] },
+
+  hangang: { name: '한강공원', base: '.', rows: [
+    '0000000000000000000000',
+    '0000000000000000000000',
+    'jjjjjjjjjjjjjjjjjjjjjj',
+    '______________________',
+    '......................',
+    '...C......C......C....',
+    '..........s...........',
+    '.T..........T.......T.',
+    '......,.......,.......',
+    '...L.............L....',
+    '......................',
+    '.t..................t.',
+    'TTTTTTTTTTTTTTTTTTTTTT'
+  ], exits: [], signs: { '10,6': '드론 비행 가능 구역\n(초보 환영 · 새들 조심)' },
+  labels: [ { x: 10, y: 0, t: '한강' } ] },
+
+  cwhome: { name: '철우집 (장충동)', base: 'f', rows: [
+    '||||||||||',
+    '|eeffkkfi|',
+    '|ffffffff|',
+    '|dCffffvf|',
+    '|ffffffff|',
+    '|offfrrff|',
+    '|ffffffff|',
+    '||||D|||||'
+  ], exits: [], signs: { '1,1': '철우의 침대. 이불이 그날따라 각 잡혀 있었다.' },
+  labels: [ { x: 4, y: 0, t: '장충동 원룸' } ] },
+
+  sjhome: { name: '성수르하임 (성수동)', base: 'f', rows: [
+    '||||||||||||||',
+    '|eeff|kzzffff|',
+    '|ffff|fffffvf|',
+    '|ffffDfffffff|',
+    '|ffffffrrffff|',
+    '|offfffrrfffi|',
+    '|ffffffffffff|',
+    '||||||D|||||||'
+  ], exits: [], signs: { '2,1': '분리형 침실. 문이 있다는 것만으로 어른이 된 기분.' },
+  labels: [ { x: 2, y: 1, t: '침실' }, { x: 10, y: 1, t: '층고 3.4m ↑' } ] },
+
+  mokjang: { name: '목장원 (부산)', base: 'F', rows: [
+    '00000000000000000000',
+    '00000000000000000000',
+    'jjjjjjjjjjjjjjjjjjjj',
+    'FFFFFFFFFFFFFFFFFFFF',
+    'FFFFFFFFP11PFFFFFFFF',
+    'FFFFFFFFFFFFFFFFFFFF',
+    'FFCCFCCFFFFFCCFCCFFF',
+    'FFCCFCCFFFFFCCFCCFFF',
+    'FFCCFCCFFFFFCCFCCFFF',
+    'FFFFFFFFFFFFFFFFFFFF',
+    'FFFFiFFFFFFFFFFiFFFF',
+    'FFFFFFFFFFFFFFFFFFFF',
+    'TTTTTTTTTTTTTTTTTTTT'
+  ], exits: [], signs: { '9,2': '부산 앞바다. 배가 지나간다.' },
+  labels: [ { x: 10, y: 1, t: '부산 앞바다' }, { x: 9, y: 4, t: '♥' }, { x: 10, y: 11, t: '목장원 야외 예식장' } ] },
+
+  apt: { name: '월곡 두산위브', base: 'f', rows: [
+    '||||||||||||',
+    '|wwffffffww|',
+    '|ffffffffff|',
+    '|eefffddfkf|',
+    '|ffffffffff|',
+    '|offfrrfffi|',
+    '|ffffffffff|',
+    '|ffzzffffvf|',
+    '||||||D|||||'
+  ], exits: [], signs: {},
+  labels: [ { x: 6, y: 0, t: '우리 집' } ] }
+};
+// 맵 크기·바닥 캐시. 겹쳐 그리는 타일(over)의 바닥은 같은 줄에서 왼쪽으로 가장 가까운 '걸을 수 있는' 타일, 없으면 base
+Object.keys(MAPS).forEach(id => {
+  const m = MAPS[id]; m.id = id; m.h = m.rows.length; m.w = m.rows[0].length;
+  m.rows.forEach((r, y) => { if (r.length !== m.w) console.error('맵 줄 길이 불일치', id, y, r.length, m.w); });
+  m.baseRows = m.rows.map(r => {
+    let out = '', last = m.base;
+    for (let x = 0; x < r.length; x++) {
+      const t = TILES[r[x]];
+      if (t && !t.solid && !t.over) last = r[x];
+      out += last;
+    }
+    return out;
+  });
+});
+
+// 주변 사람들: 맵별 고정 NPC. talk는 대본에서 채움(없으면 기본 대사)
+const NPCS = {
+  office: [
+    { id: 'boss', spr: 'boss', x: 2, y: 2, dir: 'down', name: '팀장님' },
+    { id: 'coA', spr: 'coA', x: 10, y: 1, dir: 'down', name: '최 주무관' },
+    { id: 'senior', spr: 'senior', x: 4, y: 4, dir: 'up', name: '어르신' },
+    { id: 'civil', spr: 'civil', x: 16, y: 4, dir: 'up', name: '민원인 아저씨' },
+    { id: 'civil2', spr: 'civil2', x: 2, y: 4, dir: 'up', name: '민원인 아주머니' }
+  ],
+  hangang: [ { id: 'runner', spr: 'runner', x: 17, y: 3, dir: 'left', name: '러너' } ],
+  cwhome: [],
+  sjhome: [],
+  mokjang: [
+    { id: 'fil', spr: 'fil', x: 4, y: 4, dir: 'right', name: '장인어른' },
+    { id: 'mil', spr: 'mil', x: 2, y: 5, dir: 'right', name: '장모님' },
+    { id: 'officiant', spr: 'officiant', x: 9, y: 3, dir: 'down', name: '주례 선생님' },
+    { id: 'guestA', spr: 'guestA', x: 7, y: 9, dir: 'up', name: '하객' },
+    { id: 'guestB', spr: 'guestB', x: 12, y: 9, dir: 'up', name: '하객' },
+    { id: 'guestC', spr: 'guestC', x: 16, y: 5, dir: 'left', name: '하객' }
+  ],
+  apt: [ { id: 'agent', spr: 'agent', x: 8, y: 2, dir: 'down', name: '공인중개사' } ]
+};
+// 상대방 배치는 장면 대본(friendPos)이 정한다
+const HOME = {};
+
+// ===== 엔진 =====
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+let VIEW_H = 13, SCALE = 2;
+
+// 게임 상태. q(퀘스트 진행)·done(완료한 친구)·위치만 저장된다.
+const S = {
+  screen: 'lock', ch: null, hero: null, map: null, px: 0, py: 0, dir: 'down', ending: false, care: false,
+  moving: null, step: 0, ents: [], q: {}, done: {}, busy: false, lock: false, onExit: false, time: 0
+};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ----- 화면 크기: 가로 11타일 고정, 세로는 남는 높이만큼. 정수 배율로 또렷하게 -----
+function fit() {
+  const st = $('stage').getBoundingClientRect();
+  SCALE = Math.max(1, Math.floor(Math.min(st.width / (VIEW_W * T), st.height / (10 * T))));
+  VIEW_H = Math.max(10, Math.min(18, Math.floor(st.height / (T * SCALE))));
+  cv.width = VIEW_W * T; cv.height = VIEW_H * T;
+  cv.style.width = (cv.width * SCALE) + 'px'; cv.style.height = (cv.height * SCALE) + 'px';
+  ctx.imageSmoothingEnabled = false;
+  syncLabelsBox();
+}
+window.addEventListener('resize', fit);
+
+// ----- 입력: 키보드 + 가상 패드 둘 다 같은 held/pressA/pressB로 모인다 -----
+let held = null;                 // 지금 누르고 있는 방향
+const keyDir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', KeyW: 'up', KeyS: 'down', KeyA: 'left', KeyD: 'right' };
+const keysDown = new Set();
+function heldFromKeys() { for (const k of keysDown) if (keyDir[k]) return keyDir[k]; return null; }
+window.addEventListener('keydown', e => {
+  if (e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) return;
+  if (e.repeat) { if (keyDir[e.code]) e.preventDefault(); return; }
+  if (keyDir[e.code]) { keysDown.add(e.code); held = keyDir[e.code]; e.preventDefault(); onDirPress(held); return; }
+  if (S.screen === 'lock') { const mm = e.code.match(/^(?:Digit|Numpad)([0-9])$/); if (mm) { lockKey(mm[1]); return; } if (e.code === 'Backspace') { lockKey('←'); return; } }
+  if (e.code === 'KeyZ' || e.code === 'Enter' || e.code === 'Space') { e.preventDefault(); pressA(); }
+  else if (e.code === 'KeyX' || e.code === 'Escape') { e.preventDefault(); pressB(); }
+});
+window.addEventListener('keyup', e => { if (keyDir[e.code]) { keysDown.delete(e.code); held = heldFromKeys(); } });
+window.addEventListener('blur', () => { keysDown.clear(); held = null; padDir(null); });
+
+// 가상 방향패드: 패드 영역 안에서 손가락 위치의 각도로 방향을 정한다(버튼 사이를 미끄러져도 됨)
+const dpad = $('dpad');
+function padDir(d) {
+  held = d;
+  dpad.querySelectorAll('.k').forEach(k => k.classList.toggle('on', !!d && k.dataset.d === d));
+  if (d) onDirPress(d);
+}
+function dirFromPointer(e) {
+  const r = dpad.getBoundingClientRect();
+  const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  if (Math.hypot(dx, dy) < r.width * 0.12) return held; // 중앙 근처면 이전 방향 유지
+  return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+}
+let padPointer = null;
+dpad.addEventListener('pointerdown', e => { padPointer = e.pointerId; dpad.setPointerCapture(e.pointerId); padDir(dirFromPointer(e)); e.preventDefault(); });
+dpad.addEventListener('pointermove', e => { if (padPointer === e.pointerId) padDir(dirFromPointer(e)); });
+const padEnd = e => { if (padPointer === e.pointerId) { padPointer = null; padDir(null); } };
+dpad.addEventListener('pointerup', padEnd); dpad.addEventListener('pointercancel', padEnd);
+dpad.addEventListener('contextmenu', e => e.preventDefault());
+
+function bindBtn(el, fn) {
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.classList.add('on'); fn(); });
+  const off = () => el.classList.remove('on');
+  el.addEventListener('pointerup', off); el.addEventListener('pointercancel', off); el.addEventListener('pointerleave', off);
+  el.addEventListener('contextmenu', e => e.preventDefault());
+}
+bindBtn($('btnA'), () => pressA());
+bindBtn($('btnB'), () => pressB());
+$('btnMenu').addEventListener('click', () => pressB());
+
+// ----- 대화창 -----
+// say(): 한 마디 보여주고 탭/Z를 기다림. ask(): 선택지. 둘 다 Promise라 대본을 순서대로 쓸 수 있다.
+const dlg = $('dlg'), dlgName = $('dlgName'), dlgText = $('dlgText'), dlgMore = $('dlgMore'), choicesEl = $('choices');
+let dlgState = null;   // { full, shown, timer, resolve, choices, sel }
+function say(name, text) {
+  return new Promise(resolve => {
+    S.busy = true;
+    dlg.classList.add('show'); choicesEl.classList.remove('show'); choicesEl.innerHTML = '';
+    dlgName.textContent = name || ''; dlgName.style.display = name ? '' : 'none';
+    dlgMore.classList.add('hide');
+    dlgState = { full: text, shown: 0, resolve, choices: null };
+    dlgText.textContent = '';
+    const tick = () => {
+      if (!dlgState || dlgState.full !== text) return;
+      dlgState.shown = Math.min(text.length, dlgState.shown + 1);
+      dlgText.textContent = text.slice(0, dlgState.shown);
+      if (dlgState.shown < text.length) dlgState.timer = setTimeout(tick, 22);
+      else dlgMore.classList.remove('hide');
+    };
+    tick();
+  });
+}
+function ask(name, text, options) {
+  return new Promise(async resolve => {
+    await say(name, text);
+    // say가 끝난 직후 선택지를 붙인다
+    S.busy = true;
+    dlg.classList.add('show'); dlgMore.classList.add('hide');
+    dlgName.textContent = name || ''; dlgText.textContent = text;
+    dlgState = { full: text, shown: text.length, resolve, choices: options, sel: 0 };
+    choicesEl.innerHTML = ''; choicesEl.classList.add('show');
+    options.forEach((o, i) => {
+      const b = document.createElement('button'); b.textContent = o; b.type = 'button';
+      if (i === 0) b.classList.add('sel');
+      b.addEventListener('click', e => { e.stopPropagation(); finishChoice(i); });
+      choicesEl.appendChild(b);
+    });
+  });
+}
+function finishChoice(i) {
+  const st = dlgState; if (!st || !st.choices) return;
+  dlgState = null; closeDlg(); st.resolve(i);
+}
+function closeDlg() { dlg.classList.remove('show'); choicesEl.classList.remove('show'); choicesEl.innerHTML = ''; S.busy = false; }
+// 대화 진행(탭/Z). 글자가 나오는 중이면 전부 보여주고, 다 나왔으면 다음으로.
+function advanceDlg() {
+  const st = dlgState; if (!st) return false;
+  if (st.choices) { finishChoice(st.sel); return true; }
+  if (st.shown < st.full.length) { clearTimeout(st.timer); st.shown = st.full.length; dlgText.textContent = st.full; dlgMore.classList.remove('hide'); return true; }
+  dlgState = null; closeDlg(); st.resolve();
+  return true;
+}
+// 대사창이 떠 있으면 화면의 빈 곳 아무 데나 눌러도 넘어간다.
+// 버튼·방향패드·선택지처럼 제 기능이 있는 곳은 제외하고, 미니게임 중에는 그쪽 입력이 우선이다.
+// 선택지가 떠 있을 땐 빈 곳 탭으로 고르지 않는다(실수 방지) — 선택지 버튼이나 A 로만.
+const TAP_SKIP = 'button, #dpad, #choices, #care, #mg, #photo, .screen, textarea, input';
+$('app').addEventListener('pointerdown', e => {
+  if (MG.active) return;
+  if (!dlgState || dlgState.choices) return;
+  if (e.target.closest(TAP_SKIP)) return;
+  e.preventDefault();
+  advanceDlg();
+});
+function moveChoice(d) {
+  const st = dlgState; if (!st || !st.choices) return false;
+  st.sel = (st.sel + d + st.choices.length) % st.choices.length;
+  choicesEl.querySelectorAll('button').forEach((b, i) => b.classList.toggle('sel', i === st.sel));
+  return true;
+}
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.remove('show');
+  void t.offsetWidth; t.classList.add('show');
+}
+async function fade(on) { $('fade').classList.toggle('on', on); await sleep(260); }
+
+// ----- 작은 그림들(아이템·공·느낌표) -----
+const ICONS = {};
+(function buildIcons() {
+  const R = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  const def = (k, fn) => { const c = document.createElement('canvas'); c.width = T; c.height = T; fn(c.getContext('2d')); ICONS[k] = c; };
+  def('ball', g => { R(g, 5, 4, 6, 8, '#f4f4f4'); R(g, 4, 5, 8, 6, '#f4f4f4'); R(g, 7, 6, 2, 2, '#222'); R(g, 5, 9, 2, 2, '#222'); R(g, 9, 9, 2, 1, '#222'); R(g, 4, 12, 8, 1, 'rgba(0,0,0,0.25)'); });
+  def('bottle', g => { R(g, 7, 2, 2, 3, '#2f6b3a'); R(g, 6, 5, 4, 8, '#3d8a4a'); R(g, 7, 7, 1, 4, '#7cc58a'); R(g, 6, 9, 4, 2, '#e9e2d3'); R(g, 7, 2, 2, 1, '#1d1a2b'); });
+  def('bag', g => { R(g, 4, 5, 8, 9, '#c9a27a'); R(g, 4, 5, 8, 1, '#a8825a'); R(g, 6, 3, 4, 2, '#a8825a'); R(g, 6, 8, 4, 3, '#7bd389'); });
+  def('onion', g => { R(g, 5, 6, 6, 7, '#e0b184'); R(g, 6, 5, 4, 1, '#e0b184'); R(g, 7, 2, 2, 3, '#7bd389'); R(g, 8, 7, 1, 5, '#c9935c'); });
+  def('cheese', g => { R(g, 4, 6, 8, 6, '#ffd166'); R(g, 4, 5, 8, 1, '#ffe08a'); R(g, 6, 8, 2, 2, '#e0a93a'); R(g, 9, 9, 1, 1, '#e0a93a'); });
+  def('sauce', g => { R(g, 6, 4, 4, 2, '#3a3a3a'); R(g, 5, 6, 6, 7, '#c0392b'); R(g, 6, 8, 1, 3, '#e74c3c'); R(g, 6, 10, 4, 1, '#f4e8c1'); });
+  def('coupon', g => { R(g, 3, 5, 10, 7, '#fff3b0'); R(g, 3, 5, 10, 1, '#d94b4b'); R(g, 5, 8, 6, 1, '#d94b4b'); R(g, 5, 10, 4, 1, '#8a5a33'); });
+  def('paper', g => { R(g, 4, 3, 8, 10, '#f4f1e6'); R(g, 5, 5, 6, 1, '#8a8a8a'); R(g, 5, 7, 6, 1, '#8a8a8a'); R(g, 5, 9, 4, 1, '#8a8a8a'); });
+  def('coin', g => { R(g, 5, 5, 6, 6, '#ffd166'); R(g, 4, 6, 8, 4, '#ffd166'); R(g, 7, 6, 2, 4, '#e0a93a'); });
+  def('mark', g => { R(g, 7, 1, 2, 6, '#ffd166'); R(g, 7, 9, 2, 2, '#ffd166'); R(g, 6, 0, 4, 1, '#ffd166'); });
+})();
+
+// ----- 맵·엔티티 도우미 -----
+let quest = null;  // 지금 플레이 중인 친구의 대본(QUESTS[id])
+const tileAt = (m, x, y) => (x < 0 || y < 0 || x >= m.w || y >= m.h) ? null : m.rows[y][x];
+function isSolidTile(m, x, y) { const ch = tileAt(m, x, y); if (ch === null) return true; const t = TILES[ch]; return !t || !!t.solid; }
+function entAt(x, y) { return S.ents.find(e => !e.gone && e.x === x && e.y === y); }
+function exitAt(x, y) { return S.map.exits.find(e => e.edge === 'bottom' ? y === S.map.h - 1 : (e.x === x && e.y === y)); }
+function findEnt(id) { return S.ents.find(e => e.id === id && !e.gone); }
+
+// 맵에 들어갈 때 그 맵의 사람·친구·아이템을 놓는다
+function buildEnts() {
+  const id = S.map.id; S.ents = [];
+  (NPCS[id] || []).forEach(n => {
+    if (quest && quest.hideNpc && quest.hideNpc(n.id)) return;
+    const ov = quest && quest.npcPos && quest.npcPos(n.id);
+    S.ents.push(Object.assign({ kind: 'npc' }, n, ov || {}));
+  });
+  FRIENDS.forEach(f => {
+    if (f.id === S.hero) return;
+    const pos = (quest && quest.friendPos && quest.friendPos(f.id)) || HOME[f.id];
+    if (pos && pos.map === id) S.ents.push({ kind: 'friend', id: f.id, spr: pos.spr || f.id, name: f.name, x: pos.x, y: pos.y, dir: pos.dir || 'down' });
+  });
+  if (quest && quest.ents) quest.ents(id).forEach(e => S.ents.push(e));
+  if (quest && quest.marks) quest.marks();
+}
+// 바닥에 놓인 아이템 하나 만들기. 밟으면 onPick
+function item(id, icon, x, y, onPick) { return { kind: 'item', id, icon, x, y, solid: false, onPick, mark: true }; }
+
+// ----- 이동 -----
+function startMove(nx, ny, after) { S.moving = { fx: S.px, fy: S.py, t0: S.time, after }; S.px = nx; S.py = ny; }
+function tryMove(d) {
+  S.dir = d;
+  const [dx, dy] = DIRS[d], nx = S.px + dx, ny = S.py + dy;
+  const e = entAt(nx, ny);
+  if (e && e.kind === 'ball') {               // 공 차기: 공이 한 칸 굴러가고 나도 그 자리로
+    const bx = nx + dx, by = ny + dy;
+    if (isSolidTile(S.map, bx, by) || entAt(bx, by)) return false;
+    e.moving = { fx: e.x, fy: e.y, t0: S.time }; e.x = bx; e.y = by;
+    startMove(nx, ny, async () => { if (tileAt(S.map, e.x, e.y) === 'n' && quest && quest.onGoal) { S.lock = true; await quest.onGoal(e); S.lock = false; } });
+    return true;
+  }
+  if (isSolidTile(S.map, nx, ny)) return false;
+  if (e && e.solid !== false) return false;
+  startMove(nx, ny);
+  return true;
+}
+async function arrive() {
+  const x = S.px, y = S.py;
+  const it = entAt(x, y);
+  if (it && it.kind === 'item') { it.gone = true; if (it.onPick) await it.onPick(it); }
+  const ex = exitAt(x, y);
+  if (S.onExit) { if (!ex) S.onExit = false; }
+  else if (ex) { goMap(ex.to, ex.tx, ex.ty, ex.dir); return; }
+  if (quest && quest.onStep) quest.onStep(S.map.id, x, y);
+}
+async function goMap(id, x, y, dir, silent) {
+  S.busy = true;
+  await fade(true);
+  S.map = MAPS[id]; S.px = x; S.py = y; if (dir) S.dir = dir; S.moving = null;
+  buildEnts(); S.onExit = !!exitAt(x, y);
+  draw();
+  await fade(false);
+  S.busy = false;
+  if (!silent) toast(S.map.name);
+  if (quest && quest.onEnter) { S.lock = true; await quest.onEnter(id); S.lock = false; }
+  save();
+}
+// NPC를 한 칸씩 걸어가게 한다(대본용). 막히면 그냥 순간이동
+async function walkEnt(e, path) {
+  e.walk = true;
+  for (const d of path) {
+    const [dx, dy] = DIRS[d]; e.dir = d;
+    e.moving = { fx: e.x, fy: e.y, t0: S.time }; e.x += dx; e.y += dy;
+    await sleep(WALK_MS);
+  }
+  e.walk = false;
+}
+
+// ----- 상호작용 -----
+const GENERIC_LOOK = {
+  d: '책상. 결재 서류가 얌전히 쌓여 있다.', m: '업무 포털. 새로고침해도 일은 줄지 않는다.', K: '민원 창구. 오늘도 평화롭기를.',
+  B: '게시판. 「이달의 친절 직원: 설수지」', v: '자판기. 밀크커피 300원.', C: '의자.', i: '화분. 잘 자라고 있다.',
+  e: '침대. 이불이 폭신하다.', k: '책장. 나란히 꽂힌 두 사람의 책.', o: '소파. 두 사람 자리가 딱 정해져 있다.',
+  r: '러그. 발이 따뜻하다.', z: '조리대. 오늘 저녁은 뭐 먹지.', w: '큰 창. 뷰가 좋다.', D: '문.',
+  0: '물이 반짝인다.', j: '흰 난간. 바람이 좋다.', T: '나무.', t: '덤불.', L: '가로등.', ',': '꽃이 피었다.',
+  P: '아치 기둥.', 1: '꽃 장식. 오늘을 위해 준비했다.', '_': '산책로.'
+};
+function pressA() {
+  if (MG.active) { if (MG.tap) MG.tap(); return; }
+  if (S.screen !== 'game') return;
+  if (dlgState) { advanceDlg(); return; }
+  if (S.busy || S.lock || S.moving) return;
+  interact();
+}
+function pressB() {
+  if (MG.active) { if (MG.cancel) MG.cancel(); return; }
+  if (S.screen === 'game') { if (S.busy || dlgState) return; openMenu(); }
+  else if (S.screen === 'menu') closeMenu();
+}
+function onDirPress(d) {
+  if (MG.active && MG.dir) { MG.dir(d); return; }
+  if (dlgState && dlgState.choices) moveChoice(d === 'up' ? -1 : d === 'down' ? 1 : 0);
+}
+async function interact() {
+  const [dx, dy] = DIRS[S.dir], fx = S.px + dx, fy = S.py + dy;
+  let e = entAt(fx, fy);
+  const ch = tileAt(S.map, fx, fy), t = TILES[ch];
+  if (!e && t && t.solid && t.over) { const e2 = entAt(fx + dx, fy + dy); if (e2 && (e2.kind === 'npc' || e2.kind === 'friend')) e = e2; } // 계산대 너머 사람
+  if (e && (e.kind === 'npc' || e.kind === 'friend')) { await talkTo(e); return; }
+  if (e && e.kind === 'item') { e.gone = true; if (e.onPick) await e.onPick(e); return; }
+  if (e && e.kind === 'ball') { await say('', '축구공. 차면 굴러간다. 골망에 넣어 보자.'); return; }
+  const key = fx + ',' + fy;
+  if (S.map.signs[key]) { await say('', S.map.signs[key]); return; }
+  if (quest && quest.interact) { const h = quest.interact(S.map.id, fx, fy, ch); if (h) { await h(); save(); return; } }
+  if (GENERIC_LOOK[ch]) await say('', GENERIC_LOOK[ch]);
+}
+async function talkTo(e) {
+  e.dir = { up: 'down', down: 'up', left: 'right', right: 'left' }[S.dir];
+  let fn = null;
+  if (e.kind === 'friend') fn = quest && quest.friendTalk && quest.friendTalk[e.id];
+  else fn = quest && quest.npcTalk && quest.npcTalk[e.id];
+  if (fn) await fn(e); else await defaultTalk(e);
+  if (quest && quest.marks) quest.marks();
+  setHud(); save();
+}
+async function defaultTalk(e) {
+  const lines = e.kind === 'friend' ? FRIEND_LINES[e.id] : NPC_LINES[e.id];
+  const arr = Array.isArray(lines) ? lines : [lines || '...'];
+  for (const l of arr) await say(e.name, l);
+}
+
+// ----- 그리기 -----
+function drawChar(spr, dir, frame, x, y) { const fr = SPRITES[spr]; if (fr) ctx.drawImage(fr[dir] ? fr[dir][frame] : fr.down[0], Math.round(x), Math.round(y)); }
+function draw() {
+  if (!S.map) return;
+  const m = S.map, now = S.time;
+  let ppx = S.px, ppy = S.py;
+  if (S.moving) { const k = Math.min(1, (now - S.moving.t0) / WALK_MS); ppx = S.moving.fx + (S.px - S.moving.fx) * k; ppy = S.moving.fy + (S.py - S.moving.fy) * k; }
+  const focus = S.focus || { x: ppx, y: ppy };
+  let camX = focus.x * T + T / 2 - cv.width / 2, camY = focus.y * T + T / 2 - cv.height / 2;
+  const maxX = m.w * T - cv.width, maxY = m.h * T - cv.height;
+  camX = Math.round(maxX < 0 ? maxX / 2 : Math.max(0, Math.min(maxX, camX)));
+  camY = Math.round(maxY < 0 ? maxY / 2 : Math.max(0, Math.min(maxY, camY)));
+  ctx.fillStyle = '#0e0d1a'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const x0 = Math.floor(camX / T), y0 = Math.floor(camY / T);
+  for (let y = y0; y <= y0 + VIEW_H; y++) for (let x = x0; x <= x0 + VIEW_W; x++) {
+    if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
+    const ch = m.rows[y][x], t = TILES[ch], sx = x * T - camX, sy = y * T - camY;
+    if (t && t.over) ctx.drawImage(ATLAS[m.baseRows[y][x]], sx, sy);
+    const img = ATLAS[ch]; if (img) ctx.drawImage(img, sx, sy);
+  }
+  const list = S.ents.filter(e => !e.gone).map(e => ({ e, y: e.y }));
+  if (!S.hideHero) list.push({ player: true, y: ppy });
+  list.sort((a, b) => a.y - b.y);
+  const bob = Math.round(Math.sin(now / 220)) ;
+  for (const it of list) {
+    if (it.player) { drawChar(S.heroSpr || S.hero, S.dir, S.moving ? [1, 3][S.step % 2] : 0, ppx * T - camX, ppy * T - camY); continue; }
+    const e = it.e; let ex = e.x, ey = e.y;
+    if (e.moving) { const k = Math.min(1, (now - e.moving.t0) / WALK_MS); if (k >= 1) e.moving = null; else { ex = e.moving.fx + (e.x - e.moving.fx) * k; ey = e.moving.fy + (e.y - e.moving.fy) * k; } }
+    const sx = Math.round(ex * T - camX), sy = Math.round(ey * T - camY);
+    if (e.kind === 'item') ctx.drawImage(ICONS[e.icon] || ICONS.paper, sx, sy + bob);
+    else if (e.kind === 'ball') ctx.drawImage(ICONS.ball, sx, sy);
+    else drawChar(e.spr, e.dir || 'down', e.walk ? [1, 3][Math.floor(now / WALK_MS) % 2] : 0, sx, sy);
+    if (e.mark && e.kind !== 'item') ctx.drawImage(ICONS.mark, sx, sy - 12 + bob);
+  }
+  if (S.tint) { ctx.fillStyle = S.tint; ctx.fillRect(0, 0, cv.width, cv.height); }
+  updateLabels(camX, camY); drawMini();
+}
+function update(now) {
+  S.time = now;
+  if (S.moving && now - S.moving.t0 >= WALK_MS) { const mv = S.moving; S.moving = null; S.step = (S.step + 1) % 4; if (mv.after) mv.after(); arrive(); }
+  if (!S.moving && !S.busy && !S.lock && S.screen === 'game' && held) tryMove(held);
+}
+function loop(now) { update(now); if (S.screen === 'game' || S.screen === 'menu') draw(); requestAnimationFrame(loop); }
+
+// ----- 건물 이름표: 캔버스 위 DOM 레이어 (저해상도 도트 위에서도 글자가 또렷) -----
+let labelMapId = null;
+function syncLabelsBox() {
+  const st = $('stage').getBoundingClientRect(), cb = cv.getBoundingClientRect();
+  const el = $('labels');
+  el.style.left = (cb.left - st.left) + 'px'; el.style.top = (cb.top - st.top) + 'px';
+  el.style.width = cb.width + 'px'; el.style.height = cb.height + 'px';
+}
+function updateLabels(camX, camY) {
+  const box = $('labels');
+  if (labelMapId !== S.map.id) {
+    labelMapId = S.map.id; box.innerHTML = '';
+    (S.map.labels || []).forEach(l => {
+      const d = document.createElement('div');
+      d.className = 'lb' + (l.exit ? ' exit' : ''); d.textContent = l.t; d._l = l;
+      box.appendChild(d);
+    });
+  }
+  const W = cv.width * SCALE, H = cv.height * SCALE;
+  for (const d of box.children) {
+    const l = d._l;
+    const x = (l.x * T + T / 2 - camX) * SCALE, y = (l.y * T - camY) * SCALE;
+    if (x < -70 || y < -8 || x > W + 70 || y > H + 30) { d.style.display = 'none'; continue; }
+    d.style.display = ''; d.style.left = x + 'px'; d.style.top = Math.max(15, y) + 'px';
+  }
+}
+
+// ----- 미니맵: 지금 맵의 윤곽 + 출구(노랑) + 사람(초록=친구) + 나(흰 점멸) -----
+const miniCv = $('mini'), miniCtx = miniCv.getContext('2d');
+const miniBase = {};
+function drawMini() {
+  const m = S.map; if (!m) return;
+  const sc = m.w > 26 ? 2 : 3, key = m.id + ':' + sc;
+  if (!miniBase[key]) {
+    const c = document.createElement('canvas'); c.width = m.w * sc; c.height = m.h * sc;
+    const g = c.getContext('2d');
+    for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
+      const ch = m.rows[y][x], t = TILES[ch];
+      g.fillStyle = (ch === 'D' || ch === 'Q') ? '#ffd166' : (!t || t.solid) ? '#34325a' : '#7d79aa';
+      g.fillRect(x * sc, y * sc, sc, sc);
+    }
+    m.exits.forEach(e => { g.fillStyle = '#ffd166'; if (e.edge === 'bottom') g.fillRect(0, (m.h - 1) * sc, m.w * sc, sc); else g.fillRect(e.x * sc, e.y * sc, sc, sc); });
+    miniBase[key] = c;
+  }
+  const base = miniBase[key];
+  if (miniCv.width !== base.width || miniCv.height !== base.height) { miniCv.width = base.width; miniCv.height = base.height; }
+  miniCv.style.width = Math.round(base.width * 1.4) + 'px';
+  miniCtx.drawImage(base, 0, 0);
+  for (const e of S.ents) {
+    if (e.gone || (e.kind !== 'npc' && e.kind !== 'friend')) continue;
+    miniCtx.fillStyle = e.kind === 'friend' ? '#7bd389' : '#cfcbe8';
+    miniCtx.fillRect(e.x * sc, e.y * sc, sc, sc);
+  }
+  if (Math.floor(S.time / 280) % 2 === 0) { miniCtx.fillStyle = '#ffffff'; miniCtx.fillRect(S.px * sc, S.py * sc, sc, sc); }
+}
+
+// ----- 추억 사진 연출: photos/<이름>.jpg 를 ms 동안 보여준다. 파일이 없으면 설명 카드로 대신 -----
+async function showPhoto(keys, caption, ms) {
+  if (typeof keys === 'string') keys = [keys];
+  const wasBusy = S.busy; S.busy = true;   // 사진 나오는 동안 조작 잠금
+  const ph = $('photo'), img = $('photoImg'), cap = $('photoCap');
+  let ok = false;
+  // 1) 뒤섞어 둔 .bin (비밀번호 기반 XOR) 먼저 — 공개 저장소에 원본이 그대로 올라가지 않게
+  for (const k of keys) {
+    try {
+      const res = await fetch('photos/' + k + '.bin');
+      if (res.ok) {
+        const buf = new Uint8Array(await res.arrayBuffer());
+        const key = (PASSWORD + PASSWORD).split('').map(ch => ch.charCodeAt(0));
+        for (let i = 0; i < buf.length; i++) buf[i] ^= key[i % key.length] ^ ((i * 7) & 0xff);
+        img.src = URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }));
+        await new Promise(r => { img.onload = r; img.onerror = r; });
+        ok = true; break;
+      }
+    } catch (e) { /* 다음 방법 */ }
+  }
+  if (!ok) outer: for (const k of keys) for (const ext of ['jpg', 'png', 'jpeg', 'webp']) {
+    ok = await new Promise(res => {
+      const im = new Image(); const t = setTimeout(() => res(false), 2500);
+      im.onload = () => { clearTimeout(t); img.src = im.src; res(true); };
+      im.onerror = () => { clearTimeout(t); res(false); };
+      im.src = 'photos/' + k + '.' + ext;
+    });
+    if (ok) break outer;
+  }
+  img.style.display = ok ? '' : 'none';
+  cap.textContent = caption + (ok ? '' : '\n(couple-rpg/photos/' + keys[0] + '.jpg 파일을 넣으면 실제 사진이 나옵니다)');
+  ph.classList.add('on'); void ph.offsetWidth; ph.classList.add('show');
+  await sleep(ms);
+  ph.classList.remove('show'); await sleep(380); ph.classList.remove('on');
+  S.busy = wasBusy;
+}
+
+// ----- 미니게임 공통 오버레이 (#mg) -----
+const MG = { active: false, tap: null, cancel: null };
+function mgOpen() {
+  const cvm = $('mgCv');
+  const w = Math.min(300, Math.floor(window.innerWidth * 0.78));
+  cvm.style.width = w + 'px'; cvm.style.height = Math.round(w * 200 / 160) + 'px';
+  MG.active = true; $('mg').classList.add('show');
+  return cvm.getContext('2d');
+}
+function mgClose(timer) { MG.active = false; MG.tap = MG.cancel = null; clearInterval(timer); $('mg').classList.remove('show'); }
+
+// 드론 비행: 탭하면 떠오르고, 놓으면 내려간다. 링 8개를 통과하면 성공
+function playDrone(target) {
+  return new Promise(resolve => {
+    const g = mgOpen();
+    let y, vy, gates, passed, over, win, t;
+    const reset = () => { y = 100; vy = 0; gates = [{ x: 190, gy: 90 }]; passed = 0; over = false; win = false; t = 0; };
+    reset();
+    const finish = val => { mgClose(timer); resolve(val); };
+    MG.cancel = () => finish(false);
+    MG.tap = () => { if (over) { if (win) finish(true); else reset(); return; } vy = -1.5; };
+    MG.dbg = () => ({ y, passed, over, win });
+    MG.forceWin = () => finish(true);
+    const timer = setInterval(() => {
+      if (!over) {
+        t++;
+        vy = Math.min(2.2, vy + 0.055); y += vy;
+        const last = gates[gates.length - 1];
+        if (last.x < 100) gates.push({ x: 190, gy: 34 + Math.random() * 120 });
+        gates.forEach(gt => { gt.x -= 1.1; });
+        gates = gates.filter(gt => { if (gt.x < -14) return false; return true; });
+        for (const gt of gates) {
+          if (!gt.done && gt.x < 36) { gt.done = true; passed++; sfx('tick'); if (passed >= target) { over = true; win = true; sfx('win'); } }
+          if (gt.x > 22 && gt.x < 50 && (y < gt.gy - 26 || y > gt.gy + 26)) { over = true; win = false; sfx('miss'); }
+        }
+        if (y < 6 || y > 192) { over = true; win = false; sfx('miss'); }
+      }
+      // 그리기
+      g.fillStyle = '#12203a'; g.fillRect(0, 0, 160, 200);
+      g.fillStyle = '#0d1830'; g.fillRect(0, 170, 160, 30);
+      g.fillStyle = '#26406b'; for (let i = 0; i < 5; i++) g.fillRect((i * 40 + 200 - (t % 40)) % 200 - 20, 178 + (i % 2) * 8, 14, 4);
+      for (const gt of gates) {
+        g.fillStyle = '#7bd389';
+        g.fillRect(gt.x - 3, 0, 6, gt.gy - 26);
+        g.fillRect(gt.x - 3, gt.gy + 26, 6, 200 - gt.gy - 26);
+        g.fillStyle = '#ffd166'; g.fillRect(gt.x - 5, gt.gy - 28, 10, 3); g.fillRect(gt.x - 5, gt.gy + 25, 10, 3);
+      }
+      // 드론
+      g.fillStyle = '#d9d9de'; g.fillRect(30, y - 3, 12, 6);
+      g.fillStyle = '#ff8fb1'; g.fillRect(33, y - 5, 6, 3);
+      g.fillStyle = '#8a94a6'; g.fillRect(26, y - 6, 6, 2); g.fillRect(40, y - 6, 6, 2);
+      $('mgInfo').textContent = over
+        ? (win ? '비행 성공! 링 ' + passed + '개 통과!\n탭(Z)해서 계속' : '추락… 드론은 무사하다.\n탭(Z) 다시 · B(X) 그만')
+        : '링 통과 ' + passed + '/' + target + '\n탭(또는 Z)하면 떠오른다 · B(X) 그만';
+    }, 16);
+  });
+}
+
+// 박자 맞추기: 움직이는 바늘이 금색 구간에 있을 때 탭. total번 시도, need번 성공하면 통과
+function playRhythm(label, total, need) {
+  return new Promise(resolve => {
+    const g = mgOpen();
+    let t = 0, tries, hits, zone, over, win, flash;
+    const newZone = () => { zone = 24 + Math.random() * 112; };
+    const reset = () => { tries = 0; hits = 0; over = false; win = false; flash = 0; newZone(); };
+    reset();
+    const finish = val => { mgClose(timer); resolve(val); };
+    MG.cancel = () => finish(false);
+    MG.dbg = () => ({ tries, hits, over, win });
+    MG.forceWin = () => finish(true);
+    const cursor = () => 80 + Math.sin(t / 22) * 68;
+    MG.tap = () => {
+      if (over) { if (win) finish(true); else reset(); return; }
+      const c = cursor();
+      const ok = Math.abs(c - zone) < 15;
+      if (ok) hits++; flash = ok ? 8 : -8;
+      sfx(ok ? 'hit' : 'miss');
+      tries++;
+      if (hits >= need) { over = true; win = true; sfx('win'); }
+      else if (tries >= total) { over = true; win = hits >= need; }
+      else newZone();
+    };
+    const timer = setInterval(() => {
+      t++;
+      if (!over && t % 32 === 0) sfx('tick');      // 박자를 잡아 주는 소리
+      g.fillStyle = '#241a2e'; g.fillRect(0, 0, 160, 200);
+      g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
+      g.fillText(label, 80, 30);
+      for (let i = 0; i < need; i++) { g.fillStyle = i < hits ? '#ffd166' : '#4a3f5a'; g.fillText('♪', 40 + i * 16, 56); }
+      // 바
+      g.fillStyle = '#3a3352'; g.fillRect(10, 110, 140, 14);
+      g.fillStyle = '#ffd166'; g.fillRect(zone - 14, 108, 28, 18);
+      const c = cursor();
+      g.fillStyle = flash > 0 ? '#7bd389' : flash < 0 ? '#ef6f6c' : '#ffffff';
+      if (flash > 0) flash--; if (flash < 0) flash++;
+      g.fillRect(c - 2, 102, 4, 30);
+      g.fillStyle = '#a79ec9'; g.fillText('금색 구간에서 탭!', 80, 150);
+      $('mgInfo').textContent = over
+        ? (win ? '완벽한 무대! (' + hits + '/' + need + ')\n탭(Z)해서 계속' : '아쉽다… (' + hits + '/' + need + ')\n탭(Z) 다시 · B(X) 그만')
+        : label + ' — 성공 ' + hits + '/' + need + ' · 시도 ' + tries + '/' + total + '\n탭(또는 Z) · B(X) 그만';
+    }, 16);
+  });
+}
+// 시세 타이밍: 금색 구간에서 탭 = +5천만, 놓치면 -5천만. 누적 +2.5억이면 성공
+function playPrice() {
+  return new Promise(resolve => {
+    const g = mgOpen();
+    let t = 0, sum = 0, zone = 80, flash = 0, over = false, shots = 0;
+    const newZone = () => { zone = 28 + Math.random() * 104; };
+    newZone();
+    const finish = val => { mgClose(timer); resolve(val); };
+    MG.cancel = () => finish(false);
+    MG.forceWin = () => finish(true);
+    MG.dbg = () => ({ sum, shots, over });
+    const cursor = () => 80 + Math.sin(t / 20) * 68;
+    MG.tap = () => {
+      if (over) { finish(true); return; }
+      const ok = Math.abs(cursor() - zone) < 15;
+      sum = Math.round((sum + (ok ? 0.5 : -0.5)) * 10) / 10;
+      shots++; flash = ok ? 8 : -8;
+      sfx(ok ? 'hit' : 'miss');
+      if (sum >= 2.5) { over = true; sfx('win'); } else newZone();
+    };
+    const timer = setInterval(() => {
+      t++;
+      if (!over && t % 32 === 0) sfx('tick');      // 박자를 잡아 주는 소리
+      g.fillStyle = '#1a2436'; g.fillRect(0, 0, 160, 200);
+      g.fillStyle = '#26406b';
+      for (let i = 0; i < 8; i++) g.fillRect(10 + i * 18, 158 - i * 5 - Math.sin(t / 30 + i) * 4, 12, 44);
+      g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
+      g.fillText('월곡 두산위브 실거래가', 80, 22);
+      g.font = 'bold 18px sans-serif';
+      g.fillStyle = sum >= 0 ? '#7bd389' : '#ef6f6c';
+      g.fillText((sum >= 0 ? '+' : '') + sum.toFixed(1) + '억', 80, 50);
+      g.fillStyle = '#3a3352'; g.fillRect(10, 108, 140, 14);
+      g.fillStyle = '#ffd166'; g.fillRect(zone - 14, 106, 28, 18);
+      const c = cursor();
+      g.fillStyle = flash > 0 ? '#7bd389' : flash < 0 ? '#ef6f6c' : '#ffffff';
+      if (flash > 0) flash--; if (flash < 0) flash++;
+      g.fillRect(c - 2, 100, 4, 30);
+      $('mgInfo').textContent = over
+        ? '누적 +2.5억 달성! 계속 보유합니다\n탭(Z)해서 계속'
+        : '금색에서 탭 = +5천만 / 놓치면 -5천만\n목표 +2.5억 · B(X) 그만';
+    }, 16);
+  });
+}
+// 리플릿 그리기 (퍼즐 원본이자 보상함 이미지)
+function drawLeaflet(g) {
+  g.fillStyle = '#f7f2e2'; g.fillRect(0, 0, 144, 144);
+  g.fillStyle = '#2f7a4f'; g.fillRect(0, 0, 144, 34);
+  g.fillStyle = '#ffffff'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center';
+  g.fillText('한국사회복지연구회', 72, 22);
+  const ppl = ['#ef6f6c', '#ffd166', '#7bd389', '#3f7fd9'];
+  ppl.forEach((c, i) => {
+    const x = 27 + i * 30;
+    g.fillStyle = c;
+    g.beginPath(); g.arc(x, 60, 9, 0, 7); g.fill();
+    g.fillRect(x - 10, 72, 20, 20);
+  });
+  g.fillStyle = '#ef6f6c';
+  g.beginPath(); g.arc(66, 114, 7, 0, 7); g.fill();
+  g.beginPath(); g.arc(79, 114, 7, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(59, 117); g.lineTo(72.5, 132); g.lineTo(86, 117); g.fill();
+  g.fillStyle = '#8a8272';
+  g.fillRect(14, 106, 32, 3); g.fillRect(14, 114, 32, 3); g.fillRect(14, 122, 24, 3);
+  g.fillRect(98, 106, 32, 3); g.fillRect(98, 114, 32, 3); g.fillRect(106, 122, 24, 3);
+  g.fillStyle = '#2f7a4f'; g.font = 'bold 10px sans-serif';
+  g.fillText('함께하는 복지', 72, 141);
+}
+// 리플릿 조각 퍼즐: 기울어진 조각을 탭해서 90도씩 돌려 바로 세우면 완성
+function playPuzzle() {
+  return new Promise(resolve => {
+    const g = mgOpen(), cvm = $('mgCv');
+    const art = document.createElement('canvas'); art.width = 144; art.height = 144;
+    drawLeaflet(art.getContext('2d'));
+    const CS = 48, X0 = 8, Y0 = 40;
+    let rot, cur = 4, over = false;
+    const reset = () => {
+      rot = Array.from({ length: 9 }, () => [1, 2, 3][Math.floor(Math.random() * 3)]);
+      rot[4] = 0; rot[1] = 0;   // 가운데·제목 일부는 바로 두어 기준이 되게
+      if (rot.every(r => r === 0)) rot[0] = 2;
+    };
+    reset();
+    const finish = val => { mgClose(timer); resolve(val); };
+    MG.cancel = () => finish(false);
+    MG.forceWin = () => finish(true);
+    MG.dbg = () => ({ rot: rot.join(''), over });
+    MG.dir = d => { if (over) return; if (d === 'left') cur = (cur + 8) % 9; else if (d === 'right') cur = (cur + 1) % 9; else if (d === 'up') cur = (cur + 6) % 9; else cur = (cur + 3) % 9; };
+    MG.tap = e => {
+      if (over) { finish(true); return; }
+      if (e && e.clientX !== undefined) {
+        const r = cvm.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width * 160, py = (e.clientY - r.top) / r.height * 200;
+        const cx = Math.floor((px - X0) / CS), cy = Math.floor((py - Y0) / CS);
+        if (cx < 0 || cx > 2 || cy < 0 || cy > 2) return;
+        cur = cy * 3 + cx;
+      }
+      rot[cur] = (rot[cur] + 1) % 4;
+      if (rot.every(r => r === 0)) over = true;
+    };
+    const timer = setInterval(() => {
+      g.fillStyle = '#241a2e'; g.fillRect(0, 0, 160, 200);
+      g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
+      g.fillText(over ? '리플릿 완성!' : '기울어진 조각을 바로 세우자', 80, 22);
+      for (let i = 0; i < 9; i++) {
+        const cx = i % 3, cy = (i / 3) | 0, x = X0 + cx * CS, y = Y0 + cy * CS;
+        g.save();
+        g.translate(x + CS / 2, y + CS / 2);
+        g.rotate(rot[i] * Math.PI / 2);
+        g.drawImage(art, cx * CS, cy * CS, CS, CS, -CS / 2, -CS / 2, CS, CS);
+        g.restore();
+        g.strokeStyle = over ? 'rgba(123,211,137,0.9)' : i === cur ? '#ffd166' : 'rgba(0,0,0,0.35)';
+        g.lineWidth = (i === cur && !over) ? 2 : 1;
+        g.strokeRect(x + 0.5, y + 0.5, CS - 1, CS - 1);
+      }
+      $('mgInfo').textContent = over
+        ? '「한국사회복지연구회」 리플릿 완성!\n탭(Z)해서 계속'
+        : '조각을 탭(Z)하면 90도씩 돈다 · 방향키로 칸 이동\nB(X) 그만';
+    }, 50);
+  });
+}
+$('mg').addEventListener('pointerdown', e => { e.preventDefault(); if (MG.tap) MG.tap(e); });
+
+// ----- HUD·저장·화면 -----
+function setHud() {
+  $('hudName').textContent = S.ch ? CH[S.ch].title : '—';
+  $('hudGoal').textContent = !quest ? '' : (S.q.finished ? '장면 완료!' : quest.goal(S.q));
+}
+function save() {
+  const d = { done: S.done, ending: S.ending, care: S.care };
+  if (S.ch && S.map) Object.assign(d, { ch: S.ch, hero: S.hero, map: S.map.id, x: S.px, y: S.py, dir: S.dir, q: S.q });
+  store.set(SAVE_KEY, d);
+}
+function showScreen(name) {
+  ['Title', 'Select', 'Menu', 'End', 'Lock', 'Gift'].forEach(n => $('scr' + n).classList.toggle('show', name === n.toLowerCase()));
+  S.screen = name; keysDown.clear(); held = null;
+  dpad.querySelectorAll('.k').forEach(k => k.classList.remove('on'));
+}
+function showTitle() {
+  $('btnContinue').disabled = !store.get(SAVE_KEY, null);
+  showScreen('title');
+}
+function chapterState(i) {
+  const c = CHAPTERS[i];
+  if (S.done[c.id]) return 'done';
+  for (let k = 0; k < i; k++) if (!S.done[CHAPTERS[k].id]) return 'locked';
+  return 'open';
+}
+function buildRoster() {
+  const r = $('roster'); r.innerHTML = '';
+  CHAPTERS.forEach((c, i) => {
+    const st = chapterState(i);
+    const b = document.createElement('button'); b.type = 'button';
+    const cv2 = document.createElement('canvas'); cv2.width = 16; cv2.height = 16;
+    const spr = c.id === 'c4' ? 'sjDress' : c.hero;
+    cv2.getContext('2d').drawImage(SPRITES[spr].down[0], 0, 0);
+    const nm = document.createElement('b'); nm.textContent = (i + 1) + '. ' + c.title;
+    const inProgress = S.ch === c.id && S.map && S.q && !S.q.finished && st !== 'done';
+    const tg = document.createElement('span');
+    tg.textContent = st === 'locked' ? '🔒 이전 장면을 먼저' : st === 'done' ? '완료 · 다시 보기' : inProgress ? '진행 중 · 이어서' : c.sub + ' · ' + F[c.hero].name + ' 시점';
+    b.append(cv2, nm, tg);
+    if (st === 'done') b.classList.add('done');
+    if (st === 'locked') { b.style.opacity = 0.45; b.disabled = true; }
+    else b.addEventListener('click', () => pickChapter(c.id));
+    r.appendChild(b);
+  });
+  $('btnEnding').style.display = S.done.c7 ? '' : 'none';
+  $('giftCount').textContent = rewardsOwned().length + '/' + REWARDS.length;
+  // 상담은 언제든 열린다(안내 문구는 상담 첫 화면에 있다)
+  $('btnCare').disabled = false;
+  $('btnCare').textContent = '마음결 상담 \ud83d\udcac';
+  $('careHint').textContent = '마음결 상담: 둘이 싸우면 꼭 해보세요. 평소 마음 돌보기도 있어요.';
+}
+function showSelect() { S.lock = false; buildRoster(); showScreen('select'); save(); }
+async function pickChapter(id) {
+  const resume = S.ch === id && S.map && S.q && !S.q.finished && !S.done[id];
+  await startHero(id, !resume);
+}
+async function startHero(id, fresh) {
+  S.ch = id; S.hero = CH[id].hero; quest = QUESTS[id];
+  if (fresh) { S.q = {}; quest.init(S.q); }
+  S.tint = null; S.focus = null; S.hideHero = false; S.lock = false; S.heroSpr = null;
+  showScreen('game'); fit(); setHud();
+  if (fresh) {
+    await goMap(quest.start.map, quest.start.x, quest.start.y, quest.start.dir, true);
+    if (quest.intro) { S.lock = true; await quest.intro(); S.lock = false; }
+  } else await goMap(S.map.id, S.px, S.py, S.dir, true);
+  setHud(); save();
+}
+async function finishQuest() {
+  S.q.finished = true; S.done[S.ch] = true; save(); setHud();
+  grantReward(S.ch);
+  toast('장면 완료!');
+  const n = CHAPTERS.filter(c => S.done[c.id]).length;
+  await say('', CH[S.ch].title + ' — 완료! (' + n + '/7)');
+  if (S.done.c7 && !S.ending) await say('', '일곱 장면이 모두 모였다.\n장면 선택 화면에서 「엔딩 보기」를 누르자.');
+  else if (n < 7) await say('', '다음 장면이 열렸다.');
+  showSelect();
+}
+function openMenu() {
+  const g = $('goalBox'); g.innerHTML = '';
+  const b = document.createElement('b'); b.textContent = CH[S.ch].title; g.appendChild(b);
+  g.appendChild(document.createElement('br'));
+  g.appendChild(document.createTextNode(S.q.finished ? '장면 완료!' : quest.goal(S.q)));
+  if (quest.hint) { g.appendChild(document.createElement('br')); const sm = document.createElement('small'); sm.style.color = 'var(--muted)'; sm.textContent = '힌트: ' + quest.hint(S.q); g.appendChild(sm); }
+  showScreen('menu');
+}
+function closeMenu() { showScreen('game'); }
+$('btnResume').addEventListener('click', closeMenu);
+$('btnSwitch').addEventListener('click', () => showSelect());
+$('btnRestartQuest').addEventListener('click', () => startHero(S.ch, true));
+$('btnToTitle').addEventListener('click', () => showTitle());
+$('btnEnding').addEventListener('click', () => playEnding());
+$('btnEndClose').addEventListener('click', async () => { S.care = true; save(); showSelect(); });
+$('btnNew').addEventListener('click', () => {
+  if (store.get(SAVE_KEY, null) && !confirm('저장된 진행을 지우고 처음부터 시작할까요?')) return;
+  S.done = {}; S.ch = null; S.hero = null; S.map = null; S.q = {}; S.ending = false; S.care = false; quest = null;
+  store.del(SAVE_KEY); showSelect();
+});
+$('btnContinue').addEventListener('click', () => {
+  const d = store.get(SAVE_KEY, null); if (!d) return;
+  S.done = d.done || {}; S.ending = !!d.ending; S.care = !!d.care;
+  if (d.ch && d.map && MAPS[d.map] && d.q && !d.q.finished && !S.done[d.ch]) {
+    S.ch = d.ch; S.hero = d.hero || CH[d.ch].hero; quest = QUESTS[d.ch]; S.q = d.q;
+    S.map = MAPS[d.map]; S.px = d.x; S.py = d.y; S.dir = d.dir || 'down';
+    startHero(d.ch, false);
+  } else showSelect();
+});
+
+// ----- 비밀번호 잠금 -----
+function buildPad(el, onKey) {
+  el.innerHTML = '';
+  ['1','2','3','4','5','6','7','8','9','','0','←'].forEach(k => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = k;
+    if (k === '') b.style.visibility = 'hidden';
+    else b.addEventListener('click', () => onKey(k));
+    el.appendChild(b);
+  });
+}
+let lockBuf = '';
+function lockDraw() { [...$('lockDots').children].forEach((d, i) => d.classList.toggle('on', i < lockBuf.length)); }
+function lockKey(k) {
+  const dots = $('lockDots'); dots.classList.remove('bad');
+  if (k === '←') { lockBuf = lockBuf.slice(0, -1); lockDraw(); return; }
+  if (lockBuf.length >= 4) return;
+  lockBuf += k; lockDraw();
+  if (lockBuf.length === 4) {
+    if (lockBuf === PASSWORD) { setTimeout(() => showTitle(), 200); }
+    else { void dots.offsetWidth; dots.classList.add('bad'); toastLock(); setTimeout(() => { lockBuf = ''; lockDraw(); }, 450); }
+  }
+}
+function toastLock() { const t = $('toast'); t.textContent = '앗, 다시 한 번!'; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); }
+
+function boot() {
+  fit();
+  const c = $('titleCv'), g = c.getContext('2d'); g.imageSmoothingEnabled = false;
+  g.drawImage(SPRITES.cw.down[0], 22, 8);
+  g.drawImage(SPRITES.sj.down[0], 50, 8);
+  g.fillStyle = '#ff8fb1'; g.fillRect(43, 12, 2, 2); g.fillRect(41, 10, 2, 2); g.fillRect(45, 10, 2, 2); g.fillRect(43, 8, 2, 4);
+  buildPad($('lockPad'), lockKey);
+  // 들어올 때마다 비밀번호를 묻는다(해제 상태를 기기에 남기지 않는다).
+  store.del('cs_unlock');
+  showScreen('lock');
+  requestAnimationFrame(loop);
+}
+
+// ===== 대사 =====
+const NPC_LINES = {
+  boss: ['결재는 두 번 읽고 올리세요.', '철우 씨, 요즘 일 잘하네.'],
+  coA: '두 분… 요즘 뭔가 있죠? 아, 아니면 말고요.',
+  civil: '등본 한 통이요. 어, 총각 친절하네.',
+  civil2: '이 서류가 맞는 건가 몰라…',
+  senior: '이 주민센터 선생님들이 아주 친절햐.',
+  runner: '한강은 역시 바람이죠. 드론 조심하시고요!',
+  fil: '허허. 우리 사위.',
+  mil: '우리 수지, 잘 부탁해요.',
+  officiant: '오늘의 주인공은 두 사람입니다.',
+  guestA: '신부가 너무 예쁘다!', guestB: '신랑 눈이 참 선하네.', guestC: '야외 결혼식은 처음인데, 바다가 다 하네.',
+  agent: '뷰 좋고, 관리 잘된 단지예요. 잘 사신 겁니다.'
+};
+const FRIEND_LINES = {
+  cw: ['수지야, 저녁 뭐 먹지?', '(예쁜 눈으로 웃는다)'],
+  sj: ['오빠, 나 오늘 좀 귀엽지?', '(귀여운 목소리로 콧노래)']
+};
+function markEnts(ids) { S.ents.forEach(e => { e.mark = e.kind === 'item' || ids.includes(e.id); }); }
+function got(msg) { toast(msg); setHud(); save(); }
+
+// ===== 장면 대본 =====
+const QUESTS = {};
+
+// --- 1. 처음 만난 날 (철우 · 장충동 주민센터) ---
+QUESTS.c1 = {
+  start: { map: 'office', x: 9, y: 6, dir: 'up' },
+  init(q) { q.stage = 0; },
+  goal(q) { return q.stage <= 1 ? '창구 쪽으로 가 보기 (왼쪽 위)' : q.stage === 2 ? '내 자리 컴퓨터에서 홍보 리플릿 만들기' : '설수지 주무관에게 리플릿 전해 주기'; },
+  hint(q) { return q.stage <= 1 ? '창구 앞줄(위쪽)로 걸어가면 상담 중인 목소리가 들린다.' : q.stage === 2 ? '창구 오른쪽 끝이 열려 있다. 그 틈으로 들어가 직원 자리 컴퓨터 앞에서 위를 보고 A.' : '어르신이 떠난 창구 앞(왼쪽)에 서서 위를 보고 A.'; },
+  async intro() {
+    await say('', '어느 봄날, 장충동 주민센터. 행정팀 오철우의 하루.');
+    await say('팀장님', '철우 씨. 복지팀 설수지 주무관이 부탁할 게 있다던데? 창구 쪽에 가 봐요.');
+    await say('철우', '복지팀… 설수지 주무관이 누구지?');
+    S.q.stage = 1; setHud(); this.marks();
+  },
+  marks() { const q = S.q; markEnts(q.stage === 3 ? ['sj'] : q.stage <= 1 ? ['senior'] : []); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'office', x: 4, y: 2, dir: 'down' } : null; },
+  async onStep(mapId, x, y) {
+    const q = S.q;
+    if (mapId !== 'office' || q.stage !== 1 || y !== 4 || x < 3 || x > 7) return;
+    S.lock = true;
+    await say('', '창구 앞. 어르신 한 분이 상담을 받고 계신다.');
+    await say('수지', '어르신~ 이 노인일자리는 주 3회고요, 댁에서 버스 한 번이면 가요.');
+    await say('어르신', '아이고, 그럼 나도 할 수 있겄네.');
+    await say('수지', '그럼요! 신청서는 제가 같이 봐 드릴게요. 천천히 오세요~');
+    await say('철우', '(목소리가… 귀엽다. 그리고 어르신께 진짜 다정하다.)');
+    const sn = findEnt('senior');
+    if (sn) { await say('어르신', '고마워요, 선생님. (총총)'); await walkEnt(sn, ['down', 'right', 'right', 'down']); sn.gone = true; }
+    await say('수지', '어! 행정팀 오철우 주무관님 맞죠? 부탁이 하나 있어서요.');
+    await say('수지', '한국사회복지연구회 홍보자료가 필요한데… 리플릿 만들 줄 아는 분이 철우 님뿐이래요.');
+    const i = await ask('철우', '(부탁을 받았다!)', ['맡겨 주세요. 오늘 안에 만들어 드릴게요', '어… 일정이 좀…', '리플릿이 뭐죠?']);
+    if (i === 0) await say('수지', '와, 시원시원하다! 감사해요!');
+    else if (i === 1) { await say('수지', '아… 바쁘시구나…'); await say('철우', '농담입니다! 바로 만들게요. (내가 왜 그랬지)'); }
+    else { await say('수지', '접는 홍보물이요! 후후.'); await say('철우', '(알면서 물어봤다. 바보냐 나는)'); }
+    q.stage = 2; setHud(); save(); QUESTS.c1.marks();
+    await say('', '창구 오른쪽 끝이 열려 있다. 직원 자리로 들어가 컴퓨터 앞에 앉자.');
+    S.lock = false;
+  },
+  interact(mapId, x, y, ch) {
+    if (mapId !== 'office' || (ch !== 'm' && ch !== 'd') || S.q.stage !== 2) return null;
+    return async () => {
+      await say('철우', '한국사회복지연구회 홍보 리플릿… 조각부터 바로 세우자.');
+      const win = await playPuzzle();
+      if (!win) { await say('철우', '음, 다시 해 보자. (컴퓨터 앞에서 A)'); return; }
+      S.q.stage = 3; setHud(); save(); QUESTS.c1.marks();
+      await say('철우', '완성! 우리 부서 역대급 리플릿이다. 가져다 드리자.');
+    };
+  },
+  friendTalk: {
+    sj: async e => {
+      const q = S.q;
+      if (q.stage === 3) {
+        await say('철우', '설수지 주무관님, 리플릿 완성했습니다.');
+        await say('수지', '벌써요?! …우와, 예쁘다. 연구회 분들이 진짜 좋아하시겠어요!');
+        await say('수지', '(일도 잘하고, 눈도 예쁘고, 말투도 다정하고…)');
+        await say('철우', '(칭찬받았다. 오늘 기분이 꽤 괜찮다.)');
+        await say('수지', '보답으로 제가 밀크커피 쏠게요! 자판기지만. 300원이지만.');
+        await say('', '이렇게 두 사람의 이야기가 시작됐다.');
+        await finishQuest();
+      } else if (q.stage === 2) await say(e.name, '리플릿 부탁드려요! 직원 자리는 창구 오른쪽 끝으로 돌아 들어오시면 돼요.');
+      else await say(e.name, '앗 주임님 ㅎㅎ 저 지금 민원업무 보고 있어요');
+    }
+  },
+  npcTalk: {
+    boss: async e => { await say(e.name, S.q.stage <= 1 ? '창구는 왼쪽 위요.' : '결재는 두 번 읽고 올리세요.'); }
+  }
+};
+
+// --- 2. 드론 데이트 (철우 · 한강공원) ---
+QUESTS.c2 = {
+  start: { map: 'hangang', x: 10, y: 9, dir: 'up' },
+  init(q) { q.stage = 0; },
+  goal(q) { return '수지에게 말 걸고 드론 날리기 (링 8개 통과)'; },
+  hint() { return '드론은 탭(Z)할 때마다 떠오르고, 가만두면 내려간다. 초록 기둥 사이 틈으로!'; },
+  async intro() {
+    await say('', '주말 오후, 한강공원. 철우가 아끼는 드론을 들고 나왔다.');
+    await say('철우', '(오늘은… 꼭 멋있는 모습을 보여 준다.)');
+    S.q.stage = 1; setHud(); this.marks();
+  },
+  marks() { markEnts(['sj']); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'hangang', x: 11, y: 8, dir: 'left' } : null; },
+  friendTalk: {
+    sj: async e => {
+      const q = S.q;
+      if (q.finished) { await say(e.name, '주임님 저 드론 잘 날리죠?'); return; }
+      if (!q.ready) {
+        await say('수지', '우와, 이게 그 드론이에요? 진짜 날아요?');
+        await say('철우', '그럼요. 강바람쯤은 껌입니다. (사실 조금 긴장된다)');
+        q.ready = true;
+      }
+      await say('수지', '날려 봐요, 날려 봐요!');
+      const win = await playDrone(8);
+      if (!win) { await say('수지', '앗… 그래도 멋있었어요! 한 번 더?'); return; }
+      await say('수지', '와아아! 진짜 잘 날린다!');
+      await say('철우', '(됐다. 오늘의 목표 달성.) 수지 씨도 해 볼래요?');
+      await say('', '(수지가 조종간을 잡았다. …의외로 철우보다 잘 날렸다.)');
+      await say('수지', '이거 재밌네요! 우리 다음에 또 날려요.');
+      await say('철우', '(다음이 생겼네.)');
+      await showPhoto('drone', '그날의 한강, 그리고 드론', 2000);
+      await say('', '해 질 무렵까지, 두 사람은 한강에서 웃었다.');
+      await finishQuest();
+    }
+  },
+  npcTalk: { runner: async e => { await say(e.name, '드론 데이트인가 봐요? 보기 좋네요!'); } }
+};
+
+// --- 3. 우리, 사귀자 (철우 · 장충동 원룸) ---
+QUESTS.c3 = {
+  start: { map: 'cwhome', x: 4, y: 5, dir: 'up' },
+  init(q) { q.stage = 0; },
+  goal() { return '수지 옆에서 마음 전하기'; },
+  hint() { return '소파 근처의 수지에게 A. 솔직한 마음이 제일 세다.'; },
+  async intro() {
+    await say('', '그 뒤로 계속 만남을 이어오던 어느 날. 오늘은 철우의 장충동 원룸에서 영화를 봤다.');
+    await say('', '영화는 끝났는데, 아무도 리모컨을 잡지 않는다.');
+    S.q.stage = 1; setHud(); this.marks();
+  },
+  marks() { markEnts(['sj']); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'cwhome', x: 2, y: 5, dir: 'right' } : null; },
+  friendTalk: {
+    sj: async e => {
+      const q = S.q;
+      if (q.finished) { await defaultTalk(e); return; }
+      await say('수지', '…영화 재밌었다. 그치?');
+      const i = await ask('철우', '(심장 소리가 들릴 것 같다. 뭐라고 하지?)', ['수지 씨랑 있으면 시간이 너무 빨라요', '라, 라면 먹을래요?', '(아무 말 없이 눈을 본다)']);
+      if (i === 0) await say('수지', '…나도요. 이상하게 안 지겨워.');
+      else if (i === 1) { await say('수지', '방금 먹었잖아요. 후후.'); await say('철우', '(바보냐 나는)'); }
+      else await say('수지', '…왜요. 왜 그렇게 봐요. (귀가 빨개졌다)');
+      await say('철우', '수지 씨.');
+      await say('수지', '…네.');
+      S.tint = 'rgba(255, 150, 180, 0.2)';
+      await say('', '…쪽.');
+      await say('', '(아주 짧고, 아주 긴 순간이었다)');
+      await say('철우', '우리… 사귀자.');
+      await say('수지', '…응.');
+      S.tint = null;
+      await say('', '그날이 2022년 10월 28일이었다.');
+      await finishQuest();
+    }
+  }
+};
+
+// --- 4. 결혼식 (철우 · 부산 목장원) ---
+QUESTS.c4 = {
+  start: { map: 'mokjang', x: 9, y: 11, dir: 'up' },
+  init(q) { q.stage = 0; },
+  goal(q) { return q.stage < 1 ? '버진로드를 따라 꽃 아치 앞으로 (위로 걷기)' : q.stage === 1 ? '장인어른의 색소폰 축주 (박자 맞추기)' : q.stage === 2 ? '철우의 축가: 내가 만일 (박자 맞추기)' : '성혼 선언'; },
+  hint() { return '박자 게임: 바늘이 금색 구간에 들어왔을 때 탭(Z). 8번 중 6번이면 성공.'; },
+  async intro() {
+    S.heroSpr = 'cwTux';
+    await say('', '2023년 10월 7일. 부산, 목장원. 바다가 보이는 야외 예식장.');
+    await say('', '흰 난간 너머로 배가 지나가고, 하객들이 자리에 앉았다.');
+    await say('철우', '(턱시도가 조금 조인다. 아니, 심장이 조이는 건가.)');
+    await showPhoto('venue', '2023년 10월 7일, 부산 목장원', 2000);
+    S.q.stage = 0; setHud(); this.marks();
+  },
+  marks() { markEnts([]); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'mokjang', x: 10, y: 5, dir: 'down', spr: 'sjDress' } : null; },
+  async onStep(mapId, x, y) {
+    const q = S.q;
+    if (mapId === 'mokjang' && q.stage === 0 && y === 5 && x >= 8 && x <= 11) {
+      S.lock = true;
+      await say('주례 선생님', '신랑 오철우 군과 신부 설수지 양의 결혼식을 시작하겠습니다.');
+      await say('', '(짝짝짝짝—)');
+      await say('주례 선생님', '먼저, 신부 아버님의 색소폰 축주가 있겠습니다.');
+      await say('장인어른', '험험. (색소폰을 든다)');
+      q.stage = 1; setHud(); save();
+      const win1 = await this.sax();
+      if (win1) await this.song();
+      S.lock = false;
+    }
+  },
+  async sax() {
+    const win = await playRhythm('장인어른의 색소폰 ♪', 8, 6);
+    if (!win) { await say('장인어른', '험, 다시 하지. 바다 바람 때문이야.'); const r = await this.sax(); return r; }
+    await say('', '(색소폰 소리가 바다 위로 길게 울려 퍼졌다)');
+    await say('', '하객들: 와아아— (기립 박수)');
+    await say('장인어른', '(수지를 보며 살짝 웃었다)');
+    S.q.stage = 2; setHud(); save();
+    return true;
+  },
+  async song() {
+    await say('주례 선생님', '다음은 신랑이 준비한 축가가 있겠습니다.');
+    await say('수지', '(오래 연습하던 그 노래다)');
+    await say('철우', '내가 만일… (안치환) 갑니다.');
+    const win = await playRhythm('철우의 축가 「내가 만일」 ♪', 8, 6);
+    if (!win) { await say('철우', '(헛기침) 마이크 탓입니다. 다시!'); const r = await this.song(); return r; }
+    await say('', '(수지의 눈가가 조금 붉어졌다)');
+    await say('수지', '…바보. 노래를 언제 연습했대.');
+    await say('주례 선생님', '신랑 오철우 군은 신부 설수지 양을 아내로 맞아 평생 아끼고 사랑하겠습니까?');
+    await say('철우', '네!!');
+    await say('주례 선생님', '신부 설수지 양은 신랑 오철우 군을 남편으로 맞아 평생 아끼고 사랑하겠습니까?');
+    await say('수지', '네에~!');
+    await say('주례 선생님', '두 사람이 부부가 되었음을 선언합니다!');
+    await say('', '(꽃가루, 박수, 바다, 그리고 두 사람)');
+    await showPhoto('wedding', '목장원 — 그날의 우리', 2000);
+    S.q.stage = 3;
+    await finishQuest();
+  },
+  npcTalk: {
+    fil: async e => { await say(e.name, S.q.stage < 1 ? '험험. (색소폰을 닦고 계신다)' : '우리 사위, 노래 좀 하던데?'); },
+    mil: async e => { await say(e.name, '우리 수지 예쁘지요? 잘 부탁해요, 정말로.'); }
+  }
+};
+
+// --- 5. 화해의 기술 (철우 · 성수동 신혼집) ---
+QUESTS.c5 = {
+  start: { map: 'sjhome', x: 6, y: 6, dir: 'up' },
+  init(q) { q.stage = 0; q.fails = 0; },
+  goal() { return '침실의 수지 달래기 (선택지를 잘 고르자)'; },
+  hint(q) { return q.fails ? '정답은 늘 같다: 서두르지 말고, 탓하지 말고, 구체적으로. 그리고 마지막은 손.' : '수지는 쉽게 안 풀린다. 다섯 번 중 네 번은 마음에 닿아야 한다.'; },
+  async intro() {
+    await say('', '수지의 성수동 오피스텔, 성수르하임. 층고 높은 이 집이 두 사람의 신혼집이 됐다.');
+    await showPhoto('loft', '성수르하임 — 층고 높은 우리 신혼집', 2000);
+    await say('', '…그런데 오늘은 공기가 낮다. 두 사람은 성격이 좀 다르고, 가끔 이런 날이 있다.');
+    await say('', '(무슨 일 때문인지는 중요하지 않다. 정말로.)');
+    await say('철우', '(화해는 자주 내가 먼저 한다. 그런데 수지 달래기는… 난이도가 높다.)');
+    S.q.stage = 1; setHud(); this.marks();
+  },
+  marks() { markEnts(['sj']); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'sjhome', x: 2, y: 2, dir: 'down' } : null; },
+  friendTalk: {
+    sj: async e => {
+      const q = S.q;
+      if (q.finished) { await defaultTalk(e); return; }
+      let ok = 0;
+      let i = await ask('철우', '(첫마디가 절반이다)', ['수지야, 아까는 미안해. 내 말이 짧았어', '뭐가 그렇게 서운한데?', '치킨 시킬까?']);
+      if (i === 0) { ok++; await say('수지', '…흥.'); } else if (i === 1) { await say('수지', '몰라서 물어?'); } else { await say('수지', '지금 치킨이 넘어가?'); }
+      i = await ask('철우', '(다음 한마디)', ['네 입장에서 먼저 생각을 못 했어', '나도 나름 힘들었거든?', '자자, 우리 착하지']);
+      if (i === 0) { ok++; await say('수지', '…그걸 알긴 아네.'); } else if (i === 1) { await say('수지', '지금 그 얘기가 왜 나와.'); } else { await say('수지', '애 취급하지 마.'); }
+      await say('수지', '…됐어.');
+      i = await ask('철우', '("됐어"의 번역은?)', ['안 됐다는 뜻. 더 들을게, 천천히 말해 줘', '그래, 그럼 좀 쉬어', '알았어, 나 게임한다?']);
+      if (i === 0) { ok++; await say('수지', '(조금 풀렸다) …있잖아. 나는 그때…'); await say('', '(수지의 이야기를 끝까지 들었다. 중간에 끼어들지 않고.)'); }
+      else if (i === 1) { await say('수지', '쉬라면 진짜 쉰다?'); } else { await say('수지', '…나가.'); }
+      i = await ask('철우', '(약속의 시간)', ['다음엔 그 상황에서 꼭 먼저 물어볼게. 약속', '내가 다 잘못했어 (영혼 1g)', '우리 이제 싸우지 말자!']);
+      if (i === 0) { ok++; await say('수지', '…구체적이네. 좋아, 기억한다?'); } else if (i === 1) { await say('수지', '영혼 없는 거 다 티 나거든.'); } else { await say('수지', '그게 마음대로 되니?'); }
+      i = await ask('철우', '(마무리)', ['(가만히 손을 내민다)', '셀카 찍자! 화해 기념', '장모님께 전화드릴까']);
+      if (i === 0) { ok++; await say('', '(수지가 잠깐 노려보다가… 손을 잡았다)'); } else { await say('수지', '분위기 파악.'); }
+      if (ok >= 4) {
+        await say('수지', '…치. 다음엔 진짜 잘해.');
+        await say('철우', '응. (오늘도 무사히 화해 완료)');
+        await say('', '화해는 자주 철우가 먼저 한다.');
+        await finishQuest();
+      } else {
+        q.fails++;
+        await say('수지', '…아직이야.');
+        await say('철우', '(다시. 서두르지 말자. 다시 말 걸어 보자.)');
+      }
+    }
+  }
+};
+
+// --- 6. 저녁 메뉴의 신 (수지 · 성수동 신혼집) ---
+QUESTS.c6 = {
+  start: { map: 'sjhome', x: 6, y: 6, dir: 'left' },
+  init(q) { q.stage = 0; q.round = 0; },
+  goal(q) { return '철우의 저녁 메뉴 맞추기 (' + (S.q.round || 0) + '/3연속)'; },
+  hint() { return '"아무거나"에는 늘 정답이 있다. 철우의 어제 메뉴와 말투를 떠올리자.'; },
+  async intro() {
+    await say('', '평화로운 평일 저녁의 성수동. 화가 안 난 날의 수지는… 철우에게 다 맞춰 준다.');
+    await showPhoto('street', '어느 주말의 성수동 거리', 2000);
+    await say('수지', '(맞춰 주는 게 아니라, 맞히는 거지. 나는 철우 메뉴 리더기니까.)');
+    S.q.stage = 1; setHud(); this.marks();
+  },
+  marks() { markEnts(['cw']); },
+  friendPos(fid) { return fid === 'cw' ? { map: 'sjhome', x: 1, y: 5, dir: 'right' } : null; },
+  friendTalk: {
+    cw: async e => {
+      const q = S.q;
+      if (q.finished) { await defaultTalk(e); return; }
+      const rounds = [
+        { say: '오늘 저녁? 아무거나~ 진짜 아무거나.', opts: ['제육볶음', '샐러드', '진짜 아무거나 시키기'], ans: 0,
+          right: '어떻게 알았지?! 제육 먹고 싶었는데.', wrong: '아무거나라니까… (시무룩)' },
+        { say: '어제 좀 느끼했잖아. 오늘은 음~ 알지?', opts: ['크림파스타', '얼큰한 짬뽕', '치즈돈까스'], ans: 1,
+          right: '그렇지!! 얼큰한 거!! 국물!!', wrong: '느끼했다니까?! 더 느끼한 걸?' },
+        { say: '오늘은 특별한 날이니까, 특별한 걸로.', opts: ['삼겹살', '구내식당', '수지가 먹고 싶은 거'], ans: 2,
+          right: '정답. 오늘 메뉴는 "네가 먹고 싶은 거"야.', wrong: '아니야~ 더 특별한 거.' }
+      ];
+      while (q.round < 3) {
+        const r = rounds[q.round];
+        await say('철우', r.say);
+        const i = await ask('수지', '(철우 번역기 가동…)', r.opts);
+        if (i === r.ans) { q.round++; setHud(); save(); await say('철우', r.right); await say('수지', '(후후. ' + q.round + '연속.)'); }
+        else { await say('철우', r.wrong); await say('수지', '(흠, 다시 스캔한다.)'); }
+      }
+      await say('수지', '오늘도 3연속 전승. 통산 한 1,000연승쯤 되려나?');
+      await say('철우', '수지 없으면 난 저녁을 못 정해…');
+      await say('', '화 안 난 날의 우리 집은, 대체로 이렇게 평화롭다.');
+      await finishQuest();
+    }
+  }
+};
+
+// --- 7. 내 집 마련 (철우 · 월곡 두산위브) ---
+QUESTS.c7 = {
+  start: { map: 'apt', x: 6, y: 7, dir: 'up' },
+  init(q) { q.stage = 0; },
+  goal(q) { return q.stage < 1 ? '이삿날 — 공인중개사와 이야기' : '거실 큰 창 앞에서 A — 시세 +2.5억 만들기'; },
+  hint() { return '큰 창(왼쪽 위 유리) 앞에서 위를 보고 A. 타이밍 게임: 금색에서 탭이면 +5천만, 놓치면 -5천만. 파는 게 아니라 계속 보유!'; },
+  async intro() {
+    await say('', '2025년 8월. 두 사람은 월곡 두산위브로 이사했다.');
+    await showPhoto('weve', '월곡 두산위브 — 2025년 8월', 2000);
+    await say('수지', '우리… 진짜 샀네? 우리 집이네?');
+    await say('철우', '응. 우리 집이야. (등기부등본을 세 번째 읽는 중)');
+    S.q.stage = 0; setHud(); this.marks();
+  },
+  marks() { const q = S.q; markEnts(q.stage < 1 ? ['agent'] : []); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'apt', x: 5, y: 6, dir: 'right' } : null; },
+  npcTalk: {
+    agent: async e => {
+      const q = S.q;
+      await say(e.name, '뷰 좋고, 단지 관리 잘되고. 두 분, 정말 잘 사신 거예요.');
+      if (q.stage < 1) { q.stage = 1; setHud(); save(); QUESTS.c7.marks(); await say('철우', '(그 말, 1년 뒤에도 유효하길.)'); }
+    }
+  },
+  interact(mapId, x, y, ch) {
+    if (mapId !== 'apt' || ch !== 'w' || S.q.stage < 1) return null;
+    return async () => {
+      await say('', '거실 큰 창 앞. 실거래가 알림이 울릴 때마다 두 사람은 여기 섰다.');
+      await say('수지', '오빠, 우리 파는 건 아니지만… 오르는 건 좋다?');
+      await say('철우', '응. 파는 게 아니라, 우리 집이 일을 잘하는 거야.');
+      const win = await playPrice();
+      if (!win) { await say('철우', '시세는 길게 보는 거야. 숨 고르고 다시. (창 앞에서 A)'); return; }
+      await say('', '2026년 8월. 매수가 대비 누적 +2.5억.');
+      await say('수지', '오빠!! 우리 집이 일했어!! +2.5억!!');
+      await say('철우', '집이 나보다 연봉이 높다…!');
+      await say('', '(둘은 거실에서 잠깐 춤을 췄다. 층간소음이 걱정돼서 아주 작게.)');
+      await say('수지', '그래도 우리, 계속 여기 살 거지?');
+      await say('철우', '당연하지. 여긴 우리 집이니까.');
+      await finishQuest();
+    };
+  }
+};
+
+// ===== 엔딩 =====
+async function playEnding() {
+  quest = { friendPos: fid => fid === 'sj' ? { map: 'apt', x: 5, y: 2, dir: 'up' } : null, hideNpc: () => true, goal: () => '' };
+  S.ch = 'c7'; S.hero = 'cw'; S.q = { finished: true };
+  showScreen('game'); fit(); setHud(); $('hudGoal').textContent = '';
+  S.tint = 'rgba(255, 150, 90, 0.2)'; S.focus = { x: 4, y: 3 };
+  await goMap('apt', 4, 2, 'up', true);
+  S.busy = true;
+  await say('', '저녁의 월곡두산아파트. 큰 창으로 노을이 든다.');
+  await say('수지', '오빠, 우리 처음 만난 날 기억나?');
+  await say('철우', '장충동 주민센터. 너 도와주다가 가까워졌지.');
+  await say('수지', '한강에서 드론 날리고, 장충동에서… 후후.');
+  await say('철우', '목장원에서 장인어른 색소폰에, 내 축가에.');
+  await say('수지', '성수동에서 투닥투닥하고, 화해하고. 저녁 메뉴는 내가 다 맞히고.');
+  await say('철우', '그리고 지금, 우리 집.');
+  await say('수지', '…잘 살고 있네, 우리.');
+  await say('철우', '응. 앞으로도 그럴 거야.');
+  await showPhoto('postcard', '두 사람은 지금도, 잘 살고 있습니다', 2000);
+  await fade(true);
+  const c = $('credits'); c.innerHTML = '';
+  const add = (t, cls) => { const pp = document.createElement('p'); pp.textContent = t; if (cls) pp.className = cls; pp.style.margin = '0 0 10px'; c.appendChild(pp); };
+  add(ERA);
+  add('철우 · 수지', 'names');
+  FINAL_MESSAGE.split('\n').forEach(l => add(l));
+  add('BGM: 평화로운 피아노 브금 · A hisa – Dreamin’');
+  add('— ' + MAKER + ' —');
+  add('★ 보상함에 마지막 추억이 들어왔습니다.');
+  add('마음결 상담도 잊지 마세요. 둘이 싸우면 꼭!');
+  grantReward('end');
+  S.tint = null; S.focus = null; quest = null;
+  S.ending = true; S.care = true; save();
+  showScreen('end');
+  $('fade').classList.remove('on'); S.busy = false;
+}
+
+// ----- 배경음악: 첫 터치/키 입력 뒤에 재생(브라우저 정책), 오른쪽 위 버튼으로 켜고 끔 -----
+const BGM_LIST = ['bgm1.mp3', 'bgm2.mp3'];   // 1: 평화로운 피아노 브금, 2: A hisa - Dreamin'
+const bgm = new Audio();
+bgm.volume = 0.35; bgm.preload = 'auto';
+let bgmIdx = 0, bgmOn = store.get('cs_bgm', true), bgmStarted = false;
+bgm.src = BGM_LIST[0];
+bgm.addEventListener('ended', () => { bgmIdx = (bgmIdx + 1) % BGM_LIST.length; bgm.src = BGM_LIST[bgmIdx]; bgmPlay(); });
+// ----- 효과음: 타이밍 게임용. 음원 파일 없이 웹오디오로 만든다.
+//   함수 선언이라 위쪽 미니게임에서도 부를 수 있고, 실제 호출은 부팅 뒤라 bgmOn 이 이미 정해져 있다.
+let sfxCtx = null;
+function sfxTone(t0, freq, freq2, type, vol, dur) {
+  const o = sfxCtx.createOscillator(), g = sfxCtx.createGain();
+  o.connect(g); g.connect(sfxCtx.destination);
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t0 + dur * 0.7);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function sfx(kind) {
+  if (!bgmOn) return;                       // 소리를 끈 상태면 효과음도 내지 않는다
+  try {
+    if (!sfxCtx) sfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (sfxCtx.state === 'suspended') sfxCtx.resume();
+    const t = sfxCtx.currentTime;
+    if (kind === 'hit') sfxTone(t, 880, 1320, 'triangle', 0.16, 0.16);
+    else if (kind === 'miss') sfxTone(t, 190, 90, 'sawtooth', 0.13, 0.20);
+    else if (kind === 'tick') sfxTone(t, 1250, 0, 'square', 0.04, 0.04);
+    else if (kind === 'win') [523, 659, 784, 1047].forEach((f, i) => sfxTone(t + i * 0.09, f, 0, 'triangle', 0.15, 0.22));
+  } catch (e) { /* 소리가 안 나도 게임은 그대로 돌아간다 */ }
+}
+
+function bgmBtn() { $('btnBgm').textContent = bgmOn ? '🔊' : '🔇'; }
+bgm.addEventListener('playing', () => { bgmStarted = true; });
+function bgmPlay() { if (!bgmOn) return; const p = bgm.play(); if (p && p.catch) p.catch(() => {}); }
+// 브라우저는 사용자 조작 중에만 첫 재생을 허용한다. 그런데 음원이 아직 안 받아졌거나
+// 조작이 인정되지 않으면 조용히 실패한다. 한 번 실패하고 포기하면 "껐다 켜야 소리가 난다".
+// 그래서 실제로 소리가 날 때까지, 조작이 있을 때마다 계속 다시 시도한다.
+function bgmNudge() {
+  if (sfxCtx && sfxCtx.state === 'suspended') sfxCtx.resume();   // 효과음 쪽도 같이 깨운다
+  if (!bgmOn || !bgm.paused) return;
+  bgmPlay();
+}
+['pointerdown', 'pointerup', 'touchend', 'keydown'].forEach(ev => window.addEventListener(ev, bgmNudge, true));
+$('btnBgm').addEventListener('click', e => {
+  e.stopPropagation();
+  bgmOn = !bgmOn; store.set('cs_bgm', bgmOn); bgmBtn();
+  if (bgmOn) bgmPlay(); else bgm.pause();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) bgm.pause(); else if (bgmOn && bgmStarted) bgmPlay(); });
+bgmBtn();
+
+// ===== 보상함 =====
+const REWARDS = [
+  { id: 'leaflet', ch: 'c1', name: '완성 리플릿', kind: 'draw', icon: '📄' },
+  { id: 'drone', ch: 'c2', name: '한강 드론 그림', kind: 'photo', icon: '🚁' },
+  { id: 'ticket', ch: 'c3', name: '2022.10.28 티켓', kind: 'draw', icon: '🎬' },
+  { id: 'venue', ch: 'c4', name: '목장원 풍경', kind: 'photo', icon: '🌊' },
+  { id: 'wedding', ch: 'c4', name: '결혼식 사진', kind: 'photo', icon: '💍' },
+  { id: 'loft', ch: 'c5', name: '성수르하임', kind: 'photo', icon: '🏠' },
+  { id: 'street', ch: 'c6', name: '성수동 거리', kind: 'photo', icon: '🌆' },
+  { id: 'weve', ch: 'c7', name: '월곡 두산위브', kind: 'photo', icon: '🏢' },
+  { id: 'postcard', ch: 'end', name: '우리의 엽서', kind: 'photo', icon: '💌' }
+];
+function rewardsOwned() { return store.get('cs_rewards', []); }
+function grantReward(chId) {
+  const owned = rewardsOwned();
+  REWARDS.filter(r => r.ch === chId && !owned.includes(r.id)).forEach(r => { owned.push(r.id); toast('🎁 보상 획득: ' + r.name); });
+  store.set('cs_rewards', owned);
+}
+function drawTicket(g) {
+  g.fillStyle = '#fff4d6'; g.fillRect(0, 0, 160, 110);
+  g.strokeStyle = '#c9a25c'; g.setLineDash([4, 3]); g.strokeRect(4.5, 4.5, 151, 101); g.setLineDash([]);
+  g.fillStyle = '#d94b4b'; g.fillRect(0, 0, 160, 26);
+  g.fillStyle = '#ffffff'; g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
+  g.fillText('CINEMA TICKET', 80, 17);
+  g.fillStyle = '#4a3a20'; g.font = 'bold 15px sans-serif';
+  g.fillText('2022. 10. 28.', 80, 52);
+  g.font = '11px sans-serif';
+  g.fillText('그날, 우리는 사귀기로 했다', 80, 74);
+  g.fillStyle = '#ff8fb1'; g.font = '14px sans-serif'; g.fillText('♥', 80, 94);
+}
+// 사진 키 → 표시 가능한 src (.bin 복호 → jpg → 없음)
+async function resolvePhotoSrc(key) {
+  try {
+    const res = await fetch('photos/' + key + '.bin');
+    if (res.ok) {
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const k2 = (PASSWORD + PASSWORD).split('').map(ch => ch.charCodeAt(0));
+      for (let i = 0; i < buf.length; i++) buf[i] ^= k2[i % k2.length] ^ ((i * 7) & 0xff);
+      return URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }));
+    }
+  } catch (e) { /* 다음 */ }
+  for (const ext of ['jpg', 'png']) {
+    const ok = await new Promise(r => { const im = new Image(); im.onload = () => r(true); im.onerror = () => r(false); im.src = 'photos/' + key + '.' + ext; });
+    if (ok) return 'photos/' + key + '.' + ext;
+  }
+  return null;
+}
+let viewerOpen = false;
+async function viewReward(r) {
+  const ph = $('photo'), img = $('photoImg'), cap = $('photoCap');
+  let src = null;
+  if (r.kind === 'draw') {
+    const c = document.createElement('canvas');
+    if (r.id === 'leaflet') { c.width = 288; c.height = 288; const g = c.getContext('2d'); g.scale(2, 2); drawLeaflet(g); }
+    else { c.width = 320; c.height = 220; const g = c.getContext('2d'); g.scale(2, 2); drawTicket(g); }
+    src = c.toDataURL();
+  } else src = await resolvePhotoSrc(r.id);
+  img.style.display = src ? '' : 'none'; if (src) img.src = src;
+  cap.textContent = r.name + (src ? '' : '\n(사진 파일이 아직 준비되지 않았어요)') + '\n— 탭하면 닫혀요 —';
+  viewerOpen = true;
+  ph.classList.add('on'); void ph.offsetWidth; ph.classList.add('show');
+}
+$('photo').addEventListener('pointerdown', () => {
+  if (!viewerOpen) return;
+  viewerOpen = false;
+  const ph = $('photo'); ph.classList.remove('show');
+  setTimeout(() => ph.classList.remove('on'), 380);
+});
+function buildGift() {
+  const grid = $('giftGrid'); grid.innerHTML = '';
+  const owned = rewardsOwned();
+  REWARDS.forEach(r => {
+    const b = document.createElement('button'); b.type = 'button';
+    const has = owned.includes(r.id);
+    const gi = document.createElement('span'); gi.className = 'gi'; gi.textContent = has ? r.icon : '🔒';
+    const nm = document.createElement('span'); nm.textContent = has ? r.name : (r.ch === 'end' ? '엔딩 보상' : (CH[r.ch] ? CH[r.ch].title : '') + ' 보상');
+    b.append(gi, nm);
+    if (has) { b.classList.add('own'); b.addEventListener('click', () => viewReward(r)); }
+    else b.disabled = true;
+    grid.appendChild(b);
+  });
+}
+$('btnGift').addEventListener('click', () => { buildGift(); showScreen('gift'); });
+$('btnGiftClose').addEventListener('click', () => showSelect());
+
+// ===== 마음결 상담 — 언제든 열 수 있는 두 사람의 상담실 =====
+// 마음톡(counsel-chat)과 같은 프록시. 대화는 이 기기(localStorage)에만 저장되고,
+// 보낼 때 최근 40개를 함께 보내 AI가 이어서 기억한다. 모드: 다툰 뒤 / 평소.
+const CARE_PROXY = 'https://stormy-cuttlefish-2376.woo-design22.deno.net';
+const CARE_TURNS = 40;
+const CARE_NAMES = { sj: '수지', cw: '철우' };
+const CARE_MODES = {
+  fight: { api: 'cbt', label: '다투고 난 뒤', hello: '많이 속상했겠어요. 생각을 같이 정리해 볼까요.\n오늘 마음이 크게 흔들렸던 순간 하나만 떠올려 주세요. 언제, 어디서, 무슨 일이 있었나요?' },
+  daily: { api: 'dbt', label: '평소 마음 돌보기', hello: '와 줘서 반가워요. 오늘 마음은 어땠나요?\n있었던 일 하나부터 편하게 들려주세요.' }
+};
+const CARE_NOTICE = '이 상담은 보통 20~30번 정도 주고받아요. 시작했다면 하루 안에 끝까지 마치는 게 좋아요.';
+const CARE_CRISIS = ['자살', '죽고 싶', '죽고싶', '죽어버리', '살기 싫', '살기싫', '자해', '손목', '목숨', '없어지고 싶', '사라지고 싶', '유서', '끝내고 싶', '끝내버리'];
+const CARE_HOTLINE = '혹시 지금 마음이 많이 위험하게 느껴진다면, 혼자 견디지 마세요.\n자살예방 상담전화 109 (24시간) · 정신건강 위기상담 1577-0199';
+const CARE = { who: null, mode: null, step: null, buf: '', first: '', busy: false };
+
+async function careHash(t) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('cs:' + t));
+  return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+function carePane(name) { ['careWho', 'carePw', 'careMode', 'careChat'].forEach(id => { $(id).style.display = id === name ? '' : 'none'; }); }
+function careDots() { const els = $('careDots').children; for (let i = 0; i < 4; i++) els[i].classList.toggle('on', i < CARE.buf.length); }
+function openCare() { $('care').classList.add('show'); CARE.who = null; CARE.mode = null; carePane('careWho'); }
+$('btnCare').addEventListener('click', openCare);
+$('careClose').addEventListener('click', () => $('care').classList.remove('show'));
+$('careBack').addEventListener('click', () => { CARE.who = null; carePane('careWho'); });
+$('careBack2').addEventListener('click', () => { CARE.who = null; carePane('careWho'); });
+document.querySelectorAll('#careWho [data-who]').forEach(b => b.addEventListener('click', () => carePick(b.dataset.who)));
+document.querySelectorAll('#careMode [data-mode]').forEach(b => b.addEventListener('click', () => { CARE.mode = b.dataset.mode; careEnterChat(); }));
+
+function carePick(who) {
+  CARE.who = who; CARE.buf = ''; CARE.first = '';
+  CARE.step = store.get('cs_pw_' + who, null) ? 'enter' : 'set1';
+  $('carePwMsg').textContent = CARE_NAMES[who] + (CARE.step === 'enter' ? '의 비밀번호 네 자리' : '의 새 비밀번호 네 자리를 정해 주세요');
+  careDots(); carePane('carePw');
+}
+function careShowMode() {
+  $('careModeHi').textContent = CARE_NAMES[CARE.who] + ', 오늘은 어떤 마음인가요?';
+  carePane('careMode');
+}
+async function careKey(k) {
+  if (!CARE.who) return;
+  if (k === '←') { CARE.buf = CARE.buf.slice(0, -1); careDots(); return; }
+  if (CARE.buf.length >= 4) return;
+  CARE.buf += k; careDots();
+  if (CARE.buf.length < 4) return;
+  const who = CARE.who, h = await careHash(CARE.buf);
+  if (CARE.step === 'set1') {
+    CARE.first = h; CARE.buf = ''; CARE.step = 'set2';
+    $('carePwMsg').textContent = '확인을 위해 한 번 더';
+    careDots(); return;
+  }
+  if (CARE.step === 'set2') {
+    if (h === CARE.first) { store.set('cs_pw_' + who, h); careShowMode(); }
+    else { CARE.step = 'set1'; CARE.buf = ''; $('carePwMsg').textContent = '달라요! 새 비밀번호 네 자리부터 다시'; careDots(); }
+    return;
+  }
+  if (h === store.get('cs_pw_' + who, '')) careShowMode();
+  else { CARE.buf = ''; $('carePwMsg').textContent = '앗, 다시 한 번!'; careDots(); }
+}
+function careChatKey() { return 'cs_chat_' + CARE.who + '_' + CARE.mode; }
+function careMsgs() { return store.get(careChatKey(), []); }
+function careSave(list) { store.set(careChatKey(), list.slice(-200)); }
+function careRender(liveText) {
+  const log = $('careLog'); log.innerHTML = '';
+  const add = (cls, text) => { const d = document.createElement('div'); d.className = 'careMsg ' + cls; d.textContent = text; log.appendChild(d); };
+  add('note', CARE_NAMES[CARE.who] + '의 상담실 — ' + CARE_MODES[CARE.mode].label + ' · 대화는 이 휴대폰에만 저장됩니다');
+  add('note', CARE_NOTICE);
+  const list = careMsgs();
+  if (!list.length) add('ai', CARE_MODES[CARE.mode].hello);
+  list.forEach(m => add(m.r === 'user' ? 'user' : m.r === 'crisis' ? 'crisis' : 'ai', m.t));
+  if (liveText !== undefined) add('ai', liveText || '…');
+  log.scrollTop = log.scrollHeight;
+}
+function careEnterChat() { carePane('careChat'); careRender(); $('careInput').value = ''; }
+
+async function careSend() {
+  if (CARE.busy) return;
+  const t = $('careInput').value.trim();
+  if (!t) return;
+  const list = careMsgs();
+  list.push({ r: 'user', t, ts: Date.now() });
+  if (CARE_CRISIS.some(w => t.includes(w))) list.push({ r: 'crisis', t: CARE_HOTLINE, ts: Date.now() });
+  careSave(list); $('careInput').value = ''; $('careInput').style.height = '';
+  CARE.busy = true; $('careSend').disabled = true;
+  careRender('');
+  try {
+    const hist = careMsgs().filter(m => m.r === 'user' || m.r === 'ai').slice(-CARE_TURNS)
+      .map(m => ({ role: m.r === 'user' ? 'user' : 'assistant', content: m.t }));
+    if (careMsgs().filter(m => m.r === 'ai').length === 0) hist.unshift({ role: 'assistant', content: CARE_MODES[CARE.mode].hello });
+    const res = await fetch(CARE_PROXY, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: CARE_MODES[CARE.mode].api, messages: hist })
+    });
+    if (!res.ok) throw new Error(res.status === 429 ? '너무 빠르게 여러 번 보냈어요. 잠시 뒤에 다시.' : '지금은 상담 서버가 응답하지 않아요. (' + res.status + ')');
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '', text = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const ln of lines) {
+        if (!ln.startsWith('data:')) continue;
+        const payload = ln.slice(5).trim();
+        if (!payload || payload === '[DONE]') continue;
+        try {
+          const j = JSON.parse(payload);
+          if (j.type === 'content_block_delta' && j.delta && j.delta.type === 'text_delta') { text += j.delta.text; careRender(text); }
+        } catch (e) { /* 다음 줄 */ }
+      }
+    }
+    const out = careMsgs();
+    out.push({ r: 'ai', t: text || '(응답을 받지 못했어요. 다시 한 번 보내 주세요.)', ts: Date.now() });
+    careSave(out);
+  } catch (err) {
+    const out = careMsgs();
+    const em = String(err.message || '');
+    out.push({ r: 'ai', t: /fetch|network/i.test(em) ? '상담 서버에 연결하지 못했어요. 인터넷 연결을 확인하고 다시 보내 주세요.' : (em || '연결에 실패했어요. 잠시 뒤 다시 시도해 주세요.'), ts: Date.now() });
+    careSave(out);
+  }
+  CARE.busy = false; $('careSend').disabled = false;
+  careRender();
+}
+// 길게 쓰면 입력칸이 따라 늘어난다(화면 45%까지). 보낸 뒤에는 기본 크기로 돌아온다.
+function careAutosize() {
+  const el = $('careInput');
+  el.style.height = 'auto';
+  const cap = Math.round(window.innerHeight * 0.45);
+  el.style.height = Math.min(el.scrollHeight + 4, cap) + 'px';
+}
+$('careInput').addEventListener('input', careAutosize);
+$('careSend').addEventListener('click', careSend);
+$('careInput').addEventListener('keydown', e => {
+  e.stopPropagation();
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); careSend(); }
+});
+buildPad($('carePad'), careKey);
+
+boot();
+if (/[?&]debug=1/.test(location.search)) window.NS = { S, MAPS, tick: now => { update(now); draw(); }, goMap, say, startHero, finishQuest, findEnt, MG, showPhoto, CARE, careSend, openCare };
+
+})();
+</script>
+
+
+</body></html>

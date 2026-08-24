@@ -143,6 +143,10 @@ button { font-family: inherit; }
 #careBody { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .carePane { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
 .careBtns { display: flex; gap: 12px; }
+.careTip {
+  background: var(--panel); border: 2px solid var(--accent); border-radius: 10px;
+  padding: 10px 14px; color: var(--accent); font-size: 13px; line-height: 1.5; text-align: center;
+}
 #careChat { justify-content: flex-start; padding: 0; }
 #careLog { flex: 1 1 auto; min-height: 0; overflow-y: auto; width: 100%; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
 .careMsg { max-width: 86%; padding: 10px 12px; border-radius: 14px; font-size: 15px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
@@ -342,6 +346,7 @@ button { font-family: inherit; }
     </div>
     <div id="careBody">
       <div id="careWho" class="carePane">
+        <p class="careTip">게임을 끝까지 완료한 뒤에 이용하시길 추천합니다.</p>
         <p>누구의 마음인가요?</p>
         <div class="careBtns">
           <button class="big" data-who="sj" type="button">수지</button>
@@ -1538,18 +1543,12 @@ function buildRoster() {
     r.appendChild(b);
   });
   $('btnEnding').style.display = S.done.c7 ? '' : 'none';
-  const got = rewardsOwned().length;
-  $('giftCount').textContent = got + '/' + REWARDS.length;
-  // 상담은 엔딩을 보고 보상함을 다 모아야 열린다
-  const careReady = careUnlocked();
-  $('btnCare').disabled = !careReady;
-  $('btnCare').textContent = careReady ? '마음결 상담 \ud83d\udcac' : '\ud83d\udd12 마음결 상담';
-  $('careHint').textContent = careReady
-    ? '마음결 상담: 둘이 싸우면 꼭 해보세요. 평소 마음 돌보기도 있어요.'
-    : '엔딩을 보고 보상함 ' + REWARDS.length + '개를 모두 모으면 열립니다. (지금 ' + got + '/' + REWARDS.length + ')';
+  $('giftCount').textContent = rewardsOwned().length + '/' + REWARDS.length;
+  // 상담은 언제든 열린다(안내 문구는 상담 첫 화면에 있다)
+  $('btnCare').disabled = false;
+  $('btnCare').textContent = '마음결 상담 \ud83d\udcac';
+  $('careHint').textContent = '마음결 상담: 둘이 싸우면 꼭 해보세요. 평소 마음 돌보기도 있어요.';
 }
-// 열림 조건을 한 곳에서만 정한다
-function careUnlocked() { return !!S.ending && rewardsOwned().length >= REWARDS.length; }
 function showSelect() { S.lock = false; buildRoster(); showScreen('select'); save(); }
 async function pickChapter(id) {
   const resume = S.ch === id && S.map && S.q && !S.q.finished && !S.done[id];
@@ -2192,7 +2191,7 @@ async function careHash(t) {
 }
 function carePane(name) { ['careWho', 'carePw', 'careMode', 'careChat'].forEach(id => { $(id).style.display = id === name ? '' : 'none'; }); }
 function careDots() { const els = $('careDots').children; for (let i = 0; i < 4; i++) els[i].classList.toggle('on', i < CARE.buf.length); }
-function openCare() { if (!careUnlocked()) return; $('care').classList.add('show'); CARE.who = null; CARE.mode = null; carePane('careWho'); }
+function openCare() { $('care').classList.add('show'); CARE.who = null; CARE.mode = null; carePane('careWho'); }
 $('btnCare').addEventListener('click', openCare);
 $('careClose').addEventListener('click', () => $('care').classList.remove('show'));
 $('careBack').addEventListener('click', () => { CARE.who = null; carePane('careWho'); });

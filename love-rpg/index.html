@@ -394,17 +394,17 @@ const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 // ----- 두 주인공 -----
 // pal: 스프라이트 색 교체표. s 피부, h 머리, t 윗옷, p 바지, b 신발, a 포인트(깃·무늬)
 const FRIENDS = [
-  { id: 'cw', name: '민준', tag: '회사원 3년차 · 매일 카페 봄날에 온다',
+  { id: 'cw', name: '민준', tag: '디자인 하는 회사원 · 늘 같은 자리에 앉는다',
     pal: { s: '#f1c7a3', h: '#2a2a30', t: '#4a7a5f', p: '#33415e', b: '#2b2b33', a: '#ffffff' } },
-  { id: 'sj', name: '서연', tag: '카페 알바 · 웃음이 많다', female: true,
+  { id: 'sj', name: '서연', tag: '카페 봄날의 바리스타 · 웃음이 많다', female: true,
     pal: { s: '#f7d3b3', h: '#6a4530', t: '#f2b8c6', p: '#7a6a9a', b: '#f4f4f4', a: '#fff4f7' } }
 ];
 const F = {}; FRIENDS.forEach(f => { F[f.id] = f; });
 
 // 다섯 장면 (순서대로 열림)
 const CHAPTERS = [
-  { id: 'c1', hero: 'cw', title: '포스터 한 장', sub: '골목 카페 봄날' },
-  { id: 'c2', hero: 'cw', title: '한강 드론 데이트', sub: '한강공원' },
+  { id: 'c1', hero: 'cw', title: '포스터 한 장', sub: '카페 봄날' },
+  { id: 'c2', hero: 'cw', title: '드론이 나는 날', sub: '강변 공원' },
   { id: 'c3', hero: 'cw', title: '우리, 사귈래요?', sub: '민준의 자취방' },
   { id: 'c4', hero: 'cw', title: '처음 서운했던 날', sub: '서연의 원룸' },
   { id: 'c5', hero: 'cw', title: '네 글자', sub: '바닷가 레스토랑' }
@@ -416,8 +416,8 @@ const NPC_PAL = {
   boss:    { s: '#f1c7a3', h: '#5a5a5a', t: '#6c6f7a', p: '#2e2e36', b: '#1e1e22', a: '#ffffff' },   // 팀장님
   coA:     { s: '#f1c7a3', h: '#2a2a2a', t: '#8a94a6', p: '#3a3a4a', b: '#2b2b33', a: '#ffffff' },   // 동료
   coB:     { s: '#f1c7a3', h: '#3a2a20', t: '#b8c9a6', p: '#5a4a3f', b: '#2b2b33', a: '#ffffff', female: true }, // 동료(여)
-  civil:   { s: '#e6b48f', h: '#777777', t: '#4c7a3f', p: '#3a3a3a', b: '#2b2b33', a: '#d9e8c9' },   // 민원인 아저씨
-  civil2:  { s: '#f1c7a3', h: '#8a8a8a', t: '#c95c8a', p: '#4a3a3a', b: '#2b2b33', a: '#ffffff', female: true }, // 민원인 아주머니
+  civil:   { s: '#e6b48f', h: '#777777', t: '#4c7a3f', p: '#3a3a3a', b: '#2b2b33', a: '#d9e8c9' },   // 손님 아저씨
+  civil2:  { s: '#f1c7a3', h: '#8a8a8a', t: '#c95c8a', p: '#4a3a3a', b: '#2b2b33', a: '#ffffff', female: true }, // 손님 아주머니
   fil:     { s: '#e6b48f', h: '#9a9a9a', t: '#3a3f52', p: '#2e2e36', b: '#1e1e22', a: '#ffd166' },   // 장인어른
   mil:     { s: '#f1c7a3', h: '#8a8a8a', t: '#d9b8c9', p: '#6b5a6a', b: '#2b2b33', a: '#ffffff', female: true }, // 장모님
   officiant:{ s: '#f1c7a3', h: '#4a4a4a', t: '#f4f4f4', p: '#2e2e36', b: '#1e1e22', a: '#3a3f52' },  // 주례
@@ -427,7 +427,7 @@ const NPC_PAL = {
   agent:   { s: '#f1c7a3', h: '#3a2a20', t: '#c95c8a', p: '#4a3a3a', b: '#2b2b33', a: '#ffffff', female: true }, // 중개인
   senior:  { s: '#e6c8a8', h: '#c9c9c9', t: '#8a6a4a', p: '#5a5a5a', b: '#2b2b33', a: '#d9c9a8' },   // 어르신
   runner:  { s: '#f1c7a3', h: '#2a2a2a', t: '#7bd389', p: '#3a3a4a', b: '#f4f4f4', a: '#ffffff' },   // 한강 러너
-  // 결혼식 예복 (철우 턱시도 / 수지 드레스)
+  // 프로포즈 예복 (민준 정장 / 서연 드레스)
   cwTux:   { s: '#f1c7a3', h: '#1c1c24', t: '#22242c', p: '#22242c', b: '#1e1e22', a: '#ffffff' },
   sjDress: { s: '#f7d3b3', h: '#4a2f24', t: '#ffffff', p: '#ffffff', b: '#ffffff', a: '#ffd166', female: true }
 };
@@ -623,7 +623,21 @@ const TILES = {
   'g': { name: '연두벽', solid: true }, '@': { name: '옥상', solid: true }, 'Y': { name: '주차차량', solid: true, over: true },
   'M': { name: '현금인출기', solid: true, over: true }, 'l': { name: '옷장', solid: true, over: true },
   '0': { name: '물', solid: true }, 'a': { name: '샐러드바', solid: true, over: true },
-  '1': { name: '꽃아치', solid: true, over: true }
+  '1': { name: '꽃아치', solid: true, over: true },
+  // --- 카페 봄날 ---
+  '2': { name: '에스프레소 머신', solid: true, over: true },
+  '3': { name: '디저트 쇼케이스', solid: true, over: true },
+  '4': { name: '원형 테이블', solid: true, over: true },
+  '5': { name: '벽 메뉴판', solid: true, over: true },
+  '6': { name: '거리 쪽 창', solid: true },
+  '7': { name: '주문 카운터', solid: true, over: true },
+  '8': { name: '관엽 화분', solid: true, over: true },
+  '9': { name: '창가 노트북 자리', solid: true, over: true },
+  'x': { name: '카페 벽', solid: true },
+  // --- 바닷가 레스토랑 ---
+  '$': { name: '바다 쪽 통유리', solid: true },
+  '*': { name: '촛불 테이블', solid: true, over: true },
+  '(': { name: '피아노', solid: true, over: true }
 };
 const ATLAS = {};
 (function buildAtlas() {
@@ -695,6 +709,69 @@ const ATLAS = {};
   def('l', g => { R(g, 0, 0, T, 16, '#a8825a'); R(g, 1, 1, 6, 14, '#8a6a42'); R(g, 9, 1, 6, 14, '#8a6a42'); R(g, 5, 7, 1, 2, '#ffd166'); R(g, 13, 7, 1, 2, '#ffd166'); R(g, 1, 1, 6, 1, '#6b4e2e'); R(g, 9, 1, 6, 1, '#6b4e2e'); });
   def('0', g => { R(g, 0, 0, T, T, '#7db8d9'); R(g, 0, 0, T, 2, '#a8d2e8'); for (let y = 4; y < T; y += 5) R(g, (y % 2) * 3, y, 10, 1, '#a8d2e8'); dots(g, 3, '#5a9ac0'); });
   def('1', g => { R(g, 0, 5, T, 4, '#e8f4e0'); R(g, 1, 4, 3, 3, '#ff8fb1'); R(g, 6, 5, 3, 3, '#ffd166'); R(g, 11, 4, 3, 3, '#ff8fb1'); R(g, 4, 7, 2, 2, '#7bd389'); R(g, 9, 7, 2, 2, '#7bd389'); R(g, 14, 6, 2, 2, '#ffffff'); });
+
+  // ===== 카페 봄날 =====
+  // 카페 벽: 위는 크림색, 아래는 나무 웨인스코팅
+  def('x', g => { R(g, 0, 0, T, T, '#e8d9c0'); R(g, 0, 0, T, 1, '#f2e6d4');
+    R(g, 0, 11, T, 5, '#c9a77f'); R(g, 0, 11, T, 1, '#a8865e'); });
+  // 에스프레소 머신: 은색 몸통 + 게이지 두 개 + 포터필터 + 잔
+  def('2', g => { R(g, 0, 0, T, T, '#e8d9c0'); R(g, 1, 2, 14, 11, '#c9ccd2'); R(g, 1, 2, 14, 2, '#e4e7ec');
+    R(g, 2, 5, 5, 4, '#3a3a44'); R(g, 3, 6, 3, 2, '#7bd389');
+    R(g, 9, 5, 5, 4, '#3a3a44'); R(g, 10, 6, 3, 2, '#ffd166');
+    R(g, 6, 9, 4, 2, '#8a8a94'); R(g, 6, 11, 4, 2, '#e8e0d0'); R(g, 7, 12, 2, 1, '#6b4226');
+    R(g, 0, 13, T, 3, '#7a5a3c'); });
+  // 디저트 쇼케이스: 유리 안에 크루아상·케이크·스콘
+  def('3', g => { R(g, 0, 0, T, T, '#e8d9c0'); R(g, 0, 2, T, 10, '#dbe9f0'); R(g, 0, 2, T, 1, '#8a9aa8');
+    R(g, 1, 4, 4, 3, '#e0a03a'); R(g, 6, 4, 4, 3, '#f2b8c6'); R(g, 11, 4, 4, 3, '#f4e8c1');
+    R(g, 0, 7, T, 1, '#a8c0cc');
+    R(g, 2, 8, 4, 3, '#c98b6b'); R(g, 8, 8, 5, 3, '#e8dfe2');
+    R(g, 0, 12, T, 4, '#7a5a3c'); R(g, 0, 12, T, 1, '#96714c'); });
+  // 원형 테이블 (위에서 본 모습): 둥근 상판 + 잔 하나. 다리는 그림자로만 암시한다
+  def('4', g => { R(g, 3, 13, 10, 2, 'rgba(90,60,30,0.35)');                       // 바닥 그림자
+    R(g, 4, 1, 8, 13, '#4e3824');                                                  // 짙은 호두나무 상판
+    R(g, 3, 2, 10, 11, '#4e3824'); R(g, 2, 4, 12, 7, '#4e3824');
+    R(g, 5, 2, 6, 11, '#6b4f33'); R(g, 4, 4, 8, 7, '#6b4f33');                     // 안쪽 밝은 면
+    R(g, 5, 2, 6, 1, '#8a6844');
+    R(g, 6, 6, 4, 4, '#f7f4ef'); R(g, 6, 6, 4, 1, '#ffffff'); R(g, 7, 7, 2, 2, '#c98b6b'); });
+  // 벽 메뉴판: 나무 테두리 칠판, 분홍 줄이 벚꽃 라떼
+  def('5', g => { R(g, 0, 0, T, T, '#e8d9c0'); R(g, 1, 1, 14, 14, '#5a4a3a'); R(g, 2, 2, 12, 12, '#2e3b33');
+    R(g, 3, 3, 8, 1, '#f4e8c1'); R(g, 3, 5, 9, 1, '#f4e8c1'); R(g, 3, 7, 7, 1, '#f4e8c1');
+    R(g, 3, 9, 9, 1, '#f2b8c6'); R(g, 3, 11, 6, 1, '#f4e8c1'); });
+  // 거리 쪽 창: 창밖에 가로수와 건물
+  def('6', g => { R(g, 0, 0, T, T, '#e9e2d3');
+    R(g, 1, 2, 14, 12, '#4f5a6a'); R(g, 2, 3, 12, 10, '#bfe0f2');
+    R(g, 10, 4, 4, 5, '#c9a27a'); R(g, 11, 5, 1, 1, '#8a7358'); R(g, 12, 7, 1, 1, '#8a7358');
+    R(g, 3, 5, 3, 4, '#5fae4a'); R(g, 4, 8, 1, 2, '#6b4226');
+    R(g, 2, 10, 12, 3, '#9aa0a6'); R(g, 8, 3, 1, 10, '#4f5a6a'); R(g, 2, 8, 12, 1, '#4f5a6a'); });
+  // 주문 카운터: 나무 몸통 + 상판
+  def('7', g => { R(g, 0, 2, T, 12, '#8a5f3c'); R(g, 0, 2, T, 3, '#a8794f'); R(g, 0, 5, T, 1, '#6b4226');
+    R(g, 2, 7, 5, 5, '#7a5232'); R(g, 9, 7, 5, 5, '#7a5232');
+    R(g, 0, 14, T, 2, '#5a3a22'); });
+  // 관엽 화분
+  def('8', g => { R(g, 5, 11, 6, 5, '#b5573f'); R(g, 4, 10, 8, 2, '#d9704f');
+    R(g, 7, 4, 2, 7, '#3d8a3f');
+    R(g, 2, 3, 5, 3, '#49a84f'); R(g, 9, 2, 5, 3, '#49a84f');
+    R(g, 3, 6, 4, 2, '#3d8a3f'); R(g, 9, 6, 4, 2, '#3d8a3f'); R(g, 6, 1, 4, 2, '#5cb15e'); });
+  // 창가 노트북 자리
+  def('9', g => { R(g, 4, 2, 8, 5, '#3a3a44'); R(g, 5, 3, 6, 3, '#bfe0f2');
+    R(g, 1, 7, 14, 3, '#a8794f'); R(g, 1, 7, 14, 1, '#c69a68'); R(g, 3, 7, 10, 1, '#8a8a94');
+    R(g, 2, 10, 2, 5, '#6b4226'); R(g, 12, 10, 2, 5, '#6b4226'); });
+
+  // ===== 바닷가 레스토랑 =====
+  // 바다 쪽 통유리
+  def('$', g => { R(g, 0, 0, T, T, '#3f5a72'); R(g, 1, 1, 14, 14, '#a8d2e8');
+    R(g, 1, 8, 14, 7, '#5f9fc4'); R(g, 2, 10, 6, 1, '#cfe8f4'); R(g, 8, 12, 6, 1, '#cfe8f4');
+    R(g, 1, 2, 5, 2, '#f4f8ff'); R(g, 7, 1, 1, 14, '#3f5a72'); R(g, 1, 7, 14, 1, '#3f5a72'); });
+  // 촛불 테이블 (하얀 테이블보 + 촛대)
+  def('*', g => { R(g, 6, 11, 4, 4, '#8a7358'); R(g, 4, 14, 8, 2, '#6b5a44');
+    R(g, 2, 5, 12, 6, '#f7f4ef'); R(g, 3, 4, 10, 2, '#ffffff'); R(g, 2, 10, 12, 1, '#ded7cc');
+    R(g, 7, 6, 2, 3, '#e8dfd0'); R(g, 7, 4, 2, 2, '#ffb84a'); R(g, 7, 3, 2, 1, '#ffe9a3');
+    R(g, 4, 8, 2, 2, '#c94b4b'); R(g, 10, 8, 2, 2, '#f2b8c6'); });
+  // 피아노 (연주 코너)
+  def('(', g => { R(g, 1, 4, 14, 9, '#2a2a33'); R(g, 1, 4, 14, 2, '#3f3f4c');
+    R(g, 2, 7, 12, 3, '#f4f4f4');
+    R(g, 3, 7, 1, 2, '#2a2a33'); R(g, 5, 7, 1, 2, '#2a2a33'); R(g, 8, 7, 1, 2, '#2a2a33'); R(g, 10, 7, 1, 2, '#2a2a33'); R(g, 12, 7, 1, 2, '#2a2a33');
+    R(g, 2, 13, 2, 3, '#1e1e26'); R(g, 12, 13, 2, 3, '#1e1e26'); });
   def('a', g => { R(g, 0, 3, T, 11, '#7a5a3c'); R(g, 0, 3, T, 2, '#a07a52'); R(g, 1, 6, 4, 4, '#7bd389'); R(g, 6, 6, 4, 4, '#ef6f6c'); R(g, 11, 6, 4, 4, '#ffd166'); R(g, 1, 11, 14, 2, '#5e4526'); });
 })();
 
@@ -702,89 +779,105 @@ const ATLAS = {};
 // rows: 글자 = TILES 키. exits: 그 칸을 밟으면 to 맵의 (tx,ty)로 이동(도착 칸은 출구가 아닌 칸으로 잡는다).
 // edge: 'bottom'이면 맨 아랫줄 전체가 출구(언덕↔동네 도로)
 const MAPS = {
-  office: { name: '골목 카페 「봄날」', base: 'F', rows: [
-    '||||||||||||||||||',
-    '|FFdmFFdmFFdmFFFB|',
-    '|FFFFFFFFFFFFFFFF|',
-    '|KKKKKKKKKKKKKFFF|',
-    '|FFFFFFFFFFFFFFFF|',
-    '|FCCFFCCFFCCFFFFi|',
-    '|FFFFFFFFFFFFFFFF|',
-    '|vFFFFFFFFFFFFFFi|',
-    '|||||||||D||||||||'
-  ], exits: [], signs: { '16,1': '메뉴판\n「이달의 추천: 벚꽃 라떼」' },
-  labels: [ { x: 6, y: 3, t: '민원 창구' }, { x: 9, y: 8, t: '정문' } ] },
+  // ===== 1. 카페 봄날 ===== 왼쪽이 카운터(바 뒤에 서연), 오른쪽이 창가 노트북 자리.
+  // 아래쪽 골목까지 한 맵에 넣어 세로 화면이 비지 않게 한다.
+  cafe: { name: '카페 봄날', base: 'f', rows: [
+    'xxxxxxxxxxxxxxxxxx',
+    'x5ff22ff33ffff66fx',
+    'xffffffffffffffffx',
+    'x77777777ffffffffx',
+    'xffffffffffffffffx',
+    'xf44ff44fff99ffifx',
+    'xffffffffffffffffx',
+    'x8fff44ffff44fff8x',
+    'xffffffffffffffffx',
+    'xxxxxxxxDxxxxxxxxx',
+    '__________________',
+    '__T_____L_____T___',
+    '__________________',
+    '==================',
+    '==================',
+    '__________________'
+  ], exits: [], signs: {
+    '1,1': '벽 메뉴판.\n아메리카노 · 라떼 · 그리고 분홍 글씨로 「벚꽃 라떼」.',
+    '11,5': '창가 노트북 자리. 민준이 늘 앉는 곳이다.'
+  },
+  labels: [ { x: 4, y: 3, t: '주문 카운터' }, { x: 12, y: 4, t: '창가 자리' }, { x: 8, y: 10, t: '골목' } ] },
 
-  hangang: { name: '한강공원', base: '.', rows: [
+  // ===== 2. 강변 공원 ===== 위는 강, 아래는 잔디밭. 드론 날릴 공터가 넓다
+  park: { name: '강변 공원', base: '.', rows: [
     '0000000000000000000000',
     '0000000000000000000000',
     'jjjjjjjjjjjjjjjjjjjjjj',
     '______________________',
     '......................',
-    '...C......C......C....',
-    '..........s...........',
-    '.T..........T.......T.',
-    '......,.......,.......',
-    '...L.............L....',
+    '..C.....,......,....C.',
     '......................',
+    '.T.......L....L......T',
+    '......................',
+    '..,.................,.',
+    '......s...............',
     '.t..................t.',
     'TTTTTTTTTTTTTTTTTTTTTT'
-  ], exits: [], signs: { '10,6': '드론 비행 가능 구역\n(초보 환영 · 새들 조심)' },
-  labels: [ { x: 10, y: 0, t: '한강' } ] },
+  ], exits: [], signs: { '6,10': '드론 비행 가능 구역\n(초보 환영 · 새들 조심)' },
+  labels: [ { x: 10, y: 0, t: '강' }, { x: 10, y: 3, t: '산책로' } ] },
 
-  cwhome: { name: '민준의 자취방', base: 'f', rows: [
+  // ===== 3. 민준의 자취방 ===== 좁지만 정리된 원룸
+  room: { name: '민준의 자취방', base: 'f', rows: [
     '||||||||||',
     '|eeffkkfi|',
     '|ffffffff|',
-    '|dCffffvf|',
+    '|dCffffff|',
     '|ffffffff|',
     '|offfrrff|',
     '|ffffffff|',
     '||||D|||||'
-  ], exits: [], signs: { '1,1': '민준의 침대. 이불이 그날따라 각 잡혀 있었다.' },
-  labels: [ { x: 4, y: 0, t: '장충동 원룸' } ] },
+  ], exits: [], signs: {
+    '1,1': '민준의 침대. 이불이 그날따라 각 잡혀 있었다.',
+    '5,1': '책장. 디자인 책 사이에 카페 쿠폰이 꽂혀 있다.',
+    '1,3': '작업 책상. 그 포스터를 여기서 만들었다.'
+  },
+  labels: [ { x: 4, y: 0, t: '민준의 방' } ] },
 
-  sjhome: { name: '서연의 원룸', base: 'f', rows: [
+  // ===== 4. 서연의 원룸 ===== 분리형, 주방이 오른쪽
+  sjroom: { name: '서연의 원룸', base: 'f', rows: [
     '||||||||||||||',
     '|eeff|kzzffff|',
-    '|ffff|fffffvf|',
+    '|ffff|fffffif|',
     '|ffffDfffffff|',
     '|ffffffrrffff|',
     '|offfffrrfffi|',
     '|ffffffffffff|',
     '||||||D|||||||'
-  ], exits: [], signs: { '2,1': '분리형 침실. 문이 있다는 것만으로 어른이 된 기분.' },
-  labels: [ { x: 2, y: 1, t: '침실' }, { x: 10, y: 1, t: '층고 3.4m ↑' } ] },
+  ], exits: [], signs: {
+    '2,1': '서연의 침실. 커튼이 반쯤 닫혀 있다.',
+    '7,1': '작은 주방. 드립 도구가 가지런하다.'
+  },
+  labels: [ { x: 2, y: 1, t: '침실' }, { x: 9, y: 1, t: '주방' } ] },
 
-  mokjang: { name: '바닷가 레스토랑 「첫눈」', base: 'F', rows: [
-    '00000000000000000000',
-    '00000000000000000000',
-    'jjjjjjjjjjjjjjjjjjjj',
-    'FFFFFFFFFFFFFFFFFFFF',
-    'FFFFFFFFP11PFFFFFFFF',
-    'FFFFFFFFFFFFFFFFFFFF',
-    'FFCCFCCFFFFFCCFCCFFF',
-    'FFCCFCCFFFFFCCFCCFFF',
-    'FFCCFCCFFFFFCCFCCFFF',
-    'FFFFFFFFFFFFFFFFFFFF',
-    'FFFFiFFFFFFFFFFiFFFF',
-    'FFFFFFFFFFFFFFFFFFFF',
-    'TTTTTTTTTTTTTTTTTTTT'
-  ], exits: [], signs: { '9,2': '부산 앞바다. 배가 지나간다.' },
-  labels: [ { x: 10, y: 1, t: '부산 앞바다' }, { x: 9, y: 4, t: '♥' }, { x: 10, y: 11, t: '목장원 야외 예식장' } ] },
-
-  apt: { name: '월곡 두산위브', base: 'f', rows: [
-    '||||||||||||',
-    '|wwffffffww|',
-    '|ffffffffff|',
-    '|eefffddfkf|',
-    '|ffffffffff|',
-    '|offfrrfffi|',
-    '|ffffffffff|',
-    '|ffzzffffvf|',
-    '||||||D|||||'
-  ], exits: [], signs: {},
-  labels: [ { x: 6, y: 0, t: '우리 집' } ] }
+  // ===== 5. 바닷가 레스토랑 「첫눈」 ===== 위가 통유리(바다), 창가에 촛불 테이블
+  sea: { name: '바닷가 레스토랑 「첫눈」', base: 'f', rows: [
+    '$$$$$$$$$$$$$$$$$$$$',
+    'ffffffffffffffffffff',
+    'ff**ffffffffffff**ff',
+    'ffffffffffffffffffff',
+    'ffffffff****ffffffff',
+    'ffffffffffffffffffff',
+    'ff**ffff****ffff**ff',
+    'ffffffffffffffffffff',
+    '((ffff**ffff**ffff8f',
+    'ffffffffffffffffffff',
+    'ff8ffffffffffffff8ff',
+    'ffffffffffffffffffff',
+    'xxxxxxxxxDxxxxxxxxxx',
+    '____________________',
+    '____________________',
+    '===================='
+  ], exits: [], signs: {
+    '9,0': '통유리 너머로 바다가 어둡게 빛난다. 배 한 척이 지나간다.',
+    '9,4': '창가 자리. 초가 두 개 켜져 있다.'
+  },
+  labels: [ { x: 10, y: 0, t: '바다' }, { x: 9, y: 3, t: '창가 자리' }, { x: 1, y: 8, t: '연주 코너' } ] }
 };
 // 맵 크기·바닥 캐시. 겹쳐 그리는 타일(over)의 바닥은 같은 줄에서 왼쪽으로 가장 가까운 '걸을 수 있는' 타일, 없으면 base
 Object.keys(MAPS).forEach(id => {
@@ -803,25 +896,24 @@ Object.keys(MAPS).forEach(id => {
 
 // 주변 사람들: 맵별 고정 NPC. talk는 대본에서 채움(없으면 기본 대사)
 const NPCS = {
-  office: [
+  cafe: [
     { id: 'boss', spr: 'boss', x: 2, y: 2, dir: 'down', name: '사장님' },
-    { id: 'coA', spr: 'coA', x: 10, y: 1, dir: 'down', name: '단골 손님' },
     { id: 'senior', spr: 'senior', x: 4, y: 4, dir: 'up', name: '할머니 손님' },
-    { id: 'civil', spr: 'civil', x: 16, y: 4, dir: 'up', name: '손님 아저씨' },
-    { id: 'civil2', spr: 'civil2', x: 2, y: 4, dir: 'up', name: '손님 아주머니' }
+    { id: 'coA', spr: 'coA', x: 13, y: 6, dir: 'up', name: '단골 손님' },
+    { id: 'civil', spr: 'civil', x: 3, y: 6, dir: 'up', name: '손님 아저씨' },
+    { id: 'civil2', spr: 'civil2', x: 7, y: 6, dir: 'up', name: '손님 아주머니' }
   ],
-  hangang: [ { id: 'runner', spr: 'runner', x: 17, y: 3, dir: 'left', name: '러너' } ],
-  cwhome: [],
-  sjhome: [],
-  mokjang: [
-    { id: 'fil', spr: 'fil', x: 4, y: 4, dir: 'right', name: '바이올린 연주자' },
-    { id: 'mil', spr: 'mil', x: 2, y: 5, dir: 'right', name: '매니저' },
-    { id: 'officiant', spr: 'officiant', x: 9, y: 3, dir: 'down', name: '지배인' },
-    { id: 'guestA', spr: 'guestA', x: 7, y: 9, dir: 'up', name: '하객' },
-    { id: 'guestB', spr: 'guestB', x: 12, y: 9, dir: 'up', name: '하객' },
-    { id: 'guestC', spr: 'guestC', x: 16, y: 5, dir: 'left', name: '하객' }
-  ],
-  apt: [ { id: 'agent', spr: 'agent', x: 8, y: 2, dir: 'down', name: '공인중개사' } ]
+  park: [ { id: 'runner', spr: 'runner', x: 17, y: 3, dir: 'left', name: '러너' } ],
+  room: [],
+  sjroom: [],
+  sea: [
+    { id: 'fil', spr: 'fil', x: 2, y: 9, dir: 'up', name: '피아노 연주자' },
+    { id: 'officiant', spr: 'officiant', x: 15, y: 11, dir: 'left', name: '지배인' },
+    { id: 'mil', spr: 'mil', x: 4, y: 11, dir: 'right', name: '홀 매니저' },
+    { id: 'guestA', spr: 'guestA', x: 3, y: 7, dir: 'up', name: '손님' },
+    { id: 'guestB', spr: 'guestB', x: 17, y: 7, dir: 'up', name: '손님' },
+    { id: 'guestC', spr: 'guestC', x: 9, y: 7, dir: 'up', name: '손님' }
+  ]
 };
 // 상대방 배치는 장면 대본(friendPos)이 정한다
 const HOME = {};
@@ -1069,12 +1161,23 @@ async function walkEnt(e, path) {
 
 // ----- 상호작용 -----
 const GENERIC_LOOK = {
-  d: '책상. 결재 서류가 얌전히 쌓여 있다.', m: '업무 포털. 새로고침해도 일은 줄지 않는다.', K: '민원 창구. 오늘도 평화롭기를.',
-  B: '메뉴판. 「이달의 추천: 벚꽃 라떼」', v: '원두 진열장. 좋은 향이 난다.', C: '의자.', i: '화분. 잘 자라고 있다.',
-  e: '침대. 이불이 폭신하다.', k: '책장. 나란히 꽂힌 두 사람의 책.', o: '소파. 두 사람 자리가 딱 정해져 있다.',
-  r: '러그. 발이 따뜻하다.', z: '조리대. 오늘 저녁은 뭐 먹지.', w: '큰 창. 뷰가 좋다.', D: '문.',
-  0: '물이 반짝인다.', j: '흰 난간. 바람이 좋다.', T: '나무.', t: '덤불.', L: '가로등.', ',': '꽃이 피었다.',
-  P: '아치 기둥.', 1: '꽃 장식. 오늘을 위해 준비했다.', '_': '산책로.'
+  '2': '에스프레소 머신. 아침마다 이 소리로 하루가 시작된다.',
+  '3': '디저트 쇼케이스. 크루아상이 오늘도 잘 나왔다.',
+  '4': '원형 테이블. 잔 자국이 동그랗게 남아 있다.',
+  '5': '벽 메뉴판.\n아메리카노 · 라떼 · 그리고 분홍 글씨로 「벚꽃 라떼」.',
+  '6': '거리 쪽 창. 골목에 사람이 지나간다.',
+  '7': '주문 카운터. 반질반질한 나무 상판.',
+  '8': '관엽 화분. 잎이 크다.',
+  '9': '창가 노트북 자리. 민준이 늘 앉는 곳이다.',
+  '$': '통유리 너머로 바다가 어둡게 빛난다.',
+  '*': '촛불 테이블. 초가 조용히 흔들린다.',
+  '(': '피아노. 오늘 밤은 연주가 있는 모양이다.',
+  d: '작업 책상. 그 포스터를 여기서 만들었다.', k: '책장. 디자인 책 사이에 카페 쿠폰이 꽂혀 있다.',
+  C: '의자.', i: '화분. 잘 자라고 있다.', e: '침대. 이불이 폭신하다.',
+  o: '소파. 두 사람 자리가 딱 정해져 있다.', r: '러그. 발이 따뜻하다.',
+  z: '작은 주방. 드립 도구가 가지런하다.', w: '큰 창. 뷰가 좋다.', D: '문.',
+  0: '강물이 반짝인다.', j: '흰 난간. 바람이 좋다.', T: '나무.', t: '덤불.',
+  L: '가로등.', ',': '꽃이 피었다.', '_': '산책로.', s: '안내판.'
 };
 function pressA() {
   if (MG.active) { if (MG.tap) MG.tap(); return; }
@@ -1360,78 +1463,44 @@ function playRhythm(label, total, need) {
     }, 16);
   });
 }
-// 시세 타이밍: 금색 구간에서 탭 = +5천만, 놓치면 -5천만. 누적 +2.5억이면 성공
-function playPrice() {
-  return new Promise(resolve => {
-    const g = mgOpen();
-    let t = 0, sum = 0, zone = 80, flash = 0, over = false, shots = 0;
-    const newZone = () => { zone = 28 + Math.random() * 104; };
-    newZone();
-    const finish = val => { mgClose(timer); resolve(val); };
-    MG.cancel = () => finish(false);
-    MG.forceWin = () => finish(true);
-    MG.dbg = () => ({ sum, shots, over });
-    const cursor = () => 80 + Math.sin(t / 20) * 68;
-    MG.tap = () => {
-      if (over) { finish(true); return; }
-      const ok = Math.abs(cursor() - zone) < 15;
-      sum = Math.round((sum + (ok ? 0.5 : -0.5)) * 10) / 10;
-      shots++; flash = ok ? 8 : -8;
-      sfx(ok ? 'hit' : 'miss');
-      if (sum >= 2.5) { over = true; sfx('win'); } else newZone();
-    };
-    const timer = setInterval(() => {
-      t++;
-      if (!over && t % 32 === 0) sfx('tick');      // 박자를 잡아 주는 소리
-      g.fillStyle = '#1a2436'; g.fillRect(0, 0, 160, 200);
-      g.fillStyle = '#26406b';
-      for (let i = 0; i < 8; i++) g.fillRect(10 + i * 18, 158 - i * 5 - Math.sin(t / 30 + i) * 4, 12, 44);
-      g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
-      g.fillText('월곡 두산위브 실거래가', 80, 22);
-      g.font = 'bold 18px sans-serif';
-      g.fillStyle = sum >= 0 ? '#7bd389' : '#ef6f6c';
-      g.fillText((sum >= 0 ? '+' : '') + sum.toFixed(1) + '억', 80, 50);
-      g.fillStyle = '#3a3352'; g.fillRect(10, 108, 140, 14);
-      g.fillStyle = '#ffd166'; g.fillRect(zone - 14, 106, 28, 18);
-      const c = cursor();
-      g.fillStyle = flash > 0 ? '#7bd389' : flash < 0 ? '#ef6f6c' : '#ffffff';
-      if (flash > 0) flash--; if (flash < 0) flash++;
-      g.fillRect(c - 2, 100, 4, 30);
-      $('mgInfo').textContent = over
-        ? '누적 +2.5억 달성! 계속 보유합니다\n탭(Z)해서 계속'
-        : '금색에서 탭 = +5천만 / 놓치면 -5천만\n목표 +2.5억 · B(X) 그만';
-    }, 16);
-  });
+// 포스터 그리기 (퍼즐 원본이자 보상함 이미지)
+function drawPoster(g) {
+  g.fillStyle = '#fff5f7'; g.fillRect(0, 0, 144, 144);
+  // 위아래 분홍 띠
+  g.fillStyle = '#f2b8c6'; g.fillRect(0, 0, 144, 30);
+  g.fillStyle = '#ffffff'; g.font = 'bold 16px sans-serif'; g.textAlign = 'center';
+  g.fillText('벚꽃 라떼', 72, 22);
+  // 잔
+  g.fillStyle = '#e8dfe2'; g.fillRect(46, 50, 52, 8);
+  g.fillStyle = '#ffffff'; g.fillRect(48, 58, 48, 50);
+  g.fillStyle = '#f7d9e0'; g.fillRect(52, 62, 40, 16);
+  g.fillStyle = '#c98b6b'; g.fillRect(52, 78, 40, 26);
+  // 하트 라떼아트
+  g.fillStyle = '#f2b8c6';
+  g.beginPath(); g.arc(66, 70, 6, 0, 7); g.fill();
+  g.beginPath(); g.arc(78, 70, 6, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(59, 73); g.lineTo(72, 86); g.lineTo(85, 73); g.fill();
+  // 잔 받침
+  g.fillStyle = '#e8dfe2'; g.fillRect(40, 108, 64, 6);
+  // 흩날리는 벚꽃잎
+  const petals = [[18, 44], [122, 52], [26, 96], [116, 100], [14, 68], [128, 78]];
+  g.fillStyle = '#ffc9d6';
+  petals.forEach(p => { g.beginPath(); g.arc(p[0], p[1], 5, 0, 7); g.fill(); });
+  g.fillStyle = '#ff9eb5';
+  petals.forEach(p => { g.fillRect(p[0] - 1, p[1] - 1, 2, 2); });
+  // 아래 문구
+  g.fillStyle = '#f2b8c6'; g.fillRect(0, 118, 144, 26);
+  g.fillStyle = '#ffffff'; g.font = 'bold 11px sans-serif';
+  g.fillText('봄 한정 · 3,900원', 72, 130);
+  g.font = 'bold 10px sans-serif';
+  g.fillText('카페 봄날', 72, 141);
 }
-// 리플릿 그리기 (퍼즐 원본이자 보상함 이미지)
-function drawLeaflet(g) {
-  g.fillStyle = '#f7f2e2'; g.fillRect(0, 0, 144, 144);
-  g.fillStyle = '#2f7a4f'; g.fillRect(0, 0, 144, 34);
-  g.fillStyle = '#ffffff'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center';
-  g.fillText('한국사회복지연구회', 72, 22);
-  const ppl = ['#ef6f6c', '#ffd166', '#7bd389', '#3f7fd9'];
-  ppl.forEach((c, i) => {
-    const x = 27 + i * 30;
-    g.fillStyle = c;
-    g.beginPath(); g.arc(x, 60, 9, 0, 7); g.fill();
-    g.fillRect(x - 10, 72, 20, 20);
-  });
-  g.fillStyle = '#ef6f6c';
-  g.beginPath(); g.arc(66, 114, 7, 0, 7); g.fill();
-  g.beginPath(); g.arc(79, 114, 7, 0, 7); g.fill();
-  g.beginPath(); g.moveTo(59, 117); g.lineTo(72.5, 132); g.lineTo(86, 117); g.fill();
-  g.fillStyle = '#8a8272';
-  g.fillRect(14, 106, 32, 3); g.fillRect(14, 114, 32, 3); g.fillRect(14, 122, 24, 3);
-  g.fillRect(98, 106, 32, 3); g.fillRect(98, 114, 32, 3); g.fillRect(106, 122, 24, 3);
-  g.fillStyle = '#2f7a4f'; g.font = 'bold 10px sans-serif';
-  g.fillText('함께하는 복지', 72, 141);
-}
-// 리플릿 조각 퍼즐: 기울어진 조각을 탭해서 90도씩 돌려 바로 세우면 완성
+// 포스터 조각 퍼즐: 기울어진 조각을 탭해서 90도씩 돌려 바로 세우면 완성
 function playPuzzle() {
   return new Promise(resolve => {
     const g = mgOpen(), cvm = $('mgCv');
     const art = document.createElement('canvas'); art.width = 144; art.height = 144;
-    drawLeaflet(art.getContext('2d'));
+    drawPoster(art.getContext('2d'));
     const CS = 48, X0 = 8, Y0 = 40;
     let rot, cur = 4, over = false;
     const reset = () => {
@@ -1460,7 +1529,7 @@ function playPuzzle() {
     const timer = setInterval(() => {
       g.fillStyle = '#241a2e'; g.fillRect(0, 0, 160, 200);
       g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
-      g.fillText(over ? '리플릿 완성!' : '기울어진 조각을 바로 세우자', 80, 22);
+      g.fillText(over ? '포스터 완성!' : '기울어진 조각을 바로 세우자', 80, 22);
       for (let i = 0; i < 9; i++) {
         const cx = i % 3, cy = (i / 3) | 0, x = X0 + cx * CS, y = Y0 + cy * CS;
         g.save();
@@ -1473,7 +1542,7 @@ function playPuzzle() {
         g.strokeRect(x + 0.5, y + 0.5, CS - 1, CS - 1);
       }
       $('mgInfo').textContent = over
-        ? '「한국사회복지연구회」 리플릿 완성!\n탭(Z)해서 계속'
+        ? '「벚꽃 라떼」 포스터 완성!\n탭(Z)해서 계속'
         : '조각을 탭(Z)하면 90도씩 돈다 · 방향키로 칸 이동\nB(X) 그만';
     }, 50);
   });
@@ -1629,17 +1698,16 @@ function boot() {
 
 // ===== 대사 =====
 const NPC_LINES = {
-  boss: ['오늘도 오셨네. 늘 앉던 자리 비워 놨어요.', '우리 서연이가 일을 참 잘해요.'],
+  boss: ['어서 와요. 늘 앉던 자리 비워 놨어요.', '우리 서연이가 일을 참 잘해요.'],
   coA: '이 카페 포스터 예쁘죠? 단골 손님이 만들었대요.',
-  civil: '여기 라떼가 그렇게 맛있다며?',
-  civil2: '신메뉴가 뭐가 좋을까…',
+  civil: '여기 벚꽃 라떼가 그렇게 맛있다며?',
+  civil2: '사진 찍기 좋은 카페라고 해서 왔어요.',
   senior: '이 집 아가씨가 아주 친절햐.',
-  runner: '한강은 역시 바람이죠. 드론 조심하시고요!',
-  fil: '(바이올린을 조율하고 있다)',
+  runner: '강바람이 좋죠. 드론 조심하시고요!',
+  fil: '(피아노 앞에서 손을 풀고 있다)',
   mil: '오늘 예약 손님이 특별한 준비를 하셨더라고요. 후후.',
   officiant: '창가 자리로 모시겠습니다.',
-  guestA: '어머, 저 테이블 뭔가 있다.', guestB: '반지다, 반지!', guestC: '박수 칠 준비 하자.',
-  agent: '뷰 좋은 집 필요하시면 언제든.'
+  guestA: '어머, 저 창가 테이블 뭔가 있다.', guestB: '초까지 켜 놨네.', guestC: '박수 칠 준비 하자.'
 };
 const FRIEND_LINES = {
   cw: ['서연 씨는 웃을 때 봄 같아요.', '(괜히 메뉴판만 본다)'],
@@ -1651,63 +1719,64 @@ function got(msg) { toast(msg); setHud(); save(); }
 // ===== 장면 대본 =====
 const QUESTS = {};
 
-// --- 1. 포스터 한 장 (민준 · 골목 카페 봄날) ---
+// --- 1. 포스터 한 장 (민준 · 카페 봄날) ---
 QUESTS.c1 = {
-  start: { map: 'office', x: 9, y: 6, dir: 'up' },
+  start: { map: 'cafe', x: 8, y: 7, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal(q) { return q.stage <= 1 ? '카운터 쪽으로 가 보기 (왼쪽 위)' : q.stage === 2 ? '구석 노트북 자리에서 신메뉴 포스터 만들기' : '서연 씨에게 포스터 전해 주기'; },
-  hint(q) { return q.stage <= 1 ? '카운터 앞줄(위쪽)로 걸어가면 목소리가 들린다.' : q.stage === 2 ? '카운터 오른쪽 끝이 열려 있다. 그 틈으로 들어가 노트북 앞에서 위를 보고 A.' : '할머니가 떠난 카운터 앞(왼쪽)에 서서 위를 보고 A.'; },
+  goal(q) { return q.stage <= 1 ? '주문 카운터 앞으로 가 보기 (왼쪽 위)' : q.stage === 2 ? '창가 노트북 자리에서 포스터 만들기 (오른쪽)' : '카운터의 서연에게 포스터 보여 주기'; },
+  hint(q) { return q.stage <= 1 ? '카운터 앞줄(위쪽)로 걸어가면 목소리가 들린다.' : q.stage === 2 ? '오른쪽 창가의 노트북 자리 앞에 서서 위를 보고 A.' : '할머니가 떠난 카운터 앞에 서서 위를 보고 A. 카운터 너머로도 말이 걸린다.'; },
+  marks() { const q = S.q; markEnts(q.stage === 3 ? ['sj'] : q.stage <= 1 ? ['senior'] : []); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'cafe', x: 4, y: 2, dir: 'down' } : null; },
   async intro() {
-    await say('', '어느 봄날 점심시간, 골목 카페 「봄날」. 회사원 민준의 단골 카페다.');
-    await say('사장님', '어서 와요. 늘 앉던 자리… 아 참, 저기 우리 알바생이 손님을 찾던데?');
+    await say('', '어느 봄날 점심시간, 골목 카페 「봄날」. 회사원 민준의 단골 가게다.');
+    await say('사장님', '어서 와요. 늘 앉던 창가 자리 비워 놨어요.');
+    await say('사장님', '아 참, 우리 알바생이 손님 찾던데? 카운터 쪽으로 가 봐요.');
     await say('민준', '(나를? 왜지?)');
     S.q.stage = 1; setHud(); this.marks();
   },
-  marks() { const q = S.q; markEnts(q.stage === 3 ? ['sj'] : q.stage <= 1 ? ['senior'] : []); },
-  friendPos(fid) { return fid === 'sj' ? { map: 'office', x: 4, y: 2, dir: 'down' } : null; },
   async onStep(mapId, x, y) {
     const q = S.q;
-    if (mapId !== 'office' || q.stage !== 1 || y !== 4 || x < 3 || x > 7) return;
+    if (mapId !== 'cafe' || q.stage !== 1 || y !== 4 || x < 3 || x > 7) return;
     S.lock = true;
-    await say('', '카운터 앞. 할머니 한 분이 메뉴판을 들고 계신다.');
+    await say('', '카운터 앞. 할머니 한 분이 메뉴판을 올려다보고 계신다.');
     await say('서연', '할머니~ 이건 덜 달고요, 이게 지난번에 드신 그거예요. 뜨겁게 해 드릴까요?');
     await say('할머니 손님', '아이고, 우리 아가씨가 내 입맛을 다 기억하네.');
     await say('서연', '단골이신걸요! 자리에 계시면 가져다 드릴게요~');
     await say('민준', '(목소리가… 봄 같다. 그리고 할머니께 진짜 다정하다.)');
     const sn = findEnt('senior');
-    if (sn) { await say('할머니 손님', '고마워요. (총총)'); await walkEnt(sn, ['down', 'right', 'right', 'down']); sn.gone = true; }
-    await say('서연', '어! 손님, 늘 노트북으로 디자인 하시던 분 맞죠? 부탁이 하나 있어서요.');
+    if (sn) { await say('할머니 손님', '고마워요. (총총)'); await walkEnt(sn, ['down', 'down', 'right', 'right']); sn.gone = true; }
+    await say('서연', '어! 저기, 늘 창가에서 노트북 하시는 분 맞죠? 부탁이 하나 있어서요.');
     await say('서연', '사장님이 신메뉴 포스터를 저더러 만들래요… 저 그림엔 진짜 자신 없거든요.');
     const i = await ask('민준', '(부탁을 받았다!)', ['맡겨 주세요. 오늘 안에 만들어 드릴게요', '어… 일정이 좀…', '신메뉴가 뭔데요?']);
     if (i === 0) await say('서연', '와, 시원시원하다! 감사해요!');
     else if (i === 1) { await say('서연', '아… 바쁘시구나…'); await say('민준', '농담입니다! 바로 만들게요. (내가 왜 그랬지)'); }
-    else { await say('서연', '벚꽃 라떼요! 예쁘죠. 후후.'); await say('민준', '(이름부터 봄이네.)'); }
+    else { await say('서연', '벚꽃 라떼요! 저기 분홍 글씨. 예쁘죠?'); await say('민준', '(이름부터 봄이네.)'); }
     q.stage = 2; setHud(); save(); QUESTS.c1.marks();
-    await say('', '카운터 오른쪽 끝이 열려 있다. 구석 노트북 자리로 들어가자.');
+    await say('', '늘 앉던 창가 자리로 돌아가 노트북을 열자.');
     S.lock = false;
   },
   interact(mapId, x, y, ch) {
-    if (mapId !== 'office' || (ch !== 'm' && ch !== 'd') || S.q.stage !== 2) return null;
+    if (mapId !== 'cafe' || ch !== '9' || S.q.stage !== 2) return null;
     return async () => {
       await say('민준', '벚꽃 라떼 포스터… 조각부터 바로 세우자.');
       const win = await playPuzzle();
-      if (!win) { await say('민준', '음, 다시 해 보자. (노트북 앞에서 A)'); return; }
+      if (!win) { await say('민준', '음, 다시 해 보자. (노트북 자리 앞에서 A)'); return; }
       S.q.stage = 3; setHud(); save(); QUESTS.c1.marks();
-      await say('민준', '완성! 이 골목 역대급 포스터다. 가져다 드리자.');
+      await say('민준', '완성! 이 골목 역대급 포스터다. 보여 주러 가자.');
     };
   },
   friendTalk: {
     sj: async e => {
       const q = S.q;
       if (q.stage === 3) {
-        await say('민준', '서연 씨, 포스터 완성했습니다.');
-        await say('서연', '벌써요?! …우와, 예쁘다. 사장님이 진짜 좋아하시겠어요!');
-        await say('서연', '(일도 잘하고, 매일 같은 자리에서 성실하고…)');
+        await say('민준', '서연 씨, 포스터 완성했어요.');
+        await say('서연', '벌써요?! …우와, 예쁘다. 벚꽃잎까지 날려 주셨네!');
+        await say('서연', '(그림도 잘 그리고, 매일 같은 자리에서 성실하고…)');
         await say('민준', '(칭찬받았다. 오늘 커피가 더 달다.)');
         await say('서연', '보답으로 내일 음료는 제가 쏠게요! 사장님 몰래는 아니고요.');
         await say('', '이렇게 두 사람의 봄이 시작됐다.');
         await finishQuest();
-      } else if (q.stage === 2) await say(e.name, '포스터 부탁드려요! 노트북 자리는 카운터 오른쪽 끝으로 돌아 들어오시면 돼요.');
+      } else if (q.stage === 2) await say(e.name, '포스터 부탁드려요! 편하게 창가 자리에서 하세요~');
       else await say(e.name, '주문 도와드릴까요? 오늘의 추천은 벚꽃 라떼!');
     }
   },
@@ -1716,11 +1785,11 @@ QUESTS.c1 = {
   }
 };
 
-// --- 2. 한강 드론 데이트 (민준 · 한강공원) ---
+// --- 2. 드론이 나는 날 (민준 · 강변 공원) ---
 QUESTS.c2 = {
-  start: { map: 'hangang', x: 10, y: 9, dir: 'up' },
+  start: { map: 'park', x: 10, y: 9, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal(q) { return '서연에게 말 걸고 드론 날리기 (링 8개 통과)'; },
+  goal() { return '서연에게 말 걸고 드론 날리기 (링 8개 통과)'; },
   hint() { return '드론은 탭(Z)할 때마다 떠오르고, 가만두면 내려간다. 초록 기둥 사이 틈으로!'; },
   async intro() {
     await say('', '몇 번의 커피와 몇 번의 수다 끝에, 첫 데이트. 민준이 아끼는 드론을 들고 나왔다.');
@@ -1728,11 +1797,11 @@ QUESTS.c2 = {
     S.q.stage = 1; setHud(); this.marks();
   },
   marks() { markEnts(['sj']); },
-  friendPos(fid) { return fid === 'sj' ? { map: 'hangang', x: 11, y: 8, dir: 'left' } : null; },
+  friendPos(fid) { return fid === 'sj' ? { map: 'park', x: 11, y: 8, dir: 'left' } : null; },
   friendTalk: {
     sj: async e => {
       const q = S.q;
-      if (q.finished) { await say(e.name, '민준 씨 저 드론 잘 날리죠?'); return; }
+      if (q.finished) { await say(e.name, '민준 씨, 저 드론 잘 날리죠?'); return; }
       if (!q.ready) {
         await say('서연', '우와, 이게 그 드론이에요? 진짜 날아요?');
         await say('민준', '그럼요. 강바람쯤은 껌입니다. (사실 조금 긴장된다)');
@@ -1746,27 +1815,27 @@ QUESTS.c2 = {
       await say('', '(서연이 조종간을 잡았다. …의외로 민준보다 잘 날렸다.)');
       await say('서연', '이거 재밌네요! 우리 다음에 또 날려요.');
       await say('민준', '(다음이 생겼네.)');
-      await showPhoto('drone', '그날의 한강, 그리고 드론', 2000);
-      await say('', '해 질 무렵까지, 두 사람은 한강에서 웃었다.');
+      await showPhoto('drone', '그날의 강변, 그리고 드론', 2000);
+      await say('', '해 질 무렵까지, 두 사람은 강가에서 웃었다.');
       await finishQuest();
     }
   },
   npcTalk: { runner: async e => { await say(e.name, '드론 데이트인가 봐요? 보기 좋네요!'); } }
 };
 
-// --- 3. 우리, 사귈래요? (민준 · 민준의 자취방) ---
+// --- 3. 우리, 사귈래요? (민준 · 자취방) ---
 QUESTS.c3 = {
-  start: { map: 'cwhome', x: 4, y: 5, dir: 'up' },
+  start: { map: 'room', x: 4, y: 5, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal() { return '서연 옆에서 마음 전하기'; },
-  hint() { return '소파 근처의 서연에게 A. 솔직한 마음이 제일 세다.'; },
+  goal() { return '소파의 서연 옆에서 마음 전하기'; },
+  hint() { return '왼쪽 소파 근처의 서연에게 A. 솔직한 마음이 제일 세다.'; },
   async intro() {
     await say('', '데이트를 이어오던 어느 저녁. 오늘은 민준의 자취방에서 영화를 봤다.');
     await say('', '영화는 끝났는데, 아무도 리모컨을 잡지 않는다.');
     S.q.stage = 1; setHud(); this.marks();
   },
   marks() { markEnts(['sj']); },
-  friendPos(fid) { return fid === 'sj' ? { map: 'cwhome', x: 2, y: 5, dir: 'right' } : null; },
+  friendPos(fid) { return fid === 'sj' ? { map: 'room', x: 2, y: 5, dir: 'right' } : null; },
   friendTalk: {
     sj: async e => {
       const q = S.q;
@@ -1791,9 +1860,9 @@ QUESTS.c3 = {
 
 // --- 4. 처음 서운했던 날 (민준 · 서연의 원룸) ---
 QUESTS.c4 = {
-  start: { map: 'sjhome', x: 6, y: 6, dir: 'up' },
+  start: { map: 'sjroom', x: 8, y: 6, dir: 'up' },
   init(q) { q.stage = 0; q.fails = 0; },
-  goal() { return '서연 달래기 (선택지를 잘 고르자)'; },
+  goal() { return '침실 앞의 서연 달래기 (선택지를 잘 고르자)'; },
   hint(q) { return q.fails ? '정답은 늘 같다: 서두르지 말고, 탓하지 말고, 구체적으로. 그리고 마지막은 손.' : '서연은 쉽게 안 풀린다. 다섯 번 중 네 번은 마음에 닿아야 한다.'; },
   async intro() {
     await say('', '사귄 지 백 일쯤 된 어느 날, 서연의 원룸. 오늘은 공기가 낮다.');
@@ -1802,7 +1871,7 @@ QUESTS.c4 = {
     S.q.stage = 1; setHud(); this.marks();
   },
   marks() { markEnts(['sj']); },
-  friendPos(fid) { return fid === 'sj' ? { map: 'sjhome', x: 2, y: 2, dir: 'down' } : null; },
+  friendPos(fid) { return fid === 'sj' ? { map: 'sjroom', x: 2, y: 2, dir: 'down' } : null; },
   friendTalk: {
     sj: async e => {
       const q = S.q;
@@ -1818,7 +1887,7 @@ QUESTS.c4 = {
       else if (i === 1) { await say('서연', '쉬라면 진짜 쉰다?'); } else { await say('서연', '…가.'); }
       i = await ask('민준', '(약속의 시간)', ['다음엔 늦을 것 같으면 미리 전화할게. 약속', '내가 다 잘못했어 (영혼 1g)', '우리 이제 싸우지 말자!']);
       if (i === 0) { ok++; await say('서연', '…구체적이네. 좋아, 기억한다?'); } else if (i === 1) { await say('서연', '영혼 없는 거 다 티 나거든.'); } else { await say('서연', '그게 마음대로 되니?'); }
-      i = await ask('민준', '(마무리)', ['(가만히 손을 내민다)', '셀카 찍자! 화해 기념', '내일 그 카페 갈까']);
+      i = await ask('민준', '(마무리)', ['(가만히 손을 내민다)', '셀카 찍자! 화해 기념', '내일 카페 갈까']);
       if (i === 0) { ok++; await say('', '(서연이 잠깐 노려보다가… 손을 잡았다)'); } else { await say('서연', '분위기 파악.'); }
       if (ok >= 4) {
         await say('서연', '…치. 다음엔 진짜 잘해.');
@@ -1836,44 +1905,44 @@ QUESTS.c4 = {
 
 // --- 5. 네 글자 (민준 · 바닷가 레스토랑) ---
 QUESTS.c5 = {
-  start: { map: 'mokjang', x: 9, y: 11, dir: 'up' },
+  start: { map: 'sea', x: 9, y: 11, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal(q) { return q.stage < 1 ? '창가 자리로 (위로 걷기)' : q.stage === 1 ? '악사의 바이올린 (박자 맞추기)' : q.stage === 2 ? '민준의 세레나데 (박자 맞추기)' : '네 글자'; },
+  goal(q) { return q.stage < 1 ? '창가 자리로 (위로 걷기)' : q.stage === 1 ? '연주자의 피아노 (박자 맞추기)' : q.stage === 2 ? '민준의 세레나데 (박자 맞추기)' : '네 글자'; },
   hint() { return '박자 게임: 바늘이 금색 구간에 들어왔을 때 탭(Z). 8번 중 6번이면 성공.'; },
   async intro() {
     S.heroSpr = 'cwTux';
     await say('', '이 년 뒤, 바닷가 레스토랑 「첫눈」. 민준이 한 달 전부터 예약한 곳이다.');
-    await say('', '주머니 속 작은 상자가 아까부터 무겁다.');
+    await say('', '통유리 너머로 어두운 바다가 반짝인다. 주머니 속 작은 상자가 아까부터 무겁다.');
     await say('민준', '(정장이 조금 조인다. 아니, 심장이 조이는 건가.)');
     S.q.stage = 0; setHud(); this.marks();
   },
   marks() { markEnts([]); },
-  friendPos(fid) { return fid === 'sj' ? { map: 'mokjang', x: 10, y: 5, dir: 'down', spr: 'sjDress' } : null; },
+  friendPos(fid) { return fid === 'sj' ? { map: 'sea', x: 10, y: 5, dir: 'up', spr: 'sjDress' } : null; },
   async onStep(mapId, x, y) {
     const q = S.q;
-    if (mapId === 'mokjang' && q.stage === 0 && y === 5 && x >= 8 && x <= 11) {
+    if (mapId === 'sea' && q.stage === 0 && y === 5 && x >= 8 && x <= 11) {
       S.lock = true;
       await say('지배인', '예약하신 창가 자리입니다. …준비는 말씀하신 대로 해 두었습니다.');
       await say('서연', '뭐야, 오늘 왜 이렇게 좋은 데야? 무슨 날이야?');
       await say('민준', '(아직 아니다. 침착하자.)');
-      await say('지배인', '먼저, 저희 악사의 연주가 있겠습니다.');
+      await say('지배인', '먼저, 오늘 밤 연주가 있겠습니다.');
       q.stage = 1; setHud(); save();
-      const win1 = await this.violin();
+      const win1 = await this.piano();
       if (win1) await this.song();
       S.lock = false;
     }
   },
-  async violin() {
-    const win = await playRhythm('악사의 바이올린 ♪', 8, 6);
-    if (!win) { await say('바이올린 연주자', '험, 다시 하겠습니다. 바닷바람 때문입니다.'); const r = await this.violin(); return r; }
-    await say('', '(바이올린 소리가 바다 위로 길게 울려 퍼졌다)');
-    await say('서연', '(뭔가 이상하다. 이 노래… 우리가 처음 같이 들은 곡이다.)');
+  async piano() {
+    const win = await playRhythm('연주자의 피아노 ♪', 8, 6);
+    if (!win) { await say('피아노 연주자', '험, 다시 하겠습니다. 바닷바람 때문입니다.'); const r = await this.piano(); return r; }
+    await say('', '(피아노 소리가 통유리 너머 바다까지 흘러갔다)');
+    await say('서연', '(뭔가 이상하다. 이 곡… 우리가 처음 같이 들은 노래다.)');
     S.q.stage = 2; setHud(); save();
     return true;
   },
   async song() {
     await say('민준', '서연아. 나 사실… 노래 하나 연습했어.');
-    await say('서연', '뭐? 여기서? (주변 손님들이 슬금슬금 쳐다본다)');
+    await say('서연', '뭐? 여기서? (주변 테이블이 슬금슬금 쳐다본다)');
     const win = await playRhythm('민준의 세레나데 ♪', 8, 6);
     if (!win) { await say('민준', '(헛기침) 마이크 탓입니다. 다시!'); const r = await this.song(); return r; }
     await say('', '(노래가 끝나고, 민준이 한쪽 무릎을 꿇었다)');
@@ -1890,23 +1959,24 @@ QUESTS.c5 = {
     await finishQuest();
   },
   npcTalk: {
-    fil: async e => { await say(e.name, S.q.stage < 1 ? '(바이올린을 조율하고 있다)' : '좋은 밤입니다.'); },
+    fil: async e => { await say(e.name, S.q.stage < 1 ? '(피아노 앞에서 손을 풀고 있다)' : '좋은 밤입니다.'); },
     mil: async e => { await say(e.name, '오늘 두 분, 그림 같네요.'); }
   }
 };
 
 // ===== 엔딩 =====
 async function playEnding() {
-  quest = { friendPos: fid => fid === 'sj' ? { map: 'hangang', x: 11, y: 8, dir: 'left' } : null, hideNpc: () => true, goal: () => '' };
+  quest = { friendPos: fid => fid === 'sj' ? { map: 'cafe', x: 4, y: 2, dir: 'down' } : null, hideNpc: id => id !== 'boss', goal: () => '' };
   S.ch = 'c5'; S.hero = 'cw'; S.q = { finished: true };
   showScreen('game'); fit(); setHud(); $('hudGoal').textContent = '';
-  S.tint = 'rgba(255, 170, 90, 0.18)'; S.focus = { x: 10, y: 8 };
-  await goMap('hangang', 10, 9, 'up', true);
+  S.tint = 'rgba(255, 170, 120, 0.16)'; S.focus = { x: 6, y: 4 };
+  await goMap('cafe', 5, 4, 'up', true);
   S.busy = true;
-  await say('', '몇 달 뒤, 다시 한강. 두 사람이 청첩장을 들고 걷는다.');
+  await say('', '몇 달 뒤, 다시 카페 봄날. 두 사람이 청첩장을 들고 왔다.');
   await say('서연', '있잖아, 우리 처음 만난 날 기억나?');
-  await say('민준', '카페 봄날. 포스터 만들어 달라던 날.');
-  await say('서연', '한강에서 드론 날리고, 네 방에서 영화 보고.');
+  await say('민준', '바로 여기. 포스터 만들어 달라던 날.');
+  await say('사장님', '아이고, 그 포스터! 아직도 저기 붙어 있어요.');
+  await say('서연', '강변에서 드론 날리고, 네 방에서 영화 보고.');
   await say('민준', '백 일째엔 크게 싸우고… 화해하는 법부터 배웠지.');
   await say('서연', '그리고 그 레스토랑. 네 글자.');
   await say('민준', '다섯 글자라며.');
@@ -1986,8 +2056,8 @@ bgmBtn();
 
 // ===== 보상함 =====
 const REWARDS = [
-  { id: 'leaflet', ch: 'c1', name: '벚꽃 라떼 포스터', kind: 'draw', icon: '🖼' },
-  { id: 'drone', ch: 'c2', name: '한강 드론의 기억', kind: 'photo', icon: '🚁' },
+  { id: 'poster', ch: 'c1', name: '벚꽃 라떼 포스터', kind: 'draw', icon: '🖼' },
+  { id: 'drone', ch: 'c2', name: '강변 드론의 기억', kind: 'photo', icon: '🚁' },
   { id: 'ticket', ch: 'c3', name: '그날 본 영화표', kind: 'draw', icon: '🎬' },
   { id: 'sorry', ch: 'c4', name: '화해의 손', kind: 'photo', icon: '🤝' },
   { id: 'ring', ch: 'c5', name: '네 글자의 반지', kind: 'photo', icon: '💍' },
@@ -2034,7 +2104,7 @@ async function viewReward(r) {
   let src = null;
   if (r.kind === 'draw') {
     const c = document.createElement('canvas');
-    if (r.id === 'leaflet') { c.width = 288; c.height = 288; const g = c.getContext('2d'); g.scale(2, 2); drawLeaflet(g); }
+    if (r.id === 'poster') { c.width = 288; c.height = 288; const g = c.getContext('2d'); g.scale(2, 2); drawPoster(g); }
     else { c.width = 320; c.height = 220; const g = c.getContext('2d'); g.scale(2, 2); drawTicket(g); }
     src = c.toDataURL();
   } else src = await resolvePhotoSrc(r.id);

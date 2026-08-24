@@ -1371,7 +1371,7 @@ function mgOpen() {
 }
 function mgClose(timer) { MG.active = false; MG.tap = MG.cancel = null; clearInterval(timer); $('mg').classList.remove('show'); }
 
-// 드론 비행: 탭하면 떠오르고, 놓으면 내려간다. 링 8개를 통과하면 성공
+// 드론 비행: 탭하면 떠오르고, 놓으면 내려간다. 링 5개를 통과하면 성공(데모 난이도)
 function playDrone(target) {
   return new Promise(resolve => {
     const g = mgOpen();
@@ -1789,7 +1789,7 @@ QUESTS.c1 = {
 QUESTS.c2 = {
   start: { map: 'park', x: 10, y: 9, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal() { return '서연에게 말 걸고 드론 날리기 (링 8개 통과)'; },
+  goal() { return '서연에게 말 걸고 드론 날리기 (링 5개 통과)'; },
   hint() { return '드론은 탭(Z)할 때마다 떠오르고, 가만두면 내려간다. 초록 기둥 사이 틈으로!'; },
   async intro() {
     await say('', '몇 번의 커피와 몇 번의 수다 끝에, 첫 데이트. 민준이 아끼는 드론을 들고 나왔다.');
@@ -1808,7 +1808,7 @@ QUESTS.c2 = {
         q.ready = true;
       }
       await say('서연', '날려 봐요, 날려 봐요!');
-      const win = await playDrone(8);
+      const win = await playDrone(5);
       if (!win) { await say('서연', '앗… 그래도 멋있었어요! 한 번 더?'); return; }
       await say('서연', '와아아! 진짜 잘 날린다!');
       await say('민준', '(됐다. 오늘의 목표 달성.) 서연 씨도 해 볼래요?');

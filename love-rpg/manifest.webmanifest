@@ -1,0 +1,16 @@
+{
+  "name": "봄날, 두 사람",
+  "short_name": "봄날, 두 사람",
+  "description": "장충동 주민센터에서 시작된 두 사람의 이야기 — 모바일 도트 RPG",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1b1a2e",
+  "theme_color": "#1b1a2e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

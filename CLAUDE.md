@@ -26,7 +26,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `europe-rpg/index.html` — 「우리가족 유럽여행」: 부모님·동생과 다녀온 여행을 일곱 장면으로 만든 세 번째 도트 RPG.
   장면마다 아주 쉬운 미니게임(탭 하나)과 실제 사진 한 장. 4자리 잠금(코드의 `PASSWORD`), 복구 코드, 보상함(추억 사진).
   웹 게시용 — https://woo-design22.github.io/europe-rpg/ (대문 미게재)
-- **세 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`)는 같은 엔진을 공유한다.**
+- `iso-faces/index.html` — 「격리실의 얼굴들」: 머리만 남은 사람이 몸을 얻었다 빼앗기는 SF 단편을
+  **1인칭 3D RPG**로 옮긴 것. 원작 전문을 받아 아홉 장(章)으로 쪼개고 장마다 퀘스트 하나 + 미니게임을 붙였다.
+  **three.js 없이 WebGL2를 직접 부른다**(집 규칙의 CDN·ESM 금지를 그대로 지키려고). 웹 게시 가능.
+- `lucky-day/index.html` — 「운수 좋은 날」 첫 문단 3D. 현진건(1924, **공유저작물**)의 **첫 문단 하나만**
+  입력으로 세운 79초짜리 절차적 장면. 눈→비, 동소문, 인력거와 김 첨지, 전차, 동광학교, 삯.
+  자막은 전부 원문 그대로. iso-faces와 같이 **WebGL2 직접 호출**. 게임이 아니라 보는 것(재생·되감기만).
+- `love-rpg/index.html` — 「봄날, 두 사람」: **판매용 데모** (couple-rpg 재스킨, 가상 커플 민준·서연 5장면).
+  체험판 비밀번호 0000(잠금 화면에 표시), 상담 기능 제거, 사진 폴백 카드가 광고 문구, 선택·엔딩 화면에
+  「나의 이야기로 만들기」 주문 패널(`ORDER_URL` 상수가 비면 "준비 중" 토스트). 저장 접두사 `lv_*`.
+  주문 정보 포맷은 `docs/order-schema.md`, 주문 접수 카카오봇은 `counsel-proxy/order-bot.js`(별도 Deno 프로젝트,
+  Haiku + 일일 상한, 완성 주문 JSON은 텔레그램으로 전달). 판매 기획 정본은 `docs/custom-game-business.md`(비공개).
+- **네 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`·`love-rpg`)는 같은 엔진을 공유한다.**
   공통 틀의 정본은 `docs/dot-rpg-engine.md` — 새 도트 RPG를 만들기 전에 반드시 먼저 읽는다.
 - `voxel-world/` — 복셀 샌드박스 (진행 중, 다중 파일). 규칙·상수·단계는
   `voxel-world/CLAUDE.md`(설계도) → `ROADMAP.md`(단계) → `HANDOFF.md`(일지) 순으로 읽고,
@@ -65,9 +76,12 @@ python -m http.server 8765
 - http://localhost:8765/namsan-rpg/ (모바일 모드로 볼 것, `?debug=1`이면 `window.NS` 훅)
 - http://localhost:8765/couple-rpg/ (모바일 모드, `?debug=1` 훅, 비밀번호는 코드의 `PASSWORD`)
 - http://localhost:8765/europe-rpg/ (모바일 모드, `?debug=1` 훅, 비밀번호는 코드의 `PASSWORD`)
+- http://localhost:8765/love-rpg/ (판매 데모, 비밀번호 0000, `?debug=1` 훅)
+- http://localhost:8765/iso-faces/ (`?debug=1`이면 `window.BD` 훅)
+- http://localhost:8765/lucky-day/ (`?debug=1`이면 `window.LD` 훅)
 - http://localhost:8765/event-price/
 - http://localhost:8765/voxel-world/?debug=1
-- http://localhost:8765/soccer/ (연습장. 온라인은 2단계에서 `cd soccer/server && npm start` → http://localhost:8080/)
+- http://localhost:8765/soccer/ (혼자 하기 = 인공지능과 2:2. 온라인은 2단계에서 `cd soccer/server && npm start` → http://localhost:8080/)
 
 테스트 스위트, 린터, 타입 체커가 없다. 변경 검증은 브라우저에서 직접 구동해
 콘솔 에러 확인 + 조작 테스트로 한다. `file://`로 직접 열어도 동작하도록 작성돼
@@ -96,7 +110,7 @@ python -m http.server 8765
 **새로운 영속 상태도 반드시 `store`를 통해야 한다.**
 
 사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`,
-`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
+`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
 `file://`에서는 모든 앱이 같은 localStorage 네임스페이스를 쓰므로 접두사가 충돌 방지 수단이다.
 
 ## 앱별 구조
@@ -374,6 +388,46 @@ couple-rpg와 같은 챕터형(`CHAPTERS` + `QUESTS.c1~c7`). 공통 엔진은 `d
   꼬마열차·기차·신라면·이정표·비행기)다. 일곱 장면이 모두 같은 시점 인물이라 도안을 쓰면 구분이 안 됐다.
 - **사진**: `photos/`에 `eiffel`·`louvre`·`versailles`·`gare`·`jungfrau`·`swiss` 6장. couple-rpg와 같은 XOR `.bin` 방식.
 - 대문(랜딩)에는 아직 올리지 않았다. 주소를 아는 사람만 들어간다.
+
+### iso-faces (격리실의 얼굴들)
+
+소설 전문을 받아 게임으로 옮긴 첫 작업물. 도트 RPG 셋과 달리 **1인칭 3D**이고 엔진도 공유하지 않는다
+(`docs/dot-rpg-engine.md`는 여기 적용되지 않는다). 파일 하나, 외부 의존 0, `file://`에서도 돈다.
+대문(랜딩) **문학** 섹션에 올라가 있다.
+
+- **설계 원칙: 조작할 수 있는 범위가 곧 서사다.** 1장은 코밖에 없어 시선이 ±0.6rad로 갇히고,
+  2장은 눈동자로 커서를 **초당 1픽셀** 민다. 3장에서 몸이 붙으면 이동·달리기·뛰기가 통째로 열리고,
+  8장에서 다시 빼앗긴다. 이 열림/닫힘을 약하게 만들면 작품이 무너진다.
+- **아홉 장**: `SETUP[id]`/`TICK[id]` 짝 + `ACT.go(id)`. 도트 RPG의 `QUESTS[친구id]`와 같은 자리다.
+  HUD 한 줄 목표는 `hud(장, 목표, 부연)` / `hudDone()`.
+- **미니게임 3개**(`MG.open(def)` 규약: `setup·tick·press·draw·done`) — 「냄새 맡기」·「교감」·「기억」.
+  2장의 홍채 조작은 전용 CRT 화면이라 장 자체로 돌아간다.
+  **실패 화면이 없다** — 원작에 실패가 없기 때문. 못 맞히면 다시 올 뿐이다.
+  「교감」(5장)은 **이길 수 없게 설계했다**: 성공할수록 갈망 증가폭이 커져 12회쯤에서 막힌다(실측).
+  이 곡선을 완만하게 고치면 소설의 논지가 사라진다.
+  **3장의 커넥터 접속에는 타이밍 게임을 두지 않는다** — 몸을 얻는 가장 중요한 순간이
+  손가락 시험으로 바뀌면 장면이 죽는다. 저절로 꽂히고, 목·척추·신경이 한 줄씩 지나갈 뿐이다.
+- **머리통은 진짜 머리 모양이어야 한다.** 공 하나로는 사람으로 안 보인다.
+  `HEAD_RINGS`(턱→정수리 수평 단면 15줄) + `headBump()`(눈두덩·눈구멍·광대·관자놀이·코·인중·입술·턱·목덜미)로
+  깎고, 귀·눈알·목 그루터기를 붙인다. 정점색이 재질을 나른다(**r=살, g=머리칼, b=입술**).
+  **200개를 개별 draw로 그리면 그게 곧 렉이다** — 메시는 하나만 만들고 `HEADS` 프로그램으로 인스턴싱한다
+  (인스턴스마다 회전·크기·살빛·머리칼 양). 동공만 `EYES` 프로그램으로 따로 굴린다.
+  WebGL2에 baseInstance가 없어서 **방마다 VAO를 따로 만들어 오프셋으로 구간을 나눈다**(`HEAD_SETS`),
+  `roomNear()`로 문에서 26m 밖인 방은 통째로 건너뛴다.
+- **광량이 감정선이다**: `mood(lightMul, fogMul)`로 장마다 밝기·안개를 민다.
+  실측 평균 밝기 격리실 33 → 복도 75 안팎. 이 대비가 "닭장 같은 공간이 아닌 곳"이다.
+  **알베도를 낮춰 어둡게 만들지 말 것** — 화면이 죽는다. 어둠은 광량과 안개로만 만든다.
+- **프레임이 그림보다 우선이다**: `renderScale`이 최근 프레임 시간을 보고 해상도를 0.58~1.0으로 자동 조절한다.
+  기기 픽셀비는 1.6에서 자른다. 광원 정렬(`pickLights`)은 카메라가 0.6m 넘게 움직였을 때만 다시 한다.
+- **길 안내**: 30초(`STUCK_SEC`) 넘게 목표를 못 찾으면 `#guide`가 뜬다 — 목표 쪽으로 도는 화살표 + 거리 +
+  `ACT.hintText` 한 줄. 목표가 바뀌면(`hud()` 호출) 타이머가 처음부터. 인용문을 읽는 동안은 세지 않는다.
+- **글자가 화자를 가른다**: 화자의 서술은 명조(`--serif`), 우주선의 방송·시스템은 산세리프 넓은 자간.
+  섞으면 누가 말하는지 사라진다. 안내 글자는 작게 두지 말 것(실측으로 키웠다).
+  **아무 키나 화면을 누르면 글이 빨리 사라진다**(`hurryText`) — 이미 읽은 사람을 기다리게 하지 않는다.
+- **연출 지연은 `after(초, fn)`** — 루프에서 돈다. `setTimeout`을 쓰면 탭이 가려졌을 때 연출이 어긋난다.
+  남아 있는 `setTimeout`은 소리·CSS 전환용뿐이다.
+- 영속 상태 없음(`store` 미사용). `?debug=1`이면 `window.BD` — `go/state/tp/skill/cursor/interact/frame`,
+  화면을 볼 수 없을 때 쓰는 `probe()`(픽셀 통계), `mgs()`/`hud()`/`ended()`/`raw()`.
 
 ### android-* (APK 셸 4개)
 

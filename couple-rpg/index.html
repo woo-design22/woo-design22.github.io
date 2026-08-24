@@ -1738,7 +1738,7 @@ QUESTS.c2 = {
   friendTalk: {
     sj: async e => {
       const q = S.q;
-      if (q.finished) { await defaultTalk(e); return; }
+      if (q.finished) { await say(e.name, '주임님 저 드론 잘 날리죠?'); return; }
       if (!q.ready) {
         await say('수지', '우와, 이게 그 드론이에요? 진짜 날아요?');
         await say('철우', '그럼요. 강바람쯤은 껌입니다. (사실 조금 긴장된다)');

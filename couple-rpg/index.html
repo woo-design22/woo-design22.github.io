@@ -1700,12 +1700,12 @@ QUESTS.c1 = {
         await say('철우', '설수지 주무관님, 리플릿 완성했습니다.');
         await say('수지', '벌써요?! …우와, 예쁘다. 연구회 분들이 진짜 좋아하시겠어요!');
         await say('수지', '(일도 잘하고, 눈도 예쁘고, 말투도 다정하고…)');
-        await say('철우', '(칭찬받았다. 오늘 밤 자기 전에 열 번은 다시 재생할 예정)');
+        await say('철우', '(칭찬받았다. 오늘 기분이 꽤 괜찮다.)');
         await say('수지', '보답으로 제가 밀크커피 쏠게요! 자판기지만. 300원이지만.');
         await say('', '이렇게 두 사람의 이야기가 시작됐다.');
         await finishQuest();
       } else if (q.stage === 2) await say(e.name, '리플릿 부탁드려요! 직원 자리는 창구 오른쪽 끝으로 돌아 들어오시면 돼요.');
-      else await defaultTalk(e);
+      else await say(e.name, '앗 주임님 ㅎㅎ 저 지금 민원업무 보고 있어요');
     }
   },
   npcTalk: {
@@ -1742,7 +1742,7 @@ QUESTS.c2 = {
       await say('철우', '(됐다. 오늘의 목표 달성.) 수지 씨도 해 볼래요?');
       await say('', '(수지가 조종간을 잡았다. …의외로 철우보다 잘 날렸다.)');
       await say('수지', '이거 재밌네요! 우리 다음에 또 날려요.');
-      await say('철우', '(다음이 생겼다!!!)');
+      await say('철우', '(다음이 생겼네.)');
       await showPhoto('drone', '그날의 한강, 그리고 드론', 2000);
       await say('', '해 질 무렵까지, 두 사람은 한강에서 웃었다.');
       await finishQuest();

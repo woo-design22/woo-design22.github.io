@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pomodoro-todo/index.html` — 뽀모도로 타이머 + 할 일 목록
 - `particle-playground/index.html` — 캔버스 파티클 드로잉 툴
 - `mood-log/index.html` — 기분·수면·통증 일지 (본인/배우자 2프로필)
-- `fly-brain/index.html` — 초파리에게 설탕 주기: 각설탕을 놓으면 초파리가 걸어가 먹고, 그 뇌 회로(Shiu 2024 전뇌 LIF 모델)를 같은 화면에서 봄. 웹 게시용
+- `fly-brain/index.html` — 초파리에게 먹이 주기 🔊: 설탕·쓴맛·물·간지럼에 뇌(Shiu 2024 전뇌 LIF 모델)가 반응해 먹거나 거부하거나 닦음. 광고 잠금 구조 포함, 웹 게시용
 
 각 앱은 폴더 하나에 `index.html` 한 개가 전부다. 서로 코드를 공유하지 않으며,
 공유 라이브러리·번들러·패키지 매니저·CDN 의존성이 없다.
@@ -130,27 +130,35 @@ python -m http.server 8765
   `.gitignore`로 제외되므로 없으면 `git clone --depth 1 https://github.com/philshiu/Drosophila_brain_model model`.
 - 실행 환경은 conda env `flybrain`(`C:\Users\User\anaconda3\envs\flybrain`, Brian2 2.5.1).
   `model/environment.yml`로 만들고 `pip install "setuptools<70"`을 추가해야 `pkg_resources` 오류가 안 난다.
-  C++ 컴파일러가 없어 numpy 백엔드로 돌며 1회(1초 시뮬레이션)에 코어당 약 50초, 30회·4프로세스는 약 14분.
-- `run_sugar.py --trials 30 --procs 4` → `results/<exp>.parquet`(전체 스파이크), `_rates.csv`,
-  `_summary.json`(발화한 뉴런 + 설탕 GRN + MN9의 부분 회로, 1회차 스파이크). 같은 이름의 parquet가
-  있으면 시뮬레이션은 건너뛰고 분석·내보내기만 다시 한다.
-- `build_app.py results/<exp>_summary.json` → `index.html`의 데이터 블록 교체. **앱의 수치를 바꾸려면
-  parquet를 지우고 다시 돌리거나 다른 `--name`으로 돌린 뒤 이 스크립트를 다시 실행**한다.
+  C++ 컴파일러가 없어 numpy 백엔드로 돌며 1회(1초 시뮬레이션)에 코어당 약 50초.
+- **`run_multi.py --trials 10 --procs 4`** 가 지금 쓰는 파이프라인이다(약 20분). 설탕·쓴맛·물·더듬이(JON)
+  네 가지 자극을 각각 전뇌에 넣고, 네 결과의 합집합 부분 회로를 `results/multi_summary.json`으로 낸다
+  (1,295뉴런 / 60,079연결 / 1.2MB). 뉴런 ID 목록은 논문 노트북에서 뽑아 `results/neuron_lists.json`에 있다.
+  `run_sugar.py`는 설탕 30회 단독 실행용으로 남겨 둔 옛 스크립트다. 같은 이름의 parquet가 있으면
+  시뮬레이션은 건너뛰고 분석·내보내기만 다시 한다.
+- `build_app.py`(인자 없으면 `results/multi_summary.json`) → `index.html`의 데이터 블록 교체.
+  **앱의 수치를 바꾸려면 parquet를 지우고 다시 돌린 뒤 이 스크립트를 다시 실행**한다.
+- 전뇌 모델 실측값(자극 200Hz): 설탕 → MN9 왼쪽 93.1 / 오른쪽 63.1Hz, 물 → 33.6 / 13.9Hz,
+  **쓴맛 단독 → 0Hz**(주둥이 안 나옴), 더듬이 → aBN1 70.4Hz(닦기 회로). 이 값들이 화면 동작의 근거다.
 - 브라우저 LIF(`stepLive`)는 `model.py`의 식·상수를 그대로 옮겼다. 한 가지 비직관적 규칙: Brian2는
   `(unless refractory)`가 붙은 변수에 **불응기 중 시냅스 증분(`g += w`)을 적용하지 않는다.** 이 검사를
-  빼면 발화율이 약 30% 높아진다(Brian2와 직접 대조해 확인). 부분 회로는 자극 200Hz 조건에서 전뇌와
-  통계적으로 같지만(Brian2로 검증), 주파수를 바꾸거나 뉴런을 차단하면 빠진 뉴런이 발화할 수 있어 근사다.
-- 화면 구성: 왼쪽 무대(SVG 초파리 + 각설탕) / 오른쪽 뇌 회로(canvas) / 조작부 / 통계 / 래스터 / 설명 / 실험실(details).
-  무대는 **탭 판정**(`tapDetector`: 8px·350ms 이내)으로만 각설탕을 놓고, `touch-action: pan-y`라 모바일 스크롤을 막지 않는다.
-  초파리 좌표계는 원점 = 발 밑 중앙(`GROUND` y=262), 기본 왼쪽 보기, `scale(dir,1)`로 반전. 혀 끝이 닿는 자리는
-  원점에서 바라보는 쪽 `MOUTH_DX`=114. 걷기는 실제 시간 기준(`WALK_SPEED`), 먹기는 `ext`(주둥이 뻗음)에 비례.
-  **주둥이 길이는 MN9 좌우 평균 발화율(200ms 창)/70Hz**로만 정해지므로 "먹느냐"는 전적으로 뇌 계산 결과다.
-- 체험 모드는 1초 제한 없이 계속 돌고(`WINDOW`=1초 래스터, `popHist`는 `advanceBins`로 시각 기준 비움),
-  재생 모드만 1초(`T_REPLAY`)에서 멈춘다. 단축키는 `e.code`로 판별(한글 IME 상태 대응), 버튼은 클릭 후 `blur()`.
-- 실험실 프리셋: `roundup_1/2`를 끄면 MN9 오른쪽이 거의 멈춰 아주 느리게 먹고, 1단계 뉴런 전부를 끄면 주둥이가 안 나온다(둘 다 확인됨).
-- 게시할 때 `<head>`의 주석 처리된 `og:url`·`og:image`를 실제 주소로 채운다. 파비콘은 인라인 SVG. 영속 상태 없음(`store` 미사용).
-  애니메이션은 `requestAnimationFrame` + IntersectionObserver라 탭이 숨겨지거나 화면 밖이면 멈춘다.
-
+  빼면 발화율이 약 30% 높아진다(Brian2와 직접 대조해 확인).
+- 화면 구성: 기능 아이콘 8개 / 무대(SVG) / 뇌 회로(canvas) / 조작부 / 통계 / 래스터 / 설명 / 패널들.
+  무대는 **탭 판정**(`tapDetector`: 8px·350ms 이내)으로만 먹이를 놓고, `touch-action: pan-y`라 모바일
+  스크롤을 막지 않는다. 초파리 좌표계는 원점 = 발 밑 중앙(`GROUND` y=262), 기본 왼쪽 보기, `scale(dir,1)`로
+  반전, 혀 끝이 닿는 자리는 `MOUTH_DX`=114. **주둥이 길이는 MN9 발화율/70Hz, 닦기는 aBN1·DN 발화율로만
+  정해진다** — "먹느냐/거부하느냐/닦느냐"는 전적으로 뇌 계산 결과다.
+- **광고 구조**(구조만, 실제 광고 코드는 미삽입): 아이콘 8개 중 앞 3개(각설탕·쓴맛·간지럽히기)는 무료,
+  나머지 5개는 `showRewardedAd()`를 거쳐야 열리고 해제 기록은 `localStorage`의 `fly_unlocks`에 24시간 저장된다.
+  `window.adBreak`(H5 Games Ads)가 있으면 그것을 쓰고, 없으면 5초 카운트다운 모달로 대신 동작한다.
+  실제 게재는 `<head>`의 주석 블록을 푸는 것으로 시작한다. **AdSense 승인·겸직허가 전까지는 켜지 않는다.**
+- 퍼즐 후보는 **MN9로 가는 흥분성 시냅스 수 × 설탕 발화율**(영향력) 상위 6개 + 방해용 6개로 짠다.
+  실측: 영향력 상위 2개를 끄면 MN9 19Hz(성공), 3개면 4Hz, 1개면 46Hz(실패), 영향력 낮은 3개면 70Hz(실패).
+  퍼즐 실행 중에는 속도를 ×1로 올리고 판정은 **실제 시간** 기준이다(뇌 시간으로 재면 ×0.25에서 24초가 걸린다).
+- 소리는 두 모드(`crackle` 챠라락 / `music` 연주)와 끄기. 첫 클릭 뒤에만 울리고(브라우저 정책),
+  틱 묶음 28개를 미리 만들어 두고 **프레임당 노드 1개**만 재생한다(뉴런마다 만들면 실제 브라우저에서 렉).
+- 영속 상태: `fly_unlocks`, `fly_puzzle_best`. 애니메이션은 `requestAnimationFrame` + IntersectionObserver라
+  탭이 숨겨지거나 화면 밖이면 멈춘다(자동화로 검증할 때 프레임을 직접 돌려야 하는 이유).
 
 ### android-mood-log (APK 셸)
 

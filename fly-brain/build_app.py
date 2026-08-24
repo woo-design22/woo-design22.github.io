@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-"""run_sugar.py가 만든 results/<exp>_summary.json을 index.html의 <script id="fly-data"> 안에 넣는다.
+"""run_multi.py(또는 run_sugar.py)가 만든 results/*_summary.json을 index.html의 <script id="fly-data"> 안에 넣는다.
 
+    python build_app.py                                  # 기본: results/multi_summary.json
     python build_app.py results/sugarR_200Hz_x30_summary.json
 """
 import re
@@ -8,7 +9,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-src = Path(sys.argv[1] if len(sys.argv) > 1 else HERE / 'results' / 'sugarR_200Hz_x30_summary.json')
+src = Path(sys.argv[1] if len(sys.argv) > 1 else HERE / 'results' / 'multi_summary.json')
 html_path = HERE / 'index.html'
 
 data = src.read_text(encoding='utf-8').strip()

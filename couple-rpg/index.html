@@ -1538,8 +1538,18 @@ function buildRoster() {
     r.appendChild(b);
   });
   $('btnEnding').style.display = S.done.c7 ? '' : 'none';
-  $('giftCount').textContent = rewardsOwned().length + '/' + REWARDS.length;
+  const got = rewardsOwned().length;
+  $('giftCount').textContent = got + '/' + REWARDS.length;
+  // 상담은 엔딩을 보고 보상함을 다 모아야 열린다
+  const careReady = careUnlocked();
+  $('btnCare').disabled = !careReady;
+  $('btnCare').textContent = careReady ? '마음결 상담 \ud83d\udcac' : '\ud83d\udd12 마음결 상담';
+  $('careHint').textContent = careReady
+    ? '마음결 상담: 둘이 싸우면 꼭 해보세요. 평소 마음 돌보기도 있어요.'
+    : '엔딩을 보고 보상함 ' + REWARDS.length + '개를 모두 모으면 열립니다. (지금 ' + got + '/' + REWARDS.length + ')';
 }
+// 열림 조건을 한 곳에서만 정한다
+function careUnlocked() { return !!S.ending && rewardsOwned().length >= REWARDS.length; }
 function showSelect() { S.lock = false; buildRoster(); showScreen('select'); save(); }
 async function pickChapter(id) {
   const resume = S.ch === id && S.map && S.q && !S.q.finished && !S.done[id];
@@ -2182,7 +2192,7 @@ async function careHash(t) {
 }
 function carePane(name) { ['careWho', 'carePw', 'careMode', 'careChat'].forEach(id => { $(id).style.display = id === name ? '' : 'none'; }); }
 function careDots() { const els = $('careDots').children; for (let i = 0; i < 4; i++) els[i].classList.toggle('on', i < CARE.buf.length); }
-function openCare() { $('care').classList.add('show'); CARE.who = null; CARE.mode = null; carePane('careWho'); }
+function openCare() { if (!careUnlocked()) return; $('care').classList.add('show'); CARE.who = null; CARE.mode = null; carePane('careWho'); }
 $('btnCare').addEventListener('click', openCare);
 $('careClose').addEventListener('click', () => $('care').classList.remove('show'));
 $('careBack').addEventListener('click', () => { CARE.who = null; carePane('careWho'); });

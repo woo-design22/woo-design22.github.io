@@ -563,9 +563,8 @@ const TILES = {
   'i': { name: '화분', solid: true, over: true }, 'C': { name: '의자', solid: true, over: true },
   'd': { name: '책상', solid: true, over: true }, 'K': { name: '계산대', solid: true, over: true },
   'v': { name: '자판기', solid: true, over: true }, 's': { name: '간판', solid: true, over: true },
-  // --- 파리: 에펠탑(3x3 조합) ---
-  'E': { name: '탑 꼭대기', solid: true, over: true }, 'R': { name: '탑 중단', solid: true, over: true },
-  'N': { name: '탑 다리', solid: true, over: true }, 'A': { name: '탑 아치', solid: true, over: true },
+  // --- 파리: 에펠탑(3x3 조합) --- '~'는 그림이 없다: 배경으로 칠한 하늘이 그대로 비친다
+  '~': { name: '하늘', solid: true, sky: true },
   // --- 파리: 루브르 ---
   'Y': { name: '유리 피라미드', solid: true, over: true }, 'y': { name: '피라미드 아래', solid: true, over: true },
   'V': { name: '미술관 벽', solid: true }, 'a': { name: '전시 액자', solid: true, over: true },
@@ -623,11 +622,7 @@ const ATLAS = {};
   def('v', g => { R(g, 2, 0, 12, 16, '#d83b2e'); R(g, 3, 1, 10, 7, '#9fd0ea'); R(g, 4, 2, 2, 5, '#ffd166'); R(g, 7, 2, 2, 5, '#7bd389'); R(g, 10, 2, 2, 5, '#ffffff'); R(g, 4, 10, 8, 4, '#2a2a2a'); });
   def('s', g => { R(g, 7, 8, 2, 8, '#6b4226'); R(g, 1, 2, 14, 7, '#f4e8c1'); R(g, 1, 2, 14, 1, '#6b4226'); R(g, 1, 8, 14, 1, '#6b4226'); R(g, 3, 4, 10, 1, '#8a5a33'); R(g, 3, 6, 7, 1, '#8a5a33'); });
 
-  // ===== 파리: 에펠탑 =====
-  def('E', g => { R(g, 0, 0, T, T, '#a8c4dd'); R(g, 6, 0, 4, 3, '#8a6a44'); R(g, 5, 3, 6, 3, '#9a7a50'); R(g, 7, 0, 2, 6, '#7a5a38'); R(g, 6, 6, 4, 10, '#9a7a50'); R(g, 7, 8, 2, 8, '#8a6a44'); });
-  def('R', g => { R(g, 0, 0, T, T, '#a8c4dd'); R(g, 4, 0, 8, 4, '#9a7a50'); R(g, 3, 4, 10, 2, '#8a6a44'); R(g, 3, 6, 10, 10, '#9a7a50'); R(g, 5, 2, 2, 14, '#7a5a38'); R(g, 9, 2, 2, 14, '#7a5a38'); R(g, 3, 9, 10, 1, '#7a5a38'); });
-  def('N', g => { R(g, 0, 0, T, T, '#a8c4dd'); R(g, 1, 0, 4, 16, '#9a7a50'); R(g, 11, 0, 4, 16, '#9a7a50'); R(g, 2, 0, 2, 16, '#7a5a38'); R(g, 12, 0, 2, 16, '#7a5a38'); R(g, 5, 1, 6, 2, '#8a6a44'); });
-  def('A', g => { R(g, 0, 0, T, T, '#a8c4dd'); R(g, 0, 0, T, 3, '#9a7a50'); R(g, 0, 3, 3, 4, '#9a7a50'); R(g, 13, 3, 3, 4, '#9a7a50'); R(g, 0, 6, 2, 3, '#8a6a44'); R(g, 14, 6, 2, 3, '#8a6a44'); });
+  // ===== 파리: 에펠탑 ===== 은 paintTower 가 그린다(하늘색 배경을 날씨에 맞춰 다시 칠해야 해서)
 
   // ===== 파리: 루브르 =====
   def('Y', g => { R(g, 0, 0, T, T, '#d8d4c8'); for (let i = 0; i < 8; i++) { R(g, 8 - i, 15 - i * 2, 1, 2, '#9fd0ea'); R(g, 7 + i, 15 - i * 2, 1, 2, '#bfe4f5'); } R(g, 6, 0, 4, 2, '#e8f6ff'); });
@@ -682,11 +677,11 @@ const ATLAS = {};
 // edge: 'bottom'이면 맨 아랫줄 전체가 출구(언덕↔동네 도로)
 const MAPS = {
   // ===== 1. 에펠탑 =====  가운데가 넓게 트여 있고 탑은 위쪽에만
-  eiffel: { name: '에펠탑', base: '.', rows: [
-    'XXXXXXXEXXXXXXXX',
-    'XXXXXXRRRXXXXXXX',
-    'XXXXXNXXXNXXXXXX',
-    'XXXXAAXXXAAXXXXX',
+  eiffel: { name: '에펠탑', base: '.', sky: true, rows: [
+    '~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~~~~~',
+    '~~~~~~~~~~~~~~~~',
     '................',
     '.,.....s........',
     '................',
@@ -808,7 +803,7 @@ Object.keys(MAPS).forEach(id => {
     let out = '', last = m.base;
     for (let x = 0; x < r.length; x++) {
       const t = TILES[r[x]];
-      if (t && !t.solid && !t.over) last = r[x];
+      if (t && (t.sky || (!t.solid && !t.over))) last = r[x];
       out += last;
     }
     return out;
@@ -842,7 +837,8 @@ let VIEW_H = 13, SCALE = 2;
 // 게임 상태. q(퀘스트 진행)·done(완료한 친구)·위치만 저장된다.
 const S = {
   screen: 'lock', ch: null, hero: null, map: null, px: 0, py: 0, dir: 'down', ending: false, care: false,
-  moving: null, step: 0, ents: [], q: {}, done: {}, busy: false, lock: false, onExit: false, time: 0
+  moving: null, step: 0, ents: [], q: {}, done: {}, busy: false, lock: false, onExit: false, time: 0,
+  weather: 'clear'   // 'rain' | 'clear' — sky 맵의 하늘을 정한다
 };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -1002,6 +998,85 @@ const ICONS = {};
   def('mark', g => { R(g, 7, 1, 2, 6, '#ffd166'); R(g, 7, 9, 2, 2, '#ffd166'); R(g, 6, 0, 4, 1, '#ffd166'); });
 })();
 
+// ----- 장면 아이콘: 선택 화면에서 장면마다 그 장소를 보여 준다(16×16 도트) -----
+const CHAP_ICONS = {};
+(function buildChapIcons() {
+  const R = (g, x, y, w, h, c) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  const def = (k, fn) => { const c = document.createElement('canvas'); c.width = T; c.height = T; fn(c.getContext('2d')); CHAP_ICONS[k] = c; };
+  // 1. 비 갠 에펠탑 — 파란 하늘 · 해 · 탑
+  def('c1', g => {
+    R(g, 0, 0, 16, 16, '#8fc4ea'); R(g, 0, 13, 16, 3, '#5fae4a');
+    R(g, 1, 2, 4, 4, '#ffe9a3'); R(g, 0, 3, 6, 2, '#ffe9a3');
+    R(g, 7, 0, 2, 4, '#8a6a44'); R(g, 6, 4, 4, 2, '#9a7a50');
+    R(g, 5, 6, 6, 1, '#8a6a44');
+    R(g, 5, 7, 2, 3, '#9a7a50'); R(g, 9, 7, 2, 3, '#9a7a50');
+    R(g, 5, 9, 6, 1, '#8a6a44');
+    R(g, 4, 10, 2, 3, '#9a7a50'); R(g, 10, 10, 2, 3, '#9a7a50');
+  });
+  // 2. 루브르 — 유리 피라미드
+  def('c2', g => {
+    R(g, 0, 0, 16, 16, '#a8c4dd'); R(g, 0, 11, 16, 5, '#d8d4c8');
+    R(g, 7, 3, 2, 1, '#e8f6ff');
+    R(g, 6, 4, 4, 1, '#bfe4f5'); R(g, 5, 5, 6, 1, '#9fd0ea'); R(g, 5, 6, 6, 1, '#bfe4f5');
+    R(g, 4, 7, 8, 1, '#9fd0ea'); R(g, 3, 8, 10, 1, '#bfe4f5'); R(g, 2, 9, 12, 1, '#9fd0ea');
+    R(g, 1, 10, 14, 1, '#7ab4d4'); R(g, 0, 11, 16, 1, '#c9c4b8');
+    R(g, 8, 4, 1, 7, '#7ab4d4');
+  });
+  // 3. 전설의 꼬마열차 — 베르사유 정원의 노란 열차
+  def('c3', g => {
+    R(g, 0, 0, 16, 16, '#a8c4dd'); R(g, 0, 10, 16, 6, '#cfc4a8');
+    R(g, 2, 2, 2, 3, '#5a4a3a'); R(g, 1, 1, 4, 1, '#8a8a94');
+    R(g, 1, 5, 6, 6, '#e0c04a'); R(g, 1, 5, 6, 1, '#f0d878'); R(g, 2, 7, 3, 2, '#9fd0ea');
+    R(g, 8, 6, 7, 5, '#f4e8c1'); R(g, 8, 6, 7, 1, '#e0c04a');
+    R(g, 9, 8, 2, 2, '#9fd0ea'); R(g, 12, 8, 2, 2, '#9fd0ea');
+    R(g, 1, 11, 2, 2, '#2a2a33'); R(g, 5, 11, 2, 2, '#2a2a33');
+    R(g, 9, 11, 2, 2, '#2a2a33'); R(g, 13, 11, 2, 2, '#2a2a33');
+    R(g, 0, 14, 16, 2, '#b8a684');
+  });
+  // 4. 기차를 놓쳤는데 1등석 — 승강장의 빨간 열차
+  def('c4', g => {
+    R(g, 0, 0, 16, 16, '#3a3a44'); R(g, 0, 11, 16, 5, '#b8b4ac');
+    R(g, 3, 2, 10, 11, '#c94b4b'); R(g, 3, 2, 10, 2, '#e06a6a');
+    R(g, 4, 5, 8, 4, '#9fd0ea'); R(g, 8, 5, 1, 4, '#c94b4b');
+    R(g, 4, 10, 8, 2, '#3a3a44');
+    R(g, 4, 13, 2, 2, '#2a2a33'); R(g, 10, 13, 2, 2, '#2a2a33');
+    R(g, 0, 15, 16, 1, '#e0c04a');
+  });
+  // 5. 정상에서 신라면 — 설산과 컵라면
+  def('c5', g => {
+    R(g, 0, 0, 16, 16, '#bcd6e8'); R(g, 0, 10, 16, 6, '#f0f4fa');
+    R(g, 2, 6, 1, 1, '#ffffff'); R(g, 1, 7, 3, 1, '#ffffff');
+    R(g, 1, 8, 3, 1, '#8a9aa8'); R(g, 0, 9, 5, 1, '#8a9aa8');
+    R(g, 11, 2, 2, 1, '#ffffff'); R(g, 10, 3, 4, 1, '#ffffff'); R(g, 10, 4, 4, 1, '#dfe8f0');
+    R(g, 9, 5, 6, 1, '#8a9aa8'); R(g, 8, 6, 8, 1, '#8a9aa8'); R(g, 7, 7, 9, 3, '#8a9aa8');
+    R(g, 6, 4, 1, 3, '#e8f6ff'); R(g, 9, 3, 1, 4, '#e8f6ff');
+    R(g, 4, 8, 8, 7, '#c94b4b'); R(g, 3, 7, 10, 1, '#e8e0d0');
+    R(g, 5, 10, 6, 1, '#f4e8c1'); R(g, 5, 12, 4, 1, '#f4e8c1');
+  });
+  // 6. 한국어 하는 아주머니 — 초원의 이정표와 소
+  def('c6', g => {
+    R(g, 0, 0, 16, 16, '#a8c4dd'); R(g, 0, 6, 16, 10, '#7ab84a');
+    R(g, 7, 2, 2, 13, '#8a6a3c');
+    R(g, 3, 3, 5, 3, '#f4e8c1'); R(g, 2, 4, 1, 1, '#f4e8c1');           // 왼쪽 팻말
+    R(g, 3, 3, 5, 1, '#c9b894'); R(g, 4, 4, 3, 1, '#5a4a2a');
+    R(g, 8, 8, 5, 3, '#f4e8c1'); R(g, 13, 9, 1, 1, '#f4e8c1');          // 오른쪽 팻말
+    R(g, 8, 8, 5, 1, '#c9b894'); R(g, 9, 9, 3, 1, '#5a4a2a');
+    R(g, 1, 11, 4, 3, '#f4f4f4'); R(g, 0, 10, 2, 2, '#f4f4f4');         // 소
+    R(g, 2, 11, 2, 1, '#3a3a3a'); R(g, 1, 14, 1, 1, '#d9d9de'); R(g, 4, 14, 1, 1, '#d9d9de');
+    R(g, 0, 15, 16, 1, '#69a83c');
+  });
+  // 7. 집으로 — 구름 사이의 비행기
+  def('c7', g => {
+    R(g, 0, 0, 16, 16, '#8fc4ea');
+    R(g, 1, 2, 5, 2, '#ffffff'); R(g, 2, 1, 3, 1, '#ffffff');
+    R(g, 9, 12, 6, 2, '#ffffff'); R(g, 10, 11, 4, 1, '#ffffff');
+    R(g, 2, 5, 3, 2, '#d9d9de');
+    R(g, 6, 4, 3, 3, '#d9d9de'); R(g, 6, 10, 3, 3, '#d9d9de');
+    R(g, 2, 7, 11, 3, '#e8eaf0'); R(g, 13, 7, 2, 2, '#d9d9de');
+    R(g, 4, 8, 7, 1, '#3f7fd9'); R(g, 14, 7, 1, 1, '#c94b4b');
+  });
+})();
+
 // ----- 맵·엔티티 도우미 -----
 let quest = null;  // 지금 플레이 중인 친구의 대본(QUESTS[id])
 const tileAt = (m, x, y) => (x < 0 || y < 0 || x >= m.w || y >= m.h) ? null : m.rows[y][x];
@@ -1134,6 +1209,64 @@ async function defaultTalk(e) {
 
 // ----- 그리기 -----
 function drawChar(spr, dir, frame, x, y) { const fr = SPRITES[spr]; if (fr) ctx.drawImage(fr[dir] ? fr[dir][frame] : fr.down[0], Math.round(x), Math.round(y)); }
+// ----- 하늘: sky 맵은 배경이 검정이 아니라 하늘이다. S.weather 로 비/갬이 바뀐다 -----
+const SKY = {
+  rain:  { bg: '#71818f', cloud: '#59626f', sun: null },
+  clear: { bg: '#8fc4ea', cloud: '#f2f7fb', sun: '#ffe9a3' }
+};
+// 구름·해는 탑을 피해서 놓는다 — 탑 타일이 하늘색으로 꽉 찬 사각형이라 겹치면 잘려 보인다
+const SKY_CLOUDS = [[0.4, 1.6, 0.75], [2.6, 3.2, 0.5], [13.4, 2.9, 0.6]];  // 타일 좌표
+const SUN_AT = [11.6, 1.3];
+// 에펠탑: 타일로 쪼개면 타일 경계마다 끊겨 보인다. 하늘 위에 한 덩어리로 그린다.
+// 좌표계 원점 = 탑 한가운데(7.5타일), 바닥 = 광장 첫 줄(4타일). 위로 갈수록 y 가 작다.
+function drawTower(camX, camY) {
+  const cx = Math.round(7.5 * T - camX), gy = Math.round(4 * T - camY);
+  const lo = '#7a5a38', mid = '#8a6a44', hi = '#9a7a50';
+  const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(cx + x, gy + y, w, h); };
+  R(-1, -64, 2, 8, lo);                                       // 안테나
+  R(-4, -56, 8, 4, mid);                                      // 꼭대기 전망대
+  R(-3, -52, 6, 8, hi); R(-1, -52, 2, 8, lo);                 // 좁은 몸통
+  R(-11, -44, 22, 4, mid);                                    // 2층 전망대
+  R(-8, -40, 16, 10, hi);                                     // 몸통
+  R(-6, -40, 2, 10, lo); R(4, -40, 2, 10, lo);                // 격자
+  R(-20, -30, 40, 4, mid);                                    // 1층 전망대
+  const legs = [[-26, 6, 9, 14], [-20, 6, 13, 19], [-14, 7, 17, 24], [-7, 7, 21, 30]];
+  for (const [y, h, i0, i1] of legs) {                        // 네 다리(밖으로 벌어진다)
+    R(-i1, y, i1 - i0, h, hi); R(i0, y, i1 - i0, h, hi);
+    R(-i1 + 1, y, 2, h, lo);   R(i1 - 3, y, 2, h, lo);
+  }
+  R(-17, -24, 34, 3, mid);                                    // 아치 윗변
+  R(-21, -21, 5, 3, mid); R(16, -21, 5, 3, mid);              // 아치 어깨
+}
+function drawSky(camX, camY) {
+  const w = SKY[S.weather] || SKY.clear;
+  ctx.fillStyle = w.bg; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (w.sun) {
+    const sx = SUN_AT[0] * T - camX, sy = SUN_AT[1] * T - camY;
+    ctx.fillStyle = 'rgba(255,236,180,0.35)'; ctx.beginPath(); ctx.arc(sx, sy, 17, 0, 7); ctx.fill();
+    ctx.fillStyle = w.sun; ctx.beginPath(); ctx.arc(sx, sy, 10, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = w.cloud;
+  for (const [cx, cy, s] of SKY_CLOUDS) {
+    const x = cx * T - camX, y = cy * T - camY;
+    ctx.beginPath();
+    ctx.arc(x, y, 7 * s, 0, 7); ctx.arc(x + 10 * s, y - 3 * s, 9 * s, 0, 7); ctx.arc(x + 21 * s, y, 6.5 * s, 0, 7);
+    ctx.fill();
+    ctx.fillRect(x, y, 21 * s, 7 * s);
+  }
+  drawTower(camX, camY);
+}
+// 빗줄기: 비 오는 동안 화면 전체에 사선으로 흐른다
+function drawRain(now) {
+  ctx.strokeStyle = 'rgba(206,220,235,0.55)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < 46; i++) {
+    const x = (i * 47 + Math.floor(now / 9)) % (cv.width + 24) - 12;
+    const y = (i * 61 + Math.floor(now / 2)) % (cv.height + 24) - 12;
+    ctx.moveTo(x, y); ctx.lineTo(x - 2, y + 7);
+  }
+  ctx.stroke();
+}
 function draw() {
   if (!S.map) return;
   const m = S.map, now = S.time;
@@ -1144,12 +1277,13 @@ function draw() {
   const maxX = m.w * T - cv.width, maxY = m.h * T - cv.height;
   camX = Math.round(maxX < 0 ? maxX / 2 : Math.max(0, Math.min(maxX, camX)));
   camY = Math.round(maxY < 0 ? maxY / 2 : Math.max(0, Math.min(maxY, camY)));
-  ctx.fillStyle = '#0e0d1a'; ctx.fillRect(0, 0, cv.width, cv.height);
+  if (m.sky) drawSky(camX, camY);
+  else { ctx.fillStyle = '#0e0d1a'; ctx.fillRect(0, 0, cv.width, cv.height); }
   const x0 = Math.floor(camX / T), y0 = Math.floor(camY / T);
   for (let y = y0; y <= y0 + VIEW_H; y++) for (let x = x0; x <= x0 + VIEW_W; x++) {
     if (x < 0 || y < 0 || x >= m.w || y >= m.h) continue;
     const ch = m.rows[y][x], t = TILES[ch], sx = x * T - camX, sy = y * T - camY;
-    if (t && t.over) ctx.drawImage(ATLAS[m.baseRows[y][x]], sx, sy);
+    if (t && t.over) { const bs = ATLAS[m.baseRows[y][x]]; if (bs) ctx.drawImage(bs, sx, sy); }   // 하늘 바닥은 그림이 없다
     const img = ATLAS[ch]; if (img) ctx.drawImage(img, sx, sy);
   }
   const list = S.ents.filter(e => !e.gone).map(e => ({ e, y: e.y }));
@@ -1166,6 +1300,7 @@ function draw() {
     else drawChar(e.spr, e.dir || 'down', e.walk ? [1, 3][Math.floor(now / WALK_MS) % 2] : 0, sx, sy);
     if (e.mark && e.kind !== 'item') ctx.drawImage(ICONS.mark, sx, sy - 12 + bob);
   }
+  if (m.sky && S.weather === 'rain') drawRain(now);
   if (S.tint) { ctx.fillStyle = S.tint; ctx.fillRect(0, 0, cv.width, cv.height); }
   updateLabels(camX, camY); drawMini();
 }
@@ -1721,7 +1856,7 @@ function buildRoster() {
     const st = chapterState(i);
     const b = document.createElement('button'); b.type = 'button';
     const cv2 = document.createElement('canvas'); cv2.width = 16; cv2.height = 16;
-    cv2.getContext('2d').drawImage(SPRITES[c.hero].down[0], 0, 0);
+    cv2.getContext('2d').drawImage(CHAP_ICONS[c.id] || SPRITES[c.hero].down[0], 0, 0);
     const nm = document.createElement('b'); nm.textContent = (i + 1) + '. ' + c.title;
     const inProgress = S.ch === c.id && S.map && S.q && !S.q.finished && st !== 'done';
     const tg = document.createElement('span');
@@ -1743,7 +1878,7 @@ async function pickChapter(id) {
 async function startHero(id, fresh) {
   S.ch = id; S.hero = CH[id].hero; quest = QUESTS[id];
   if (fresh) { S.q = {}; quest.init(S.q); }
-  S.tint = null; S.focus = null; S.hideHero = false; S.lock = false; S.heroSpr = null;
+  S.tint = null; S.focus = null; S.hideHero = false; S.lock = false; S.heroSpr = null; S.weather = 'clear';
   showScreen('game'); fit(); setHud();
   if (fresh) {
     await goMap(quest.start.map, quest.start.x, quest.start.y, quest.start.dir, true);
@@ -1879,12 +2014,13 @@ QUESTS.c1 = {
   hint() { return '노란 느낌표가 붙은 사람에게 걸어가 A 버튼을 누르면 됩니다.'; },
   familyPos: fam('eiffel', [['ap', 7, 5, 'down'], ['om', 6, 6, 'right'], ['hj', 8, 6, 'left']]),
   async intro() {
-    S.tint = 'rgba(60,70,90,0.45)';
+    S.weather = 'rain'; S.tint = 'rgba(60,70,90,0.45)';
     await say('', '파리에 온 지 사흘째. 오는 날부터 계속 비가 왔다.');
     await say('설현지', '언니, 우리 파리 온 거 맞아? 계속 비만 와.');
     await say('설수지', '일정표엔 오늘 오후 맑음이라고 돼 있었는데…');
     await say('송정자', '얘, 엄마 머리 다 젖었잖니. 사진은 어떻게 찍니.');
     await say('', '그런데 에펠탑 앞에 도착한 순간—');
+    S.weather = 'clear';                     // 비가 그치고 하늘이 갠다
     for (let i = 0; i < 5; i++) { S.tint = 'rgba(60,70,90,' + (0.36 - i * 0.09) + ')'; await sleep(220); }
     S.tint = null;
     await say('', '거짓말처럼 구름이 걷히고 해가 났다.');
@@ -2191,7 +2327,7 @@ QUESTS.c7 = {
     this.marks();
     if (this.count(q) >= 3) {
       await say('설수지', '(다 들었다. 이제 나만 남았네.)');
-      await say('설수지', '나는… 이 네 사람이랑 온 게 제일 좋았어.');
+      await say('설수지', '나는… 이 세 사람이랑 온 게 제일 좋았어.');
       await say('설현지', '언니 그거 반칙이야. 너무 착한 대답이잖아.');
       await say('송정자', '얘, 엄마는 사진 잘 나온 게 제일 좋다.');
       await say('설진쾌', '…또 오자.');

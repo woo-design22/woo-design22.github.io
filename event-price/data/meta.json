@@ -1,0 +1,19 @@
+{
+ "wedding": {
+  "collected": "2026-08-24",
+  "latest_month": "202606",
+  "businesses": 278,
+  "source": [
+   "https://www.price.go.kr/tprice/portal/wedding/areaCompare.do",
+   "https://www.price.go.kr/tprice/portal/board/boardInfoMgr.do?boardTypeCode=0090000121",
+   "https://www.price.go.kr/tprice/portal/board/boardInfoMgr.do?boardTypeCode=0090000122"
+  ]
+ },
+ "funeral": {
+  "collected": "2026-08-24",
+  "scope": "서울특별시",
+  "facilities": 61,
+  "source": "https://www.15774129.go.kr/portal/esky/fnlfac/fac_list.do?menuId=M0001000100000000",
+  "license": "e하늘 저작권정책: 수익 목적 이용 시 보건복지부 사전 허락 필요"
+ }
+}

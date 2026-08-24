@@ -1596,7 +1596,7 @@ function lockKey(k) {
   if (lockBuf.length >= 4) return;
   lockBuf += k; lockDraw();
   if (lockBuf.length === 4) {
-    if (lockBuf === PASSWORD) { store.set('cs_unlock', true); setTimeout(() => showTitle(), 200); }
+    if (lockBuf === PASSWORD) { setTimeout(() => showTitle(), 200); }
     else { void dots.offsetWidth; dots.classList.add('bad'); toastLock(); setTimeout(() => { lockBuf = ''; lockDraw(); }, 450); }
   }
 }
@@ -1609,7 +1609,9 @@ function boot() {
   g.drawImage(SPRITES.sj.down[0], 50, 8);
   g.fillStyle = '#ff8fb1'; g.fillRect(43, 12, 2, 2); g.fillRect(41, 10, 2, 2); g.fillRect(45, 10, 2, 2); g.fillRect(43, 8, 2, 4);
   buildPad($('lockPad'), lockKey);
-  if (store.get('cs_unlock', false)) showTitle(); else showScreen('lock');
+  // 들어올 때마다 비밀번호를 묻는다(해제 상태를 기기에 남기지 않는다).
+  store.del('cs_unlock');
+  showScreen('lock');
   requestAnimationFrame(loop);
 }
 

@@ -963,8 +963,17 @@ function advanceDlg() {
   dlgState = null; closeDlg(); st.resolve();
   return true;
 }
-// 글 영역을 탭하면 다음으로. 선택지가 떠 있을 땐 글 탭으로 고르지 않는다(실수 방지) — 버튼이나 A로만
-dlg.addEventListener('pointerdown', e => { if (e.target.closest('#choices')) return; e.preventDefault(); if (dlgState && dlgState.choices) return; advanceDlg(); });
+// 대사창이 떠 있으면 화면의 빈 곳 아무 데나 눌러도 넘어간다.
+// 버튼·방향패드·선택지처럼 제 기능이 있는 곳은 제외하고, 미니게임 중에는 그쪽 입력이 우선이다.
+// 선택지가 떠 있을 땐 빈 곳 탭으로 고르지 않는다(실수 방지) — 선택지 버튼이나 A 로만.
+const TAP_SKIP = 'button, #dpad, #choices, #care, #mg, #photo, .screen, textarea, input';
+$('app').addEventListener('pointerdown', e => {
+  if (MG.active) return;
+  if (!dlgState || dlgState.choices) return;
+  if (e.target.closest(TAP_SKIP)) return;
+  e.preventDefault();
+  advanceDlg();
+});
 function moveChoice(d) {
   const st = dlgState; if (!st || !st.choices) return false;
   st.sel = (st.sel + d + st.choices.length) % st.choices.length;
@@ -2017,8 +2026,8 @@ async function playEnding() {
 // ----- 배경음악: 첫 터치/키 입력 뒤에 재생(브라우저 정책), 오른쪽 위 버튼으로 켜고 끔 -----
 const BGM_LIST = ['bgm1.mp3', 'bgm2.mp3'];   // 1: 평화로운 피아노 브금, 2: A hisa - Dreamin'
 const bgm = new Audio();
-bgm.volume = 0.35;
-let bgmIdx = 0, bgmOn = store.get('cs_bgm', true), bgmTried = false;
+bgm.volume = 0.35; bgm.preload = 'auto';
+let bgmIdx = 0, bgmOn = store.get('cs_bgm', true), bgmStarted = false;
 bgm.src = BGM_LIST[0];
 bgm.addEventListener('ended', () => { bgmIdx = (bgmIdx + 1) % BGM_LIST.length; bgm.src = BGM_LIST[bgmIdx]; bgmPlay(); });
 // ----- 효과음: 타이밍 게임용. 음원 파일 없이 웹오디오로 만든다.
@@ -2048,16 +2057,23 @@ function sfx(kind) {
 }
 
 function bgmBtn() { $('btnBgm').textContent = bgmOn ? '🔊' : '🔇'; }
-function bgmPlay() { if (bgmOn) bgm.play().catch(() => {}); }
-function bgmFirst() { if (bgmTried) return; bgmTried = true; bgmPlay(); }
-window.addEventListener('pointerdown', bgmFirst, true);
-window.addEventListener('keydown', bgmFirst, true);
+bgm.addEventListener('playing', () => { bgmStarted = true; });
+function bgmPlay() { if (!bgmOn) return; const p = bgm.play(); if (p && p.catch) p.catch(() => {}); }
+// 브라우저는 사용자 조작 중에만 첫 재생을 허용한다. 그런데 음원이 아직 안 받아졌거나
+// 조작이 인정되지 않으면 조용히 실패한다. 한 번 실패하고 포기하면 "껐다 켜야 소리가 난다".
+// 그래서 실제로 소리가 날 때까지, 조작이 있을 때마다 계속 다시 시도한다.
+function bgmNudge() {
+  if (sfxCtx && sfxCtx.state === 'suspended') sfxCtx.resume();   // 효과음 쪽도 같이 깨운다
+  if (!bgmOn || !bgm.paused) return;
+  bgmPlay();
+}
+['pointerdown', 'pointerup', 'touchend', 'keydown'].forEach(ev => window.addEventListener(ev, bgmNudge, true));
 $('btnBgm').addEventListener('click', e => {
   e.stopPropagation();
   bgmOn = !bgmOn; store.set('cs_bgm', bgmOn); bgmBtn();
-  if (bgmOn) { bgmTried = true; bgmPlay(); } else bgm.pause();
+  if (bgmOn) bgmPlay(); else bgm.pause();
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden) bgm.pause(); else if (bgmOn && bgmTried) bgmPlay(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) bgm.pause(); else if (bgmOn && bgmStarted) bgmPlay(); });
 bgmBtn();
 
 // ===== 보상함 =====

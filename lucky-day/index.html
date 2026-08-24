@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>운수 좋은 날 — 첫 문단 3D</title>
+<style>
+  :root{
+    --bg:#0b0d10;
+    --panel:rgba(14,17,21,.90);
+    --line:#2b313a;
+    --ink:#eae4d8;
+    --dim:#959ca6;
+    --gold:#c9a227;
+    --btn:#171b21;
+    --btn-on:#333e4a;
+    --shadow:0 6px 24px rgba(0,0,0,.55);
+    /* 세로 화면에서 그림이 그려지는 16:9 띠. draw()가 매 프레임 채운다. */
+    --film-top:0px;
+    --film-h:100vh;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+  body{
+    font-family:'Segoe UI', Pretendard, sans-serif;
+    color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+  /* 제목 — 앞부분에만 떠 있다 */
+  #title{
+    position:fixed;left:0;right:0;
+    top:calc(var(--film-top) + max(18px, env(safe-area-inset-top)));
+    text-align:center;pointer-events:none;transition:opacity 1.4s ease;
+  }
+  #title b{display:block;font-size:clamp(17px,3.4vw,21px);letter-spacing:.22em;font-weight:600;
+           text-shadow:0 2px 14px rgba(0,0,0,.85)}
+  #title span{display:block;margin-top:6px;font-size:11.5px;color:var(--dim);letter-spacing:.14em}
+
+  /* 아래쪽은 자막과 조작부를 한 흐름으로 묶는다.
+     따로 띄우면 조작부 버튼이 줄바꿈될 때(좁은 화면) 자막이 그 위로 겹친다. */
+  #bottom{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    width:min(760px,94vw);
+    display:flex;flex-direction:column;gap:12px;align-items:stretch;
+    pointer-events:none;
+  }
+
+  /* 자막 — 전부 원문 그대로 */
+  #sub{
+    text-align:center;
+    font-size:clamp(15px,2.6vw,21px);line-height:1.65;
+    text-shadow:0 2px 10px rgba(0,0,0,.95),0 0 30px rgba(0,0,0,.75);
+    opacity:0;transition:opacity .55s ease;
+    min-height:1.65em;
+  }
+  #sub.on{opacity:1}
+
+  /* 조작부 */
+  #dock{
+    pointer-events:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:10px 12px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;gap:9px;
+  }
+  #bar{position:relative;height:18px;cursor:pointer;touch-action:none}
+  #bar .track{position:absolute;top:7px;left:0;right:0;height:4px;border-radius:2px;background:#242a32}
+  #bar .fill{position:absolute;top:7px;left:0;height:4px;border-radius:2px;background:var(--gold);width:0}
+  #bar .knob{position:absolute;top:2px;width:14px;height:14px;border-radius:50%;
+             background:var(--ink);border:2px solid #0b0d10;left:0;margin-left:-7px}
+  #bar .mark{position:absolute;top:5px;width:2px;height:8px;background:#49525d;margin-left:-1px}
+  #row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  button{
+    font-family:inherit;font-size:13px;color:var(--ink);
+    background:var(--btn);border:1px solid var(--line);border-radius:9px;
+    padding:7px 11px;cursor:pointer;transition:background .15s;
+    touch-action:manipulation;white-space:nowrap;
+  }
+  button:hover{background:var(--btn-on)}
+  button[aria-pressed="true"]{background:var(--btn-on);border-color:var(--gold);color:var(--gold)}
+  #clock{font-size:12px;color:var(--dim);margin-left:auto;font-variant-numeric:tabular-nums}
+
+  /* 구절 → 장면 대응표 */
+  #map{
+    position:fixed;right:max(14px,env(safe-area-inset-right));
+    top:max(14px,env(safe-area-inset-top));
+    width:min(390px,90vw);max-height:min(74vh,640px);overflow:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;box-shadow:var(--shadow);
+    font-size:12.5px;line-height:1.6;display:none;-webkit-overflow-scrolling:touch;
+  }
+  #map.on{display:block}
+  #map h3{margin:0 0 4px;font-size:13px;letter-spacing:.1em;color:var(--gold)}
+  #map p.src{margin:0 0 10px;color:var(--dim);font-size:11.5px}
+  #map table{width:100%;border-collapse:collapse}
+  #map td{padding:6px 4px;border-top:1px solid var(--line);vertical-align:top;cursor:pointer}
+  #map td:first-child{width:47%;color:var(--ink)}
+  #map td:last-child{color:var(--dim)}
+  #map tr.now td{background:rgba(201,162,39,.10)}
+  #map tr.now td:first-child{color:var(--gold)}
+
+  /* 삯 연출 */
+  #coin{
+    position:fixed;left:50%;
+    top:calc(var(--film-top) + var(--film-h) * 0.34);
+    transform:translate(-50%,-50%);
+    text-align:center;pointer-events:none;opacity:0;transition:opacity .55s ease;
+  }
+  #coin.on{opacity:1}
+  #coin b{display:block;font-size:clamp(30px,7vw,56px);color:var(--gold);
+          letter-spacing:.08em;text-shadow:0 3px 20px rgba(0,0,0,.95)}
+  #coin i{display:block;font-style:normal;margin-top:6px;font-size:12.5px;color:var(--dim);letter-spacing:.1em}
+
+  /* WebGL2 미지원 안내 */
+  #nogl{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
+  #nogl div{max-width:430px;background:var(--panel);border:1px solid var(--line);
+            border-radius:14px;padding:22px;line-height:1.75;font-size:14px}
+  #nogl b{color:var(--gold)}
+
+  @media (max-width:600px){
+    #map{left:max(10px,env(safe-area-inset-left));right:max(10px,env(safe-area-inset-right));width:auto}
+    #clock{width:100%;margin-left:0;text-align:right}
+    button{font-size:12px;padding:6px 9px}
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="title"><b>운수 좋은 날</b><span>현진건 · 1924 — 첫 문단</span></div>
+<div id="coin"><b></b><i></i></div>
+
+<div id="map">
+  <h3>구절 → 장면 대응표</h3>
+  <p class="src">원문을 구절로 쪼개, 각 구절이 화면의 무엇이 되었는지. 줄을 누르면 그 대목으로 간다.</p>
+  <table id="maptbl"></table>
+</div>
+
+<div id="bottom">
+<div id="sub"></div>
+<div id="dock">
+  <div id="bar"><div class="track"></div><div class="fill"></div><div class="knob"></div></div>
+  <div id="row">
+    <button id="bPlay" title="스페이스">⏸ 일시정지</button>
+    <button id="bBack" title="← 3초">⏪ 3초</button>
+    <button id="bFwd" title="→ 3초">3초 ⏩</button>
+    <button id="bRe" title="R">⟲ 처음</button>
+    <button id="bFree" title="F" aria-pressed="false">👁 자유 시점</button>
+    <button id="bMap" title="T" aria-pressed="false">📖 대응표</button>
+    <span id="clock">0:00 / 0:00</span>
+  </div>
+</div>
+</div>
+
+<div id="nogl"><div>
+  <b>WebGL2를 쓸 수 없는 브라우저입니다.</b><br>
+  이 장면은 WebGL2로 그립니다. 최신 크롬 · 엣지 · 사파리(15 이상)에서 열어 주세요.
+  카카오톡 · 인스타그램 같은 인앱 브라우저에서는 막혀 있을 수 있으니,
+  오른쪽 위 메뉴의 <b>다른 브라우저로 열기</b>를 눌러 주세요.
+</div></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════════
+   운수 좋은 날 — 첫 문단 3D
+   현진건 「운수 좋은 날」(1924, 공유저작물)의 첫 문단만 읽고 세운 장면.
+   외부 라이브러리 없음. WebGL2를 직접 부른다. 파일 하나로 끝난다.
+   ?debug=1 이면 window.LD 훅이 열린다(숨은 탭에서는 rAF가 멈추므로
+   자동 검증은 LD.seek(t)로 프레임을 직접 돌린다).
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ───────────── 원문 · 구절 · 대응표 ─────────────
+   자막은 전부 원문 그대로다. 지어낸 문장은 한 줄도 없다. */
+const SCRIPT = [
+  { t: 0.0, s:'새침하게 흐린 품이',                            m:'낮게 깔린 잿빛 하늘. 채도를 뺀 팔레트' },
+  { t: 4.2, s:'눈이 올 듯하더니 눈은 아니 오고',                m:'눈송이가 잠깐 흩날리다 그친다' },
+  { t: 8.8, s:'얼다가 만 비가 추적추적 내리었다.',              m:'굵고 느린 진눈깨비. 노면이 젖고 웅덩이가 인다' },
+  { t:14.5, s:'이날이야말로 동소문 안에서',                     m:'동소문 성문과 성벽. 카메라가 문 안으로 들어간다' },
+  { t:19.8, s:'인력거꾼 노릇을 하는 김 첨지에게는',             m:'인력거와 김 첨지. 젖은 무명옷, 머릿수건' },
+  { t:25.0, s:'오래간만에도 닥친 운수 좋은 날이었다.',          m:'하늘이 조금 열리지만 빛은 끝까지 차갑다' },
+  { t:30.5, s:'문안에(거기도 문밖은 아니지만) 들어간답시는',    m:'성문 안쪽 골목. 앞집 대문이 열린다' },
+  { t:35.0, s:'앞집 마나님을 전찻길까지 모셔다 드린 것을 비롯으로', m:'첫 손님 마나님을 태우고 전찻길까지' },
+  { t:41.5, s:'행여나 손님이 있을까 하고 정류장에서 어정어정하며', m:'정류장 옆에 인력거를 세우고 오락가락' },
+  { t:47.0, s:'내리는 사람 하나하나에게 거의 비는 듯한 눈결을 보내고 있다가', m:'전차가 선다. 내리는 사람을 하나씩 눈으로 좇는다' },
+  { t:53.5, s:'마침내 교원인 듯한 양복장이를',                  m:'중절모에 양복, 가방을 든 손님' },
+  { t:58.0, s:'동광학교(東光學校)까지 태워다 주기로 되었다.',   m:'학교 앞까지 달린다. 현판에 東光學校' },
+  { t:66.5, s:'첫번에 삼십 전, 둘째 번에 오십 전 -',            m:'젖은 손바닥 위로 떨어지는 동전 두 번' },
+  { t:71.5, s:'아침 댓바람에 그리 흔치 않은 일이었다.',         m:'카메라가 물러나 비 내리는 거리 전체를 본다' }
+];
+const DUR = 79.0;                     // 전체 길이(초)
+
+/* ───────────── 장면 좌표계 ─────────────
+   X : 동소문(-) → 동광학교(+)   Y : 위   Z : 길 건너 방향
+   단위는 미터. */
+const GATE_X   = -62;                 // 동소문
+const STOP_X   =   0;                 // 전차 정류장
+const SCHOOL_X =  56;                 // 동광학교
+const ROAD_HW  = 6.5;                 // 노면 반폭
+
+/* 색은 여기 한곳에 모아 둔다(CSS의 :root에 해당하는 자리). */
+const PAL = {
+  zenith:[0.40,0.43,0.48], horizon:[0.70,0.71,0.72], cloud:[0.53,0.55,0.58],
+  earth :[0.25,0.22,0.19], road:[0.19,0.19,0.21],  puddle:[0.11,0.12,0.14],
+  stone :[0.45,0.44,0.42], wall:[0.63,0.58,0.49],  tile:[0.21,0.22,0.25],
+  wood  :[0.31,0.24,0.17], door:[0.24,0.18,0.13],  brick:[0.42,0.26,0.22],
+  rail  :[0.32,0.30,0.29], sleep:[0.22,0.18,0.15], pole:[0.27,0.23,0.19],
+  lamp  :[1.00,0.86,0.58], glass:[0.30,0.34,0.36],
+  rick  :[0.13,0.13,0.13], hood:[0.10,0.10,0.11],  spoke:[0.55,0.53,0.50],
+  tram  :[0.24,0.30,0.26], trim:[0.74,0.71,0.62],
+  skin  :[0.76,0.62,0.50], hair:[0.10,0.09,0.09],
+  rain  :[0.76,0.82,0.88], gold:[0.85,0.70,0.28],  snow:[0.94,0.95,0.97]
+};
+
+/* 사람 팔레트: [옷위, 옷아래, 머리/모자, 신] */
+const WHO = {
+  kim   : { top:[0.72,0.70,0.62], bot:[0.64,0.61,0.54], head:[0.80,0.78,0.72], shoe:[0.30,0.26,0.21] },
+  lady  : { top:[0.88,0.86,0.82], bot:[0.26,0.30,0.44], head:PAL.hair,          shoe:[0.25,0.22,0.20], skirt:true },
+  teach : { top:[0.14,0.15,0.18], bot:[0.14,0.15,0.18], head:[0.10,0.10,0.12], shoe:[0.09,0.09,0.10], hat:true },
+  pass1 : { top:[0.30,0.28,0.32], bot:[0.22,0.21,0.24], head:PAL.hair, shoe:[0.16,0.15,0.14] },
+  pass2 : { top:[0.78,0.76,0.71], bot:[0.36,0.34,0.40], head:PAL.hair, shoe:[0.20,0.18,0.17], skirt:true },
+  pass3 : { top:[0.20,0.24,0.30], bot:[0.18,0.18,0.20], head:[0.12,0.12,0.14], shoe:[0.12,0.12,0.13], hat:true },
+  pass4 : { top:[0.55,0.50,0.44], bot:[0.40,0.37,0.33], head:PAL.hair, shoe:[0.22,0.20,0.18] },
+  pass5 : { top:[0.84,0.82,0.78], bot:[0.30,0.28,0.26], head:PAL.hair, shoe:[0.19,0.18,0.17], skirt:true }
+};
+
+/* ══════════════ 4×4 · 3×3 행렬 ══════════════ */
+const m4 = {
+  make(){ return new Float32Array(16); },
+  ident(o){ o.fill(0); o[0]=o[5]=o[10]=o[15]=1; return o; },
+  mul(o,a,b){                                   // o = a·b (열 우선)
+    for(let c=0;c<4;c++){
+      const b0=b[c*4],b1=b[c*4+1],b2=b[c*4+2],b3=b[c*4+3];
+      o[c*4  ]=a[0]*b0+a[4]*b1+a[8 ]*b2+a[12]*b3;
+      o[c*4+1]=a[1]*b0+a[5]*b1+a[9 ]*b2+a[13]*b3;
+      o[c*4+2]=a[2]*b0+a[6]*b1+a[10]*b2+a[14]*b3;
+      o[c*4+3]=a[3]*b0+a[7]*b1+a[11]*b2+a[15]*b3;
+    }
+    return o;
+  },
+  persp(o,fovy,asp,n,f){
+    const t=1/Math.tan(fovy/2);
+    o.fill(0); o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f);
+    return o;
+  },
+  look(o,e,c,up){
+    let zx=e[0]-c[0], zy=e[1]-c[1], zz=e[2]-c[2];
+    let l=Math.hypot(zx,zy,zz)||1; zx/=l; zy/=l; zz/=l;
+    let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+    l=Math.hypot(xx,xy,xz)||1; xx/=l; xy/=l; xz/=l;
+    const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    o[0]=xx; o[1]=yx; o[2]=zx; o[3]=0;
+    o[4]=xy; o[5]=yy; o[6]=zy; o[7]=0;
+    o[8]=xz; o[9]=yz; o[10]=zz; o[11]=0;
+    o[12]=-(xx*e[0]+xy*e[1]+xz*e[2]);
+    o[13]=-(yx*e[0]+yy*e[1]+yz*e[2]);
+    o[14]=-(zx*e[0]+zy*e[1]+zz*e[2]);
+    o[15]=1;
+    return o;
+  },
+  inv(o,m){                                      // 일반 4×4 역행렬(하늘 광선용)
+    const a=m[0],b=m[1],c=m[2],d=m[3],e=m[4],f=m[5],g=m[6],h=m[7],
+          i=m[8],j=m[9],k=m[10],l=m[11],n=m[12],p=m[13],q=m[14],r=m[15];
+    const s0=a*f-b*e, s1=a*g-c*e, s2=a*h-d*e, s3=b*g-c*f,
+          s4=b*h-d*f, s5=c*h-d*g, t0=i*p-j*n, t1=i*q-k*n,
+          t2=i*r-l*n, t3=j*q-k*p, t4=j*r-l*p, t5=k*r-l*q;
+    let det=s0*t5-s1*t4+s2*t3+s3*t2-s4*t1+s5*t0;
+    if(!det) return m4.ident(o);
+    det=1/det;
+    o[0]=( f*t5-g*t4+h*t3)*det; o[1]=(-b*t5+c*t4-d*t3)*det;
+    o[2]=( p*s5-q*s4+r*s3)*det; o[3]=(-j*s5+k*s4-l*s3)*det;
+    o[4]=(-e*t5+g*t2-h*t1)*det; o[5]=( a*t5-c*t2+d*t1)*det;
+    o[6]=(-n*s5+q*s2-r*s1)*det; o[7]=( i*s5-k*s2+l*s1)*det;
+    o[8]=( e*t4-f*t2+h*t0)*det; o[9]=(-a*t4+b*t2-d*t0)*det;
+    o[10]=( n*s4-p*s2+r*s0)*det; o[11]=(-i*s4+j*s2-l*s0)*det;
+    o[12]=(-e*t3+f*t1-g*t0)*det; o[13]=( a*t3-b*t1+c*t0)*det;
+    o[14]=(-n*s3+p*s1-q*s0)*det; o[15]=( i*s3-j*s1+k*s0)*det;
+    return o;
+  }
+};
+
+/* ══════════════ 변환 스택 ══════════════
+   규칙 하나: 스택은 이동·회전만 한다. 크기는 그리는 순간에만 준다.
+   그래야 스택 행렬의 위쪽 3×3이 항상 순수 회전이고,
+   법선 행렬을 회전 × (1/크기)로 정확히 구할 수 있다. */
+const MS = (function(){
+  const pool=[]; for(let i=0;i<32;i++) pool.push(m4.ident(m4.make()));
+  const tmp=m4.make(); const scr=m4.make();
+  let top=0;
+  const api={
+    reset(){ top=0; m4.ident(pool[0]); return api; },
+    push(){ pool[top+1].set(pool[top]); top++; return api; },
+    pop(){ top--; return api; },
+    cur(){ return pool[top]; },
+    mulIn(m){ m4.mul(scr,pool[top],m); pool[top].set(scr); return api; },
+    move(x,y,z){ m4.ident(tmp); tmp[12]=x; tmp[13]=y; tmp[14]=z; return api.mulIn(tmp); },
+    rotY(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[0]=c; tmp[2]=-s; tmp[8]=s; tmp[10]=c; return api.mulIn(tmp); },
+    rotX(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[5]=c; tmp[6]=s; tmp[9]=-s; tmp[10]=c; return api.mulIn(tmp); },
+    rotZ(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[0]=c; tmp[1]=s; tmp[4]=-s; tmp[5]=c; return api.mulIn(tmp); }
+  };
+  return api;
+})();
+
+/* ══════════════ WebGL 준비 ══════════════ */
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl2', { antialias:true, alpha:false, powerPreference:'high-performance' });
+if(!gl){
+  document.getElementById('nogl').style.display='flex';
+  document.getElementById('dock').style.display='none';
+  return;
+}
+
+function shader(type,src){
+  const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error('셰이더 컴파일 실패\n'+gl.getShaderInfoLog(s)+'\n'+src);
+  return s;
+}
+function program(vs,fs,names){
+  const p=gl.createProgram();
+  gl.attachShader(p,shader(gl.VERTEX_SHADER,vs));
+  gl.attachShader(p,shader(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)) console.error('프로그램 링크 실패\n'+gl.getProgramInfoLog(p));
+  const u={}; names.forEach(n=>{ u[n]=gl.getUniformLocation(p,n); });
+  return { p:p, u:u };
+}
+
+/* ── 본체 셰이더: 램버트 + 반구광 + 젖은 노면 + 안개 ── */
+const VS_MAIN = `#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec3 aCol;
+uniform mat4 uProj, uView, uModel;
+uniform mat3 uNrm;
+out vec3 vN; out vec3 vC; out vec3 vW;
+void main(){
+  vec4 w = uModel * vec4(aPos,1.0);
+  vW = w.xyz;
+  vN = uNrm * aNrm;
+  vC = aCol;
+  gl_Position = uProj * uView * w;
+}`;
+
+const FS_MAIN = `#version 300 es
+precision highp float;
+in vec3 vN; in vec3 vC; in vec3 vW;
+uniform vec3  uTint;
+uniform vec3  uEye;
+uniform vec3  uFog;
+uniform vec3  uSky;
+uniform float uFogD;
+uniform float uTime;
+uniform float uWet;
+uniform float uAlpha;
+uniform float uFlat;
+uniform float uLight;
+out vec4 outColor;
+
+void main(){
+  if(uFlat > 0.5){                                   /* 그림자·유리 같은 납작한 것 */
+    outColor = vec4(uTint, uAlpha * vC.r);
+    return;
+  }
+  vec3 N = normalize(vN);
+  float up = smoothstep(0.90, 0.995, N.y);
+  float d = length(uEye - vW);
+
+  /* 젖음은 가까운 데서만 계산한다. 멀리까지 켜 두면
+     지면이 스쳐 보이는 각도에서 물결무늬(모아레)가 화면을 뒤덮는다. */
+  float wet = uWet * (1.0 - smoothstep(26.0, 72.0, d));
+
+  /* 젖은 바닥에 이는 잔물결 */
+  if(up > 0.001 && wet > 0.001){
+    float r = sin(vW.x*3.3 + uTime*4.6) * sin(vW.z*2.9 - uTime*3.9)
+            + 0.5*sin(vW.x*7.1 - uTime*6.2) * sin(vW.z*6.4 + uTime*5.1);
+    N = normalize(N + vec3(r*0.05, 0.0, r*0.05) * up * wet);
+  }
+
+  vec3 L = normalize(vec3(-0.30, 0.88, 0.37));       /* 구름 뒤의 해 */
+  vec3 V = normalize(uEye - vW);
+  float lam = max(dot(N,L), 0.0);
+  float hemi = 0.5 + 0.5*N.y;                        /* 하늘 반구광 */
+
+  vec3 base = vC * uTint;
+  vec3 c = base * (0.26 + 0.44*hemi + 0.32*lam) * uLight;
+
+  /* 젖은 면: 하늘이 비치고 하이라이트가 뜬다 */
+  if(up > 0.001){
+    float fres = pow(1.0 - max(dot(N,V), 0.0), 4.0);
+    c = mix(c, uSky, fres * 0.55 * up * wet);
+    vec3 H = normalize(L + V);
+    c += vec3(1.0,0.98,0.94) * pow(max(dot(N,H),0.0), 110.0) * 0.9 * up * wet;
+  }
+
+  c = mix(c, uFog, 1.0 - exp(-d / uFogD));
+  outColor = vec4(c, uAlpha);
+}`;
+
+const MAIN = program(VS_MAIN, FS_MAIN,
+  ['uProj','uView','uModel','uNrm','uTint','uEye','uFog','uSky','uFogD','uTime','uWet','uAlpha','uFlat','uLight']);
+
+/* ── 하늘: 전체 화면 삼각형에 시선 광선으로 그라데이션 ── */
+const SKY = program(
+`#version 300 es
+out vec2 vNdc;
+void main(){
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  vNdc = p * 2.0 - 1.0;
+  gl_Position = vec4(vNdc, 1.0, 1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec2 vNdc;
+uniform mat4 uInvVP;
+uniform vec3 uEye, uZen, uHor, uCld;
+uniform float uTime;
+out vec4 outColor;
+void main(){
+  vec4 p = uInvVP * vec4(vNdc, 1.0, 1.0);
+  vec3 dir = normalize(p.xyz / p.w - uEye);
+  float h = clamp(dir.y, 0.0, 1.0);
+  vec3 c = mix(uHor, uZen, pow(h, 0.62));
+  float n = 0.5 + 0.5 * sin(dir.x*6.0 + uTime*0.045) * sin(dir.z*5.0 - uTime*0.035);
+  n = 0.5 + 0.5 * (n + 0.5*sin(dir.x*13.0 - dir.z*11.0 + uTime*0.02) - 0.5);
+  c = mix(c, uCld, n * 0.42 * smoothstep(0.0, 0.45, h));
+  outColor = vec4(c, 1.0);
+}`,
+['uInvVP','uEye','uZen','uHor','uCld','uTime']);
+
+/* ── 비 · 눈: 인스턴싱한 줄기 ── */
+const RAIN = program(
+`#version 300 es
+layout(location=0) in vec2 aQ;
+layout(location=1) in vec4 aSeed;
+uniform mat4 uProj, uView;
+uniform vec3 uEye, uBox;
+uniform vec2 uSize;
+uniform float uTime, uSnow;
+out float vA;
+void main(){
+  float bx = uBox.x, by = uBox.y, bz = uBox.z;
+  vec3 base = vec3(aSeed.x * bx, 0.0, aSeed.z * bz);
+  vec3 rel = base - uEye;
+  rel.x = mod(rel.x + bx*0.5, bx) - bx*0.5;
+  rel.z = mod(rel.z + bz*0.5, bz) - bz*0.5;
+
+  float spd = mix(1.0, 0.09, uSnow);
+  float fall = fract(aSeed.y - uTime * aSeed.w * spd);
+  float sway = uSnow * sin(uTime*0.9 + aSeed.x*37.0) * 1.1;
+
+  /* 빗줄기 기둥은 카메라 높이를 따라간다. 높이 올라간 컷에서도 비가 보이게. */
+  float top = uEye.y + by * 0.55;
+  float bot = max(0.0, uEye.y - by * 0.45);
+  vec3 w = vec3(uEye.x + rel.x + sway, bot + fall * (top - bot), uEye.z + rel.z);
+  vec3 toEye = uEye - w;
+  float d = length(toEye);
+  vec3 right = normalize(cross(vec3(0.0,1.0,0.0), toEye));
+
+  float len = mix(uSize.y, uSize.y*0.14, uSnow);
+  float wid = mix(uSize.x, uSize.x*3.6, uSnow);
+  vec3 pos = w + right*(aQ.x*wid) + vec3(0.0, aQ.y*len, 0.0) + right*(aQ.y*len*0.20);
+
+  vA = smoothstep(1.0, 4.5, d) * (1.0 - smoothstep(bz*0.30, bz*0.50, d));
+  gl_Position = uProj * uView * vec4(pos, 1.0);
+}`,
+`#version 300 es
+precision highp float;
+in float vA;
+uniform vec3 uCol;
+uniform float uOpacity;
+out vec4 outColor;
+void main(){ outColor = vec4(uCol, vA * uOpacity); }`,
+['uProj','uView','uEye','uBox','uSize','uTime','uSnow','uCol','uOpacity']);
+
+/* ══════════════ 형상 만들기 ══════════════
+   모든 형상은 코드로 찍는다. 내려받은 에셋이 하나도 없다. */
+function Builder(){ this.a = []; }
+Builder.prototype.tri = function(p, n, col){
+  const M = MS.cur(), a = this.a;
+  for(let i=0;i<3;i++){
+    const x=p[i][0], y=p[i][1], z=p[i][2];
+    a.push(M[0]*x+M[4]*y+M[8]*z+M[12], M[1]*x+M[5]*y+M[9]*z+M[13], M[2]*x+M[6]*y+M[10]*z+M[14]);
+    const nx=n[i][0], ny=n[i][1], nz=n[i][2];
+    let tx=M[0]*nx+M[4]*ny+M[8]*nz, ty=M[1]*nx+M[5]*ny+M[9]*nz, tz=M[2]*nx+M[6]*ny+M[10]*nz;
+    const l=Math.hypot(tx,ty,tz)||1;
+    a.push(tx/l, ty/l, tz/l, col[0], col[1], col[2]);
+  }
+};
+Builder.prototype.quad = function(p0,p1,p2,p3,col){
+  const ux=p1[0]-p0[0], uy=p1[1]-p0[1], uz=p1[2]-p0[2];
+  const vx=p3[0]-p0[0], vy=p3[1]-p0[1], vz=p3[2]-p0[2];
+  const n=[uy*vz-uz*vy, uz*vx-ux*vz, ux*vy-uy*vx];
+  const l=Math.hypot(n[0],n[1],n[2])||1; n[0]/=l; n[1]/=l; n[2]/=l;
+  this.tri([p0,p1,p2],[n,n,n],col);
+  this.tri([p0,p2,p3],[n,n,n],col);
+};
+/* 중심이 원점인 직육면체 */
+Builder.prototype.box = function(sx,sy,sz,col){
+  const x=sx/2, y=sy/2, z=sz/2;
+  const v=[[-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]];
+  this.quad(v[4],v[5],v[6],v[7],col);            // +Z
+  this.quad(v[1],v[0],v[3],v[2],col);            // -Z
+  this.quad(v[5],v[1],v[2],v[6],col);            // +X
+  this.quad(v[0],v[4],v[7],v[3],col);            // -X
+  this.quad(v[3],v[7],v[6],v[2],col);            // +Y
+  this.quad(v[0],v[1],v[5],v[4],col);            // -Y
+};
+/* Y축 원기둥(중심 원점).
+   감김 방향에 주의: 바깥을 향한 면이 반시계(CCW)가 되어야 뒷면 컬링에 안 잘린다.
+   법선만 맞추고 감김을 뒤집어 두면 겉면이 잘리고 속면이 보인다 — 동전처럼
+   납작한 것에서 바로 티가 난다. */
+Builder.prototype.cyl = function(r,h,seg,col,caps){
+  const y=h/2, U=[0,1,0], D=[0,-1,0];
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
+    const p0=[c0*r,-y,s0*r], p1=[c1*r,-y,s1*r], p2=[c1*r,y,s1*r], p3=[c0*r,y,s0*r];
+    const n0=[c0,0,s0], n1=[c1,0,s1];
+    this.tri([p0,p2,p1],[n0,n1,n1],col);
+    this.tri([p0,p3,p2],[n0,n0,n1],col);
+    if(caps!==false){
+      this.tri([[0,y,0],p2,p3],[U,U,U],col);
+      this.tri([[0,-y,0],p0,p1],[D,D,D],col);
+    }
+  }
+};
+/* 원뿔대(밑면 y=-h/2 반지름 r0, 윗면 y=+h/2 반지름 r1) — 치마·나무·항아리에 쓴다 */
+Builder.prototype.cone = function(r0,r1,h,seg,col){
+  const y=h/2, ny=(r0-r1)/h, U=[0,1,0], D=[0,-1,0];
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
+    const p0=[c0*r0,-y,s0*r0], p1=[c1*r0,-y,s1*r0], p2=[c1*r1,y,s1*r1], p3=[c0*r1,y,s0*r1];
+    const n0=[c0,ny,s0], n1=[c1,ny,s1];
+    this.tri([p0,p2,p1],[n0,n1,n1],col);
+    this.tri([p0,p3,p2],[n0,n0,n1],col);
+    this.tri([[0,-y,0],p0,p1],[D,D,D],col);
+    if(r1>0.001) this.tri([[0,y,0],p2,p3],[U,U,U],col);
+  }
+};
+/* XZ 평면의 원판. 가운데는 진하고 가장자리는 투명 — 그림자용 */
+Builder.prototype.disc = function(r,seg){
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    this.tri([[0,0,0],[Math.cos(a1)*r,0,Math.sin(a1)*r],[Math.cos(a0)*r,0,Math.sin(a0)*r]],
+             [[0,1,0],[0,1,0],[0,1,0]], [1,1,1]);
+    /* 가장자리 투명도는 정점색으로 준다 */
+    const n=this.a.length;
+    this.a[n-13]=0; this.a[n-12]=0; this.a[n-11]=0;   // 두 번째 정점 색
+    this.a[n-4]=0;  this.a[n-3]=0;  this.a[n-2]=0;    // 세 번째 정점 색
+  }
+};
+/* 저(低)폴리 구 */
+Builder.prototype.sph = function(r,seg,ring,col){
+  for(let j=0;j<ring;j++){
+    const t0=j/ring*Math.PI, t1=(j+1)/ring*Math.PI;
+    for(let i=0;i<seg;i++){
+      const p0=i/seg*Math.PI*2, p1=(i+1)/seg*Math.PI*2;
+      const P=(t,p)=>[Math.sin(t)*Math.cos(p), Math.cos(t), Math.sin(t)*Math.sin(p)];
+      const a=P(t0,p0), b=P(t1,p0), c=P(t1,p1), d=P(t0,p1);
+      const S=v=>[v[0]*r,v[1]*r,v[2]*r];
+      this.tri([S(a),S(c),S(b)],[a,c,b],col);
+      this.tri([S(a),S(d),S(c)],[a,d,c],col);
+    }
+  }
+};
+/* 맞배지붕. 용마루는 X축을 따라 눕는다 — 즉 w가 건물의 긴 쪽이다.
+   지붕 방향을 틀고 싶으면 이 함수가 아니라 부르는 쪽에서 rotY 한다. */
+Builder.prototype.roof = function(w,d,h,eave,col){
+  const x=w/2+eave, z=d/2+eave, y=h, rx=w*0.47, rz=d*0.06;
+  const A=[-x,0,-z], B=[x,0,-z], C=[x,0,z], D=[-x,0,z];
+  const E=[-rx,y,-rz], F=[rx,y,-rz], G=[rx,y,rz], H=[-rx,y,rz];
+  this.quad(D,C,G,H,col);                                    // +Z 경사
+  this.quad(B,A,E,F,col);                                    // -Z 경사
+  this.quad(A,D,H,E,[col[0]*0.86,col[1]*0.86,col[2]*0.86]);  // -X 박공
+  this.quad(C,B,F,G,[col[0]*0.86,col[1]*0.86,col[2]*0.86]);  // +X 박공
+  this.quad(E,H,G,F,[col[0]*1.18,col[1]*1.18,col[2]*1.18]);  // 용마루
+};
+
+function upload(arr){
+  const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+  const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW);
+  const S=36;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,S,0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,S,12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,S,24);
+  gl.bindVertexArray(null);
+  return { vao:vao, n:arr.length/9 };
+}
+function bake(fn){ MS.reset(); const b=new Builder(); fn(b); return upload(b.a); }
+
+/* ══════════════ 단위 형상(움직이는 것들이 쓴다) ══════════════ */
+const P = {
+  box  : bake(b=>b.box(1,1,1,[1,1,1])),
+  cyl  : bake(b=>b.cyl(0.5,1,14,[1,1,1],true)),
+  tube : bake(b=>b.cyl(0.5,1,14,[1,1,1],false)),
+  cone : bake(b=>b.cone(0.5,0.001,1,14,[1,1,1])),
+  skirt: bake(b=>b.cone(0.5,0.22,1,16,[1,1,1])),
+  sph  : bake(b=>b.sph(0.5,12,8,[1,1,1])),
+  disc : bake(b=>b.disc(0.5,20))
+};
+
+/* 그리기: 단위 형상을 현재 변환 × 크기로 놓는다.
+   법선 행렬 = (스택의 회전) × (1/크기). 스택에 크기가 없으니 정확하다. */
+const _M=m4.make(), _S=m4.make(), _N=new Float32Array(9);
+function part(prim, sx,sy,sz, col, opt){
+  const C=MS.cur();
+  m4.ident(_S); _S[0]=sx; _S[5]=sy; _S[10]=sz;
+  m4.mul(_M, C, _S);
+  const ix=1/sx, iy=1/sy, iz=1/sz;
+  _N[0]=C[0]*ix; _N[1]=C[1]*ix; _N[2]=C[2]*ix;
+  _N[3]=C[4]*iy; _N[4]=C[5]*iy; _N[5]=C[6]*iy;
+  _N[6]=C[8]*iz; _N[7]=C[9]*iz; _N[8]=C[10]*iz;
+  gl.uniformMatrix4fv(MAIN.u.uModel,false,_M);
+  gl.uniformMatrix3fv(MAIN.u.uNrm,false,_N);
+  gl.uniform3fv(MAIN.u.uTint, col);
+  gl.uniform1f(MAIN.u.uAlpha, (opt && opt.alpha!==undefined) ? opt.alpha : 1);
+  gl.uniform1f(MAIN.u.uFlat,  (opt && opt.flat) ? 1 : 0);
+  gl.uniform1f(MAIN.u.uLight, (opt && opt.light!==undefined) ? opt.light : 1);
+  gl.bindVertexArray(prim.vao);
+  gl.drawArrays(gl.TRIANGLES, 0, prim.n);
+}
+
+/* ══════════════ 거리 굽기 ══════════════ */
+function rand(seed){ let s=seed; return function(){ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; }; }
+
+const WORLD = bake(function(b){
+  const R = rand(20240315);
+
+  /* ── 땅과 노면. 부감 컷에서 지면의 끝선이 보이지 않을 만큼 넓게 ── */
+  MS.push(); MS.move(0,-0.06,0); b.box(620,0.12,460, PAL.earth); MS.pop();
+  MS.push(); MS.move(0,0.01,0);  b.box(280,0.02,ROAD_HW*2, PAL.road); MS.pop();
+  /* 길가 흙둔덕 */
+  MS.push(); MS.move(0,0.05,ROAD_HW+0.9);  b.box(280,0.10,1.8,[0.28,0.25,0.21]); MS.pop();
+  MS.push(); MS.move(0,0.05,-ROAD_HW-0.9); b.box(280,0.10,1.8,[0.28,0.25,0.21]); MS.pop();
+
+  /* 웅덩이 — 길에 파인 자리 */
+  for(let i=0;i<46;i++){
+    const x=-120+R()*250, z=(R()*2-1)*(ROAD_HW-0.5), r=0.5+R()*1.5;
+    MS.push(); MS.move(x,0.025,z); b.cone(r,r*0.94,0.02,12,PAL.puddle); MS.pop();
+  }
+
+  /* ── 전찻길: 레일 두 줄과 침목 ── */
+  for(const dz of [-0.72, 0.72]){
+    MS.push(); MS.move(0,0.07,dz); b.box(272,0.1,0.11, PAL.rail); MS.pop();
+  }
+  for(let x=-130;x<=140;x+=1.6){
+    MS.push(); MS.move(x,0.03,0); b.box(0.24,0.07,2.3, PAL.sleep); MS.pop();
+  }
+
+  /* ── 동소문(혜화문) — 석축 사이 홍예문, 그 위 문루 ── */
+  MS.push(); MS.move(GATE_X,0,0);
+    const GW = 3.6;                                    // 문 구멍 반폭
+    const GR = GW + 0.34;                              // 홍예 돌의 반지름
+    const SPR = 4.6;                                   // 홍예가 시작되는 높이
+
+    /* 석축은 문루 기단 바로 밑까지 올라간다 — 낮게 두면 문루가 허공에 뜬다 */
+    for(const s of [-1,1]){
+      MS.push(); MS.move(0, 4.45, s*(GW+4.9)); b.box(9.6, 8.9, 9.8, PAL.stone); MS.pop();
+      MS.push(); MS.move(0, 8.75, s*(GW+4.9)); b.box(10.4, 0.5, 10.5, [0.40,0.39,0.37]); MS.pop();
+      /* 돌 켜 — 없으면 거대한 회색 판 하나로 보인다 */
+      for(let yy=1.1; yy<8.4; yy+=1.25){
+        for(const sx of [-1,1]){
+          MS.push(); MS.move(sx*4.82, yy, s*(GW+4.9)); b.box(0.05, 0.11, 9.8, [0.35,0.34,0.33]); MS.pop();
+        }
+        MS.push(); MS.move(0, yy, s*(GW+0.03)); b.box(9.6, 0.11, 0.05, [0.35,0.34,0.33]); MS.pop();
+      }
+    }
+    /* 홍예 — 반원을 돌 열세 장으로 두른다 */
+    for(let i=0;i<=12;i++){
+      const a = i/12*Math.PI;
+      MS.push(); MS.move(0, SPR + Math.sin(a)*GR, Math.cos(a)*GR); MS.rotX(Math.PI/2 - a);
+        b.box(9.6, 0.68, 1.12, [0.47,0.46,0.44]);
+      MS.pop();
+    }
+    /* 홍예 위 빈 곳을 채운다 — 안 채우면 틈으로 하늘이 샌다 */
+    for(let i=0;i<6;i++){
+      const zz = GR*Math.cos((i+0.5)/6*Math.PI);
+      const yb = SPR + Math.sqrt(Math.max(GR*GR - zz*zz, 0)) - 0.1, yt = 8.9;
+      if(yt > yb){
+        MS.push(); MS.move(0, (yb+yt)/2, zz); b.box(9.6, yt-yb, GR*2/6, PAL.stone); MS.pop();
+      }
+    }
+    MS.push(); MS.move(0, 8.6, 0); b.box(9.6, 0.8, GW*2+1.0, PAL.stone); MS.pop();   // 통로 천장
+
+    /* 문루: 기단 → 마루 → 기둥과 벽 → 난간 → 지붕 */
+    MS.push(); MS.move(0, 9.20, 0); b.box(11.2, 0.62, 20.0, [0.40,0.39,0.37]); MS.pop();
+    MS.push(); MS.move(0, 9.68, 0); b.box(11.5, 0.34, 20.5, [0.34,0.27,0.20]); MS.pop();
+    for(let i=-3;i<=3;i++) for(const s of [-1,1]){
+      MS.push(); MS.move(s*3.6, 11.05, i*2.95); b.cyl(0.28, 2.5, 10, PAL.wood, true); MS.pop();
+    }
+    MS.push(); MS.move(0, 10.95, 0); b.box(6.2, 2.3, 18.4, [0.58,0.50,0.40]); MS.pop();
+    for(const s of [-1,1]){
+      MS.push(); MS.move(s*5.35, 10.3, 0); b.box(0.16, 0.7, 20.2, [0.36,0.28,0.20]); MS.pop();
+      MS.push(); MS.move(s*5.35, 10.62, 0); b.box(0.22, 0.12, 20.4, [0.30,0.24,0.17]); MS.pop();
+    }
+    /* 지붕: 긴 쪽이 Z이므로 90도 틀어 용마루를 Z에 눕힌다 */
+    MS.push(); MS.move(0, 12.25, 0); MS.rotY(Math.PI/2); b.roof(21.5, 9.8, 3.5, 1.9, PAL.tile); MS.pop();
+
+    /* 성벽이 좌우로 뻗는다 */
+    for(const s of [-1,1]){
+      MS.push(); MS.move(0, 2.9, s*(GW+22)); b.box(8.4, 5.8, 25, PAL.stone); MS.pop();
+      for(let i=0;i<9;i++){                            // 여장(성가퀴)
+        MS.push(); MS.move(0, 6.35, s*(GW+10.6+i*2.9)); b.box(8.4, 1.1, 1.9, [0.50,0.49,0.47]); MS.pop();
+      }
+    }
+  MS.pop();
+
+  /* ── 한옥 줄 — 길 양쪽 ── */
+  function hanok(x,z,face,w,d,seed){
+    const r=rand(seed);
+    MS.push(); MS.move(x,0,z); MS.rotY(face);
+      MS.push(); MS.move(0,0.28,0); b.box(w+0.7,0.56,d+0.7,[0.40,0.36,0.31]); MS.pop();   // 기단
+      MS.push(); MS.move(0,1.65,0); b.box(w,2.2,d, PAL.wall); MS.pop();                     // 흙벽
+      for(let i=0;i<3;i++){                                                                 // 기둥
+        MS.push(); MS.move(-w/2+0.2, 1.65, -d/2+0.3+i*(d-0.6)/2); b.cyl(0.13,2.2,8,PAL.wood,true); MS.pop();
+      }
+      MS.push(); MS.move(-w/2-0.02,1.35,0); b.box(0.1,1.6,1.3, PAL.door); MS.pop();         // 대문
+      MS.push(); MS.move(-w/2-0.05,1.35,0); b.box(0.06,0.1,1.3,[0.52,0.44,0.30]); MS.pop(); // 문고리 띠
+      MS.push(); MS.move(0,2.78,0); b.roof(w,d,1.25,0.62, PAL.tile); MS.pop();              // 기와지붕
+      if(r()>0.55){                                                                          // 장독대
+        for(let i=0;i<2+((r()*3)|0);i++){
+          MS.push(); MS.move(w/2-0.5-r()*0.8, 0.85, -d/2+0.5+r()*(d-1));
+            b.cone(0.20,0.15,0.6,10,[0.24,0.19,0.16]); MS.pop();
+        }
+      }
+    MS.pop();
+  }
+  let hs=7001;
+  for(let x=GATE_X+13; x<SCHOOL_X-16; x+=8.4){
+    const jitter=(R()*2-1)*0.9;
+    hanok(x+jitter,  ROAD_HW+5.6+R()*1.4, Math.PI/2 + (R()*2-1)*0.05, 6.4+R()*1.6, 5.2+R()*1.2, hs++);
+    if(R()>0.18)
+      hanok(x-2+jitter, -ROAD_HW-5.6-R()*1.4, -Math.PI/2 + (R()*2-1)*0.05, 6.2+R()*1.6, 5.0+R()*1.2, hs++);
+  }
+  /* 뒷줄 — 안개 속에 지붕만 겹쳐 보인다 */
+  for(let x=GATE_X+8; x<SCHOOL_X+10; x+=9.6){
+    hanok(x, ROAD_HW+14+R()*3, Math.PI/2, 7+R()*2, 5.6, hs++);
+    hanok(x+4, -ROAD_HW-14-R()*3, -Math.PI/2, 7+R()*2, 5.6, hs++);
+  }
+
+  /* ── 동광학교 — 붉은 벽돌 2층에 현판 ── */
+  MS.push(); MS.move(SCHOOL_X, 0, -ROAD_HW-13);
+    MS.push(); MS.move(0,0.35,0); b.box(25,0.7,15,[0.38,0.36,0.34]); MS.pop();
+    MS.push(); MS.move(0,4.3,0);  b.box(23,7.2,13, PAL.brick); MS.pop();
+    MS.push(); MS.move(0,8.1,0);  b.box(24,0.5,14,[0.33,0.20,0.17]); MS.pop();
+    MS.push(); MS.move(0,9.0,0); b.roof(24,14.2,1.9,0.7,[0.26,0.23,0.24]); MS.pop();
+    /* 창 — 두 층 */
+    for(let f=0;f<2;f++) for(let i=-4;i<=4;i++){
+      MS.push(); MS.move(-1.2+i*2.4, 2.6+f*3.3, 6.55); b.box(1.25,1.9,0.12, PAL.glass); MS.pop();
+      MS.push(); MS.move(-1.2+i*2.4, 2.6+f*3.3, 6.62); b.box(0.09,1.9,0.06,[0.30,0.26,0.22]); MS.pop();
+    }
+    /* 현관 + 현판(東光學校) */
+    MS.push(); MS.move(-1.2,1.85,7.2); b.box(3.4,3.7,1.6,[0.36,0.22,0.19]); MS.pop();
+    MS.push(); MS.move(-1.2,1.55,8.05); b.box(2.0,2.9,0.14, PAL.door); MS.pop();
+    MS.push(); MS.move(-1.2,4.0,8.06); b.box(3.0,0.62,0.10,[0.16,0.13,0.11]); MS.pop();
+    for(let i=0;i<4;i++){                             /* 넉 자를 흰 획으로 새긴다 */
+      MS.push(); MS.move(-2.35+i*0.78, 4.0, 8.13);
+        b.box(0.30,0.06,0.04,[0.88,0.85,0.78]);
+        MS.push(); MS.move(0,0.14,0); b.box(0.22,0.05,0.04,[0.88,0.85,0.78]); MS.pop();
+        MS.push(); MS.move(0,-0.15,0); b.box(0.26,0.05,0.04,[0.88,0.85,0.78]); MS.pop();
+        MS.push(); MS.move(0,0,0); b.box(0.05,0.34,0.04,[0.88,0.85,0.78]); MS.pop();
+      MS.pop();
+    }
+    /* 교문 기둥 */
+    for(const s of [-1,1]){
+      MS.push(); MS.move(-1.2+s*5.6, 1.5, 12.5); b.box(0.9,3.0,0.9,[0.42,0.40,0.38]); MS.pop();
+      MS.push(); MS.move(-1.2+s*5.6, 3.15, 12.5); b.box(1.15,0.3,1.15,[0.36,0.34,0.32]); MS.pop();
+    }
+  MS.pop();
+
+  /* ── 전신주와 전차선 ── */
+  for(let x=GATE_X+10; x<SCHOOL_X+14; x+=13){
+    MS.push(); MS.move(x, 4.2, ROAD_HW+1.6);
+      b.cyl(0.16,8.4,8, PAL.pole, true);
+      MS.push(); MS.move(0,3.3,-1.5); b.box(0.10,0.10,3.0,[0.24,0.21,0.18]); MS.pop();
+      MS.push(); MS.move(0,2.7,-1.2); b.box(0.09,0.09,2.4,[0.24,0.21,0.18]); MS.pop();
+      for(let i=-1;i<=1;i++){
+        MS.push(); MS.move(0,3.45,-1.5+i*1.2); b.cyl(0.075,0.2,6,[0.62,0.72,0.68],true); MS.pop();
+      }
+    MS.pop();
+  }
+  MS.push(); MS.move(0,5.6,0); b.box(268,0.05,0.05,[0.18,0.17,0.16]); MS.pop();   // 전차선
+
+  /* ── 가로등 ── */
+  for(let x=GATE_X+18; x<SCHOOL_X+8; x+=26){
+    MS.push(); MS.move(x, 0, -ROAD_HW-1.5);
+      b.cyl(0.11,5.2,8, [0.20,0.20,0.21], true); MS.move(0,2.6,0);
+      MS.push(); MS.move(0,2.75,0); b.cone(0.42,0.16,0.5,10,[0.20,0.20,0.21]); MS.pop();
+    MS.pop();
+  }
+
+  /* ── 정류장 ── */
+  MS.push(); MS.move(STOP_X, 0, ROAD_HW-0.3);
+    MS.push(); MS.move(0,0.12,0); b.box(7.0,0.24,2.6,[0.46,0.44,0.42]); MS.pop();   // 승강장
+    MS.push(); MS.move(-2.6,1.32,0); b.cyl(0.055,2.64,8,[0.24,0.24,0.25],true); MS.pop();
+    MS.push(); MS.move(-2.6,2.62,0); b.box(0.07,0.44,0.60,[0.20,0.19,0.20]); MS.pop(); // 표지판 테
+    MS.push(); MS.move(-2.63,2.62,0); b.box(0.03,0.34,0.50,[0.78,0.76,0.70]); MS.pop();
+    for(let i=0;i<2;i++){                                                            // 글자 자리
+      MS.push(); MS.move(-2.655,2.62,-0.12+i*0.24); b.box(0.02,0.20,0.13,[0.22,0.21,0.22]); MS.pop();
+    }
+  MS.pop();
+
+  /* ── 헐벗은 겨울나무 ── */
+  function tree(x,z,h,seed){
+    const r=rand(seed);
+    MS.push(); MS.move(x,0,z);
+      MS.push(); MS.move(0,h/2,0); b.cone(0.24,0.10,h,8,[0.23,0.19,0.16]); MS.pop();
+      for(let i=0;i<7;i++){
+        const a=r()*Math.PI*2, t=0.5+r()*0.5;
+        MS.push(); MS.move(0,h*(0.62+r()*0.3),0); MS.rotY(a); MS.rotZ(0.7+r()*0.5);
+          MS.move(0,h*0.16*t,0); b.cone(0.09,0.02,h*0.32*t,6,[0.21,0.18,0.15]);
+        MS.pop();
+      }
+    MS.pop();
+  }
+  let ts=9001;
+  for(let x=GATE_X+24; x<SCHOOL_X+4; x+=17) tree(x+(R()*2-1)*3, -ROAD_HW-3.4, 4.4+R()*1.6, ts++);
+  for(let x=GATE_X+32; x<SCHOOL_X;   x+=21) tree(x+(R()*2-1)*3,  ROAD_HW+3.6, 4.0+R()*1.8, ts++);
+});
+
+/* 가로등 불빛(따로 그린다 — 스스로 빛나는 것) */
+const LAMP_POS = [];
+for(let x=GATE_X+18; x<SCHOOL_X+8; x+=26) LAMP_POS.push(x);
+
+/* ══════════════ 움직이는 것들 ══════════════ */
+
+/* ── 사람 ── */
+function drawPerson(who, x, z, dirY, phase, opt){
+  opt = opt || {};
+  const w = WHO[who] || WHO.pass1;
+  const sw = Math.sin(phase), cw = Math.cos(phase);
+  const moving = opt.moving !== false;
+  const bob = moving ? Math.abs(sw) * 0.035 : 0;
+  const lean = opt.lean || 0;
+
+  MS.push();
+  MS.move(x, 0, z);
+  MS.rotY(dirY);
+
+  /* 발밑 그림자 — 흐린 날이므로 옅고 작게 */
+  gl.depthMask(false);
+  MS.push(); MS.move(0, 0.03, 0);
+    part(P.disc, 1.00, 1, 0.80, [0,0,0], {flat:true, alpha:0.26});
+  MS.pop();
+  gl.depthMask(true);
+
+  MS.move(0, bob, 0);
+  MS.rotX(lean);
+
+  /* 다리 */
+  const legSw = moving ? sw * 0.55 : 0.05;
+  for(const s of [-1, 1]){
+    const a = s > 0 ? legSw : -legSw;
+    MS.push(); MS.move(s * 0.11, 0.44, 0); MS.rotX(a);
+      MS.push(); MS.move(0, -0.22, 0); part(P.cyl, 0.16, 0.52, 0.16, w.bot); MS.pop();
+      MS.push(); MS.move(0, -0.46, 0.04); part(P.box, 0.17, 0.09, 0.30, w.shoe); MS.pop();
+    MS.pop();
+  }
+  /* 몸통 */
+  if(w.skirt){
+    MS.push(); MS.move(0, 0.60, 0); part(P.skirt, 0.86, 0.66, 0.76, w.bot); MS.pop();
+    MS.push(); MS.move(0, 1.03, 0); part(P.box, 0.40, 0.30, 0.24, w.top); MS.pop();
+    MS.push(); MS.move(0, 1.19, 0); part(P.box, 0.44, 0.06, 0.27, [0.80,0.28,0.30]); MS.pop();  // 고름
+  } else {
+    MS.push(); MS.move(0, 0.92, 0); part(P.box, 0.40, 0.60, 0.25, w.top); MS.pop();
+    if(opt.coat){                                       // 두루마기 자락
+      MS.push(); MS.move(0, 0.66, 0); part(P.skirt, 0.60, 0.46, 0.44, w.top); MS.pop();
+    }
+  }
+  /* 팔 */
+  const armSw = moving ? -sw * 0.5 : 0.08;
+  for(const s of [-1, 1]){
+    const a = opt.armF !== undefined ? opt.armF : (s > 0 ? armSw : -armSw);
+    MS.push(); MS.move(s * 0.27, 1.16, 0); MS.rotX(a);
+      MS.push(); MS.move(0, -0.24, 0); part(P.cyl, 0.13, 0.52, 0.13, w.top); MS.pop();
+      MS.push(); MS.move(0, -0.52, 0); part(P.sph, 0.14, 0.14, 0.14, PAL.skin); MS.pop();
+    MS.pop();
+  }
+  /* 목·머리 */
+  MS.push(); MS.move(0, 1.26, 0); part(P.cyl, 0.13, 0.10, 0.13, PAL.skin); MS.pop();
+  MS.push(); MS.move(0, 1.44, 0); MS.rotY(opt.look || 0);
+    part(P.sph, 0.31, 0.35, 0.30, PAL.skin);
+    MS.push(); MS.move(0, 0.10, 0); part(P.sph, 0.32, 0.24, 0.31, w.head); MS.pop();   // 머리칼
+    /* 눈 — 이 대목에서 하나하나 쳐다본다는 그 눈 */
+    for(const s of [-1, 1]){
+      MS.push(); MS.move(s * 0.08, 0.02, 0.145); part(P.box, 0.055, 0.035, 0.02, [0.10,0.09,0.09]); MS.pop();
+    }
+    if(w.hat){                                          // 중절모 — 챙이 눈을 덮지 않게 높이 올린다
+      MS.push(); MS.move(0, 0.215, 0.01); part(P.cyl, 0.52, 0.045, 0.50, w.head); MS.pop();
+      MS.push(); MS.move(0, 0.30, 0.01);  part(P.cyl, 0.34, 0.19, 0.33, w.head); MS.pop();
+      MS.push(); MS.move(0, 0.245, 0.01); part(P.cyl, 0.355, 0.045, 0.345, [0.06,0.06,0.07]); MS.pop();
+    }
+    if(opt.towel){                                      // 김 첨지의 머릿수건 — 머리에 두른 모양으로
+      MS.push(); MS.move(0, 0.10, 0);   part(P.sph, 0.345, 0.30, 0.335, [0.82,0.80,0.73]); MS.pop();
+      MS.push(); MS.move(0, 0.145, 0);  part(P.box, 0.30, 0.09, 0.29, [0.77,0.75,0.68]); MS.pop();
+      MS.push(); MS.move(0.02, 0.085, -0.165); MS.rotZ(0.5);
+        part(P.box, 0.09, 0.17, 0.11, [0.76,0.74,0.67]); MS.pop();                          // 뒤로 묶은 매듭
+    }
+    if(w.skirt && !w.hat){                              // 쪽진 머리
+      MS.push(); MS.move(0, 0.03, -0.18); part(P.sph, 0.20, 0.18, 0.18, PAL.hair); MS.pop();
+    }
+  MS.pop();
+
+  if(opt.bag){                                          // 가방
+    MS.push(); MS.move(0.34, 0.70, 0.05); part(P.box, 0.16, 0.30, 0.40, [0.24,0.17,0.12]); MS.pop();
+  }
+  if(opt.umbrella){                                     // 우산
+    MS.push(); MS.move(-0.34, 1.55, 0);
+      part(P.cyl, 0.035, 1.1, 0.035, [0.20,0.18,0.16]);
+      MS.push(); MS.move(0, 0.62, 0); part(P.skirt, 1.9, 0.42, 1.9, opt.umbrella); MS.pop();
+    MS.pop();
+  }
+  MS.pop();
+}
+
+/* ── 인력거 ──
+   원점은 두 바퀴 사이 지면. +X 쪽이 진행 방향. */
+function drawRickshaw(x, z, dirY, roll, rider){
+  MS.push();
+  MS.move(x, 0, z);
+  MS.rotY(dirY);
+
+  gl.depthMask(false);
+  MS.push(); MS.move(-0.1, 0.03, 0); part(P.disc, 2.5, 1, 1.5, [0,0,0], {flat:true, alpha:0.24}); MS.pop();
+  gl.depthMask(true);
+
+  /* 바퀴 두 짝 */
+  for(const s of [-1, 1]){
+    MS.push(); MS.move(0, 0.58, s * 0.66); MS.rotX(Math.PI/2); MS.rotY(0); MS.rotZ(0);
+      MS.push(); MS.rotZ(roll);
+        part(P.tube, 1.16, 0.09, 1.16, [0.14,0.13,0.12]);          // 테
+        part(P.tube, 1.02, 0.10, 1.02, [0.20,0.18,0.16]);
+        for(let i=0;i<8;i++){                                       // 살
+          MS.push(); MS.rotY(i * Math.PI / 8);
+            part(P.box, 1.02, 0.035, 0.035, PAL.spoke);
+          MS.pop();
+        }
+        part(P.cyl, 0.16, 0.14, 0.16, [0.35,0.33,0.30]);            // 축통
+      MS.pop();
+    MS.pop();
+  }
+  MS.push(); MS.move(0, 0.58, 0); MS.rotX(Math.PI/2); part(P.cyl, 0.07, 1.5, 0.07, [0.30,0.28,0.26]); MS.pop();
+
+  /* 차대와 좌석 */
+  MS.push(); MS.move(0.02, 0.70, 0); part(P.box, 1.34, 0.12, 1.16, PAL.rick); MS.pop();
+  MS.push(); MS.move(0.0,  0.86, 0); part(P.box, 1.18, 0.22, 1.04, [0.17,0.15,0.14]); MS.pop();  // 방석
+  MS.push(); MS.move(-0.56, 1.24, 0); part(P.box, 0.14, 0.86, 1.10, PAL.rick); MS.pop();         // 등받이
+  MS.push(); MS.move(0.62, 0.52, 0); MS.rotZ(0.34); part(P.box, 0.44, 0.10, 1.02, PAL.rick); MS.pop(); // 발판
+  for(const s of [-1, 1]){                                                                        // 옆판
+    MS.push(); MS.move(0.0, 1.00, s * 0.56); part(P.box, 1.24, 0.42, 0.06, [0.15,0.14,0.13]); MS.pop();
+  }
+  /* 幌(포장) — 얇은 판을 호(弧)로 세운다.
+     앞으로 너무 감으면 손님이 통째로 가려지므로 여기서 끊는다. */
+  for(let i=0;i<5;i++){
+    const a = -0.30 + i * 0.30;
+    MS.push(); MS.move(-0.50 + Math.sin(a) * 0.72, 1.62 + Math.cos(a) * 0.62, 0);
+      MS.rotZ(-a);
+      part(P.box, 0.28, 0.05, 1.16, PAL.hood);
+    MS.pop();
+  }
+  MS.push(); MS.move(-0.62, 1.72, 0); part(P.box, 0.10, 0.86, 1.14, PAL.hood); MS.pop();
+
+  /* 채(끌채) 두 개 — 앞으로 뻗는다 */
+  for(const s of [-1, 1]){
+    MS.push(); MS.move(1.06, 0.80, s * 0.50); MS.rotZ(0.09);
+      part(P.box, 2.30, 0.09, 0.09, [0.30,0.24,0.18]);
+      MS.push(); MS.move(1.12, 0.06, 0); part(P.box, 0.16, 0.09, 0.10, [0.44,0.38,0.28]); MS.pop();
+    MS.pop();
+  }
+  /* 등(燈) */
+  MS.push(); MS.move(0.66, 1.16, 0.62); part(P.box, 0.16, 0.24, 0.16, [0.22,0.20,0.18]); MS.pop();
+
+  /* 손님 */
+  if(rider){
+    MS.push(); MS.move(-0.06, 0.95, 0); MS.rotY(-Math.PI/2);
+      const w = WHO[rider];
+      if(w.skirt){
+        MS.push(); MS.move(0, 0.20, 0); part(P.skirt, 0.90, 0.52, 0.80, w.bot); MS.pop();
+        MS.push(); MS.move(0, 0.52, 0); part(P.box, 0.42, 0.32, 0.26, w.top); MS.pop();
+      } else {
+        MS.push(); MS.move(0, 0.28, 0.10); MS.rotX(-0.42); part(P.cyl, 0.19, 0.52, 0.19, w.bot); MS.pop();
+        MS.push(); MS.move(0, 0.44, -0.05); part(P.box, 0.42, 0.52, 0.28, w.top); MS.pop();
+      }
+      MS.push(); MS.move(0, 0.80, -0.02); part(P.sph, 0.30, 0.34, 0.29, PAL.skin);
+        MS.push(); MS.move(0, 0.10, 0); part(P.sph, 0.31, 0.23, 0.30, w.head); MS.pop();
+        if(w.hat){
+          MS.push(); MS.move(0, 0.16, 0); part(P.cyl, 0.60, 0.06, 0.58, w.head); MS.pop();
+          MS.push(); MS.move(0, 0.25, 0); part(P.cyl, 0.35, 0.19, 0.34, w.head); MS.pop();
+        }
+        if(w.skirt){ MS.push(); MS.move(0, 0.02, -0.17); part(P.sph, 0.19, 0.17, 0.17, PAL.hair); MS.pop(); }
+      MS.pop();
+    MS.pop();
+  }
+  MS.pop();
+}
+
+/* ── 전차 ── */
+function drawTram(x, lit){
+  MS.push();
+  MS.move(x, 0, 0);
+
+  gl.depthMask(false);
+  MS.push(); MS.move(0, 0.04, 0); part(P.disc, 10.6, 1, 2.8, [0,0,0], {flat:true, alpha:0.22}); MS.pop();
+  gl.depthMask(true);
+
+  MS.push(); MS.move(0, 0.42, 0); part(P.box, 9.4, 0.5, 2.5, [0.14,0.14,0.15]); MS.pop();   // 대차
+  MS.push(); MS.move(0, 1.85, 0); part(P.box, 9.0, 2.4, 2.35, PAL.tram); MS.pop();          // 차체
+  MS.push(); MS.move(0, 2.62, 0); part(P.box, 9.05, 0.55, 2.40, PAL.trim); MS.pop();        // 흰 띠
+  MS.push(); MS.move(0, 3.16, 0); part(P.box, 8.7, 0.36, 2.5, [0.30,0.28,0.26]); MS.pop();  // 지붕
+  MS.push(); MS.move(0, 3.36, 0); part(P.box, 3.6, 0.22, 1.5, [0.26,0.24,0.23]); MS.pop();
+
+  /* 창: 어두운 테를 먼저, 불 밝힌 유리를 그 바깥으로 — 순서를 뒤집으면 테가 유리를 가린다 */
+  for(const s of [-1, 1]){
+    for(let i=-3;i<=3;i++){
+      MS.push(); MS.move(i*1.22, 2.20, s*1.19); part(P.box, 1.06, 1.16, 0.05, [0.13,0.14,0.13]); MS.pop();
+      MS.push(); MS.move(i*1.22, 2.20, s*1.235);
+        part(P.box, 0.95, 1.03, 0.03, lit ? [1.0,0.87,0.60] : PAL.glass, {flat: lit, alpha:1});
+      MS.pop();
+    }
+  }
+  MS.push(); MS.move(-4.54, 2.05, 0); part(P.box, 0.10, 1.9, 1.6, [0.16,0.16,0.17]); MS.pop();  // 앞면
+  MS.push(); MS.move(4.54, 2.05, 0);  part(P.box, 0.10, 1.9, 1.6, [0.16,0.16,0.17]); MS.pop();
+  MS.push(); MS.move(-4.62, 1.55, 0); part(P.sph, 0.34, 0.34, 0.34, [1.0,0.94,0.74], {flat:true, alpha:0.95}); MS.pop();
+
+  /* 트롤리 폴 */
+  MS.push(); MS.move(1.6, 3.4, 0); MS.rotZ(-0.62);
+    part(P.box, 3.6, 0.07, 0.07, [0.20,0.19,0.18]);
+  MS.pop();
+  MS.pop();
+}
+
+/* ══════════════ 시간에 따른 배치 ══════════════ */
+
+/* 인력거의 길: (t, x, z). 사이는 부드럽게 잇는다. */
+const PATH = [
+  { t: 0.0,  x:-49.0, z: 4.6, on:null   },
+  { t:30.5,  x:-49.0, z: 4.6, on:null   },
+  { t:33.0,  x:-47.4, z: 4.2, on:null   },
+  { t:35.4,  x:-47.4, z: 4.2, on:'lady' },
+  { t:41.4,  x: -6.0, z: 3.3, on:'lady' },
+  { t:42.8,  x: -4.2, z: 3.3, on:null   },
+  { t:45.6,  x:  4.6, z: 3.6, on:null   },
+  { t:48.6,  x: -2.2, z: 3.1, on:null   },
+  { t:51.6,  x:  3.4, z: 3.6, on:null   },
+  { t:53.6,  x:  1.0, z: 3.2, on:null   },
+  { t:57.8,  x:  1.6, z: 3.2, on:'teach'},
+  { t:66.0,  x: 51.0, z: 3.0, on:'teach'},
+  { t:67.4,  x: 52.0, z: 3.0, on:null   },
+  { t:79.0,  x: 52.0, z: 3.0, on:null   }
+];
+
+function smoothstep(a){ return a*a*(3-2*a); }
+function lerp(a,b,k){ return a+(b-a)*k; }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+/* 그 시각의 인력거 상태 */
+function rickshawAt(t){
+  let i = 0;
+  while(i < PATH.length-2 && t > PATH[i+1].t) i++;
+  const a = PATH[i], b = PATH[i+1];
+  const span = Math.max(b.t - a.t, 0.001);
+  const k = smoothstep(clamp((t - a.t) / span, 0, 1));
+  const x = lerp(a.x, b.x, k), z = lerp(a.z, b.z, k);
+  /* 속도는 수치 미분으로 — 방향과 걸음 위상에 쓴다 */
+  const d = 0.05;
+  let i2 = 0; const t2 = Math.min(t + d, DUR);
+  while(i2 < PATH.length-2 && t2 > PATH[i2+1].t) i2++;
+  const a2 = PATH[i2], b2 = PATH[i2+1];
+  const k2 = smoothstep(clamp((t2 - a2.t) / Math.max(b2.t - a2.t, 0.001), 0, 1));
+  const vx = (lerp(a2.x, b2.x, k2) - x) / d, vz = (lerp(a2.z, b2.z, k2) - z) / d;
+  const spd = Math.hypot(vx, vz);
+  return { x:x, z:z, vx:vx, vz:vz, spd:spd, on:a.on };
+}
+/* 전차: 42초에 들어와 서고, 52.5초에 떠난다 */
+function tramAt(t){
+  if(t < 42.0 || t > 60.5) return null;
+  let x;
+  if(t < 47.0)      x = lerp(96, STOP_X + 1.2, smoothstep((t - 42.0) / 5.0));
+  else if(t < 52.5) x = STOP_X + 1.2;
+  else              x = lerp(STOP_X + 1.2, -96, smoothstep((t - 52.5) / 8.0));
+  return x;
+}
+/* 전차에서 내리는 사람들: 각자 내리는 때와 걸어가는 곳이 다르다 */
+const ALIGHT = [
+  { who:'pass1', t:47.4, gx: -7.5, gz:  8.6, um:null },
+  { who:'pass2', t:48.1, gx: -4.0, gz: 10.2, um:[0.30,0.28,0.26] },
+  { who:'pass3', t:48.9, gx:  6.5, gz:  9.4, um:null },
+  { who:'pass4', t:49.7, gx: 11.0, gz:  8.0, um:[0.22,0.24,0.28] },
+  { who:'pass5', t:50.5, gx: -12.0, gz: 9.0, um:null }
+];
+
+/* 진행 방향. 서 있는 동안에는 마지막으로 움직이던 방향을 되돌려 준다.
+   되감기해도 같은 값이 나오게 시각만으로 계산한다(전역 변수에 기대지 않는다). */
+function headAt(t){
+  for(let k=0;k<48;k++){
+    const r = rickshawAt(Math.max(0, t - k*0.25));
+    if(r.spd > 0.05) return Math.atan2(r.vz, r.vx);
+  }
+  return 0;
+}
+/* 김 첨지가 선 자리와, 삯을 받는 손의 자리.
+   카메라와 그리기가 같은 함수를 봐야 손과 화면이 어긋나지 않는다. */
+function kimAt(t){
+  const r = rickshawAt(t), h = headAt(t);
+  return { x: r.x + Math.cos(h)*2.55, z: r.z + Math.sin(h)*2.55, h:h, spd:r.spd };
+}
+const HAND = [0.30, 0.80, 0.42];                 // 김 첨지 기준 손의 자리
+function handAt(t){
+  const k = kimAt(t), a = -k.h + Math.PI/2, c = Math.cos(a), s = Math.sin(a);
+  return [ k.x + HAND[0]*c + HAND[2]*s, HAND[1], k.z - HAND[0]*s + HAND[2]*c ];
+}
+
+/* ══════════════ 카메라 ══════════════
+   컷 목록. from → to 로 이음새 없이 민다.
+   한 가지 금기: 카메라의 |z| 는 8.5를 넘지 않는다 — 한옥 줄의 앞면이 z=±9.5라
+   그보다 밖으로 나가면 벽 속으로 들어간다. */
+const SHOTS = [
+  { t: 0.0,  e:[GATE_X-30, 19, 27], a:[GATE_X+8, 11, 0], e2:[GATE_X-21, 14, 19], a2:[GATE_X+12, 9, 0], fov:44 },
+  { t: 4.2,  e:[GATE_X-27, 13, 16], a:[GATE_X+4, 10, 0], e2:[GATE_X-19, 10, 10], a2:[GATE_X+3, 8.5, 0], fov:44 },
+  { t: 8.8,  e:[-38, 5.0, 7.4], a:[-30, 1.6, 0.5], e2:[-31, 3.2, 5.2], a2:[-24, 1.0, 0.5], fov:50 },
+  { t:14.5,  e:[GATE_X-24, 6.2, 0.6], a:[GATE_X+3, 7.0, 0], e2:[GATE_X-4, 5.4, 0.8], a2:[GATE_X+26, 5.0, 0], fov:52 },
+  { t:19.8,  e:[-44.6, 2.2, -3.2], a:[-49.0, 1.4, 4.2], e2:[-45.6, 1.9, -1.0], a2:[-49.0, 1.3, 4.4], fov:44 },
+  { t:25.0,  e:[-43.2, 5.6, -3.4], a:[-48.6, 1.9, 4.4], e2:[-45.6, 4.0, -0.6], a2:[-48.6, 1.7, 4.5], fov:46 },
+  { t:30.5,  e:[-54.5, 2.0, -1.6], a:[-48.6, 1.5, 4.6], e2:[-52.5, 1.9, 0.2], a2:[-48.0, 1.4, 4.4], fov:46 },
+  /* 옆에서 따라붙는다 — 뒤에서 보면 포장에 가려 손님이 안 보인다 */
+  { t:35.0,  follow:true, off:[0.2, 2.0, -5.8], look:[0.2, 1.15, 0], fov:46 },
+  { t:41.5,  e:[-9.5, 2.4, -5.6], a:[0.5, 1.5, 3.4], e2:[6.5, 2.3, -5.2], a2:[1.0, 1.4, 3.4], fov:47 },
+  { t:47.0,  e:[7.0, 2.7, 7.4], a:[0.5, 1.6, 2.2], e2:[1.5, 2.5, 7.0], a2:[1.5, 1.6, 2.4], fov:46 },
+  { t:53.5,  e:[5.4, 1.9, 6.4], a:[1.2, 1.4, 3.2], e2:[3.6, 1.8, 5.6], a2:[1.4, 1.4, 3.2], fov:42 },
+  { t:58.0,  follow:true, off:[-4.2, 2.6, -5.6], look:[3.2, 1.3, 0], fov:50 },
+  /* 학교 앞. 여기서만 학교와 도착하는 인력거가 한 화면에 든다 */
+  { t:62.5,  e:[40, 6.2, 8.0], a:[52.5, 2.2, -3.4], e2:[45, 5.0, 7.4], a2:[52.5, 1.8, -2.6], fov:52 },
+  { t:66.5,  hand:true, fov:34 },
+  { t:71.5,  e:[47.5, 3.2, -7.0], a:[53.5, 1.4, 2.4], e2:[22, 20, -26], a2:[52, 5, -6], fov:50 }
+];
+
+function cameraAt(t){
+  let i = 0;
+  while(i < SHOTS.length-1 && t >= SHOTS[i+1].t) i++;
+  const s = SHOTS[i];
+  const end = (i < SHOTS.length-1) ? SHOTS[i+1].t : DUR;
+  const k = smoothstep(clamp((t - s.t) / Math.max(end - s.t, 0.001), 0, 1));
+  if(s.hand){
+    const p = handAt(t);
+    return { eye:[p[0]+0.24, p[1]+0.60-k*0.05, p[2]+0.56],
+             at :[p[0]-0.01, p[1]+0.10, p[2]-0.04], fov:s.fov };
+  }
+  if(s.follow){
+    const r = rickshawAt(t);
+    const h = headAt(t);
+    const c = Math.cos(h), sn = Math.sin(h);
+    const ox = s.off[0]*c - s.off[2]*sn, oz = s.off[0]*sn + s.off[2]*c;
+    const lx = s.look[0]*c - s.look[2]*sn, lz = s.look[0]*sn + s.look[2]*c;
+    /* 컷이 시작할 때 살짝 흔들어 사람이 든 카메라처럼 */
+    const sh = Math.sin(t*2.3)*0.06, sh2 = Math.cos(t*1.7)*0.05;
+    return { eye:[r.x+ox+sh, s.off[1]+sh2, r.z+oz],
+             at :[r.x+lx, s.look[1], r.z+lz], fov:s.fov };
+  }
+  return {
+    eye:[lerp(s.e[0],s.e2[0],k), lerp(s.e[1],s.e2[1],k), lerp(s.e[2],s.e2[2],k)],
+    at :[lerp(s.a[0],s.a2[0],k), lerp(s.a[1],s.a2[1],k), lerp(s.a[2],s.a2[2],k)],
+    fov: s.fov
+  };
+}
+
+/* ══════════════ 비 · 눈 버퍼 ══════════════ */
+const RAIN_N = 9000, SNOW_N = 1400;
+function rainVAO(n, seed){
+  const r = rand(seed);
+  const quad = new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]);
+  const seeds = new Float32Array(n*4);
+  for(let i=0;i<n;i++){
+    seeds[i*4  ] = r();
+    seeds[i*4+1] = r();
+    seeds[i*4+2] = r();
+    seeds[i*4+3] = 0.30 + r()*0.22;
+  }
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  const qb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, qb);
+  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  const sb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, sb);
+  gl.bufferData(gl.ARRAY_BUFFER, seeds, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,4,gl.FLOAT,false,0,0);
+  gl.vertexAttribDivisor(1,1);
+  gl.bindVertexArray(null);
+  return vao;
+}
+const rainV = rainVAO(RAIN_N, 4242), snowV = rainVAO(SNOW_N, 7777);
+const emptyVAO = gl.createVertexArray();
+
+/* ══════════════ 그리기 ══════════════ */
+const proj = m4.make(), view = m4.make(), vp = m4.make(), invVP = m4.make();
+
+function draw(t){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.round(cv.clientWidth * dpr));
+  const h = Math.max(1, Math.round(cv.clientHeight * dpr));
+  if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+
+  /* 컷은 가로 화면(16:9) 기준으로 잡았다. 세로로 잡은 폰에서 그대로 그리면
+     좌우가 통째로 잘린다. 두 가지로 막는다.
+     ① 세로 화면에서는 4:3 띠 안에만 그리고 위아래를 검게 둔다.
+     ② 화면이 16:9보다 좁으면 세로 화각을 키워 가로 화각을 기준값으로 유지한다. */
+  const FILM = 4/3, REF = 16/9;
+  let vw = w, vh = h, vy = 0;
+  if(w/h < FILM){
+    vh = Math.max(1, Math.round(w/FILM));
+    /* 화면 한가운데가 아니라 "자막·조작부를 뺀 나머지"의 한가운데에 둔다 */
+    const uiPx = (elBottom.offsetHeight + 22) * dpr;
+    const topGap = Math.max(0, Math.round((h - uiPx - vh) / 2));
+    vy = Math.max(0, h - topGap - vh);
+  }
+  gl.viewport(0, 0, w, h);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.viewport(0, vy, vw, vh);
+  gl.enable(gl.SCISSOR_TEST);
+  gl.scissor(0, vy, vw, vh);
+  /* 화면 글자(삯 등)가 띠 한가운데 오도록 위치를 알려 준다 */
+  const rootS = document.documentElement.style;
+  rootS.setProperty('--film-top', ((h - vy - vh)/dpr) + 'px');
+  rootS.setProperty('--film-h', (vh/dpr) + 'px');
+
+  const cam = free.on ? freeCamera() : cameraAt(t);
+  const asp = vw/vh;
+  const fovy = 2 * Math.atan(Math.tan(cam.fov*Math.PI/360) * Math.max(1, REF/asp));
+  m4.persp(proj, fovy, asp, 0.06, 400);
+  m4.look(view, cam.eye, cam.at, [0,1,0]);
+  m4.mul(vp, proj, view);
+  m4.inv(invVP, vp);
+
+  /* 날씨: 0~6초는 눈기, 6~14초 사이에 비로 넘어가며 바닥이 젖는다 */
+  const snowAmt = clamp(1 - (t - 3.0) / 4.5, 0, 1) * clamp(t / 1.2, 0, 1);
+  const rainAmt = clamp((t - 6.0) / 4.0, 0, 1);
+  const wet     = clamp((t - 7.0) / 7.0, 0, 1);
+  /* 아침 댓바람 — 아주 조금씩 밝아진다 */
+  const dawn = 0.80 + 0.22 * clamp(t / 40, 0, 1);
+
+  gl.disable(gl.BLEND);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthMask(true);
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+  gl.clearColor(PAL.horizon[0], PAL.horizon[1], PAL.horizon[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  /* 하늘 */
+  gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(SKY.p);
+  gl.uniformMatrix4fv(SKY.u.uInvVP, false, invVP);
+  gl.uniform3fv(SKY.u.uEye, cam.eye);
+  gl.uniform3f(SKY.u.uZen, PAL.zenith[0]*dawn, PAL.zenith[1]*dawn, PAL.zenith[2]*dawn);
+  gl.uniform3f(SKY.u.uHor, PAL.horizon[0]*dawn, PAL.horizon[1]*dawn, PAL.horizon[2]*dawn);
+  gl.uniform3f(SKY.u.uCld, PAL.cloud[0]*dawn, PAL.cloud[1]*dawn, PAL.cloud[2]*dawn);
+  gl.uniform1f(SKY.u.uTime, t);
+  gl.bindVertexArray(emptyVAO);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+
+  /* 본체 */
+  gl.useProgram(MAIN.p);
+  gl.uniformMatrix4fv(MAIN.u.uProj, false, proj);
+  gl.uniformMatrix4fv(MAIN.u.uView, false, view);
+  gl.uniform3fv(MAIN.u.uEye, cam.eye);
+  gl.uniform3f(MAIN.u.uFog, PAL.horizon[0]*dawn*0.96, PAL.horizon[1]*dawn*0.96, PAL.horizon[2]*dawn*0.96);
+  gl.uniform3f(MAIN.u.uSky, PAL.horizon[0]*dawn, PAL.horizon[1]*dawn, PAL.horizon[2]*dawn);
+  /* 안개는 높이 올라갈수록 걷힌다 — 안 그러면 부감 컷이 통째로 회색이 된다 */
+  gl.uniform1f(MAIN.u.uFogD, 64 + Math.max(0, cam.eye[1] - 3) * 7.0);
+  gl.uniform1f(MAIN.u.uTime, t);
+  gl.uniform1f(MAIN.u.uWet, wet);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  /* 거리 */
+  MS.reset();
+  part(WORLD, 1, 1, 1, [dawn, dawn, dawn]);
+
+  /* 가로등 불빛 */
+  for(const lx of LAMP_POS){
+    MS.reset(); MS.move(lx, 5.05, -ROAD_HW-1.5);
+    part(P.sph, 0.46, 0.52, 0.46, PAL.lamp, {flat:true, alpha:0.92});
+  }
+
+  /* 전차 */
+  const tx = tramAt(t);
+  if(tx !== null){ MS.reset(); drawTram(tx, true); }
+
+  /* 내리는 사람들 */
+  if(tx !== null){
+    for(const p of ALIGHT){
+      if(t < p.t) continue;
+      const k = clamp((t - p.t) / 5.5, 0, 1);
+      const sx = tx + 1.0, sz = 2.0;
+      const x = lerp(sx, p.gx, smoothstep(k)), z = lerp(sz, p.gz, smoothstep(k));
+      const hd = Math.atan2(p.gz - sz, p.gx - sx);
+      MS.reset();
+      drawPerson(p.who, x, z, hd + Math.PI/2, (t - p.t) * 7.0,
+                 { moving: k < 0.99, umbrella: p.um, lean: 0.06 });
+    }
+  }
+
+  /* 골목의 동네 사람 — 장면이 비지 않게 */
+  MS.reset(); drawPerson('pass4', -35.5, 8.4, 1.2, 0, { moving:false, umbrella:[0.26,0.24,0.22] });
+  MS.reset(); drawPerson('pass2', 22.0 + Math.sin(t*0.25)*5.5, -8.6, Math.cos(t*0.25) > 0 ? 1.57 : -1.57,
+                          t*4.2, { umbrella:[0.30,0.27,0.25] });
+  MS.reset(); drawPerson('pass1', -18.0 - Math.sin(t*0.19)*6.0, 9.2,
+                          Math.cos(t*0.19) > 0 ? -1.57 : 1.57, t*3.8, {});
+
+  /* 앞집 마나님 — 태우기 전에는 대문 앞에 서 있다 */
+  const rk = rickshawAt(t);
+  if(t >= 29.0 && t < 35.4){
+    const k = clamp((t - 29.0) / 5.0, 0, 1);
+    MS.reset();
+    drawPerson('lady', lerp(-50.6, -48.2, smoothstep(k)), lerp(6.0, 4.6, smoothstep(k)),
+               -0.9, t*4.0, { moving: k < 0.98 });
+  }
+  /* 내린 마나님 — 전찻길 가에서 멀어진다.
+     인력거가 아직 그 자리에 있을 때 겹치지 않게 조금 늦게, 옆으로 비켜 내린다 */
+  if(t >= 43.4 && t < 52){
+    const k = clamp((t - 43.4) / 6.0, 0, 1);
+    MS.reset();
+    drawPerson('lady', lerp(-5.4, -12.0, smoothstep(k)), lerp(5.4, 9.2, smoothstep(k)),
+               2.35, (t-43.4)*5.5, { moving: k < 0.98 });
+  }
+  /* 양복장이 — 태우기 전 정류장에서 다가온다 */
+  if(t >= 52.0 && t < 57.8){
+    const k = clamp((t - 52.0) / 5.0, 0, 1);
+    MS.reset();
+    drawPerson('teach', lerp(-1.5, 1.9, smoothstep(k)), lerp(5.6, 3.6, smoothstep(k)),
+               -1.0, (t-52.0)*5.0, { moving: k < 0.95, bag:true });
+  }
+  /* 내린 양복장이 — 학교로 들어간다 */
+  if(t >= 67.4){
+    const k = clamp((t - 67.4) / 7.0, 0, 1);
+    MS.reset();
+    drawPerson('teach', lerp(52.6, 55.0, smoothstep(k)), lerp(3.8, -5.6, smoothstep(k)),
+               -0.25, (t-67.4)*5.0, { moving: k < 0.98, bag:true });
+  }
+
+  /* 인력거와 김 첨지 */
+  const head = headAt(t);
+  const roll = travelledCache(t) / 0.58;
+  MS.reset();
+  drawRickshaw(rk.x, rk.z, -head, -roll, rk.on);
+
+  /* 김 첨지는 채 끝에 선다 */
+  const km = kimAt(t);
+  /* 47~53초 — 내리는 사람을 하나씩 눈으로 좇는다 */
+  let look = 0;
+  if(t >= 46.5 && t < 53.5) look = Math.sin((t - 46.5) * 1.15) * 0.85;
+  MS.reset();
+  drawPerson('kim', km.x, km.z, -head + Math.PI/2,
+             travelledCache(t) * 1.9,
+             { moving: rk.spd > 0.15, towel:true, coat:false, look:look,
+               lean: rk.spd > 0.15 ? 0.17 : 0.04, armF: -0.62 });
+
+  /* 삯 — 손바닥 위의 동전 두 닢. 자리는 handAt()이 정한다(카메라와 같은 함수) */
+  if(t >= 66.0 && t < 72.5){
+    const c1 = clamp((t - 66.4) / 0.5, 0, 1), c2 = clamp((t - 69.0) / 0.5, 0, 1);
+    MS.reset(); MS.move(km.x, 0, km.z); MS.rotY(-head + Math.PI/2);
+      MS.push(); MS.move(HAND[0], HAND[1], HAND[2]); MS.rotX(-0.30);
+        part(P.box, 0.23, 0.05, 0.25, PAL.skin, {light:1.30});                     // 손바닥
+        for(const f of [[-0.082,0.108],[-0.027,0.118],[0.029,0.116],[0.083,0.104]]) {
+          MS.push(); MS.move(f[0], 0.006, f[1]);
+            part(P.box, 0.044, 0.034, 0.075, PAL.skin, {light:1.30}); MS.pop();
+        }
+        /* 동전은 어두운 날에도 반짝여야 한다 — 빛을 따로 올린다 */
+        if(c1 > 0){
+          MS.push(); MS.move(-0.045, 0.042 + (1-c1)*0.40, 0.010);
+            part(P.cyl, 0.090, 0.016, 0.090, PAL.gold, {light:2.30}); MS.pop();
+        }
+        if(c2 > 0){
+          MS.push(); MS.move(0.050, 0.060 + (1-c2)*0.40, -0.032);
+            part(P.cyl, 0.104, 0.018, 0.104, [0.92,0.82,0.42], {light:2.30}); MS.pop();
+        }
+      MS.pop();
+    MS.reset();
+  }
+
+  /* 비와 눈 */
+  gl.depthMask(false);
+  gl.useProgram(RAIN.p);
+  gl.uniformMatrix4fv(RAIN.u.uProj, false, proj);
+  gl.uniformMatrix4fv(RAIN.u.uView, false, view);
+  gl.uniform3fv(RAIN.u.uEye, cam.eye);
+  gl.uniform1f(RAIN.u.uTime, t);
+  if(rainAmt > 0.01){
+    gl.uniform3f(RAIN.u.uBox, 54, 26, 54);
+    gl.uniform2f(RAIN.u.uSize, 0.017, 0.46);
+    gl.uniform1f(RAIN.u.uSnow, 0);
+    gl.uniform3fv(RAIN.u.uCol, PAL.rain);
+    gl.uniform1f(RAIN.u.uOpacity, 0.40 * rainAmt);
+    gl.bindVertexArray(rainV);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, RAIN_N);
+  }
+  if(snowAmt > 0.01){
+    gl.uniform3f(RAIN.u.uBox, 46, 24, 46);
+    gl.uniform2f(RAIN.u.uSize, 0.020, 0.40);
+    gl.uniform1f(RAIN.u.uSnow, 1);
+    gl.uniform3fv(RAIN.u.uCol, PAL.snow);
+    gl.uniform1f(RAIN.u.uOpacity, 0.62 * snowAmt);
+    gl.bindVertexArray(snowV);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, SNOW_N);
+  }
+  gl.depthMask(true);
+  gl.bindVertexArray(null);
+  gl.disable(gl.SCISSOR_TEST);
+}
+
+/* 이동 거리는 매 프레임 적분하면 비싸다 — 0.25초 격자로 미리 재 둔다 */
+const TRAVEL = (function(){
+  const step = 0.25, n = Math.ceil(DUR/step)+2, arr = new Float32Array(n);
+  let d = 0, px = PATH[0].x, pz = PATH[0].z;
+  for(let i=1;i<n;i++){
+    const r = rickshawAt(i*step);
+    d += Math.hypot(r.x-px, r.z-pz);
+    px = r.x; pz = r.z; arr[i] = d;
+  }
+  return { step:step, arr:arr };
+})();
+function travelledCache(t){
+  const f = clamp(t/TRAVEL.step, 0, TRAVEL.arr.length-2);
+  const i = Math.floor(f);
+  return lerp(TRAVEL.arr[i], TRAVEL.arr[i+1], f-i);
+}
+
+/* ══════════════ 자유 시점 ══════════════ */
+const free = { on:false, yaw:0.7, pitch:0.28, dist:14, tx:0, ty:1.5, tz:0 };
+function freeCamera(){
+  const cp = Math.cos(free.pitch), sp = Math.sin(free.pitch);
+  return {
+    eye:[ free.tx + Math.cos(free.yaw)*cp*free.dist,
+          /* 땅 밑으로는 못 내려간다 — 내려가면 화면이 통째로 흙색이 된다 */
+          Math.max(0.35, free.ty + sp*free.dist),
+          free.tz + Math.sin(free.yaw)*cp*free.dist ],
+    at :[ free.tx, free.ty, free.tz ],
+    fov: 48
+  };
+}
+
+/* ══════════════ 화면 글자 ══════════════ */
+const elSub = document.getElementById('sub');
+const elBottom = document.getElementById('bottom');
+const elTitle = document.getElementById('title');
+const elCoin = document.getElementById('coin');
+const elClock = document.getElementById('clock');
+const elFill = document.querySelector('#bar .fill');
+const elKnob = document.querySelector('#bar .knob');
+const elBar = document.getElementById('bar');
+const elMap = document.getElementById('map');
+
+/* 대응표를 채운다 */
+(function(){
+  const tb = document.getElementById('maptbl');
+  SCRIPT.forEach(function(s, i){
+    if(!s.s) return;
+    const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    const a = document.createElement('td'); a.textContent = s.s;
+    const b = document.createElement('td'); b.textContent = s.m;
+    tr.appendChild(a); tr.appendChild(b); tb.appendChild(tr);
+    tr.addEventListener('click', function(){ seek(s.t + 0.05); });
+  });
+  /* 눈금 */
+  SCRIPT.forEach(function(s){
+    if(!s.s) return;
+    const d = document.createElement('div');
+    d.className = 'mark'; d.style.left = (s.t/DUR*100) + '%';
+    elBar.appendChild(d);
+  });
+})();
+
+let curLine = -1;
+function cue(t){
+  let i = -1;
+  for(let k=0;k<SCRIPT.length;k++) if(t >= SCRIPT[k].t) i = k;
+  if(i !== curLine){
+    curLine = i;
+    const s = (i >= 0 && SCRIPT[i].s) ? SCRIPT[i].s : '';
+    elSub.textContent = s;
+    elSub.classList.toggle('on', !!s);
+    const rows = elMap.querySelectorAll('tr');
+    rows.forEach(function(r){ r.classList.toggle('now', +r.dataset.i === i); });
+  }
+  elTitle.style.opacity = t > 7.5 ? 0 : 1;
+
+  /* 삯 */
+  const cb = elCoin.querySelector('b'), ci = elCoin.querySelector('i');
+  if(t >= 66.4 && t < 69.0){ cb.textContent = '삼십 전'; ci.textContent = '첫 번째 손님'; elCoin.classList.add('on'); }
+  else if(t >= 69.0 && t < 71.4){ cb.textContent = '오십 전'; ci.textContent = '두 번째 손님'; elCoin.classList.add('on'); }
+  else elCoin.classList.remove('on');
+
+  const mm = function(v){ const m = Math.floor(v/60), s2 = Math.floor(v%60); return m + ':' + (s2<10?'0':'') + s2; };
+  elClock.textContent = mm(t) + ' / ' + mm(DUR);
+  const pct = (t/DUR*100);
+  elFill.style.width = pct + '%';
+  elKnob.style.left = pct + '%';
+}
+
+/* ══════════════ 시간과 입력 ══════════════ */
+const state = { t:0, playing:true, last:0 };
+
+function seek(t){
+  state.t = clamp(t, 0, DUR);
+  cue(state.t);
+  draw(state.t);
+}
+function setPlaying(v){
+  state.playing = v;
+  document.getElementById('bPlay').textContent = v ? '⏸ 일시정지' : '▶ 재생';
+}
+
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - state.last) / 1000, 0.1);
+  state.last = now;
+  if(state.playing){
+    state.t += dt;
+    if(state.t >= DUR){ state.t = DUR; setPlaying(false); }
+  }
+  cue(state.t);
+  draw(state.t);
+}
+
+/* ── 버튼 ── */
+document.getElementById('bPlay').addEventListener('click', function(){
+  if(state.t >= DUR) state.t = 0;
+  setPlaying(!state.playing);
+});
+document.getElementById('bBack').addEventListener('click', function(){ seek(state.t - 3); });
+document.getElementById('bFwd').addEventListener('click',  function(){ seek(state.t + 3); });
+document.getElementById('bRe').addEventListener('click', function(){ seek(0); setPlaying(true); });
+const bFree = document.getElementById('bFree');
+bFree.addEventListener('click', function(){
+  free.on = !free.on;
+  bFree.setAttribute('aria-pressed', free.on ? 'true' : 'false');
+  if(free.on){
+    const c = cameraAt(state.t);
+    free.tx = c.at[0]; free.ty = c.at[1]; free.tz = c.at[2];
+    const dx = c.eye[0]-c.at[0], dy = c.eye[1]-c.at[1], dz = c.eye[2]-c.at[2];
+    free.dist = Math.max(2.5, Math.hypot(dx,dy,dz));
+    free.yaw = Math.atan2(dz, dx);
+    free.pitch = Math.asin(clamp(dy/free.dist, -1, 1));
+  }
+  draw(state.t);
+});
+const bMap = document.getElementById('bMap');
+bMap.addEventListener('click', function(){
+  const on = elMap.classList.toggle('on');
+  bMap.setAttribute('aria-pressed', on ? 'true' : 'false');
+});
+
+/* ── 진행 바: 마우스와 터치 양쪽 ── */
+let barDrag = false;
+function barSeek(ev){
+  const r = elBar.getBoundingClientRect();
+  seek((ev.clientX - r.left) / r.width * DUR);
+}
+elBar.addEventListener('pointerdown', function(e){
+  /* 자리 이동을 먼저 한다. setPointerCapture는 브라우저에 따라 던질 수 있고,
+     먼저 부르면 그 예외에 눌린 자리가 통째로 묻힌다. */
+  barDrag = true;
+  barSeek(e);
+  try{ elBar.setPointerCapture(e.pointerId); }catch(_){}
+});
+elBar.addEventListener('pointermove', function(e){ if(barDrag) barSeek(e); });
+elBar.addEventListener('pointerup',  function(e){ barDrag = false; try{ elBar.releasePointerCapture(e.pointerId); }catch(_){} });
+elBar.addEventListener('pointercancel', function(){ barDrag = false; });
+
+/* ── 자유 시점 조작: 끌기 + 휠 + 두 손가락 ── */
+let drag = null; const touches = new Map();
+cv.addEventListener('pointerdown', function(e){
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  touches.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(touches.size === 1) drag = { x:e.clientX, y:e.clientY };
+});
+cv.addEventListener('pointermove', function(e){
+  if(!touches.has(e.pointerId)) return;
+  const prev = touches.get(e.pointerId);
+  touches.set(e.pointerId, { x:e.clientX, y:e.clientY });
+  if(touches.size === 2){                                     // 두 손가락 = 거리
+    const it = touches.values();
+    const a = it.next().value, b = it.next().value;
+    const d = Math.hypot(a.x-b.x, a.y-b.y);
+    if(drag && drag.pinch) free.dist = clamp(free.dist * (drag.pinch/d), 1.5, 90);
+    drag = { pinch:d };
+    if(free.on) draw(state.t);
+    return;
+  }
+  if(drag && !drag.pinch && free.on){
+    free.yaw   -= (e.clientX - prev.x) * 0.006;
+    free.pitch  = clamp(free.pitch + (e.clientY - prev.y) * 0.005, -0.35, 1.42);
+    draw(state.t);
+  }
+});
+function endPointer(e){
+  touches.delete(e.pointerId);
+  if(touches.size === 0) drag = null;
+  else if(touches.size === 1){ const v = touches.values().next().value; drag = { x:v.x, y:v.y }; }
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('wheel', function(e){
+  if(!free.on) return;
+  e.preventDefault();
+  free.dist = clamp(free.dist * (1 + Math.sign(e.deltaY)*0.12), 1.5, 90);
+  draw(state.t);
+}, { passive:false });
+
+/* ── 자판 ── */
+window.addEventListener('keydown', function(e){
+  const tag = (e.target && e.target.tagName) || '';
+  if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if(e.key === ' '){ e.preventDefault(); if(state.t >= DUR) state.t = 0; setPlaying(!state.playing); }
+  else if(e.key === 'ArrowLeft')  seek(state.t - 3);
+  else if(e.key === 'ArrowRight') seek(state.t + 3);
+  else if(e.key === 'r' || e.key === 'R'){ seek(0); setPlaying(true); }
+  else if(e.key === 'f' || e.key === 'F') bFree.click();
+  else if(e.key === 't' || e.key === 'T') bMap.click();
+});
+
+window.addEventListener('resize', function(){ draw(state.t); });
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) setPlaying(false);
+});
+
+/* ══════════════ ?debug=1 훅 ══════════════
+   숨은 탭에서는 rAF가 멈추므로, 자동 검증은 이 훅으로 프레임을 직접 돌린다. */
+if(/[?&]debug=1/.test(location.search)){
+  window.LD = {
+    dur: DUR,
+    seek: function(t){ setPlaying(false); seek(t); return this.state(); },
+    play: function(){ setPlaying(true); },
+    state: function(){
+      const c = free.on ? freeCamera() : cameraAt(state.t), r = rickshawAt(state.t);
+      return { t:+state.t.toFixed(2), playing:state.playing, free:free.on,
+               sub: SCRIPT[curLine] ? SCRIPT[curLine].s : '',
+               eye: c.eye.map(v=>+v.toFixed(2)), at: c.at.map(v=>+v.toFixed(2)),
+               rick: { x:+r.x.toFixed(2), z:+r.z.toFixed(2), spd:+r.spd.toFixed(2), on:r.on },
+               tram: tramAt(state.t), tris: WORLD.n/3|0,
+               size: [cv.width, cv.height] };
+    },
+    cues: SCRIPT.map(s=>s.t)
+  };
+}
+
+setPlaying(true);
+cue(0);
+requestAnimationFrame(function(n){ state.last = n; frame(n); });
+
+})();
+</script>
+</body>
+</html>

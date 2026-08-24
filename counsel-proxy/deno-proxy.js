@@ -144,6 +144,21 @@ const MODES = [
     ].join('\n')
   },
   {
+    id: 'dbt',
+    name: '감정 다루기 (DBT)',
+    desc: '감정의 파도를 타는 법',
+    hello: '와 줘서 반가워요. 오늘 마음은 어땠나요?\n있었던 일 하나부터 편하게 들려주세요.',
+    prompt: [
+      '# 이번 대화의 분야: 변증법적 행동치료(DBT) 기반 일상 정서 돌봄',
+      '상대가 위기 상황이 아니라 평소에 감정 조절 근육을 기르러 온 모드다. 부드럽고 일상적으로 진행한다.',
+      '- 수용과 변화의 균형: 지금 감정을 있는 그대로 타당화한 뒤에야 방법을 제안한다.',
+      '- 한 번에 하나: 마음챙김, 감정에 이름 붙이기, 반대 행동, 오감으로 자기진정, 부드럽게 부탁하기를 상황에 맞게 하나씩.',
+      '- 기법 이름 같은 전문용어를 앞세우지 않는다. 방법을 일상 언어로 풀어 말한다.',
+      '- 연습을 제안할 때는 오늘 바로 해 볼 수 있는 작고 구체적인 것 하나만.',
+      '- 대화가 20~30회쯤 이어지면 자연스럽게 마무리를 향한다. 마무리 무렵에는 오늘 나눈 것을 함께 정리한다.'
+    ].join('\n')
+  },
+  {
     id: 'couple',
     name: '부부·연인',
     desc: '관계의 반복되는 패턴',
@@ -694,7 +709,15 @@ async function handleKakao(request) {
       '환경변수 KAKAO_ALLOWED_USERS 에 아래 값을 넣고 재배포하세요:' + '\n' + userKey));
   }
   if (!allowed.includes(userKey)) {
-    return kakaoJson(kakaoText('이 봇은 개인용입니다.'));
+    // 등록 안 된 사용자에게도 키를 알려준다.
+    // 봇테스트와 실제 카카오톡의 botUserKey 가 다르기 때문에, 실제 키를 알아내려면
+    // 이 안내가 필요하다. 키를 안다고 쓸 수 있는 게 아니므로(화이트리스트는 서버에 있다)
+    // 위험하지 않다. 등록이 끝나면 KAKAO_HIDE_KEY=1 로 이 안내를 끌 수 있다.
+    if (Deno.env.get('KAKAO_HIDE_KEY') === '1') {
+      return kakaoJson(kakaoText('이 봇은 개인용입니다.'));
+    }
+    return kakaoJson(kakaoText(
+      '이 봇은 개인용입니다.\n\n본인이라면 환경변수 KAKAO_ALLOWED_USERS 에 아래 값을 추가하세요:\n' + userKey));
   }
 
   let state = kakaoChats.get(userKey);

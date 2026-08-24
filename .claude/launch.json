@@ -4,7 +4,11 @@
     {
       "name": "static-server",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8765"],
+      "runtimeArgs": [
+        "-c",
+        "import os,http.server,socketserver;socketserver.TCPServer.allow_reuse_address=True;socketserver.TCPServer(('',int(os.environ.get('PORT','8765'))),http.server.SimpleHTTPRequestHandler).serve_forever()"
+      ],
+      "autoPort": true,
       "port": 8765
     }
   ]

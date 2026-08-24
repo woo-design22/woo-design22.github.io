@@ -21,3 +21,11 @@ android-counsel/build/
 android-counsel/dist/
 android-counsel/assets/
 android-counsel/debug.keystore
+
+# soccer 서버 (2단계) — 의존성·배포 설정·인증서는 커밋하지 않는다
+soccer/server/node_modules/
+soccer/server/deploy.local.json
+*.pem
+
+# event-price 수집기 실행 로그 (build_data.py 가 매번 다시 만든다)
+event-price/data/build.log

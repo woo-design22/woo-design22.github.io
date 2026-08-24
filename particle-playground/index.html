@@ -2,18 +2,43 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- viewport-fit=cover: 노치 있는 안드로이드/iOS에서 화면 끝까지 캔버스를 쓴다.
+     user-scalable=no: 그리는 도중 두 손가락 확대가 끼어들지 않게 한다. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05050a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>파티클 플레이그라운드</title>
 <style>
-  :root { --panel-bg: rgba(20,20,30,0.75); }
+  :root {
+    --panel-bg: rgba(20,20,30,0.75);
+    /* 노치·홈 인디케이터 영역 */
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #05050a; font-family: 'Segoe UI', Pretendard, sans-serif; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #05050a;
+    font-family: 'Segoe UI', Pretendard, sans-serif;
+    /* 모바일에서 당겨서 새로고침 / 고무줄 스크롤 차단 */
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
   canvas { display: block; touch-action: none; }
 
   .panel {
     position: fixed;
-    top: 16px;
-    left: 16px;
+    top: calc(16px + var(--safe-t));
+    left: calc(16px + var(--safe-l));
     background: var(--panel-bg);
     backdrop-filter: blur(8px);
     border-radius: 16px;
@@ -44,7 +69,7 @@
   .buttons button:hover { background: #2c2c48; }
   .hint {
     position: fixed;
-    bottom: 14px;
+    bottom: calc(14px + var(--safe-b));
     left: 50%;
     transform: translateX(-50%);
     color: #778;
@@ -54,8 +79,8 @@
   }
   .toggle-hide {
     position: fixed;
-    top: 16px;
-    right: 16px;
+    top: calc(16px + var(--safe-t));
+    right: calc(16px + var(--safe-r));
     background: var(--panel-bg);
     color: #eee;
     border: none;
@@ -63,6 +88,22 @@
     padding: 8px 12px;
     cursor: pointer;
     font-size: 0.8rem;
+  }
+
+  /* 좁은 화면(휴대폰 세로)에서는 패널이 캔버스를 다 덮지 않도록 줄이고,
+     손가락으로 누를 수 있게 조작 요소를 키운다. */
+  @media (max-width: 560px) {
+    .panel {
+      width: auto;
+      right: calc(16px + var(--safe-r));
+      padding: 14px 16px;
+    }
+    .panel h1 { font-size: 0.95rem; }
+    .swatch { width: 30px; height: 30px; }
+    .buttons button { padding: 12px 0; font-size: 0.85rem; }
+    .row input[type=range] { height: 26px; }
+    .toggle-hide { padding: 10px 14px; }
+    .hint { font-size: 0.7rem; padding: 0 12px; }
   }
 </style>
 </head>
@@ -89,10 +130,21 @@
   const ctx = canvas.getContext('2d');
   let W, H;
   function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    // 고해상도 화면(휴대폰은 보통 2~3배)에서 뿌옇게 보이지 않도록
+    // 실제 픽셀 수만큼 캔버스를 잡고 CSS 픽셀 기준으로 그린다.
+    // 배율이 높을수록 픽셀이 제곱으로 늘어 느려지므로 2배에서 자른다.
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   window.addEventListener('resize', resize);
+  // 안드로이드에서 주소창이 접히거나 화면을 돌리면 크기가 바뀐다
+  window.addEventListener('orientationchange', () => setTimeout(resize, 150));
   resize();
 
   const palette = ['#f25c54', '#4cc9f0', '#ffd166', '#06d6a0', '#c77dff', '#ffffff'];
@@ -134,7 +186,7 @@
   clearBtn.addEventListener('click', () => particles.length = 0);
 
   let particles = [];
-  let pointer = { x: W / 2, y: H / 2, down: false, lastX: null, lastY: null };
+  let pointer = { x: W / 2, y: H / 2, down: false };
   let orbitCenter = { x: W / 2, y: H / 2 };
 
   function hexToRgb(hex) {
@@ -173,35 +225,46 @@
     }
   }
 
-  function pointerPos(e) {
-    if (e.touches && e.touches.length) {
-      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-    return { x: e.clientX, y: e.clientY };
-  }
-
   function handleDown(e) {
     pointer.down = true;
-    const p = pointerPos(e);
-    pointer.x = p.x; pointer.y = p.y;
-    pointer.lastX = p.x; pointer.lastY = p.y;
-    orbitCenter = { x: p.x, y: p.y };
+    pointer.x = e.clientX; pointer.y = e.clientY;
+    orbitCenter = { x: e.clientX, y: e.clientY };
   }
   function handleMove(e) {
-    const p = pointerPos(e);
-    pointer.x = p.x; pointer.y = p.y;
-    if (pointer.down) {
-      spawn(p.x, p.y);
-    }
+    pointer.x = e.clientX; pointer.y = e.clientY;
+    if (pointer.down) spawn(e.clientX, e.clientY);
   }
   function handleUp() { pointer.down = false; }
 
   canvas.addEventListener('mousedown', handleDown);
   canvas.addEventListener('mousemove', handleMove);
   window.addEventListener('mouseup', handleUp);
-  canvas.addEventListener('touchstart', e => { handleDown(e); e.preventDefault(); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { handleMove(e); e.preventDefault(); }, { passive: false });
-  canvas.addEventListener('touchend', handleUp);
+
+  // 터치는 손가락 여러 개를 동시에 받는다. e.touches를 모두 순회해야
+  // 두 손가락 이상으로 그릴 때 첫 손가락만 반응하는 문제가 없다.
+  function handleTouch(e, isStart) {
+    pointer.down = true;
+    for (let i = 0; i < e.touches.length; i++) {
+      const t = e.touches[i];
+      if (isStart && i === 0) orbitCenter = { x: t.clientX, y: t.clientY };
+      pointer.x = t.clientX; pointer.y = t.clientY;
+      spawn(t.clientX, t.clientY);
+    }
+    e.preventDefault();
+  }
+  canvas.addEventListener('touchstart', e => handleTouch(e, true), { passive: false });
+  canvas.addEventListener('touchmove', e => handleTouch(e, false), { passive: false });
+  canvas.addEventListener('touchend', e => {
+    if (e.touches.length === 0) pointer.down = false;
+  });
+  canvas.addEventListener('touchcancel', () => { pointer.down = false; });
+
+  // 홈 화면 설치 + 오프라인 실행용. file:// 로 열면 등록이 불가능하므로 조용히 넘어간다.
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
 
   function step() {
     ctx.fillStyle = 'rgba(5,5,10,0.18)';

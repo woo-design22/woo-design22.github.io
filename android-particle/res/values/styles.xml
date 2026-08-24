@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 앱 실행 순간 흰 화면이 번쩍이지 않도록 배경을 캔버스와 같은 색으로 둔다 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">#05050A</item>
+        <item name="android:colorBackground">#05050A</item>
+    </style>
+</resources>

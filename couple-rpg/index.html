@@ -1294,10 +1294,10 @@ function playDrone(target) {
         gates.forEach(gt => { gt.x -= 1.1; });
         gates = gates.filter(gt => { if (gt.x < -14) return false; return true; });
         for (const gt of gates) {
-          if (!gt.done && gt.x < 36) { gt.done = true; passed++; if (passed >= target) { over = true; win = true; } }
-          if (gt.x > 22 && gt.x < 50 && (y < gt.gy - 26 || y > gt.gy + 26)) { over = true; win = false; }
+          if (!gt.done && gt.x < 36) { gt.done = true; passed++; sfx('tick'); if (passed >= target) { over = true; win = true; sfx('win'); } }
+          if (gt.x > 22 && gt.x < 50 && (y < gt.gy - 26 || y > gt.gy + 26)) { over = true; win = false; sfx('miss'); }
         }
-        if (y < 6 || y > 192) { over = true; win = false; }
+        if (y < 6 || y > 192) { over = true; win = false; sfx('miss'); }
       }
       // 그리기
       g.fillStyle = '#12203a'; g.fillRect(0, 0, 160, 200);
@@ -1338,13 +1338,15 @@ function playRhythm(label, total, need) {
       const c = cursor();
       const ok = Math.abs(c - zone) < 15;
       if (ok) hits++; flash = ok ? 8 : -8;
+      sfx(ok ? 'hit' : 'miss');
       tries++;
-      if (hits >= need) { over = true; win = true; }
+      if (hits >= need) { over = true; win = true; sfx('win'); }
       else if (tries >= total) { over = true; win = hits >= need; }
       else newZone();
     };
     const timer = setInterval(() => {
       t++;
+      if (!over && t % 32 === 0) sfx('tick');      // 박자를 잡아 주는 소리
       g.fillStyle = '#241a2e'; g.fillRect(0, 0, 160, 200);
       g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
       g.fillText(label, 80, 30);
@@ -1380,10 +1382,12 @@ function playPrice() {
       const ok = Math.abs(cursor() - zone) < 15;
       sum = Math.round((sum + (ok ? 0.5 : -0.5)) * 10) / 10;
       shots++; flash = ok ? 8 : -8;
-      if (sum >= 2.5) over = true; else newZone();
+      sfx(ok ? 'hit' : 'miss');
+      if (sum >= 2.5) { over = true; sfx('win'); } else newZone();
     };
     const timer = setInterval(() => {
       t++;
+      if (!over && t % 32 === 0) sfx('tick');      // 박자를 잡아 주는 소리
       g.fillStyle = '#1a2436'; g.fillRect(0, 0, 160, 200);
       g.fillStyle = '#26406b';
       for (let i = 0; i < 8; i++) g.fillRect(10 + i * 18, 158 - i * 5 - Math.sin(t / 30 + i) * 4, 12, 44);
@@ -1632,7 +1636,7 @@ const NPC_LINES = {
   mil: '우리 수지, 잘 부탁해요.',
   officiant: '오늘의 주인공은 두 사람입니다.',
   guestA: '신부가 너무 예쁘다!', guestB: '신랑 눈이 참 선하네.', guestC: '야외 결혼식은 처음인데, 바다가 다 하네.',
-  agent: '남향에 뷰 좋고, 관리 잘된 단지예요. 잘 사신 겁니다.'
+  agent: '뷰 좋고, 관리 잘된 단지예요. 잘 사신 겁니다.'
 };
 const FRIEND_LINES = {
   cw: ['수지야, 저녁 뭐 먹지?', '(예쁜 눈으로 웃는다)'],
@@ -1754,7 +1758,7 @@ QUESTS.c3 = {
   goal() { return '수지 옆에서 마음 전하기'; },
   hint() { return '소파 근처의 수지에게 A. 솔직한 마음이 제일 세다.'; },
   async intro() {
-    await say('', '몇 번의 한강, 몇 번의 저녁. 오늘은 철우의 장충동 원룸에서 영화를 봤다.');
+    await say('', '그 뒤로 계속 만남을 이어오던 어느 날. 오늘은 철우의 장충동 원룸에서 영화를 봤다.');
     await say('', '영화는 끝났는데, 아무도 리모컨을 잡지 않는다.');
     S.q.stage = 1; setHud(); this.marks();
   },
@@ -1823,8 +1827,8 @@ QUESTS.c4 = {
     return true;
   },
   async song() {
-    await say('주례 선생님', '다음은… 신랑의 깜짝 축가가 있겠습니다.');
-    await say('수지', '어? (금시초문)');
+    await say('주례 선생님', '다음은 신랑이 준비한 축가가 있겠습니다.');
+    await say('수지', '(오래 연습하던 그 노래다)');
     await say('철우', '내가 만일… (안치환) 갑니다.');
     const win = await playRhythm('철우의 축가 「내가 만일」 ♪', 8, 6);
     if (!win) { await say('철우', '(헛기침) 마이크 탓입니다. 다시!'); const r = await this.song(); return r; }
@@ -1857,7 +1861,7 @@ QUESTS.c5 = {
     await showPhoto('loft', '성수르하임 — 층고 높은 우리 신혼집', 2000);
     await say('', '…그런데 오늘은 공기가 낮다. 두 사람은 성격이 좀 다르고, 가끔 이런 날이 있다.');
     await say('', '(무슨 일 때문인지는 중요하지 않다. 정말로.)');
-    await say('철우', '(화해는 늘 내가 먼저. 그런데 수지 달래기는… 난이도가 높다.)');
+    await say('철우', '(화해는 자주 내가 먼저 한다. 그런데 수지 달래기는… 난이도가 높다.)');
     S.q.stage = 1; setHud(); this.marks();
   },
   marks() { markEnts(['sj']); },
@@ -1867,7 +1871,6 @@ QUESTS.c5 = {
       const q = S.q;
       if (q.finished) { await defaultTalk(e); return; }
       let ok = 0;
-      await say('', '침실 문 앞. 심호흡 한 번.');
       let i = await ask('철우', '(첫마디가 절반이다)', ['수지야, 아까는 미안해. 내 말이 짧았어', '뭐가 그렇게 서운한데?', '치킨 시킬까?']);
       if (i === 0) { ok++; await say('수지', '…흥.'); } else if (i === 1) { await say('수지', '몰라서 물어?'); } else { await say('수지', '지금 치킨이 넘어가?'); }
       i = await ask('철우', '(다음 한마디)', ['네 입장에서 먼저 생각을 못 했어', '나도 나름 힘들었거든?', '자자, 우리 착하지']);
@@ -1883,7 +1886,7 @@ QUESTS.c5 = {
       if (ok >= 4) {
         await say('수지', '…치. 다음엔 진짜 잘해.');
         await say('철우', '응. (오늘도 무사히 화해 완료)');
-        await say('', '화해는 보통 철우가 먼저 한다. 그리고 그건, 생각보다 괜찮은 규칙이다.');
+        await say('', '화해는 자주 철우가 먼저 한다.');
         await finishQuest();
       } else {
         q.fails++;
@@ -1953,7 +1956,7 @@ QUESTS.c7 = {
   npcTalk: {
     agent: async e => {
       const q = S.q;
-      await say(e.name, '남향에 뷰 좋고, 단지 관리 잘되고. 두 분, 정말 잘 사신 거예요.');
+      await say(e.name, '뷰 좋고, 단지 관리 잘되고. 두 분, 정말 잘 사신 거예요.');
       if (q.stage < 1) { q.stage = 1; setHud(); save(); QUESTS.c7.marks(); await say('철우', '(그 말, 1년 뒤에도 유효하길.)'); }
     }
   },
@@ -1986,7 +1989,7 @@ async function playEnding() {
   S.busy = true;
   await say('', '저녁의 월곡두산아파트. 큰 창으로 노을이 든다.');
   await say('수지', '오빠, 우리 처음 만난 날 기억나?');
-  await say('철우', '장충동 주민센터. 서류 들고 갔다가 목소리에 반했지.');
+  await say('철우', '장충동 주민센터. 너 도와주다가 가까워졌지.');
   await say('수지', '한강에서 드론 날리고, 장충동에서… 후후.');
   await say('철우', '목장원에서 장인어른 색소폰에, 내 축가에.');
   await say('수지', '성수동에서 투닥투닥하고, 화해하고. 저녁 메뉴는 내가 다 맞히고.');
@@ -2018,6 +2021,32 @@ bgm.volume = 0.35;
 let bgmIdx = 0, bgmOn = store.get('cs_bgm', true), bgmTried = false;
 bgm.src = BGM_LIST[0];
 bgm.addEventListener('ended', () => { bgmIdx = (bgmIdx + 1) % BGM_LIST.length; bgm.src = BGM_LIST[bgmIdx]; bgmPlay(); });
+// ----- 효과음: 타이밍 게임용. 음원 파일 없이 웹오디오로 만든다.
+//   함수 선언이라 위쪽 미니게임에서도 부를 수 있고, 실제 호출은 부팅 뒤라 bgmOn 이 이미 정해져 있다.
+let sfxCtx = null;
+function sfxTone(t0, freq, freq2, type, vol, dur) {
+  const o = sfxCtx.createOscillator(), g = sfxCtx.createGain();
+  o.connect(g); g.connect(sfxCtx.destination);
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t0);
+  if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t0 + dur * 0.7);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function sfx(kind) {
+  if (!bgmOn) return;                       // 소리를 끈 상태면 효과음도 내지 않는다
+  try {
+    if (!sfxCtx) sfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (sfxCtx.state === 'suspended') sfxCtx.resume();
+    const t = sfxCtx.currentTime;
+    if (kind === 'hit') sfxTone(t, 880, 1320, 'triangle', 0.16, 0.16);
+    else if (kind === 'miss') sfxTone(t, 190, 90, 'sawtooth', 0.13, 0.20);
+    else if (kind === 'tick') sfxTone(t, 1250, 0, 'square', 0.04, 0.04);
+    else if (kind === 'win') [523, 659, 784, 1047].forEach((f, i) => sfxTone(t + i * 0.09, f, 0, 'triangle', 0.15, 0.22));
+  } catch (e) { /* 소리가 안 나도 게임은 그대로 돌아간다 */ }
+}
+
 function bgmBtn() { $('btnBgm').textContent = bgmOn ? '🔊' : '🔇'; }
 function bgmPlay() { if (bgmOn) bgm.play().catch(() => {}); }
 function bgmFirst() { if (bgmTried) return; bgmTried = true; bgmPlay(); }

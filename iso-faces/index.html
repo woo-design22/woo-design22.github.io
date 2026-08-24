@@ -1,0 +1,2529 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>격리실의 얼굴들</title>
+<style>
+  :root{
+    /* 색의 궤적 — 갇힘(초록) · 자유(청백) · 몸(앰버) · 무(검정) · 기억(옅은 청) */
+    --void:#04060a;
+    --ink:#e7e3da;
+    --dim:#8b96a2;
+    --faint:#4a545f;
+    --phos:#8ff0c4;          /* 인광 초록 — 격리실과 단말기 */
+    --phos-bg:#071510;
+    --cold:#b9d2e6;          /* 복도의 형광 */
+    --amber:#e6b077;         /* 몸이 생길 때 처음 들어오는 따뜻함 */
+    --blood:#c05a5a;
+    --sea:#7fb6d9;           /* 마지막의 기억 */
+    --line:rgba(231,227,218,.16);
+    /* 두 개의 목소리: 화자는 명조, 우주선은 산세리프 */
+    --serif:'Nanum Myeongjo', Batang, 바탕, 'Apple SD Gothic Neo', 'Times New Roman', serif;
+    --sans:'Segoe UI', Pretendard, 'Malgun Gothic', sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--void);overflow:hidden}
+  body{
+    font-family:var(--sans);color:var(--ink);
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+  /* 색 보정 — 장마다 화면 전체의 온도를 민다 */
+  #tint{position:fixed;inset:0;pointer-events:none;opacity:0;
+        transition:opacity 2.4s ease, background 2.4s ease;mix-blend-mode:soft-light}
+  /* 시야 테두리 — 머리통일 때는 좁고, 몸이 있으면 넓어진다 */
+  #vig{position:fixed;inset:0;pointer-events:none;transition:box-shadow 1.6s cubic-bezier(.3,0,.2,1)}
+  /* 순간 섬광 — 커넥터가 꽂힐 때, 머리가 떨어질 때 */
+  #flash{position:fixed;inset:0;pointer-events:none;background:#fff;opacity:0;
+         transition:opacity .5s ease}
+  /* 시네마 바 — 인용이 뜰 때만 닫힌다 */
+  .bar{position:fixed;left:0;right:0;height:0;background:#000;pointer-events:none;z-index:7;
+       transition:height 1.0s cubic-bezier(.22,1,.36,1)}
+  #barT{top:0} #barB{bottom:0}
+  body.cine .bar{height:8.5vh}
+
+  /* ── 화자의 목소리: 명조 ── */
+  #say{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(11vh + env(safe-area-inset-bottom));
+    width:min(720px,86vw);text-align:center;pointer-events:none;z-index:6;
+    font-family:var(--serif);
+    font-size:clamp(16.5px,2.8vw,21.5px);line-height:2.0;letter-spacing:.015em;
+    text-shadow:0 1px 16px #000, 0 0 42px rgba(0,0,0,.95);
+    opacity:0;transition:opacity 1.0s ease;
+  }
+  #say.on{opacity:1}
+
+  #quote{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:10vw;pointer-events:none;opacity:0;z-index:6;
+    transition:opacity 1.3s cubic-bezier(.4,0,.2,1);
+    background:radial-gradient(ellipse 90% 70% at center, rgba(2,4,7,.80), rgba(2,4,7,.97));
+  }
+  #quote.on{opacity:1}
+  #quote p{
+    margin:0;max-width:20em;text-align:center;font-family:var(--serif);
+    font-size:clamp(19px,3.4vw,29px);line-height:2.1;letter-spacing:.02em;
+    color:#d9d5cc;
+  }
+  #quote p b{color:#fff;font-weight:400;
+             text-shadow:0 0 26px rgba(255,255,255,.35)}
+  #quote p em{font-style:normal;color:var(--amber)}
+
+  /* ── 우주선의 목소리: 산세리프, 넓은 자간, 규칙선 ── */
+  #bcast{
+    position:fixed;left:50%;top:15vh;transform:translateX(-50%);
+    width:min(620px,88vw);text-align:center;pointer-events:none;z-index:8;
+    opacity:0;transition:opacity .7s ease;
+  }
+  #bcast.on{opacity:1}
+  #bcast .lab{
+    font-size:12px;letter-spacing:.44em;color:var(--blood);text-indent:.44em;
+    padding-bottom:11px;border-bottom:1px solid rgba(192,90,90,.34);display:block;
+  }
+  #bcast .msg{
+    display:block;padding-top:16px;font-size:clamp(15.5px,2.5vw,19px);
+    letter-spacing:.06em;line-height:1.95;color:#dbe3ea;
+  }
+
+  /* 상호작용 안내 */
+  #prompt{
+    position:fixed;left:50%;top:57%;transform:translate(-50%,-50%);
+    pointer-events:none;text-align:center;opacity:0;transition:opacity .35s ease;z-index:6;
+  }
+  #prompt.on{opacity:1}
+  #prompt span{
+    display:inline-block;padding:12px 22px;border:1px solid rgba(231,227,218,.30);
+    background:rgba(4,6,10,.62);font-size:17px;letter-spacing:.10em;
+    backdrop-filter:blur(2px);
+  }
+  #prompt small{display:block;margin-top:12px;font-size:12.5px;color:var(--dim);letter-spacing:.22em;
+                text-indent:.22em}
+
+  #dot{
+    position:fixed;left:50%;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;
+    background:rgba(231,227,218,.42);pointer-events:none;
+    opacity:0;transition:opacity .5s ease;
+  }
+  #dot.on{opacity:1}
+
+  /* ── 2장: 눈앞의 단말기 ── */
+  #screen{
+    position:fixed;left:50%;top:43%;transform:translate(-50%,-50%);
+    width:min(600px,93vw);aspect-ratio:8/5;
+    background:var(--phos-bg);
+    border:14px solid #0d1116;border-radius:18px/22px;
+    box-shadow:
+      0 0 0 1px #000,
+      0 0 0 3px #191f26,
+      0 30px 90px rgba(0,0,0,.9),
+      inset 0 0 90px rgba(0,0,0,.85),
+      0 0 70px rgba(120,240,190,.09);
+    display:none;overflow:hidden;
+  }
+  #screen.on{display:block}
+  #crt{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+  #scan{
+    position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.34) 2px 4px);
+    mix-blend-mode:multiply;
+  }
+  #glow{
+    position:absolute;inset:-2px;pointer-events:none;
+    background:
+      radial-gradient(ellipse 76% 62% at 50% 46%, rgba(140,255,205,.10), rgba(0,0,0,0) 70%),
+      radial-gradient(ellipse 120% 110% at center, rgba(0,0,0,0) 52%, rgba(0,0,0,.75));
+    animation:flick 5.5s infinite steps(1);
+  }
+  @keyframes flick{
+    0%,88%{opacity:1} 89%{opacity:.86} 90%{opacity:1} 96%{opacity:.92} 97%{opacity:1}
+  }
+  #meta{
+    position:fixed;left:50%;transform:translateX(-50%);
+    top:calc(43% + min(188px,29.5vw) + 30px);
+    text-align:center;font-size:12.5px;color:var(--dim);letter-spacing:.26em;
+    text-indent:.26em;display:none;z-index:6;
+  }
+  #meta.on{display:block}
+  #meta b{color:var(--phos);font-weight:400;letter-spacing:.16em;text-indent:.16em}
+  #focus{
+    width:210px;height:1px;margin:13px auto 0;background:rgba(231,227,218,.13);overflow:hidden;
+  }
+  #focus i{display:block;height:100%;width:0;background:var(--phos);
+           box-shadow:0 0 8px var(--phos);transition:width .06s linear}
+
+  /* ── 퀘스트 HUD ── */
+  #hud{
+    position:fixed;left:50%;transform:translateX(-50%);
+    top:calc(3vh + env(safe-area-inset-top));
+    text-align:center;pointer-events:none;z-index:6;
+    opacity:0;transition:opacity 1s ease;
+  }
+  #hud.on{opacity:1}
+  #hud .ch{font-size:11.5px;letter-spacing:.46em;color:var(--dim);text-indent:.46em}
+  #hud .gl{
+    margin-top:11px;font-size:16px;letter-spacing:.10em;color:var(--cold);
+    text-indent:.10em;text-shadow:0 1px 18px #000;
+  }
+  #hud .gl:before{content:'▸\00a0\00a0';color:var(--phos)}
+  #hud .gl.done{color:var(--faint)}
+  #hud .gl.done:before{content:'✓\00a0\00a0';color:var(--faint)}
+  #hud .sub{margin-top:9px;font-size:12.5px;letter-spacing:.14em;color:var(--dim);text-indent:.14em}
+
+  /* ── 미니게임 공통 틀 ── */
+  #mg{
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:clamp(18px,3.4vh,30px);padding:7vw;z-index:9;
+    background:radial-gradient(ellipse 88% 76% at center, rgba(2,4,7,.74), rgba(2,4,7,.96));
+  }
+  #mg.on{display:flex}
+  #mgTitle{font-size:13px;letter-spacing:.50em;color:var(--phos);text-indent:.50em;
+           text-shadow:0 0 18px rgba(143,240,196,.45)}
+  #mgc{width:min(540px,88vw);height:min(292px,49vw);display:block}
+  #mgInfo{
+    font-family:var(--serif);font-size:clamp(17px,3.0vw,23px);line-height:2.0;
+    text-align:center;max-width:21em;color:var(--ink);min-height:2.2em;
+    transition:color .3s ease;
+  }
+  #mgInfo b{font-weight:400;color:var(--amber)}
+  #mgKey{font-size:13px;letter-spacing:.26em;color:var(--dim);text-indent:.26em;text-align:center}
+
+  /* ── 길 안내 — 30초 넘게 헤매면 뜬다 ── */
+  #guide{
+    position:fixed;left:50%;top:27%;transform:translate(-50%,-50%);
+    pointer-events:none;text-align:center;z-index:6;
+    opacity:0;transition:opacity .9s ease;
+  }
+  #guide.on{opacity:1}
+  #guide .arw{width:76px;height:70px;margin:0 auto;position:relative;
+              transition:transform .16s ease-out}
+  #guide .arw:before{
+    content:'';position:absolute;left:50%;top:6px;margin-left:-14px;
+    border-left:14px solid transparent;border-right:14px solid transparent;
+    border-bottom:24px solid var(--phos);
+    filter:drop-shadow(0 0 14px rgba(143,240,196,.7));
+  }
+  #guide .arw:after{
+    content:'';position:absolute;left:50%;top:28px;margin-left:-3px;
+    width:6px;height:32px;background:var(--phos);opacity:.85;
+    filter:drop-shadow(0 0 12px rgba(143,240,196,.55));
+  }
+  #guide .txt{margin-top:16px;font-size:16px;letter-spacing:.06em;color:var(--phos);
+              text-shadow:0 1px 18px #000;max-width:22em}
+  #guide .dst{margin-top:8px;font-size:12.5px;letter-spacing:.22em;color:var(--dim);text-indent:.22em}
+
+  /* ── 조작판 (터치) ── */
+  #pad{position:fixed;display:none;pointer-events:none;inset:0}
+  #pad.on{display:block}
+  .padk{
+    position:absolute;width:56px;height:56px;border-radius:12px;
+    background:rgba(18,22,28,.72);border:1px solid rgba(216,212,204,.20);
+    display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--ink);
+    pointer-events:auto;touch-action:none;
+  }
+  .padk.hit{background:rgba(125,224,176,.22);border-color:var(--green)}
+  #stick{
+    position:absolute;left:max(22px,env(safe-area-inset-left));
+    bottom:calc(26px + env(safe-area-inset-bottom));
+    width:132px;height:132px;border-radius:50%;
+    background:rgba(14,18,23,.42);border:1px solid rgba(216,212,204,.14);
+    pointer-events:auto;touch-action:none;display:none;
+  }
+  #stick.on{display:block}
+  #stick i{
+    position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+    border-radius:50%;background:rgba(216,212,204,.26);border:1px solid rgba(216,212,204,.34);
+  }
+  #act{
+    position:fixed;right:max(22px,env(safe-area-inset-right));
+    bottom:calc(40px + env(safe-area-inset-bottom));
+    width:74px;height:74px;border-radius:50%;
+    background:rgba(18,22,28,.72);border:1px solid rgba(216,212,204,.22);
+    display:none;align-items:center;justify-content:center;
+    font-size:13px;color:var(--ink);pointer-events:auto;touch-action:none;letter-spacing:.04em;
+  }
+  #act.on{display:flex}
+  #act.hit{background:rgba(125,224,176,.24);border-color:var(--green)}
+
+  /* ── 표지 / 끝 ── */
+  /* 표지 — 뒤에서 격리실이 그대로 돌아간다. 얼굴들 위에 제목이 얹힌다. */
+  #cover,#end{
+    position:fixed;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:clamp(20px,3.6vh,34px);padding:32px;
+    text-align:center;transition:opacity 1.8s cubic-bezier(.4,0,.2,1);z-index:10;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 44%, rgba(4,6,10,.42), rgba(4,6,10,.86) 72%),
+      linear-gradient(180deg, rgba(4,6,10,.92), rgba(4,6,10,.66) 38%, rgba(4,6,10,.96));
+  }
+  #end{display:none;opacity:0;background:#020305}
+  #cover h1,#end h1{
+    margin:0;font-family:var(--serif);
+    font-size:clamp(26px,6.6vw,44px);letter-spacing:.30em;font-weight:400;
+    text-indent:.30em;line-height:1.55;max-width:11em;
+    text-shadow:0 2px 40px #000, 0 0 90px rgba(0,0,0,.9);
+  }
+  #cover h1:after,#end h1:after{
+    content:'';display:block;width:52px;height:1px;margin:clamp(18px,3vh,28px) auto 0;
+    background:linear-gradient(90deg,transparent,rgba(143,240,196,.55),transparent);
+  }
+  #cover p,#end p{
+    margin:0;font-size:11px;color:var(--dim);line-height:2.3;letter-spacing:.30em;text-indent:.30em;
+  }
+  #end p{font-family:var(--serif);font-size:clamp(14px,2.4vw,17.5px);
+         letter-spacing:.02em;text-indent:0;color:var(--ink);max-width:20em}
+  #cover button,#end button{
+    font-family:var(--sans);font-size:11px;color:var(--ink);letter-spacing:.42em;text-indent:.42em;
+    background:transparent;border:1px solid var(--line);
+    padding:15px 34px;cursor:pointer;transition:.35s cubic-bezier(.4,0,.2,1);
+  }
+  #cover button:hover,#end button:hover{
+    background:rgba(143,240,196,.07);border-color:rgba(143,240,196,.5);color:var(--phos);
+  }
+  #cover small{font-size:9.5px;color:var(--faint);letter-spacing:.22em;line-height:2.4;text-indent:.22em}
+  #cover small{font-size:11px;color:#4d565f;letter-spacing:.08em;line-height:1.9}
+
+  #nogl{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px}
+  #nogl div{max-width:430px;background:var(--panel);border:1px solid var(--line);
+            border-radius:14px;padding:22px;line-height:1.75;font-size:14px}
+  #nogl b{color:var(--amber)}
+
+  @media (max-width:640px){
+    /* 서술이 엄지 스틱 위로 내려앉지 않게 띄운다 */
+    #say{bottom:calc(184px + env(safe-area-inset-bottom));width:92vw;line-height:1.85}
+    #prompt{top:44%}
+    #hud .gl{font-size:14px}
+    #prompt span{font-size:15.5px;padding:11px 18px}
+    #guide{top:25%}
+    #guide .txt{font-size:14px}
+    #bcast{top:11vh}
+    #mgc{height:min(250px,44vw)}
+  }
+  @media (max-height:520px){
+    #say{bottom:calc(96px + env(safe-area-inset-bottom));font-size:14px;line-height:1.7}
+    #screen{top:40%;width:min(430px,66vw)}
+    #meta{top:calc(40% + min(134px,20.6vw) + 18px)}
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="tint"></div>
+<div id="vig"></div>
+<div id="flash"></div>
+<div class="bar" id="barT"></div>
+<div class="bar" id="barB"></div>
+<div id="dot"></div>
+
+<div id="hud">
+  <span class="ch"></span>
+  <div class="gl"></div>
+  <div class="sub"></div>
+</div>
+
+<div id="guide"><div class="arw"></div><div class="txt"></div><div class="dst"></div></div>
+<div id="prompt"><span></span><small></small></div>
+<div id="say"></div>
+<div id="quote"><p></p></div>
+<div id="bcast"><span class="lab">선내 방송</span><span class="msg"></span></div>
+
+<div id="mg">
+  <div id="mgTitle"></div>
+  <canvas id="mgc" width="1080" height="584"></canvas>
+  <div id="mgInfo"></div>
+  <div id="mgKey"></div>
+</div>
+
+<div id="screen"><canvas id="crt" width="480" height="300"></canvas><div id="scan"></div><div id="glow"></div></div>
+<div id="meta">
+  <span id="day">1일째</span> · <b id="hint">눈동자를 굴려 마우스를 움직인다</b>
+  <div id="focus"><i></i></div>
+</div>
+
+<div id="pad">
+  <div id="stick"><i></i></div>
+  <div id="act">만지기</div>
+</div>
+
+<div id="cover">
+  <h1>격리실의 얼굴들</h1>
+  <p>머리만 남은 사람의 이야기<br>1인칭으로 다시 쓴 것</p>
+  <button id="go">시작</button>
+  <small>소리를 켜면 좋습니다 · 이어폰 권장<br>PC: WASD 이동 · 끌어서 시선 · E 상호작용 &nbsp;/&nbsp; 모바일: 왼쪽 스틱 · 오른쪽 끌기</small>
+</div>
+
+<div id="end">
+  <h1>격리실의 얼굴들</h1>
+  <p id="endtxt"></p>
+  <button id="again">다시</button>
+</div>
+
+<div id="nogl"><div>
+  <b>WebGL2를 쓸 수 없는 브라우저입니다.</b><br>
+  최신 크롬 · 엣지 · 사파리(15 이상)에서 열어 주세요.
+  카카오톡 · 인스타그램 같은 인앱 브라우저에서는 막혀 있을 수 있으니,
+  오른쪽 위 메뉴의 <b>다른 브라우저로 열기</b>를 눌러 주세요.
+</div></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════════
+   「격리실의 얼굴들」 — 소설을 1인칭으로 옮긴 것
+   이 게임의 규칙 하나: 조작할 수 있는 범위가 곧 이야기다.
+   1장에서는 코밖에 없고, 2장에서는 눈동자로 한 픽셀을 민다.
+   3장에서 몸이 생기면 조작이 통째로 열리고, 8장에서 다시 빼앗긴다.
+   외부 라이브러리 없음. WebGL2 직접 호출. 파일 하나.
+   ?debug=1 이면 window.BD 훅이 열린다.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─────────── 4×4 행렬 ─────────── */
+const m4 = {
+  make(){ return new Float32Array(16); },
+  ident(o){ o.fill(0); o[0]=o[5]=o[10]=o[15]=1; return o; },
+  mul(o,a,b){
+    for(let c=0;c<4;c++){
+      const b0=b[c*4],b1=b[c*4+1],b2=b[c*4+2],b3=b[c*4+3];
+      o[c*4  ]=a[0]*b0+a[4]*b1+a[8 ]*b2+a[12]*b3;
+      o[c*4+1]=a[1]*b0+a[5]*b1+a[9 ]*b2+a[13]*b3;
+      o[c*4+2]=a[2]*b0+a[6]*b1+a[10]*b2+a[14]*b3;
+      o[c*4+3]=a[3]*b0+a[7]*b1+a[11]*b2+a[15]*b3;
+    }
+    return o;
+  },
+  persp(o,fovy,asp,n,f){
+    const t=1/Math.tan(fovy/2);
+    o.fill(0); o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f);
+    return o;
+  },
+  look(o,e,c,up){
+    let zx=e[0]-c[0], zy=e[1]-c[1], zz=e[2]-c[2];
+    let l=Math.hypot(zx,zy,zz)||1; zx/=l; zy/=l; zz/=l;
+    let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+    l=Math.hypot(xx,xy,xz)||1; xx/=l; xy/=l; xz/=l;
+    const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    o[0]=xx;o[1]=yx;o[2]=zx;o[3]=0; o[4]=xy;o[5]=yy;o[6]=zy;o[7]=0;
+    o[8]=xz;o[9]=yz;o[10]=zz;o[11]=0;
+    o[12]=-(xx*e[0]+xy*e[1]+xz*e[2]);
+    o[13]=-(yx*e[0]+yy*e[1]+yz*e[2]);
+    o[14]=-(zx*e[0]+zy*e[1]+zz*e[2]); o[15]=1;
+    return o;
+  }
+};
+
+/* ─────────── 변환 스택 ───────────
+   규칙: 스택은 이동·회전만 한다. 크기는 그리는 순간에만.
+   그래야 스택 위쪽 3×3이 늘 순수 회전이고 법선이 정확하다. */
+const MS = (function(){
+  const pool=[]; for(let i=0;i<40;i++) pool.push(m4.ident(m4.make()));
+  const tmp=m4.make(), scr=m4.make();
+  let top=0;
+  const api={
+    reset(){ top=0; m4.ident(pool[0]); return api; },
+    push(){ pool[top+1].set(pool[top]); top++; return api; },
+    pop(){ top--; return api; },
+    cur(){ return pool[top]; },
+    mulIn(m){ m4.mul(scr,pool[top],m); pool[top].set(scr); return api; },
+    move(x,y,z){ m4.ident(tmp); tmp[12]=x; tmp[13]=y; tmp[14]=z; return api.mulIn(tmp); },
+    rotY(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[0]=c; tmp[2]=-s; tmp[8]=s; tmp[10]=c; return api.mulIn(tmp); },
+    rotX(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[5]=c; tmp[6]=s; tmp[9]=-s; tmp[10]=c; return api.mulIn(tmp); },
+    rotZ(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[0]=c; tmp[1]=s; tmp[4]=-s; tmp[5]=c; return api.mulIn(tmp); }
+  };
+  return api;
+})();
+
+/* ─────────── WebGL ─────────── */
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl2', { antialias:true, alpha:false, powerPreference:'high-performance' });
+if(!gl){
+  document.getElementById('nogl').style.display='flex';
+  document.getElementById('cover').style.display='none';
+  return;
+}
+function shader(t,src){
+  const s=gl.createShader(t); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error('셰이더 실패\n'+gl.getShaderInfoLog(s));
+  return s;
+}
+function program(vs,fs,names){
+  const p=gl.createProgram();
+  gl.attachShader(p,shader(gl.VERTEX_SHADER,vs));
+  gl.attachShader(p,shader(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)) console.error('링크 실패\n'+gl.getProgramInfoLog(p));
+  const u={}; names.forEach(n=>{ u[n]=gl.getUniformLocation(p,n); });
+  return { p:p, u:u };
+}
+
+const NL = 10;   /* 한 번에 켜는 점광 개수 */
+
+/* 본체와 머리통이 함께 쓰는 조명식. 한 곳만 고치면 둘 다 바뀐다. */
+const GLSL_LIGHT = `
+uniform vec3 uEye,uFog;
+uniform float uFogD,uAmb;
+uniform int uNL;
+uniform vec3 uLP[${NL}];
+uniform vec3 uLC[${NL}];
+uniform float uLR[${NL}];
+vec3 shade(vec3 base, vec3 N, vec3 W, float emis, float gloss){
+  vec3 V=normalize(uEye-W);
+  vec3 c=base*uAmb;
+  for(int i=0;i<${NL};i++){
+    if(i>=uNL) break;
+    vec3 d=uLP[i]-W;
+    float dist=length(d);
+    float att=clamp(1.0-dist/uLR[i],0.0,1.0); att*=att;
+    if(att<=0.0) continue;
+    vec3 L=d/max(dist,0.0001);
+    c += base*uLC[i]*max(dot(N,L),0.0)*att;
+    vec3 H=normalize(L+V);
+    c += uLC[i]*pow(max(dot(N,H),0.0),46.0)*att*gloss;
+  }
+  c += base*emis;
+  float dd=length(uEye-W);
+  return mix(c,uFog,1.0-exp(-dd/uFogD));
+}`;
+const LIGHT_UNIFORMS = ['uEye','uFog','uFogD','uAmb','uNL','uLP','uLC','uLR'];
+
+const MAIN = program(
+`#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec3 aCol;
+uniform mat4 uProj,uView,uModel;
+uniform mat3 uNrm;
+out vec3 vN; out vec3 vC; out vec3 vW;
+void main(){
+  vec4 w = uModel*vec4(aPos,1.0);
+  vW=w.xyz; vN=uNrm*aNrm; vC=aCol;
+  gl_Position = uProj*uView*w;
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vN; in vec3 vC; in vec3 vW;
+uniform vec3 uTint;
+uniform float uAlpha,uFlat,uEmis;
+${GLSL_LIGHT}
+out vec4 outColor;
+void main(){
+  if(uFlat>0.5){ outColor=vec4(uTint,uAlpha*vC.r); return; }
+  outColor=vec4(shade(vC*uTint, normalize(vN), vW, uEmis, 0.16), uAlpha);
+}`,
+['uProj','uView','uModel','uNrm','uTint','uAlpha','uFlat','uEmis'].concat(LIGHT_UNIFORMS));
+
+/* 눈동자: 인스턴싱한 작은 판. 플레이어 쪽으로 최대한 굴러간다. */
+const EYES = program(
+`#version 300 es
+layout(location=0) in vec2 aQ;
+layout(location=1) in vec3 aP;      /* 흰자 중심 */
+layout(location=2) in vec3 aF;      /* 그 머리가 향한 방향 */
+uniform mat4 uProj,uView;
+uniform vec3 uEye;
+uniform float uSize,uRoll;
+out float vD;
+void main(){
+  vec3 want = normalize(uEye - aP);
+  vec3 f = normalize(aF);
+  /* 눈은 얼굴 안에서만 구른다 — 최대 각도를 넘지 못한다 */
+  float k = clamp(dot(want,f), -1.0, 1.0);
+  vec3 t = normalize(want - f*k);
+  float ang = acos(clamp(k,-1.0,1.0));
+  float lim = min(ang, 1.05*uRoll);
+  vec3 dir = normalize(f*cos(lim) + t*sin(lim));
+  vec3 c = aP + dir*0.0108;
+  vec3 toE = uEye - c;
+  vec3 r = normalize(cross(vec3(0.0,1.0,0.0), toE));
+  vec3 u = normalize(cross(toE, r));
+  vec3 pos = c + r*(aQ.x*uSize) + u*(aQ.y*uSize);
+  vD = length(toE);
+  gl_Position = uProj*uView*vec4(pos,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in float vD;
+uniform vec3 uCol;
+out vec4 outColor;
+void main(){
+  float a = 1.0 - smoothstep(16.0, 26.0, vD);
+  outColor = vec4(uCol, a);
+}`,
+['uProj','uView','uEye','uSize','uRoll','uCol']);
+
+/* ─────────── 형상 빌더 ─────────── */
+function Builder(){ this.a=[]; }
+Builder.prototype.tri=function(p,n,col){
+  const M=MS.cur(), a=this.a;
+  for(let i=0;i<3;i++){
+    const x=p[i][0],y=p[i][1],z=p[i][2];
+    a.push(M[0]*x+M[4]*y+M[8]*z+M[12], M[1]*x+M[5]*y+M[9]*z+M[13], M[2]*x+M[6]*y+M[10]*z+M[14]);
+    const nx=n[i][0],ny=n[i][1],nz=n[i][2];
+    let tx=M[0]*nx+M[4]*ny+M[8]*nz, ty=M[1]*nx+M[5]*ny+M[9]*nz, tz=M[2]*nx+M[6]*ny+M[10]*nz;
+    const l=Math.hypot(tx,ty,tz)||1;
+    a.push(tx/l,ty/l,tz/l,col[0],col[1],col[2]);
+  }
+};
+/* 정점마다 색이 다른 삼각형 — 머리통이 살·머리칼·입술을 한 메시에 담는 데 쓴다 */
+Builder.prototype.tri3=function(p,n,c){
+  const M=MS.cur(), a=this.a;
+  for(let i=0;i<3;i++){
+    const x=p[i][0],y=p[i][1],z=p[i][2];
+    a.push(M[0]*x+M[4]*y+M[8]*z+M[12], M[1]*x+M[5]*y+M[9]*z+M[13], M[2]*x+M[6]*y+M[10]*z+M[14]);
+    const nx=n[i][0],ny=n[i][1],nz=n[i][2];
+    let tx=M[0]*nx+M[4]*ny+M[8]*nz, ty=M[1]*nx+M[5]*ny+M[9]*nz, tz=M[2]*nx+M[6]*ny+M[10]*nz;
+    const l=Math.hypot(tx,ty,tz)||1;
+    a.push(tx/l,ty/l,tz/l,c[i][0],c[i][1],c[i][2]);
+  }
+};
+/* 눌린 공 — 귀에 쓴다 */
+Builder.prototype.ell=function(rx,ry,rz,seg,ring,col){
+  for(let j=0;j<ring;j++){
+    const t0=j/ring*Math.PI,t1=(j+1)/ring*Math.PI;
+    for(let i=0;i<seg;i++){
+      const p0=i/seg*Math.PI*2,p1=(i+1)/seg*Math.PI*2;
+      const U=(t,p)=>[Math.sin(t)*Math.cos(p),Math.cos(t),Math.sin(t)*Math.sin(p)];
+      const S=v=>[v[0]*rx,v[1]*ry,v[2]*rz];
+      const N=v=>{ const n=[v[0]/rx,v[1]/ry,v[2]/rz], l=Math.hypot(n[0],n[1],n[2])||1;
+                   return [n[0]/l,n[1]/l,n[2]/l]; };
+      const a=U(t0,p0),b2=U(t1,p0),c2=U(t1,p1),d=U(t0,p1);
+      this.tri([S(a),S(b2),S(c2)],[N(a),N(b2),N(c2)],col);
+      this.tri([S(a),S(c2),S(d)],[N(a),N(c2),N(d)],col);
+    }
+  }
+};
+Builder.prototype.quad=function(p0,p1,p2,p3,col){
+  const ux=p1[0]-p0[0],uy=p1[1]-p0[1],uz=p1[2]-p0[2];
+  const vx=p3[0]-p0[0],vy=p3[1]-p0[1],vz=p3[2]-p0[2];
+  let n=[uy*vz-uz*vy, uz*vx-ux*vz, ux*vy-uy*vx];
+  const l=Math.hypot(n[0],n[1],n[2])||1; n=[n[0]/l,n[1]/l,n[2]/l];
+  this.tri([p0,p1,p2],[n,n,n],col); this.tri([p0,p2,p3],[n,n,n],col);
+};
+Builder.prototype.box=function(sx,sy,sz,col,inside){
+  const x=sx/2,y=sy/2,z=sz/2;
+  const v=[[-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]];
+  if(inside){          /* 방 안쪽에서 보는 상자 — 면을 뒤집는다 */
+    this.quad(v[7],v[6],v[5],v[4],col); this.quad(v[2],v[3],v[0],v[1],col);
+    this.quad(v[6],v[2],v[1],v[5],col); this.quad(v[3],v[7],v[4],v[0],col);
+    this.quad(v[2],v[6],v[7],v[3],col); this.quad(v[4],v[5],v[1],v[0],col);
+  } else {
+    this.quad(v[4],v[5],v[6],v[7],col); this.quad(v[1],v[0],v[3],v[2],col);
+    this.quad(v[5],v[1],v[2],v[6],col); this.quad(v[0],v[4],v[7],v[3],col);
+    this.quad(v[3],v[7],v[6],v[2],col); this.quad(v[0],v[1],v[5],v[4],col);
+  }
+};
+Builder.prototype.cyl=function(r,h,seg,col,caps){
+  const y=h/2;
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2,a1=(i+1)/seg*Math.PI*2;
+    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
+    const p0=[c0*r,-y,s0*r],p1=[c1*r,-y,s1*r],p2=[c1*r,y,s1*r],p3=[c0*r,y,s0*r];
+    this.tri([p0,p1,p2],[[c0,0,s0],[c1,0,s1],[c1,0,s1]],col);
+    this.tri([p0,p2,p3],[[c0,0,s0],[c1,0,s1],[c0,0,s0]],col);
+    if(caps!==false){
+      this.tri([[0,y,0],p3,p2],[[0,1,0],[0,1,0],[0,1,0]],col);
+      this.tri([[0,-y,0],p1,p0],[[0,-1,0],[0,-1,0],[0,-1,0]],col);
+    }
+  }
+};
+Builder.prototype.sph=function(r,seg,ring,col){
+  for(let j=0;j<ring;j++){
+    const t0=j/ring*Math.PI,t1=(j+1)/ring*Math.PI;
+    for(let i=0;i<seg;i++){
+      const p0=i/seg*Math.PI*2,p1=(i+1)/seg*Math.PI*2;
+      const P=(t,p)=>[Math.sin(t)*Math.cos(p),Math.cos(t),Math.sin(t)*Math.sin(p)];
+      const a=P(t0,p0),b=P(t1,p0),c=P(t1,p1),d=P(t0,p1);
+      const S=v=>[v[0]*r,v[1]*r,v[2]*r];
+      this.tri([S(a),S(b),S(c)],[a,b,c],col);
+      this.tri([S(a),S(c),S(d)],[a,c,d],col);
+    }
+  }
+};
+Builder.prototype.disc=function(r,seg){
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2,a1=(i+1)/seg*Math.PI*2;
+    this.tri([[0,0,0],[Math.cos(a1)*r,0,Math.sin(a1)*r],[Math.cos(a0)*r,0,Math.sin(a0)*r]],
+             [[0,1,0],[0,1,0],[0,1,0]],[1,1,1]);
+    const n=this.a.length;
+    this.a[n-13]=0;this.a[n-12]=0;this.a[n-11]=0;
+    this.a[n-4]=0; this.a[n-3]=0; this.a[n-2]=0;
+  }
+};
+function upload(arr){
+  const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+  const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(arr),gl.STATIC_DRAW);
+  const S=36;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,S,0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,S,12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,S,24);
+  gl.bindVertexArray(null);
+  return { vao:vao, n:arr.length/9, buf:buf };
+}
+function bake(fn){ MS.reset(); const b=new Builder(); fn(b); return upload(b.a); }
+
+const P = {
+  box : bake(b=>b.box(1,1,1,[1,1,1])),
+  cyl : bake(b=>b.cyl(0.5,1,14,[1,1,1],true)),
+  tube: bake(b=>b.cyl(0.5,1,14,[1,1,1],false)),
+  sph : bake(b=>b.sph(0.5,14,10,[1,1,1])),
+  disc: bake(b=>b.disc(0.5,20))
+};
+const _M=m4.make(), _S=m4.make(), _N=new Float32Array(9);
+function part(prim,sx,sy,sz,col,opt){
+  const C=MS.cur();
+  m4.ident(_S); _S[0]=sx; _S[5]=sy; _S[10]=sz;
+  m4.mul(_M,C,_S);
+  const ix=1/sx,iy=1/sy,iz=1/sz;
+  _N[0]=C[0]*ix;_N[1]=C[1]*ix;_N[2]=C[2]*ix;
+  _N[3]=C[4]*iy;_N[4]=C[5]*iy;_N[5]=C[6]*iy;
+  _N[6]=C[8]*iz;_N[7]=C[9]*iz;_N[8]=C[10]*iz;
+  gl.uniformMatrix4fv(MAIN.u.uModel,false,_M);
+  gl.uniformMatrix3fv(MAIN.u.uNrm,false,_N);
+  gl.uniform3fv(MAIN.u.uTint,col);
+  gl.uniform1f(MAIN.u.uAlpha,(opt&&opt.alpha!==undefined)?opt.alpha:1);
+  gl.uniform1f(MAIN.u.uFlat,(opt&&opt.flat)?1:0);
+  gl.uniform1f(MAIN.u.uEmis,(opt&&opt.emis!==undefined)?opt.emis:0);
+  gl.bindVertexArray(prim.vao);
+  gl.drawArrays(gl.TRIANGLES,0,prim.n);
+}
+
+/* ═══════════════════ 우주선 ═══════════════════
+   좌표: X = 복도가 뻗은 방향, Y = 위, Z = 복도를 가로지르는 방향.
+   격리실 A(내 자리)는 x=-30의 남쪽 문, 격리실 B(3장)는 x=+6의 북쪽 문. */
+const HALL = { x0:-74, x1:74, z0:-3.6, z1:3.6, h:4.2 };
+/* 방의 문 쪽 벽은 복도 벽과 같은 평면에 둔다. 그래야 구멍이 한 번만 뚫린다. */
+const ROOM_A = { x:-30, x0:-38, x1:-24, z0:-14.6, z1:HALL.z0, h:3.1, side:-1 };
+const ROOM_B = { x:  6, x0: -1, x1: 13, z0:HALL.z1, z1: 14.6, h:3.1, side: 1 };
+const DOORW = 1.65;                       /* 문 구멍 폭 */
+const DOORH = 2.30;
+const MY = { x:-30, y:1.617, z:-13.0 };   /* 내 머리통이 매달린 자리(맨 앞줄, 눈높이) */
+
+/* 알베도는 "이 표면이 빛을 얼마나 되돌려 주는가"다. 분위기를 어둡게 하려고
+   알베도를 떨어뜨리면 화면이 죽는다 — 어둠은 광량과 안개로 만든다. */
+const COL = {
+  wallA:[0.30,0.33,0.36], wallB:[0.25,0.27,0.30], floor:[0.19,0.21,0.24],
+  ceil :[0.27,0.29,0.32], rib:[0.38,0.41,0.44],  pipe:[0.34,0.33,0.30],
+  rack :[0.36,0.35,0.33], jar:[0.40,0.44,0.45],  door:[0.33,0.36,0.39],
+  skin :[0.66,0.53,0.46], hair:[0.13,0.12,0.11], white:[0.90,0.90,0.88],
+  scr  :[0.42,0.92,0.70], lamp:[0.72,0.86,0.80], amber:[0.85,0.62,0.30],
+  strip:[0.86,0.95,0.90], stripH:[0.88,0.94,0.97],
+  steel:[0.30,0.32,0.34], body:[0.36,0.39,0.42]
+};
+function rand(seed){ let s=seed; return function(){ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; }; }
+
+/* 광원 자리 — 천장 등에서 뽑아 둔다 */
+const LIGHTS = [];
+function addLight(x,y,z,r,g,b,range){ LIGHTS.push({p:[x,y,z], c:[r,g,b], r:range}); }
+
+/* 흰자 자리 — 눈동자 인스턴스가 여기에 붙는다.
+   머리통은 rotY(fy)로 돌아가 있다. 그 행렬에서 (a,·,b) → (fz·a+fx·b, ·, −fx·a+fz·b).
+   흰자의 국소 좌표는 (±EX, EY, EZ)이므로 아래처럼 풀어 쓴다. */
+const EYE_P = [], EYE_F = [];
+const HEYE = [0.118, -0.012, 0.268];      /* 단위 머리 기준 눈알 중심 */
+function addHeadEyes(x,y,z,fx,fz,sc){
+  for(const s of [-1,1]){
+    const a=HEYE[0]*s*sc, b=HEYE[2]*sc;
+    EYE_P.push(x + fz*a + fx*b, y + HEYE[1]*sc, z - fx*a + fz*b);
+    EYE_F.push(fx,0,fz);
+  }
+}
+
+/* ═══════════ 사람 머리통 ═══════════
+   공 하나로는 사람으로 보이지 않는다. 턱에서 정수리까지 수평 단면(반폭·앞깊이·뒤깊이)을
+   쌓고, 그 위에 눈두덩·눈구멍·광대·관자놀이·코·인중·입술·턱·목덜미를 혹으로 얹는다.
+   단위 공간에서 머리 높이가 1이고, 인스턴스마다 실제 크기(약 0.235m)로 키운다.
+   200개를 따로 그리면 그게 곧 렉이므로 메시는 하나만 만들고 인스턴싱으로 찍는다. */
+const HEAD_RINGS = [
+  /* y(위→아래),  반폭,   앞깊이,  뒤깊이 */
+  [ 0.500, 0.045, 0.050, 0.050],   /* 정수리 */
+  [ 0.472, 0.155, 0.160, 0.172],
+  [ 0.424, 0.240, 0.250, 0.274],
+  [ 0.344, 0.292, 0.300, 0.342],
+  [ 0.244, 0.318, 0.330, 0.380],
+  [ 0.142, 0.330, 0.342, 0.400],   /* 가장 넓은 곳 */
+  [ 0.062, 0.330, 0.352, 0.400],   /* 눈두덩 */
+  [-0.020, 0.322, 0.350, 0.392],   /* 눈 */
+  [-0.100, 0.312, 0.342, 0.372],   /* 광대 */
+  [-0.180, 0.292, 0.330, 0.342],
+  [-0.260, 0.262, 0.310, 0.300],   /* 입 */
+  [-0.340, 0.220, 0.280, 0.252],
+  [-0.420, 0.162, 0.232, 0.192],   /* 턱선 */
+  [-0.478, 0.092, 0.152, 0.112],
+  [-0.500, 0.030, 0.062, 0.040]    /* 턱끝 */
+];
+function gauss(v,c,s){ const t=(v-c)/s; return Math.exp(-t*t); }
+/* 표면을 바깥으로 밀거나 당기는 양 */
+function headBump(y,a){
+  const fa=Math.abs(a);                       /* 0 = 정면, π = 뒤통수 */
+  let d=0;
+  d += 0.070*gauss(y,-0.075,0.115)*gauss(a,0,0.28);      /* 코 */
+  d += 0.014*gauss(y, 0.068,0.048)*gauss(fa,0.30,0.34);  /* 눈두덩 */
+  d -= 0.021*gauss(y,-0.008,0.048)*gauss(fa,0.37,0.23);  /* 눈구멍 */
+  d += 0.013*gauss(y,-0.112,0.062)*gauss(fa,0.74,0.30);  /* 광대 */
+  d -= 0.013*gauss(y, 0.070,0.070)*gauss(fa,1.10,0.26);  /* 관자놀이 */
+  d -= 0.009*gauss(y,-0.216,0.026)*gauss(fa,0,0.24);     /* 인중 아래 */
+  d += 0.011*gauss(y,-0.272,0.032)*gauss(fa,0,0.30);     /* 입술 */
+  d += 0.013*gauss(y,-0.452,0.052)*gauss(fa,0,0.30);     /* 턱끝 */
+  d -= 0.026*gauss(y,-0.395,0.085)*gauss(Math.PI-fa,0,0.52); /* 목덜미 */
+  return d;
+}
+function headRing(u){
+  const n=HEAD_RINGS.length-1;
+  const f=Math.max(0,Math.min(1,u))*n, i=Math.min(n-1,Math.floor(f)), k=f-i;
+  const A=HEAD_RINGS[i], B=HEAD_RINGS[i+1];
+  return [A[0]+(B[0]-A[0])*k, A[1]+(B[1]-A[1])*k, A[2]+(B[2]-A[2])*k, A[3]+(B[3]-A[3])*k];
+}
+function headPoint(u,a){
+  const R=headRing(u), sa=Math.sin(a), ca=Math.cos(a);
+  const dep = ca>=0 ? R[2] : R[3];
+  const bp = headBump(R[0],a);
+  return [(R[1]+bp)*sa, R[0], (dep+bp)*ca];
+}
+function headNormal(u,a){
+  const e=0.004, h=0.02;
+  const p=headPoint(u,a);
+  const pa=headPoint(u,a+h), pu=headPoint(Math.min(1,u+e),a);
+  const ta=[pa[0]-p[0],pa[1]-p[1],pa[2]-p[2]];
+  const tu=[pu[0]-p[0],pu[1]-p[1],pu[2]-p[2]];
+  let n=[ta[1]*tu[2]-ta[2]*tu[1], ta[2]*tu[0]-ta[0]*tu[2], ta[0]*tu[1]-ta[1]*tu[0]];
+  const l=Math.hypot(n[0],n[1],n[2])||1;
+  return [n[0]/l,n[1]/l,n[2]/l];
+}
+/* 머리칼이 덮는 자리. 앞머리선이 옆·뒤보다 높다. */
+function hairMask(y,a){
+  const front=Math.max(0,Math.cos(a));
+  const start=-0.030+0.170*Math.pow(front,1.5);
+  return Math.max(0,Math.min(1,(y-start)/0.045));
+}
+function lipMask(y,a){ return gauss(y,-0.276,0.026)*gauss(Math.abs(a),0,0.26); }
+
+/* 정점색으로 재질을 나른다: r=살, g=머리칼, b=입술 */
+const HEADM = bake(function(b){
+  const SEG=30, RING=30;
+  function V(u,a){
+    const p=headPoint(u,a), n=headNormal(u,a), R=headRing(u);
+    return { p:p, n:n, c:[1, hairMask(R[0],a), lipMask(R[0],a)] };
+  }
+  for(let i=0;i<RING;i++){
+    const u0=i/RING, u1=(i+1)/RING;
+    for(let j=0;j<SEG;j++){
+      const a0=-Math.PI+j/SEG*Math.PI*2, a1=-Math.PI+(j+1)/SEG*Math.PI*2;
+      const A=V(u0,a0), B=V(u1,a0), C=V(u1,a1), D=V(u0,a1);
+      b.tri3([A.p,B.p,C.p],[A.n,B.n,C.n],[A.c,B.c,C.c]);
+      b.tri3([A.p,C.p,D.p],[A.n,C.n,D.n],[A.c,C.c,D.c]);
+    }
+  }
+  /* 귀 */
+  for(const s of [-1,1]){
+    MS.push(); MS.move(s*0.318,-0.020,-0.055); MS.rotY(s*0.30); MS.rotZ(s*-0.12);
+      b.ell(0.026,0.098,0.060,10,8,[1,0,0]);
+      MS.push(); MS.move(s*0.012,0.006,0.012); b.ell(0.014,0.058,0.034,8,6,[1,0,0]); MS.pop();
+    MS.pop();
+  }
+  /* 눈알 — 흰자. 동공은 따로 인스턴싱해서 굴린다. */
+  for(const s of [-1,1]){
+    MS.push(); MS.move(s*HEYE[0],HEYE[1],HEYE[2]); b.sph(0.047,12,9,[1,0,0]); MS.pop();
+  }
+  /* 목 그루터기와 커넥터 */
+  MS.push(); MS.move(0,-0.60,-0.020); b.cyl(0.150,0.24,14,[1,0,0],true); MS.pop();
+});
+/* 머리통 인스턴스 — 자리·방향·크기·살빛·머리칼 양 */
+const HEAD_POS=[], HEAD_RSH=[], HEAD_SKIN=[];
+const HEAD_SCALE=0.235;
+function addHead(x,y,z,fy,seed){
+  const r=rand(seed);
+  const sc=HEAD_SCALE*(0.93+r()*0.14);
+  HEAD_POS.push(x,y,z);
+  HEAD_RSH.push(fy, sc, r()<0.16?0.10:(0.55+r()*0.45));   /* 몇은 머리가 성글다 */
+  const t=0.86+r()*0.30, u=0.90+r()*0.20;
+  HEAD_SKIN.push(COL.skin[0]*t, COL.skin[1]*t*u, COL.skin[2]*t*u);
+  addHeadEyes(x,y,z,Math.sin(fy),Math.cos(fy),sc);
+}
+
+/* 머리통 전용 프로그램 — 메시 하나를 인스턴스마다 돌리고·키우고·살빛을 바꿔 찍는다 */
+const HEADS = program(
+`#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec3 aCol;
+layout(location=3) in vec3 aIPos;
+layout(location=4) in vec3 aIRSH;   /* 회전 · 크기 · 머리칼 양 */
+layout(location=5) in vec3 aISkin;
+uniform mat4 uProj,uView;
+out vec3 vN; out vec3 vC; out vec3 vW; out vec3 vSkin; out float vHair;
+void main(){
+  float c=cos(aIRSH.x), s=sin(aIRSH.x);
+  vec3 p=aPos*aIRSH.y;
+  vec3 w=vec3(c*p.x + s*p.z, p.y, -s*p.x + c*p.z) + aIPos;
+  vN=vec3(c*aNrm.x + s*aNrm.z, aNrm.y, -s*aNrm.x + c*aNrm.z);
+  vC=aCol; vW=w; vSkin=aISkin; vHair=aIRSH.z;
+  gl_Position=uProj*uView*vec4(w,1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vN; in vec3 vC; in vec3 vW; in vec3 vSkin; in float vHair;
+uniform vec3 uHairCol,uLipCol;
+${GLSL_LIGHT}
+out vec4 outColor;
+void main(){
+  vec3 alb=vSkin;
+  alb=mix(alb,uLipCol,vC.b);
+  alb=mix(alb,uHairCol,clamp(vC.g*vHair,0.0,1.0));
+  outColor=vec4(shade(alb,normalize(vN),vW,0.0,0.09),1.0);
+}`,
+['uProj','uView','uHairCol','uLipCol'].concat(LIGHT_UNIFORMS));
+
+let HEAD_N=0;
+/* 세트마다 VAO를 하나씩 만든다. 인스턴스 버퍼는 같고 시작 오프셋만 다르다 —
+   WebGL2에는 baseInstance가 없어서 이렇게 나눈다. */
+function buildHeadVAO(){
+  HEAD_N=HEAD_POS.length/3;
+  const bufs=[HEAD_POS,HEAD_RSH,HEAD_SKIN].map(function(a){
+    const bf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,bf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(a),gl.STATIC_DRAW);
+    return bf;
+  });
+  HEAD_SETS.forEach(function(set){
+    const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, HEADM.buf);
+    const S=36;
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,S,0);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,S,12);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,S,24);
+    bufs.forEach(function(bf,k){
+      gl.bindBuffer(gl.ARRAY_BUFFER,bf);
+      gl.enableVertexAttribArray(3+k);
+      gl.vertexAttribPointer(3+k,3,gl.FLOAT,false,0,set.s*12);
+      gl.vertexAttribDivisor(3+k,1);
+    });
+    gl.bindVertexArray(null);
+    set.vao=vao;
+  });
+  /* 눈동자도 같은 경계로 나눈다 */
+  const ep=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ep);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(EYE_P),gl.STATIC_DRAW);
+  const ef=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ef);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(EYE_F),gl.STATIC_DRAW);
+  HEAD_SETS.forEach(function(set){
+    const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+    gl.bindBuffer(gl.ARRAY_BUFFER,eyeQuad);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,ep);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,0,set.s*2*12);
+    gl.vertexAttribDivisor(1,1);
+    gl.bindBuffer(gl.ARRAY_BUFFER,ef);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,0,set.s*2*12);
+    gl.vertexAttribDivisor(2,1);
+    gl.bindVertexArray(null);
+    set.eyeVao=vao;
+  });
+}
+
+/* 머리통 앞의 작은 모니터 */
+function bakeMonitor(b,x,y,z,fy,on){
+  MS.push(); MS.move(x,y,z); MS.rotY(fy);
+    b.box(0.30,0.22,0.035,[0.09,0.10,0.11]);
+    MS.push(); MS.move(0,0,0.021); b.box(0.25,0.165,0.004, on?COL.scr:[0.035,0.040,0.045]); MS.pop();
+  MS.pop();
+}
+
+/* ─── 벽 한 장 · 바닥 한 장 ───
+   문 구멍을 남길 수 있어야 해서 통짜 상자 대신 판을 이어 붙인다.
+   dir=+1이면 법선이 +Z(panelZ) 또는 +X(panelX)를 향한다. 방 안에서는 안쪽을 향해야 한다. */
+function panelZ(b,z,xa,xb,ya,yb,col,dir){
+  const p0=[xa,ya,z],p1=[xb,ya,z],p2=[xb,yb,z],p3=[xa,yb,z];
+  if(dir>0) b.quad(p0,p1,p2,p3,col); else b.quad(p1,p0,p3,p2,col);
+}
+function panelX(b,x,za,zb,ya,yb,col,dir){
+  const p0=[x,ya,za],p1=[x,ya,zb],p2=[x,yb,zb],p3=[x,yb,za];
+  if(dir>0) b.quad(p1,p0,p3,p2,col); else b.quad(p0,p1,p2,p3,col);
+}
+function slab(b,x0,x1,z0,z1,y,col,up){
+  const p0=[x0,y,z0],p1=[x1,y,z0],p2=[x1,y,z1],p3=[x0,y,z1];
+  if(up) b.quad(p3,p2,p1,p0,col); else b.quad(p0,p1,p2,p3,col);
+}
+function wallZ(b,z,x0,x1,h,col,dir,holes){
+  const hs=(holes||[]).slice().sort(function(a,c){ return a.at-c.at; });
+  let cur=x0;
+  for(const o of hs){
+    const a=o.at-o.w/2, c=o.at+o.w/2;
+    if(a>cur) panelZ(b,z,cur,a,0,h,col,dir);
+    if(o.h<h)  panelZ(b,z,a,c,o.h,h,col,dir);     /* 상인방 */
+    cur=c;
+  }
+  if(cur<x1) panelZ(b,z,cur,x1,0,h,col,dir);
+}
+function wallX(b,x,z0,z1,h,col,dir,holes){
+  const hs=(holes||[]).slice().sort(function(a,c){ return a.at-c.at; });
+  let cur=z0;
+  for(const o of hs){
+    const a=o.at-o.w/2, c=o.at+o.w/2;
+    if(a>cur) panelX(b,x,cur,a,0,h,col,dir);
+    if(o.h<h)  panelX(b,x,a,c,o.h,h,col,dir);
+    cur=c;
+  }
+  if(cur<z1) panelX(b,x,cur,z1,0,h,col,dir);
+}
+/* 문설주 — 두 벽 사이의 두께를 메운다 */
+function jamb(b,x,z,w,h,t,col){
+  for(const s of [-1,1]){
+    MS.push(); MS.move(x+s*(w/2+0.035),h/2,z); b.box(0.07,h,t,col); MS.pop();
+  }
+  MS.push(); MS.move(x,h+0.035,z); b.box(w+0.14,0.07,t,col); MS.pop();
+}
+
+/* ─── 격리실 굽기 ─── */
+function bakeRoom(R, seed, isMine){
+  return bake(function(b){
+    const r=rand(seed);
+    const cx=(R.x0+R.x1)/2;
+    const w=R.x1-R.x0, d=R.z1-R.z0;
+    const dz = (R.side<0)? R.z1 : R.z0;            /* 복도에 붙은 벽 */
+    slab(b,R.x0,R.x1,R.z0,R.z1,0,COL.floor,true);
+    slab(b,R.x0,R.x1,R.z0,R.z1,R.h,COL.ceil,false);
+    /* 네 벽. 안쪽을 향하게. 복도 쪽 벽에만 구멍이 있다. */
+    const hole=[{at:R.x,w:DOORW,h:DOORH}];
+    wallZ(b,R.z1,R.x0,R.x1,R.h,COL.wallB,-1, R.side<0?hole:null);
+    wallZ(b,R.z0,R.x0,R.x1,R.h,COL.wallB, 1, R.side>0?hole:null);
+    wallX(b,R.x0,R.z0,R.z1,R.h,COL.wallB, 1,null);
+    wallX(b,R.x1,R.z0,R.z1,R.h,COL.wallB,-1,null);
+    jamb(b,R.x,dz,DOORW,DOORH,0.12,[0.20,0.23,0.26]);
+    addLight(R.x,2.15,dz-R.side*0.9, 0.34,0.50,0.44, 8.5);
+
+    /* 천장 등 — 흐릿한 초록 */
+    for(let i=0;i<3;i++){
+      const lz=R.z0+2.2+i*(d-4.4)/2;
+      MS.push(); MS.move(cx,R.h-0.09,lz); b.box(w*0.62,0.06,0.16,COL.strip); MS.pop();
+      addLight(cx,R.h-0.24,lz, 0.50,0.66,0.57, 13.5);
+    }
+    /* 선반 다섯 줄, 한 줄에 스무 개 = 백 개의 머리통 */
+    const rows=5, per=20;
+    for(let ry=0; ry<rows; ry++){
+      const zz = R.z0 + 1.6 + ry*(d-3.2)/(rows-1);
+      MS.push(); MS.move(cx,1.30,zz); b.box(w-1.6,0.07,0.62,COL.rack); MS.pop();
+      MS.push(); MS.move(cx,0.65,zz); b.box(w-1.9,0.05,0.10,[0.13,0.14,0.15]); MS.pop();
+      for(const s of [-1,1]){
+        MS.push(); MS.move(cx+s*(w/2-0.85),0.66,zz); b.cyl(0.05,1.32,8,COL.rack,true); MS.pop();
+      }
+      for(let i=0;i<per;i++){
+        const hx = R.x0+0.9 + i*(w-1.8)/(per-1);
+        const face = (R.side<0) ? 0 : Math.PI;      /* 문 쪽을 본다 */
+        /* 받침과 기둥은 붙박이라 굽고, 머리통만 인스턴스로 뺀다 */
+        MS.push(); MS.move(hx,1.39,zz); b.cyl(0.20,0.10,14,COL.jar,true); MS.pop();
+        MS.push(); MS.move(hx,1.49,zz); b.cyl(0.075,0.14,10,[0.36,0.34,0.32],true); MS.pop();
+        bakeMonitor(b,hx,1.66,zz+(R.side<0?0.46:-0.46), face, false);
+        if(isMine && ry===0 && Math.abs(hx-MY.x)<0.45) continue;   /* 내 자리는 비운다 */
+        addHead(hx,1.62,zz, face + (r()-0.5)*0.30, seed+ry*97+i*13);
+      }
+    }
+    /* 내 자리: 혼자만 살아 있는 모니터 */
+    if(isMine){
+      bakeMonitor(b,MY.x,1.66,MY.z+0.46,0,true);
+      addLight(MY.x,1.66,MY.z+0.60, 0.30,0.78,0.58, 3.6);
+    }
+  });
+}
+
+/* ─── 복도 굽기 ─── */
+const HALLM = bake(function(b){
+  const w=HALL.x1-HALL.x0, d=HALL.z1-HALL.z0, cx=(HALL.x0+HALL.x1)/2;
+  slab(b,HALL.x0,HALL.x1,HALL.z0,HALL.z1,0,COL.floor,true);
+  slab(b,HALL.x0,HALL.x1,HALL.z0,HALL.z1,HALL.h,COL.ceil,false);
+  wallZ(b,HALL.z0,HALL.x0,HALL.x1,HALL.h,COL.wallA, 1,[{at:ROOM_A.x,w:DOORW,h:DOORH}]);
+  wallZ(b,HALL.z1,HALL.x0,HALL.x1,HALL.h,COL.wallA,-1,[{at:ROOM_B.x,w:DOORW,h:DOORH}]);
+  wallX(b,HALL.x0,HALL.z0,HALL.z1,HALL.h,COL.wallA, 1,null);
+  wallX(b,HALL.x1,HALL.z0,HALL.z1,HALL.h,COL.wallA,-1,null);
+  /* 바닥 이음선 */
+  for(let x=HALL.x0;x<HALL.x1;x+=2.4){
+    MS.push(); MS.move(x,0.008,0); b.box(0.05,0.006,d,[0.055,0.062,0.070]); MS.pop();
+  }
+  /* 갈비뼈처럼 두른 틀 + 천장 등 */
+  for(let x=HALL.x0+2;x<HALL.x1;x+=6){
+    MS.push(); MS.move(x,HALL.h/2,0);
+      for(const s of [-1,1]){
+        MS.push(); MS.move(0,0,s*(d/2-0.06)); b.box(0.34,HALL.h,0.14,COL.rib); MS.pop();
+      }
+      MS.push(); MS.move(0,HALL.h/2-0.07,0); b.box(0.34,0.14,d,COL.rib); MS.pop();
+    MS.pop();
+    MS.push(); MS.move(x+3,HALL.h-0.10,0); b.box(1.9,0.07,0.30,COL.stripH); MS.pop();
+    addLight(x+3,HALL.h-0.30, 0, 0.66,0.80,0.86, 17.0);
+  }
+  /* 배관 */
+  for(const s of [-1,1]) for(let k=0;k<3;k++){
+    MS.push(); MS.move(cx,HALL.h-0.42-k*0.24,s*(d/2-0.30)); MS.rotZ(Math.PI/2);
+      b.cyl(0.055+k*0.012,w,10,COL.pipe,false);
+    MS.pop();
+  }
+  /* 문들 — 이 우주선에 있는 수천 개 격리실 중 하나하나 */
+  for(let x=HALL.x0+6;x<HALL.x1-4;x+=12){
+    for(const s of [-1,1]){
+      MS.push(); MS.move(x,1.15,s*(d/2-0.05));
+        b.box(1.7,2.3,0.10,COL.door);
+        MS.push(); MS.move(0,0,-s*0.06); b.box(1.45,2.05,0.03,[0.055,0.065,0.075]); MS.pop();
+        MS.push(); MS.move(0,1.28,0); b.box(0.42,0.05,0.05,[0.30,0.20,0.20]); MS.pop();
+      MS.pop();
+    }
+  }
+});
+
+/* 눈동자 판(공용) */
+const eyeQuad=(function(){
+  const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]),gl.STATIC_DRAW);
+  return b;
+})();
+/* 방마다 머리통이 몇 번째부터 몇 개인지 기억해 둔다 — 안 보이는 방은 그리지 않는다 */
+const HEAD_SETS=[];
+let _h0=0;
+const ROOMA = bakeRoom(ROOM_A, 5150, true);
+HEAD_SETS.push({s:_h0, n:HEAD_POS.length/3-_h0, R:ROOM_A}); _h0=HEAD_POS.length/3;
+const ROOMB = bakeRoom(ROOM_B, 8420, false);
+HEAD_SETS.push({s:_h0, n:HEAD_POS.length/3-_h0, R:ROOM_B});
+buildHeadVAO();          /* 방을 다 굽고 나서 머리통 인스턴스를 올린다 */
+/* 그 방이 지금 보일 만한 자리인가 (문에서 26m 안) */
+function roomNear(R,x,z){
+  const dz = R.side<0 ? R.z1 : R.z0;
+  return Math.hypot(x-R.x, z-dz) < 26;
+}
+
+const EYE_N = EYE_P.length/3;
+
+/* ═══════════════════ 소리 ═══════════════════
+   음원 파일 없이 웹오디오로만 만든다. 첫 입력 뒤에 열린다. */
+const A = (function(){
+  let ctx=null, master=null, humG=null, wavG=null, on=false;
+  function init(){
+    if(ctx) return;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    ctx=new AC();
+    master=ctx.createGain(); master.gain.value=0.9; master.connect(ctx.destination);
+    /* 우주선의 웅웅거림 */
+    humG=ctx.createGain(); humG.gain.value=0.0; humG.connect(master);
+    const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=180; lp.connect(humG);
+    [47,71,94].forEach(function(f,i){
+      const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+      const g=ctx.createGain(); g.gain.value=0.11-i*0.03;
+      o.connect(g); g.connect(lp); o.start();
+    });
+    /* 파도 — 마지막 장에서만 */
+    wavG=ctx.createGain(); wavG.gain.value=0; wavG.connect(master);
+    const nb=ctx.createBufferSource(); nb.buffer=noiseBuf(4); nb.loop=true;
+    const bf=ctx.createBiquadFilter(); bf.type='bandpass'; bf.frequency.value=520; bf.Q.value=0.6;
+    const lfo=ctx.createOscillator(); lfo.frequency.value=0.16;
+    const lg=ctx.createGain(); lg.gain.value=0.42;
+    const amp=ctx.createGain(); amp.gain.value=0.5;
+    lfo.connect(lg); lg.connect(amp.gain); lfo.start();
+    nb.connect(bf); bf.connect(amp); amp.connect(wavG); nb.start();
+    on=true;
+  }
+  function noiseBuf(sec){
+    const n=Math.floor(ctx.sampleRate*sec), b=ctx.createBuffer(1,n,ctx.sampleRate), d=b.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+    return b;
+  }
+  function burst(o){
+    if(!on) return;
+    o=o||{};
+    const src=ctx.createBufferSource(); src.buffer=noiseBuf(0.5);
+    const f=ctx.createBiquadFilter(); f.type=o.type||'bandpass';
+    f.frequency.value=o.freq||600; f.Q.value=o.q||1.2;
+    const g=ctx.createGain();
+    const t=ctx.currentTime, dur=o.dur||0.18, vol=o.vol||0.2;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+(o.atk||0.012));
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    src.connect(f); f.connect(g); g.connect(master);
+    src.start(t); src.stop(t+dur+0.05);
+  }
+  function tone(freq,dur,vol,type){
+    if(!on) return;
+    const o=ctx.createOscillator(); o.type=type||'sine'; o.frequency.value=freq;
+    const g=ctx.createGain(); const t=ctx.currentTime;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol||0.12,t+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.2));
+    o.connect(g); g.connect(master); o.start(t); o.stop(t+(dur||0.2)+0.05);
+  }
+  return {
+    init:init,
+    ready:function(){ return on; },
+    resume:function(){ if(ctx&&ctx.state==='suspended') ctx.resume(); },
+    hum:function(v){ if(on) humG.gain.setTargetAtTime(v,ctx.currentTime,0.8); },
+    waves:function(v){ if(on) wavG.gain.setTargetAtTime(v,ctx.currentTime,1.4); },
+    sniff:function(){ burst({freq:340,q:0.7,dur:0.55,vol:0.10,atk:0.14}); },
+    tick:function(){ tone(1400,0.03,0.030,'square'); },
+    click:function(){ tone(720,0.05,0.055,'square'); },
+    step:function(hard){ burst({freq:hard?150:110,q:1.6,dur:0.09,vol:hard?0.13:0.08}); },
+    thunk:function(){ burst({freq:80,q:2.2,dur:0.42,vol:0.26}); tone(52,0.5,0.14,'sine'); },
+    servo:function(){ burst({freq:900,q:5,dur:0.5,vol:0.07}); tone(180,0.6,0.06,'sawtooth'); },
+    rasp:function(){
+      burst({freq:420,q:1.1,dur:0.30,vol:0.16});
+      setTimeout(()=>burst({freq:700,q:1.4,dur:0.22,vol:0.14}),240);
+      setTimeout(()=>burst({freq:300,q:0.9,dur:0.40,vol:0.15}),520);
+    },
+    breath:function(v){ burst({freq:260,q:0.6,dur:0.5,vol:0.05*(v||1),atk:0.16}); },
+    kiss:function(){ burst({freq:1500,q:3,dur:0.08,vol:0.09}); tone(560,0.12,0.05,'sine'); },
+    beep:function(){ tone(880,0.11,0.09,'square'); setTimeout(()=>tone(660,0.16,0.09,'square'),140); },
+    alarm:function(){ tone(140,0.7,0.12,'sawtooth'); },
+    chase:function(){ burst({freq:190,q:1.4,dur:0.11,vol:0.20}); }
+  };
+})();
+
+/* ═══════════════════ 화면 글자 ═══════════════════ */
+const E = {
+  say:document.getElementById('say'), quote:document.getElementById('quote'),
+  qp:document.querySelector('#quote p'), prompt:document.getElementById('prompt'),
+  ps:document.querySelector('#prompt span'), pm:document.querySelector('#prompt small'),
+  dot:document.getElementById('dot'), vig:document.getElementById('vig'),
+  screen:document.getElementById('screen'), crt:document.getElementById('crt'),
+  meta:document.getElementById('meta'), day:document.getElementById('day'),
+  hint:document.getElementById('hint'), focus:document.querySelector('#focus i'),
+  pad:document.getElementById('pad'), stick:document.getElementById('stick'),
+  act:document.getElementById('act'), cover:document.getElementById('cover'),
+  end:document.getElementById('end'), endtxt:document.getElementById('endtxt')
+};
+let sayTimer=0;
+function say(text,hold){
+  E.say.textContent=text;
+  E.say.classList.add('on');
+  sayTimer = (hold===undefined? 4.6 : hold);
+}
+function sayClear(){ E.say.classList.remove('on'); sayTimer=0; }
+let quoteTimer=0, quoteAfter=null;
+function quote(html,hold,after){
+  E.qp.innerHTML=html; E.quote.classList.add('on');
+  quoteTimer=hold||4.5; quoteAfter=after||null;
+}
+function prompt(text,sub){
+  if(text===null){ E.prompt.classList.remove('on'); E.act.classList.remove('on'); return; }
+  E.ps.textContent=text; E.pm.textContent=sub||'';
+  E.prompt.classList.add('on');
+  if(touchMode) E.act.classList.add('on');
+}
+function vignette(px,alpha){
+  E.vig.style.boxShadow='inset 0 0 '+px+'px '+(px*0.55)+'px rgba(0,0,0,'+alpha+')';
+}
+
+/* ═══════════════════ 입력 ═══════════════════ */
+let touchMode = matchMedia('(hover: none)').matches;
+const key = Object.create(null);
+const look = { yaw:0, pitch:0 };
+const move = { x:0, y:0 };            /* 스틱 (-1..1) */
+let interactPressed = false;
+
+window.addEventListener('keydown',function(e){
+  const tag=(e.target&&e.target.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
+  key[e.key.toLowerCase()]=true;
+  if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
+  hurryText();
+  if(e.key.toLowerCase()==='e') interactPressed=true;
+  /* 스페이스는 상황에 따라 다르다: 미니게임 중엔 누르기, 걸어 다닐 땐 뛰기 */
+  if(e.key===' '){ if(MG.on || !PL.free) interactPressed=true; else jumpReq=true; }
+  A.init(); A.resume();
+});
+window.addEventListener('keyup',function(e){ key[e.key.toLowerCase()]=false; });
+
+/* 시선: 화면 오른쪽 절반을 끈다(터치) / 아무 데나 끈다(마우스) */
+const drags = new Map();
+let lookId=null, stickId=null;
+cv.addEventListener('pointerdown',function(e){
+  A.init(); A.resume(); hurryText();
+  cv.setPointerCapture(e.pointerId);
+  drags.set(e.pointerId,{x:e.clientX,y:e.clientY,ox:e.clientX,oy:e.clientY,t:performance.now()});
+  if(lookId===null) lookId=e.pointerId;
+});
+cv.addEventListener('pointermove',function(e){
+  const d=drags.get(e.pointerId); if(!d) return;
+  const dx=e.clientX-d.x, dy=e.clientY-d.y;
+  d.x=e.clientX; d.y=e.clientY;
+  if(e.pointerId===lookId && ACT.canLook){
+    look.yaw   -= dx*0.0042;
+    look.pitch  = clampf(look.pitch - dy*0.0036, -1.15, 1.15);
+  }
+});
+function endDrag(e){
+  const d=drags.get(e.pointerId);
+  /* 짧게 톡 누르면 뛰기 (터치에서 점프할 방법) */
+  if(d && PL.free && !MG.on){
+    const moved=Math.hypot(e.clientX-d.ox, e.clientY-d.oy);
+    if(moved<12 && performance.now()-d.t<300) jumpReq=true;
+  }
+  drags.delete(e.pointerId); if(lookId===e.pointerId) lookId=null;
+}
+cv.addEventListener('pointerup',endDrag);
+cv.addEventListener('pointercancel',endDrag);
+/* 미니게임 화면은 어디를 눌러도 '누르기'다 (E 참조가 아직 없으므로 직접 잡는다) */
+document.getElementById('mg').addEventListener('pointerdown',function(e){
+  e.preventDefault(); A.init(); A.resume(); hurryText(); interactPressed=true;
+});
+
+/* 왼쪽 가상 스틱 */
+(function(){
+  const s=E.stick, knob=s.querySelector('i');
+  s.addEventListener('pointerdown',function(e){
+    e.stopPropagation(); s.setPointerCapture(e.pointerId); stickId=e.pointerId; upd(e);
+    A.init(); A.resume();
+  });
+  s.addEventListener('pointermove',function(e){ if(stickId===e.pointerId){ e.stopPropagation(); upd(e); } });
+  function off(e){
+    if(stickId!==e.pointerId) return;
+    stickId=null; move.x=0; move.y=0;
+    knob.style.transform='translate(0,0)';
+  }
+  s.addEventListener('pointerup',off); s.addEventListener('pointercancel',off);
+  function upd(e){
+    const r=s.getBoundingClientRect();
+    let dx=(e.clientX-(r.left+r.width/2))/(r.width/2);
+    let dy=(e.clientY-(r.top+r.height/2))/(r.height/2);
+    const l=Math.hypot(dx,dy); if(l>1){ dx/=l; dy/=l; }
+    move.x=dx; move.y=-dy;
+    knob.style.transform='translate('+(dx*36)+'px,'+(dy*36)+'px)';
+  }
+})();
+E.act.addEventListener('pointerdown',function(e){
+  e.stopPropagation(); E.act.classList.add('hit'); interactPressed=true; A.init(); A.resume();
+});
+E.act.addEventListener('pointerup',function(){ E.act.classList.remove('hit'); });
+
+/* 30초 넘게 헤매면 갈 곳을 알려 준다. 화살표는 목표 쪽으로 돌아간다. */
+const STUCK_SEC = 30;
+function updateGuide(dt){
+  const busy = MG.on || quoteTimer>0 || E.cover.style.display!=='none';
+  if(busy){ ACT.stuck=0; E.guide.classList.remove('on'); return; }
+  if(!ACT.hintText && !ACT.target){ E.guide.classList.remove('on'); return; }
+  ACT.stuck += dt;
+  if(ACT.stuck < STUCK_SEC){ E.guide.classList.remove('on'); return; }
+  E.guide.classList.add('on');
+  if(ACT.target){
+    const dx=ACT.target.x-PL.x, dz=ACT.target.z-PL.z;
+    let rel=Math.atan2(-dx,-dz)-look.yaw;
+    while(rel> Math.PI) rel-=Math.PI*2;
+    while(rel<-Math.PI) rel+=Math.PI*2;
+    E.gArw.style.display='';
+    E.gArw.style.transform='rotate('+(-rel)+'rad)';
+    E.gDst.textContent=Math.round(Math.hypot(dx,dz))+'m';
+  } else {
+    E.gArw.style.display='none';
+    E.gDst.textContent='';
+  }
+  E.gTxt.textContent = ACT.hintText || '이쪽이다';
+}
+
+/* 글을 이미 읽은 사람은 기다릴 이유가 없다 — 누르면 넘어간다 */
+function hurryText(){
+  if(quoteTimer>0.30){ quoteTimer=0.28; return true; }
+  if(sayTimer>0.40){ sayTimer=0.35; return true; }
+  return false;
+}
+function clampf(v,a,b){ return v<a?a:(v>b?b:v); }
+function lerp(a,b,k){ return a+(b-a)*k; }
+function smooth(k){ return k*k*(3-2*k); }
+function takeInteract(){ const v=interactPressed; interactPressed=false; return v; }
+
+/* 걷기 입력을 하나로 모은다 (자판 + 스틱) */
+function walkInput(){
+  let fx=move.y, fz=move.x;
+  if(key['w']||key['arrowup']) fx+=1;
+  if(key['s']||key['arrowdown']) fx-=1;
+  if(key['a']||key['arrowleft']) fz-=1;
+  if(key['d']||key['arrowright']) fz+=1;
+  const l=Math.hypot(fx,fz);
+  if(l>1){ fx/=l; fz/=l; }
+  return { f:fx, s:fz, run:!!(key['shift']||key['shiftleft']) };
+}
+
+/* ═══════════════════ 플레이어 ═══════════════════ */
+const PL = {
+  x:MY.x, y:MY.y, z:MY.z,          /* 눈높이 */
+  eye:1.62, bob:0, step:0,
+  h:0, vy:0, grounded:true,        /* 뛰기 — h를 빼먹으면 PL.y가 NaN이 된다 */
+  free:false                       /* 몸이 있느냐 */
+};
+/* 걸어 다닐 수 있는 사각형들 */
+const WALK = [
+  { x0:HALL.x0+0.6, x1:HALL.x1-0.6, z0:HALL.z0+0.6, z1:HALL.z1-0.6 },
+  { x0:ROOM_A.x0+0.7, x1:ROOM_A.x1-0.7, z0:ROOM_A.z0+0.7, z1:ROOM_A.z1-0.7 },
+  { x0:ROOM_B.x0+0.7, x1:ROOM_B.x1-0.7, z0:ROOM_B.z0+0.7, z1:ROOM_B.z1-0.7 },
+  { x0:ROOM_A.x-0.7, x1:ROOM_A.x+0.7, z0:ROOM_A.z1-0.9, z1:HALL.z0+0.9 },   /* A 문턱 */
+  { x0:ROOM_B.x-0.7, x1:ROOM_B.x+0.7, z0:HALL.z1-0.9, z1:ROOM_B.z0+0.9 }    /* B 문턱 */
+];
+function walkable(x,z){
+  for(let i=0;i<WALK.length;i++){
+    if(i===3 && doorShutA) continue;          /* 4장에서 닫은 문은 다시 못 지난다 */
+    const r=WALK[i];
+    if(x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1) return true;
+  }
+  return false;
+}
+/* 축마다 따로 밀어 본다 — 벽을 스치며 미끄러지도록 */
+function tryMove(nx,nz){
+  if(walkable(nx,PL.z)) PL.x=nx;
+  if(walkable(PL.x,nz)) PL.z=nz;
+}
+
+/* 장마다 3D 위에 얹는 것들. draw()가 이걸 부른다.
+   선언이 장(章)보다 먼저 와야 한다 — 장 정의에서 SCENE.extra에 대입하기 때문. */
+const SCENE = { extra:null, eyeRoll:1 };
+let doorShutA=false, jumpReq=false, blackout=0;
+/* 광량과 안개는 장마다 다르다. 격리실은 눌러 두고 복도에서 터뜨린다 —
+   '닭장 같은 공간이 아닌 곳'이라는 문장이 눈으로 느껴져야 한다. */
+let lightMul=0.60, fogMul=0.72, lightTarget=0.60, fogTarget=0.72;
+function mood(l,f){ lightTarget=l; fogTarget=f; }
+
+/* ═══════════════════ 연출 도구 ═══════════════════ */
+Object.assign(E,{
+  tint:document.getElementById('tint'), flash:document.getElementById('flash'),
+  hud:document.getElementById('hud'),
+  hudCh:document.querySelector('#hud .ch'), hudGl:document.querySelector('#hud .gl'),
+  hudSub:document.querySelector('#hud .sub'),
+  bcast:document.getElementById('bcast'), bcastMsg:document.querySelector('#bcast .msg'),
+  guide:document.getElementById('guide'),
+  gArw:document.querySelector('#guide .arw'), gTxt:document.querySelector('#guide .txt'),
+  gDst:document.querySelector('#guide .dst'),
+  mg:document.getElementById('mg'), mgTitle:document.getElementById('mgTitle'),
+  mgc:document.getElementById('mgc'), mgInfo:document.getElementById('mgInfo'),
+  mgKey:document.getElementById('mgKey')
+});
+/* 연출 지연은 setTimeout이 아니라 루프에서 돌린다.
+   탭이 가려져 rAF가 멈추면 setTimeout만 계속 흘러 연출이 어긋난다. */
+const TIMERS=[];
+function after(sec,fn){ TIMERS.push({t:sec,fn:fn}); return TIMERS[TIMERS.length-1]; }
+function clearTimers(){ TIMERS.length=0; }
+function tintTo(css,a){ E.tint.style.background=css; E.tint.style.opacity=a; }
+function flash(a,ms){
+  E.flash.style.transition='opacity .06s ease';
+  E.flash.style.opacity=a;
+  setTimeout(function(){ E.flash.style.transition='opacity '+(ms||600)+'ms ease'; E.flash.style.opacity=0; },40);
+}
+function cine(on){ document.body.classList.toggle('cine',!!on); }
+let bcastTimer=0;
+function bcast(msg,hold){
+  E.bcastMsg.textContent=msg; E.bcast.classList.add('on');
+  bcastTimer=hold||5; A.beep();
+}
+function hud(ch,goal,sub){
+  ACT.stuck=0;                     /* 목표가 바뀌면 헤맨 시간도 처음부터 */
+  E.guide.classList.remove('on');
+  if(ch===null){ E.hud.classList.remove('on'); return; }
+  E.hudCh.textContent=ch; E.hudGl.textContent=goal;
+  E.hudGl.classList.remove('done');
+  E.hudSub.textContent=sub||'';
+  E.hud.classList.add('on');
+}
+function hudDone(text){
+  E.hudGl.classList.add('done');
+  if(text) E.hudGl.textContent=text;
+  E.hudSub.textContent='';
+}
+
+/* ═══════════════════ 미니게임 틀 ═══════════════════
+   도트 RPG의 playStack/playRhythm과 같은 자리. 실패 화면은 두지 않는다 —
+   소설에 실패가 없기 때문이다. 못 맞혀도 이야기는 이어진다. */
+const MGC = E.mgc.getContext('2d');
+const MW=1080, MH=584;
+const MG = {
+  on:false, def:null, t:0,
+  open:function(def){
+    this.def=def; this.t=0; this.on=true;
+    E.mg.classList.add('on');
+    E.mgTitle.textContent=def.title||'';
+    E.mgInfo.innerHTML=def.info||'';
+    E.mgKey.textContent = touchMode ? (def.keyT||'화면을 누른다') : (def.key||'스페이스 · E');
+    prompt(null); E.dot.classList.remove('on');
+    if(def.setup) def.setup(this);
+  },
+  info:function(h){ E.mgInfo.innerHTML=h; },
+  close:function(){
+    if(!this.on) return;
+    this.on=false; E.mg.classList.remove('on');
+    const d=this.def; this.def=null;
+    if(d&&d.done) d.done();
+  },
+  /* 장을 갈아탈 때는 done()을 부르지 않고 그냥 접는다(재귀 방지) */
+  abort:function(){ this.on=false; this.def=null; E.mg.classList.remove('on'); },
+  tick:function(dt){
+    if(!this.on) return;
+    this.t+=dt;
+    if(this.def.tick) this.def.tick(dt,this);
+    if(!this.on || !this.def) return;      /* tick 안에서 닫혔을 수 있다 */
+    MGC.clearRect(0,0,MW,MH);
+    if(this.def.draw) this.def.draw(this.t,this);
+  },
+  press:function(){ if(this.on&&this.def.press) this.def.press(this); }
+};
+/* 미니게임 공통 붓질 — 얇은 선, 인광 초록, 목표는 앰버 */
+const MGP = { ink:'#e7e3da', dim:'rgba(231,227,218,.22)', phos:'#8ff0c4',
+              amber:'#e6b077', bad:'rgba(192,90,90,.9)' };
+function mgRing(cx,cy,r,col,w,alpha){
+  MGC.save(); MGC.globalAlpha=alpha===undefined?1:alpha;
+  MGC.strokeStyle=col; MGC.lineWidth=w||2;
+  MGC.beginPath(); MGC.arc(cx,cy,Math.max(r,0),0,Math.PI*2); MGC.stroke(); MGC.restore();
+}
+function mgText(t,x,y,size,col,align,track){
+  MGC.save();
+  MGC.fillStyle=col; MGC.textAlign=align||'center'; MGC.textBaseline='middle';
+  MGC.font=size+'px "Segoe UI", Pretendard, sans-serif';
+  if(track){
+    const ch=t.split(''); let w=0;
+    ch.forEach(c=>{ w+=MGC.measureText(c).width+track; });
+    let cx = align==='center' ? x-w/2 : x;
+    MGC.textAlign='left';
+    ch.forEach(c=>{ MGC.fillText(c,cx,y); cx+=MGC.measureText(c).width+track; });
+  } else MGC.fillText(t,x,y);
+  MGC.restore();
+}
+function mgGauge(x,y,w,h,v,col,bg){
+  MGC.fillStyle=bg||'rgba(231,227,218,.10)'; MGC.fillRect(x,y,w,h);
+  MGC.fillStyle=col; MGC.fillRect(x,y,w*clampf(v,0,1),h);
+}
+
+/* ═══════════════════ 장(章) ═══════════════════ */
+const ACT = {
+  id:'cover', t:0, canLook:false, sub:0, data:{},
+  target:null, oneWay:0, mark:0, jumps:0, backMsg:null, hintText:null, stuck:0,
+  go:function(id){
+    this.id=id; this.t=0; this.sub=0; this.data={};
+    this.target=null; this.oneWay=0; this.jumps=0; this.backMsg=null;
+    this.hintText=null; this.stuck=0;
+    E.guide.classList.remove('on');
+    sayClear(); prompt(null); MG.abort(); clearTimers();
+    E.screen.classList.remove('on'); E.meta.classList.remove('on');
+    if(SETUP[id]) SETUP[id]();
+  }
+};
+const SETUP = {}, TICK = {};
+
+/* ───────── 사람 그리기 (기동대 · 내 몸) ───────── */
+function figure(x,y,z,ry,phase,pal,opt){
+  opt=opt||{};
+  const sw=Math.sin(phase), amp=opt.run?0.9:0.5;
+  MS.reset(); MS.move(x,y,z); MS.rotY(ry);
+  MS.push(); MS.move(0,0.03,0); part(P.disc,1.0,1,0.8,[0,0,0],{flat:true,alpha:0.30}); MS.pop();
+  MS.move(0,Math.abs(sw)*0.04*(opt.run?1.6:1),0);
+  if(opt.lean) MS.rotX(opt.lean);
+  for(const s of [-1,1]){
+    const a=(s>0?sw:-sw)*amp;
+    MS.push(); MS.move(s*0.11,0.46,0); MS.rotX(a);
+      MS.push(); MS.move(0,-0.23,0); part(P.cyl,0.17,0.54,0.17,pal.leg); MS.pop();
+      MS.push(); MS.move(0,-0.48,0.05); part(P.box,0.17,0.10,0.29,pal.shoe); MS.pop();
+    MS.pop();
+  }
+  MS.push(); MS.move(0,0.95,0); part(P.box,0.42,0.62,0.26,pal.top); MS.pop();
+  for(const s of [-1,1]){
+    const a=(s>0?-sw:sw)*amp*(opt.run?1.2:1);
+    MS.push(); MS.move(s*0.28,1.18,0); MS.rotX(a);
+      MS.push(); MS.move(0,-0.25,0); part(P.cyl,0.14,0.54,0.14,pal.top); MS.pop();
+      MS.push(); MS.move(0,-0.53,0); part(P.sph,0.15,0.15,0.15,pal.skin||COL.skin); MS.pop();
+    MS.pop();
+  }
+  if(!opt.headless){
+    MS.push(); MS.move(0,1.30,0); part(P.cyl,0.13,0.12,0.13,pal.skin||COL.skin); MS.pop();
+    MS.push(); MS.move(0,1.48,0);
+      part(P.sph,0.30,0.34,0.29,pal.skin||COL.skin);
+      MS.push(); MS.move(0,0.09,-0.01); part(P.sph,0.31,0.24,0.30,pal.hair||COL.hair); MS.pop();
+      if(pal.visor){
+        MS.push(); MS.move(0,0.01,0.10); part(P.box,0.30,0.13,0.10,pal.visor,{emis:0.5}); MS.pop();
+      }
+    MS.pop();
+  } else {
+    /* 목이 잘린 자리 */
+    MS.push(); MS.move(0,1.28,0); part(P.cyl,0.12,0.06,0.12,[0.34,0.16,0.16],{emis:0.25}); MS.pop();
+  }
+}
+const PAL_GUARD = { top:[0.10,0.11,0.13], leg:[0.09,0.10,0.12], shoe:[0.06,0.06,0.07],
+                    skin:[0.16,0.17,0.19], hair:[0.08,0.08,0.09], visor:[0.75,0.22,0.22] };
+const PAL_ME    = { top:[0.40,0.43,0.47], leg:[0.34,0.37,0.41], shoe:[0.18,0.19,0.21],
+                    skin:COL.skin, hair:COL.hair };
+
+/* 목표 자리 표시 — 은은한 빛기둥 하나 */
+function marker(x,z,t){
+  const p=0.55+0.45*Math.sin(t*2.0);
+  MS.reset(); MS.move(x,1.1,z);
+  part(P.tube,0.52,2.2,0.52,[0.56,0.94,0.78],{flat:true,alpha:0.055+0.05*p});
+  MS.reset(); MS.move(x,0.02,z);
+  part(P.disc,1.5,1,1.5,[0.56,0.94,0.78],{flat:true,alpha:0.10+0.07*p});
+}
+
+/* ───────── 표지 ───────── */
+SETUP.cover = function(){
+  mood(0.74,0.80);
+  PL.free=false; PL.x=MY.x+1.2; PL.y=MY.y; PL.z=MY.z-0.2;
+  look.yaw=0.35; look.pitch=-0.02;
+  ACT.canLook=false;
+  vignette(420,0.95);
+  tintTo('linear-gradient(180deg,#0f3a2a,#06140f)',0.55);
+  hud(null);
+};
+TICK.cover = function(dt){
+  /* 얼굴들 사이를 아주 느리게 훑는다 */
+  look.yaw = 0.35 + Math.sin(ACT.t*0.10)*0.34;
+  look.pitch = -0.02 + Math.sin(ACT.t*0.07)*0.05;
+};
+
+/* ───────── 1장 · 코 ───────── */
+const SMELLS = [
+  '맡을 수 있는 거라곤 우주선의 답답한 공기뿐이었다. 그래도 좋았다.',
+  '그 옛날 바닷가의 냄새를 떠올렸다.',
+  '처음 사본 향수의 냄새를 떠올렸다.',
+  '정신을 차려보면 다시 이 눅눅한 우주선의 냄새가 느껴졌다.',
+  '지겨운 냄새. 역겨운 냄새. 아니, 그거라도 좋았다. 코라도 남았으니까.'
+];
+SETUP.nose = function(){
+  mood(0.74,0.80);
+  PL.free=false; PL.x=MY.x; PL.y=MY.y; PL.z=MY.z;
+  look.yaw=0; look.pitch=0;
+  ACT.canLook=true;
+  vignette(400,0.95);
+  tintTo('linear-gradient(180deg,#0f3a2a,#06140f)',0.55);
+  E.dot.classList.remove('on');
+  E.stick.classList.remove('on'); E.pad.classList.add('on');
+  A.hum(0.55);
+  hud('1장 · 격리실','냄새라도 맡아본다','내가 할 수 있는 건 이것뿐이다');
+  cine(true);
+  quote('다행히도 코는 없어지지 않았기에<br><b>냄새라도 맡을 수 있었다.</b><br>'+
+        '<span style="font-size:.7em;opacity:.6">그래도 맡을 수 있는 거라곤 우주선의 답답한 공기뿐이었지만</span>',
+        5.2, function(){ cine(false); MG.open(mgSmell); });
+};
+TICK.nose = function(dt){
+  /* 눈은 굴러가지만 목은 없다 — 시선이 좁게 갇힌다 */
+  look.yaw = clampf(look.yaw, -0.60, 0.60);
+  look.pitch = clampf(look.pitch, -0.32, 0.28);
+};
+
+/* 미니게임 ①「냄새 맡기」 — 숨이 부풀어 오르는 순간을 붙잡는다 */
+const mgSmell = {
+  title:'냄 새 맡 기', key:'스페이스 · E', keyT:'화면을 누른다',
+  info:'숨이 가장 크게 부풀 때 <b>붙잡는다</b>.',
+  setup:function(m){ m.r=10; m.speed=112; m.hits=0; m.flashT=0; m.lock=0; },
+  tick:function(dt,m){
+    m.r += m.speed*dt;
+    if(m.r>300){ m.r=10; m.speed=112+m.hits*16; }
+    if(m.flashT>0) m.flashT-=dt;
+    if(m.lock>0){ m.lock-=dt; if(m.lock<=0) MG.close(); }
+  },
+  press:function(m){
+    if(m.lock>0) return;
+    const T=196, tol=30;
+    if(Math.abs(m.r-T)<tol){
+      A.sniff(); m.hits++; m.flashT=0.45; m.r=10;
+      MG.info(SMELLS[Math.min(m.hits-1,SMELLS.length-1)]);
+      if(m.hits>=3){ m.lock=2.4; }
+    } else {
+      A.breath(0.6); m.flashT=-0.3;
+      MG.info('놓쳤다. 그래도 다시 숨이 온다.');
+    }
+  },
+  draw:function(t,m){
+    const cx=MW/2, cy=MH/2;
+    const T=196;
+    /* 붙잡아야 하는 자리 */
+    mgRing(cx,cy,T,MGP.amber,1.5,0.55);
+    mgRing(cx,cy,T-30,MGP.amber,1,0.14);
+    mgRing(cx,cy,T+30,MGP.amber,1,0.14);
+    /* 부풀어 오르는 숨 */
+    const near = 1-Math.min(1,Math.abs(m.r-T)/120);
+    mgRing(cx,cy,m.r,MGP.phos,2.5,0.30+0.55*near);
+    mgRing(cx,cy,m.r*0.62,MGP.phos,1,0.10+0.20*near);
+    MGC.save(); MGC.globalAlpha=0.55;
+    MGC.fillStyle=MGP.phos; MGC.beginPath(); MGC.arc(cx,cy,4,0,Math.PI*2); MGC.fill();
+    MGC.restore();
+    if(m.flashT>0) mgRing(cx,cy,T,MGP.amber,6,m.flashT/0.45*0.8);
+    if(m.flashT<0) mgRing(cx,cy,m.r,MGP.bad,2,Math.max(0,(0.3+m.flashT)/0.3)*0.6);
+    /* 몇 번 맡았는지 */
+    for(let i=0;i<3;i++){
+      const x=cx-46+i*46;
+      MGC.fillStyle = i<m.hits ? MGP.phos : 'rgba(231,227,218,.16)';
+      MGC.fillRect(x-9,MH-40,18,2);
+    }
+  },
+  done:function(){
+    cine(true);
+    quote('지겨운 냄새. 역겨운 냄새.<br>아니, 그거라도 좋았다. <b>코라도 남았으니까.</b>',4.6,function(){
+      quote('나는 며칠 전부터<br><b>내 눈 앞의 컴퓨터를 조작하는 연습을 하고 있었다.</b><br>'+
+            '<span style="font-size:.7em;opacity:.6">컴퓨터는 홍채를 인식해서 마우스를 움직일 수 있었다.</span>',
+            5.2, function(){ cine(false); ACT.go('pixel'); });
+    });
+  }
+};
+
+/* ───────── 2장 · 한 픽셀 ─────────
+   여기가 이 게임의 심장이다. 눈동자로 커서를 민다.
+   처음엔 1초에 한 픽셀. 일주일 동안 늘어서 마지막엔 쓸 만해진다. */
+const SW=480, SH=300;                     /* 모니터의 실제 픽셀 */
+const ICON = { x:352, y:54, w:74, h:66 }; /* '육체' */
+const RUNB = { x:300, y:214, w:132, h:36 };/* 실행 */
+SETUP.pixel = function(){
+  mood(0.64,0.78);
+  ACT.canLook=false;
+  E.screen.classList.add('on'); E.meta.classList.add('on');
+  E.dot.classList.remove('on');
+  vignette(520,0.96);
+  ACT.data = { cx:34, cy:262, acc:0, skill:0, phase:'icon', held:0, hinted:false };
+  E.hint.textContent='눈동자를 굴려 마우스를 움직인다';
+  A.hum(0.42);
+  hud('2장 · 한 픽셀',"'육체' 프로그램을 실행한다",'눈동자로만 커서를 민다');
+  if(touchMode) E.stick.classList.add('on');   /* 커서를 밀 방향키가 필요하다 */
+};
+const crt = E.crt.getContext('2d');
+function drawCRT(){
+  const d=ACT.data;
+  crt.fillStyle='#07130d'; crt.fillRect(0,0,SW,SH);
+  /* 격자 */
+  crt.strokeStyle='rgba(120,240,190,.045)'; crt.lineWidth=1;
+  for(let x=0;x<SW;x+=24){ crt.beginPath(); crt.moveTo(x+.5,0); crt.lineTo(x+.5,SH); crt.stroke(); }
+  for(let y=0;y<SH;y+=24){ crt.beginPath(); crt.moveTo(0,y+.5); crt.lineTo(SW,y+.5); crt.stroke(); }
+  /* 머리글 */
+  crt.fillStyle='rgba(140,250,200,.66)';
+  crt.font='11px "Segoe UI", Pretendard, sans-serif';
+  crt.fillText('UNIT 4417-K  ·  베잔틴 항성계 제7행성 항행중', 12, 20);
+  crt.fillStyle='rgba(140,250,200,.28)';
+  crt.fillRect(12,28,SW-24,1);
+  /* 아이콘들 */
+  const items=[
+    {x:44, y:54,  label:'전쟁',  lock:true},
+    {x:150,y:54,  label:'노동',  lock:true},
+    {x:246,y:54,  label:'방송',  dead:true},
+    {x:ICON.x,y:ICON.y, label:'육체', target:true}
+  ];
+  for(const it of items){
+    const on = it.target && (d.phase!=='icon');
+    crt.strokeStyle = it.dead? 'rgba(140,250,200,.14)' : (on?'rgba(160,255,210,.95)':'rgba(140,250,200,.42)');
+    crt.fillStyle   = on? 'rgba(120,240,190,.16)' : 'rgba(120,240,190,.04)';
+    crt.lineWidth=1;
+    crt.fillRect(it.x+.5, it.y+.5, 54, 44);
+    crt.strokeRect(it.x+.5, it.y+.5, 54, 44);
+    crt.fillStyle = it.dead? 'rgba(140,250,200,.22)'
+                  : (on? 'rgba(190,255,225,1)':'rgba(140,250,200,.72)');
+    crt.font='12px "Segoe UI", Pretendard, sans-serif';
+    crt.textAlign='center';
+    crt.fillText(it.label, it.x+27, it.y+72);
+    crt.textAlign='left';
+    if(it.lock){
+      crt.fillStyle='rgba(140,250,200,.30)';
+      crt.fillRect(it.x+22, it.y+18, 10, 9);
+      crt.fillRect(it.x+24, it.y+12, 6, 6);
+    }
+    if(it.dead){
+      crt.strokeStyle='rgba(200,90,90,.5)';
+      crt.beginPath(); crt.moveTo(it.x+8,it.y+8); crt.lineTo(it.x+46,it.y+36);
+      crt.moveTo(it.x+46,it.y+8); crt.lineTo(it.x+8,it.y+36); crt.stroke();
+    }
+  }
+  /* 방송 꺼짐 안내 */
+  crt.fillStyle='rgba(200,120,120,.44)';
+  crt.font='10px "Segoe UI", Pretendard, sans-serif';
+  crt.fillText('※ 방송 신호 없음 — 7일째', 246, 138);
+
+  /* 실행 버튼 */
+  if(d.phase!=='icon'){
+    const hot = d.phase==='run';
+    crt.fillStyle = hot? 'rgba(120,240,190,.20)':'rgba(120,240,190,.06)';
+    crt.strokeStyle='rgba(160,255,210,.85)';
+    crt.fillRect(RUNB.x+.5,RUNB.y+.5,RUNB.w,RUNB.h);
+    crt.strokeRect(RUNB.x+.5,RUNB.y+.5,RUNB.w,RUNB.h);
+    crt.fillStyle='rgba(200,255,230,.96)';
+    crt.font='14px "Segoe UI", Pretendard, sans-serif';
+    crt.textAlign='center';
+    crt.fillText('실 행', RUNB.x+RUNB.w/2, RUNB.y+24);
+    crt.textAlign='left';
+    crt.fillStyle='rgba(140,250,200,.58)';
+    crt.font='11px "Segoe UI", Pretendard, sans-serif';
+    crt.fillText('육체 · BODY.PRG  준비됨', RUNB.x, RUNB.y-14);
+  }
+  /* 커서 — 한 픽셀씩 움직인다 */
+  crt.fillStyle='rgba(230,255,244,.98)';
+  crt.fillRect(d.cx, d.cy, 2, 2);
+  crt.fillRect(d.cx, d.cy, 1, 11);
+  crt.fillRect(d.cx, d.cy, 8, 1);
+  crt.fillStyle='rgba(120,240,190,.28)';
+  crt.fillRect(d.cx-4, d.cy-4, 9, 9);
+  /* 좌표 */
+  crt.fillStyle='rgba(140,250,200,.34)';
+  crt.font='10px "Segoe UI", Pretendard, sans-serif';
+  crt.fillText('CUR '+d.cx+','+d.cy, 12, SH-12);
+}
+TICK.pixel = function(dt){
+  const d=ACT.data;
+  let dx=0,dy=0;
+  if(key['arrowleft']||key['a']) dx-=1;
+  if(key['arrowright']||key['d']) dx+=1;
+  if(key['arrowup']||key['w']) dy-=1;
+  if(key['arrowdown']||key['s']) dy+=1;
+  dx+=move.x; dy-=move.y;
+  const l=Math.hypot(dx,dy);
+  if(l>1){ dx/=l; dy/=l; }
+
+  const pressing = l>0.08;
+  if(pressing){
+    d.skill = Math.min(1, d.skill + dt*0.036);        /* 일주일치 연습 */
+    d.held += dt;
+  } else {
+    d.acc = 0;
+  }
+  const v = 1.15 + 52*d.skill*d.skill;                /* 픽셀/초 */
+  if(pressing){
+    d.acc += v*dt;
+    const n=Math.floor(d.acc);
+    if(n>0){
+      d.acc-=n;
+      const before=d.cx+','+d.cy;
+      d.cx=Math.round(clampf(d.cx+dx*n,2,SW-3));
+      d.cy=Math.round(clampf(d.cy+dy*n,2,SH-3));
+      if(before!==d.cx+','+d.cy && d.skill<0.34) A.tick();
+    }
+  }
+  E.focus.style.width=(d.skill*100)+'%';
+  const day=1+Math.floor(d.skill*6.99);
+  E.day.textContent=day+'일째';
+
+  /* 안내는 아주 늦게, 한 번만 */
+  if(!d.hinted && d.held>26){
+    d.hinted=true;
+    E.hint.textContent = (d.phase==='icon') ? "'육체'로 커서를 옮긴다" : '실행을 누른다';
+  }
+  if(d.skill>0.5 && d.hint2!==true){ d.hint2=true; E.hint.textContent='손에 익어간다'; }
+
+  const inIcon = d.cx>=ICON.x && d.cx<=ICON.x+54 && d.cy>=ICON.y && d.cy<=ICON.y+44;
+  const inRun  = d.cx>=RUNB.x && d.cx<=RUNB.x+RUNB.w && d.cy>=RUNB.y && d.cy<=RUNB.y+RUNB.h;
+
+  if(d.phase==='icon' && inIcon){
+    d.phase='picked'; A.click();
+    E.hint.textContent='실행을 누른다';
+    quote("<b>'육체' 프로그램</b>에 접속할 수 있었다.<br>몸이었다.<br>"+
+          "<span style='letter-spacing:.3em'>'몸' '몸' '몸'</span><br>내 몸이다.", 4.8);
+  }
+  if(d.phase==='picked' && inRun){ d.phase='run'; prompt('실행','E'); }
+  if(d.phase==='run' && !inRun){ d.phase='picked'; prompt(null); }
+
+  if(d.phase==='run' && takeInteract()){
+    d.phase='fired'; A.click(); prompt(null);
+    hudDone('실행했다');
+    ACT.go('body');
+  }
+  if(d.phase!=='fired') drawCRT();
+};
+
+/* ───────── 3장 · 몸 ───────── */
+SETUP.body = function(){
+  mood(0.90,0.90);
+  ACT.canLook=true;
+  E.screen.classList.remove('on'); E.meta.classList.remove('on');
+  look.yaw=0; look.pitch=-0.06;
+  ACT.data = { stage:0, rise:0, count:0 };
+  ACT.hintText='화면 가운데 안내대로 눌러 보면 된다. PC는 E, 모바일은 오른쪽 둥근 단추.';
+  vignette(500,0.95);
+  A.servo();
+  hud('3장 · 몸','밑에서 올라오는 몸에 접속한다');
+  quote('나는 실행 버튼을 눌렀다.', 2.6);
+};
+function bodyReady(){
+  PL.free=true;
+  A.hum(0.5);
+  E.dot.classList.add('on');
+  if(touchMode) E.stick.classList.add('on');
+  vignette(760,0.80);
+  tintTo('linear-gradient(180deg,#3a2a12,#140d06)',0.30);   /* 처음 들어오는 따뜻한 빛 */
+  hud('3장 · 몸','내 몸을 확인한다','0 / 6');
+  quote('뻗어 나온 바늘 같은 커넥터들이 목과 척추에 곧게 연결되었다.<br><b>몸이 생겼다.</b>',3.8);
+}
+const TOUCHES = [
+  { key:'neck', label:'목을 만져본다',    line:'나는 팔을 움직여 목을 만져보았다.' },
+  { key:'talk', label:'소리를 내본다',    line:'"아... 악하... 카아... 아아아"' },
+  { key:'arm',  label:'팔을 본다',        line:'내 팔에 소름이 돋았다. 내 팔이었다. 내 마음대로 움직일 수 있는 팔.' },
+  { key:'wall', label:'벽을 만져본다',    line:'손으로 우주선의 벽을 만져보았다.' },
+  { key:'head', label:'두피를 쓰다듬는다', line:'두피를 쓰다듬어 보기도 하였다.' },
+  { key:'nose', label:'코를 만져본다',    line:'코를 만져도 보고 엉덩이를 긁어도 보았다. 내 몸이었다.' }
+];
+TICK.body = function(dt){
+  const d=ACT.data;
+  if(d.stage===0){
+    /* 몸이 밑에서 올라온다 — 카메라가 그만큼 내려앉는다.
+       여기에 타이밍 게임을 두면 가장 중요한 순간이 손가락 시험이 된다. 그냥 꽂힌다. */
+    d.rise=Math.min(1,d.rise+dt*0.40);
+    PL.y = lerp(MY.y, PL.eye, smooth(d.rise));
+    look.pitch = lerp(-0.06,-0.26,smooth(d.rise));
+    if(d.rise>0.34 && !d.c1){ d.c1=true; A.thunk(); say('목.',1.6); }
+    if(d.rise>0.62 && !d.c2){ d.c2=true; A.thunk(); say('척추.',1.6); }
+    if(d.rise>0.86 && !d.c3){ d.c3=true; A.thunk(); flash(0.34,700); say('신경.',1.6); }
+    if(d.rise>=1){ d.stage=2; bodyReady(); }
+    return;
+  }
+  if(d.stage!==2) return;
+  if(d.count<TOUCHES.length){
+    const t=TOUCHES[d.count];
+    prompt(t.label, touchMode?'오른쪽 단추':'E');
+    if(takeInteract()){
+      d.count++;
+      if(t.key==='talk'){ A.rasp(); say(t.line,5.2); } else { A.breath(1.2); say(t.line,4.6); }
+      E.hudSub.textContent=d.count+' / '+TOUCHES.length;
+      if(d.count>=TOUCHES.length){
+        prompt(null); hudDone('내 몸이었다');
+        after(4.6,function(){
+          quote('나는 움직였다.<br><b>일단 이곳을 벗어나야겠다고 생각했다.</b>',3.8,
+                function(){ ACT.go('hall'); });
+        });
+      }
+    }
+  }
+  walkStep(dt,1.0);
+};
+
+/* ───────── 4장 · 복도 ───────── */
+SETUP.hall = function(){
+  mood(0.98,1.05);
+  PL.free=true; ACT.canLook=true;
+  E.dot.classList.add('on');
+  if(touchMode) E.stick.classList.add('on');
+  ACT.data={ step:0, ran:0, jumps:0, shut:false };
+  ACT.target={ x:ROOM_A.x, z:HALL.z0-0.9, r:1.5 };
+  ACT.hintText='초록빛 기둥이 선 곳이 문이다. 그리로 걸어 나간다.';
+  hud('4장 · 복도','격리실을 벗어난다');
+  vignette(760,0.80);
+};
+TICK.hall = function(dt){
+  const d=ACT.data;
+  const spd=walkStep(dt,1.0)||0;
+
+  if(d.step===0){
+    if(PL.z>HALL.z0-0.2){                       /* 복도로 나왔다 */
+      d.step=1; ACT.target=null;
+      tintTo('linear-gradient(180deg,#16283a,#070c12)',0.42);
+      vignette(980,0.62);
+      mood(1.55,1.74); after(2.2,function(){ mood(1.30,1.64); });
+      A.hum(0.34);
+      cine(true);
+      quote('우주선의 <b>널따란 복도</b>가 보였다.<br>넓은 길. 넓은 복도. 닭장 같은 공간이 아닌 곳.',4.4,
+        function(){
+          cine(false);
+          hud('4장 · 복도','문을 닫는다','뒤를 돌아본다');
+          ACT.hintText='방금 나온 문 쪽으로 돌아서서 다가가면 닫을 수 있다.';
+          ACT.data.step=2;
+          ACT.target={ x:ROOM_A.x, z:HALL.z0+0.5, r:2.6 };
+        });
+    }
+    return;
+  }
+  if(d.step===2){
+    const near=Math.hypot(PL.x-ROOM_A.x,PL.z-(HALL.z0+0.5))<2.8;
+    if(near && !d.saidBack){ d.saidBack=true;
+      say('머리들이 나를 보고 있었다. 폐가 없어서 한숨의 소리도 내지 못했지만 그들의 표정은 말하고 있었다.',6.0); }
+    if(near){
+      prompt('문을 닫는다', touchMode?'오른쪽 단추':'E');
+      if(takeInteract()){
+        prompt(null); d.step=3; d.shut=true; doorShutA=true; ACT.target=null;
+        A.thunk();
+        say('머리통들이 울부짖고 비명을 지르는 소리가 들렸다. 하지만 그것은 환청이다. 그들은 소리를 낼 수 없으니까.',6.4);
+        after(5.2,function(){
+          hud('4장 · 복도','마음껏 달려본다','달리기 Shift · 뛰기 Space');
+          if(touchMode) E.hudSub.textContent='스틱을 밀면 달린다 · 화면을 톡 누르면 뛴다';
+          ACT.hintText='아무 데나 달려도 된다. PC는 Shift로 달리고 Space로 뛴다. 모바일은 스틱을 끝까지 밀고, 화면을 톡 누르면 뛴다.';
+          ACT.data.step=4;
+        });
+      }
+    } else prompt(null);
+    return;
+  }
+  if(d.step===4){
+    d.ran += spd*dt;
+    d.jumps = ACT.jumps||0;
+    E.hudSub.textContent = '달린 거리 '+Math.floor(d.ran)+'m / 30m   ·   뛰기 '+Math.min(d.jumps,2)+' / 2';
+    if(d.ran>30 && d.jumps>=2){
+      d.step=5; hudDone('내 몸이었다. 나는 그냥 좋았다.');
+      cine(true);
+      quote('나는 방방 뛰었다. 손으로 우주선의 벽을 만져도 보고<br>두피를 쓰다듬어 보기도 하였다.<br>'+
+            '<b>내 몸이었다. 나는 그냥 좋았다.</b>',4.6,function(){
+        quote('그리고 아차 하면서 무언가 떠올랐다.<br>몸이 생긴다면 가장 하고 싶었던 것.<br><b>다른 사람을 안아보기.</b>',4.6,
+          function(){ cine(false); ACT.go('faces'); });
+      });
+    }
+  }
+};
+
+/* ───────── 5장 · 격리실의 얼굴들 ───────── */
+SETUP.faces = function(){
+  mood(1.34,1.60);
+  PL.free=true; ACT.canLook=true;
+  ACT.data={ entered:false };
+  ACT.target={ x:ROOM_B.x, z:HALL.z1+0.9, r:1.6 };
+  ACT.hintText='복도 건너편 벽에 열린 문이 있다. 초록빛 기둥 쪽이다.';
+  hud('5장 · 격리실의 얼굴들','아무 격리실로 들어간다','본래의 격리실로는 돌아가지 않는다');
+};
+TICK.faces = function(dt){
+  walkStep(dt,1.0);
+  if(!ACT.data.entered && PL.z>ROOM_B.z0+0.6){
+    ACT.data.entered=true; ACT.target=null;
+    tintTo('linear-gradient(180deg,#0f3a2a,#06140f)',0.50);
+    vignette(620,0.90);
+    mood(0.80,0.86);
+    hud('5장 · 격리실의 얼굴들','모두와 교감을 나눈다');
+    say('내가 들어가자 머리통들이 나를 주목했다. 남자도 있었고 여자도 있었다.',5.4);
+    after(3.4,function(){ MG.open(mgCommune); });
+  }
+};
+/* 미니게임 ③「교감」 — 이길 수 없게 설계했다.
+   성공할수록 방 전체의 갈망이 더 크게 오른다. 그것이 이 소설의 논지다. */
+const mgCommune = {
+  title:'교 감', key:'스페이스 · E', keyT:'화면을 누른다',
+  info:'고리가 <b>얼굴에 닿을 때</b> 누른다.',
+  lines:['처음의 여자는 내가 뭘 하는지 알아채지 못했으므로 그냥 놀라했다.',
+         '짧은 입맞춤이 끝나자 그녀는 더 원하였다.',
+         '불쌍한 사람들. 몸이 없는 사람들.',
+         '그들은 더욱 원했다. 더. 더. 더욱.',
+         '심지어는 남자들마저도 원하는 것 같았다.',
+         '나는 이제 만족이 되었지만 그들은 만족하지 않았다.'],
+  setup:function(m){ m.r=300; m.hits=0; m.want=0.06; m.pop=0; m.gain=0; m.lock=0; m.face=0; },
+  tick:function(dt,m){
+    if(m.lock>0){ m.lock-=dt; if(m.lock<=0) MG.close(); return; }
+    m.r -= dt*150;
+    if(m.r<40){ m.r=300; m.face=(m.face+1)%5; m.want=Math.min(1,m.want+0.02); }
+    m.want = Math.min(1, m.want + dt*(0.007+m.hits*0.0018));
+    if(m.pop>0) m.pop-=dt;
+    if(m.want>=1 && m.lock<=0){
+      m.lock=3.2;
+      MG.info('<b>그들은 결코 만족할 수 없을 테니까.</b>');
+    }
+  },
+  press:function(m){
+    if(m.lock>0) return;
+    if(Math.abs(m.r-96)<26){
+      A.kiss(); m.hits++; m.pop=0.6;
+      m.gain = 0.014+0.0075*m.hits;               /* 성공할수록 더 크게 오른다 — 8배까지 */
+      m.want = Math.min(1, m.want+m.gain);
+      m.r=300; m.face=(m.face+1)%5;
+      MG.info(this.lines[Math.min(m.hits-1,this.lines.length-1)]);
+    } else { m.r=300; m.face=(m.face+1)%5; }
+  },
+  draw:function(t,m){
+    const cx=MW/2, cy=MH/2-30;
+    /* 얼굴 — 눈 둘. 이 방의 모든 얼굴이 나를 본다. */
+    const soft = m.pop>0 ? m.pop/0.6 : 0;
+    for(const s of [-1,1]){
+      const ex=cx+s*44;
+      MGC.save();
+      MGC.fillStyle='rgba(231,227,218,'+(0.62+0.3*soft)+')';
+      MGC.beginPath(); MGC.ellipse(ex,cy,26,15-soft*7,0,0,Math.PI*2); MGC.fill();
+      MGC.fillStyle='#0a0d10';
+      MGC.beginPath(); MGC.arc(ex,cy,8.5-soft*3,0,Math.PI*2); MGC.fill();
+      MGC.restore();
+    }
+    MGC.strokeStyle='rgba(231,227,218,.20)'; MGC.lineWidth=1.5;
+    MGC.beginPath(); MGC.moveTo(cx-20,cy+56); MGC.lineTo(cx+20,cy+56); MGC.stroke();
+    /* 닿아야 하는 자리 */
+    mgRing(cx,cy,96,MGP.amber,1.5,0.5);
+    mgRing(cx,cy,m.r,MGP.phos,2.5,0.30+0.5*(1-Math.min(1,Math.abs(m.r-96)/150)));
+    if(m.pop>0) mgRing(cx,cy,96+(1-m.pop/0.6)*70,MGP.amber,3,m.pop/0.6*0.7);
+    /* 갈망 — 절대 줄지 않는다 */
+    const gx=MW/2-260, gy=MH-46;
+    mgText('이 방의 갈망', gx, gy-20, 12, 'rgba(231,227,218,.42)','left',4);
+    mgGauge(gx,gy,520,7,m.want, m.want>0.75?MGP.bad:MGP.amber);
+    mgText('만족시킨 얼굴  '+m.hits+' / 100', MW/2+260, gy-20, 12,
+           'rgba(231,227,218,.42)','right',4);
+    if(m.pop>0 && m.gain>0)
+      mgText('+'+Math.round(m.gain*100), gx+520*Math.min(m.want,1)+18, gy+3, 13, MGP.bad,'left',1);
+  },
+  done:function(){
+    hudDone('나는 채워지지 않는 식욕을 북돋아주었던 것이다');
+    tintTo('linear-gradient(180deg,#16283a,#070c12)',0.42);
+    vignette(900,0.68);
+    cine(true);
+    quote('100명이 넘는 사람들이 모두 만족할 때까지 쓰다듬어주는 일을,<br>나는 해낼 수 없을 것이다.<br>'+
+          '<b>나는 채워지지 않는 식욕을 북돋아주었던 것이다.</b>',5.0,function(){
+      quote('이제 어떡하지? 난 뭘 해야 하지?<br>'+
+            '<span style="font-size:.78em;opacity:.72">나는 복도의 벽에 기대 앉아보았다.<br>'+
+            '그래, 이게 앉는 느낌이었지.</span>',4.4,function(){
+        cine(false); ACT.go('road');
+      });
+    });
+  }
+};
+
+/* ───────── 6장 · 정해진 길 ───────── */
+SETUP.road = function(){
+  mood(1.24,1.50);
+  PL.free=true; ACT.canLook=true;
+  if(PL.z>HALL.z1-0.8){ PL.x=ROOM_B.x; PL.z=HALL.z1-1.2; }
+  ACT.data={ relief:0, said:0, blocked:0 };
+  ACT.oneWay=-1; ACT.mark=PL.x;
+  ACT.target={ x:ROOM_A.x, z:HALL.z0+1.2, r:2.6, quiet:true };
+  ACT.hintText='왔던 길을 되짚어 간다. 되돌아갈 수는 없다.';
+  hud('6장 · 정해진 길','본래의 격리실로 돌아간다','숨이 막힌다 — E 로 숨을 고른다');
+  bcast('거기 너. 어떻게 몸을 얻었는지는 모르겠지만 당장 격리실로 돌아가라. 지금 돌아간다면 벌을 주지 않겠다.', 8);
+  after(7.0,function(){
+    say('나 스스로 그곳에 돌아갈 바에는 그냥 자살을 하는 게 나았다. 그래도 곧 기동대가 올 거다.',6.4);
+  });
+};
+TICK.road = function(dt){
+  const d=ACT.data;
+  walkStep(dt,1.0);
+  const dist=Math.abs(PL.x-ROOM_A.x);
+  /* 가까워질수록 숨이 막힌다. 「그래도 자유니까」가 그걸 잠깐 푼다. */
+  if(d.relief>0) d.relief=Math.max(0,d.relief-dt*0.16);
+  const tight=clampf(1-dist/40,0,1)-d.relief;
+  vignette(940-560*clampf(tight,0,1), 0.66+0.28*clampf(tight,0,1));
+  if(ACT.t>4){
+    prompt('그래도 자유니까', touchMode?'오른쪽 단추':'E');
+    if(takeInteract()){
+      d.relief=0.55; A.breath(1.6);
+      say('그래도 자유니까. 이렇게 생각하니까 숨이 덜 막히는 것 같았다.',3.4);
+    }
+  }
+  E.hudSub.textContent='남은 거리 '+Math.max(0,Math.floor(dist))+'m';
+  if(dist<2.6 && Math.abs(PL.z-(HALL.z0+1.2))<3.5){
+    prompt(null); hudDone('결국 나는 본래의 격리실 앞에 도달했다');
+    ACT.go('stand');
+  }
+};
+
+/* ───────── 7장 · 서 있기 ───────── */
+SETUP.stand = function(){
+  mood(1.10,1.28);
+  PL.free=true; ACT.canLook=true;
+  PL.x=ROOM_A.x; PL.z=HALL.z0+1.5;
+  look.yaw=0; look.pitch=-0.02;
+  ACT.data={ n:0 };
+  ACT.hintText='아무것도 하지 않아도 된다. 가만히 서 있는 것이 대답이다.';
+  vignette(560,0.90);
+  hud('7장 · 서 있기','들어가지 않는다','아무것도 하지 않는 것이 대답이다');
+  say('나는 들어가지 않을 생각이었다. 하지만 도망칠 수도 없었다. 그래서 나는 서있었다. 그냥 가만히.',6.4);
+};
+const ORDERS=[
+  { t:5,  msg:'들어가라. 귀찮게 하지 말고 들어가.',  after:'나는 그냥 서있었다.' },
+  { t:13, msg:'마지막으로 말한다. 들어가라.',        after:'나는 많이 불안했다. 그러나 그대로 서있었다.' },
+  { t:21, msg:'좋아. 그게 네 생각이군.',             after:'' }
+];
+TICK.stand = function(dt){
+  const d=ACT.data;
+  walkStep(dt,0.55);
+  while(d.n<ORDERS.length && ACT.t>=ORDERS[d.n].t){
+    const o=ORDERS[d.n]; d.n++;
+    bcast(o.msg, 5.4);
+    if(o.after) after(3.0,function(){ say(o.after,4.0); });
+  }
+  /* 들어가는 것도 선택지다 */
+  if(Math.abs(PL.x-ROOM_A.x)<1.2 && PL.z<HALL.z0+2.4 && ACT.t<25){
+    prompt('들어간다', touchMode?'오른쪽 단추':'E');
+    if(takeInteract()){ prompt(null); finish('return'); }
+  } else prompt(null);
+  if(ACT.t>26){ prompt(null); ACT.go('run'); }
+};
+
+/* ───────── 8장 · 달리기 ───────── */
+SETUP.run = function(){
+  mood(1.28,1.74);
+  PL.free=true; ACT.canLook=true;
+  ACT.data={ gd:30, boost:0, caught:false, phase:0, bodyX:PL.x, ph:0, hold:0 };
+  ACT.oneWay=1; ACT.mark=PL.x;                 /* 가지 않은 복도 쪽으로만 */
+  ACT.hintText='앞으로 달린다. 연타하면 조금 더 빨라진다.';
+  ACT.backMsg='어디로 뛰든 결국 제자리로 돌아올 텐데.';
+  vignette(700,0.84);
+  hud('8장 · 달리기','도망친다','연타하면 조금 더 빨라진다');
+  A.hum(0.62); A.alarm();
+  say('아마 기동대가 오겠지. 어서 도망가야지. 하지만 어디로.',5.0);
+  after(5.2,function(){ say('가지 않은 복도가 보였다. 그러고는 그냥 달렸다.',4.4); });
+};
+TICK.run = function(dt){
+  const d=ACT.data;
+  if(d.phase===0){
+    if(takeInteract()){ d.boost=Math.min(1.35,d.boost+0.14); }
+    d.boost=Math.max(0,d.boost-dt*0.42);
+    const spd=walkStep(dt,1.28+d.boost*0.30)||0;
+    /* 어떻게 달려도 따라잡힌다 */
+    d.gd -= (5.4 - Math.min(spd,4.9)*0.72 - d.boost*0.9)*dt;
+    if(d.gd<22) d.ph+=dt*7;
+    if(d.ph>1){ d.ph=0; A.chase(); }
+    E.hudSub.textContent='뒤에서 '+Math.max(0,d.gd).toFixed(1)+'m';
+    vignette(700-360*clampf(1-d.gd/30,0,1), 0.84+0.10*clampf(1-d.gd/30,0,1));
+    if(d.gd<=1.0){
+      d.phase=1; d.caught=true; d.holdX=PL.x; d.bodyX=PL.x;
+      PL.free=false; prompt(null); hud(null);
+      flash(0.9,900); A.thunk();
+      cine(true);
+      look.yaw=-Math.PI/2;                       /* 복도 저쪽을 본다 */
+      say('뒤에서 기동대가 내 머리통을 붙잡았다. 그러고 나서 곧바로 내 몸과 머리를 분리시켜버렸다.',6.4);
+    }
+    return;
+  }
+  /* 붙잡힌 뒤 — 내 머리는 손에 들려 흔들리고, 내 몸은 소실점으로 달려간다 */
+  d.hold+=dt;
+  PL.y = 1.16 + Math.sin(d.hold*3.4)*0.055;
+  PL.x = d.holdX - 0.5 + Math.sin(d.hold*1.7)*0.06;
+  PL.z = clampf(PL.z,-1.2,1.2) + Math.sin(d.hold*2.1)*0.004;
+  look.yaw = -Math.PI/2 + Math.sin(d.hold*1.3)*0.05;
+  look.pitch = -0.03 + Math.sin(d.hold*2.6)*0.02;
+  d.bodyX += (7.6+d.hold*0.7)*dt;
+  d.ph += dt*13;
+  if(d.hold>3.4 && !d.said2){ d.said2=true;
+    say('나는 여전히 도망가는 내 몸뚱아리를 볼 수 있었다.',5.0); }
+  if(d.hold>8.5 && !d.said3){ d.said3=true;
+    say('몸뚱아리는 복도의 소실점을 향해 쓰러지지도 않고 계속 내달렸다. 허우적대는 꼭두각시 인형처럼.',6.4); }
+  if(d.hold>15){ cine(false); ACT.go('brain'); }
+};
+
+/* ───────── 9장 · 뇌 ───────── */
+SETUP.brain = function(){
+  mood(0,0.5);
+  PL.free=false; ACT.canLook=false;
+  blackout=1; prompt(null); hud(null);
+  E.dot.classList.remove('on'); E.stick.classList.remove('on');
+  vignette(0,0);
+  tintTo('#000',0);
+  A.hum(0.10);
+  cine(true);
+  quote('그들은 나를 벌주었다.<br><b>이제는 코도 없고 눈도 없었다.</b><br>나는 생각밖에 할 수 없었다.',5.0,
+    function(){
+      quote('깜깜하고 고요했다. 아무것도 없었다.<br>나는 거대한 적막에 압도당했다.<br>'+
+            '<b>뭐라도 해야 했다. 무엇이든.</b>',4.8,function(){
+        cine(false); A.waves(0.28); MG.open(mgRemember);
+      });
+    });
+};
+TICK.brain = function(dt){};
+/* 미니게임 ④「기억」 — 화면에는 아무것도 없다. 소리만 있다. */
+const mgRemember = {
+  title:'기 억', key:'스페이스 · E', keyT:'화면을 누른다',
+  info:'보이는 것은 없다. <b>파도가 밀려오는 때</b>에 맞춰 누른다.',
+  lines:['바닷가의 냄새를 기억해보았다.','파도 소리를 기억해보았다.','그래. 조금 안정이 되었다.'],
+  setup:function(m){ m.p=0; m.hits=0; m.glow=0; m.lock=0; },
+  tick:function(dt,m){
+    if(m.lock>0){ m.lock-=dt; if(m.lock<=0) MG.close(); return; }
+    m.p+=dt/3.1; if(m.p>1) m.p-=1;
+    m.glow=Math.max(0,m.glow-dt*0.30);
+  },
+  press:function(m){
+    if(m.lock>0) return;
+    const w=Math.sin(m.p*Math.PI*2);
+    if(w>0.72){
+      m.hits++; m.glow=1; A.waves(0.28+m.hits*0.12);
+      MG.info(this.lines[Math.min(m.hits-1,this.lines.length-1)]);
+      if(m.hits>=3) m.lock=3.0;
+    }
+  },
+  draw:function(t,m){
+    const w=(Math.sin(m.p*Math.PI*2)+1)/2;
+    const base=0.03+0.06*w+0.34*m.glow;
+    /* 수평선 하나. 그것이 전부다. */
+    const g=MGC.createLinearGradient(0,MH/2-60,0,MH/2+60);
+    g.addColorStop(0,'rgba(127,182,217,0)');
+    g.addColorStop(0.5,'rgba(127,182,217,'+base+')');
+    g.addColorStop(1,'rgba(127,182,217,0)');
+    MGC.fillStyle=g; MGC.fillRect(0,MH/2-60,MW,120);
+    MGC.strokeStyle='rgba(127,182,217,'+(base*1.5)+')'; MGC.lineWidth=1;
+    MGC.beginPath(); MGC.moveTo(0,MH/2); MGC.lineTo(MW,MH/2); MGC.stroke();
+    for(let i=0;i<3;i++){
+      MGC.fillStyle = i<m.hits ? 'rgba(127,182,217,.75)' : 'rgba(127,182,217,.12)';
+      MGC.fillRect(MW/2-46+i*46-9, MH-42, 18, 2);
+    }
+  },
+  done:function(){
+    A.waves(0.5);
+    cine(true);
+    quote('나는 어서 빨리 베잔틴 항성계의 7번째 행성에 도달하기를 바랐다.<br>'+
+          '어서 빨리 그들이 몸뚱아리와 일거리를 던져주길 바랐다.',5.0,function(){
+      quote('<b>그래도 뇌는 있으니까.</b><br>뇌는 있으니까.<br>나는 그렇게 생각했다.',5.2,
+        function(){ finish('brain'); });
+    });
+  }
+};
+
+/* ───────── 끝 ───────── */
+const ENDINGS = {
+  brain :'끝까지 서 있었고, 끝까지 빼앗겼다.<br>그래도 뇌는 있으니까.',
+  return:'너는 스스로 걸어 들어갔다.<br>벌은 없었다. 몸도 없었다.<br>다시 백 개의 얼굴 중 하나가 되었다.'
+};
+function finish(kind){
+  running=false;
+  MG.close(); prompt(null); hud(null); cine(false);
+  E.endtxt.innerHTML=ENDINGS[kind]||ENDINGS.brain;
+  E.end.style.display='flex';
+  requestAnimationFrame(function(){ E.end.style.opacity='1'; });
+  A.hum(0); A.waves(kind==='brain'?0.34:0);
+}
+
+/* ───────── 걷기 공통 ───────── */
+function walkStep(dt, scale){
+  if(!PL.free) return 0;
+  const w=walkInput();
+  const sp=(w.run?4.7:2.4)*(scale===undefined?1:scale);
+  const c=Math.cos(look.yaw), s=Math.sin(look.yaw);
+  const vx=(-s*w.f + c*w.s)*sp, vz=(-c*w.f - s*w.s)*sp;
+  const spd=Math.hypot(vx,vz);
+  if(spd>0.01){
+    let nx=PL.x+vx*dt;
+    /* 정해진 길 — 역행하지 않는다 */
+    if(ACT.oneWay<0){
+      if(nx>ACT.mark+0.9){ nx=ACT.mark+0.9; backLine(); }
+      ACT.mark=Math.min(ACT.mark,nx);
+    } else if(ACT.oneWay>0){
+      if(nx<ACT.mark-0.9){ nx=ACT.mark-0.9; backLine(); }
+      ACT.mark=Math.max(ACT.mark,nx);
+    }
+    tryMove(nx, PL.z+vz*dt);
+  }
+  /* 뛰기 */
+  if(jumpReq && PL.grounded){ PL.vy=3.7; PL.grounded=false; ACT.jumps=(ACT.jumps||0)+1; A.step(true); }
+  jumpReq=false;
+  if(!PL.grounded || PL.h>0){
+    PL.vy-=11.2*dt; PL.h+=PL.vy*dt;
+    if(PL.h<=0){ PL.h=0; PL.vy=0; if(!PL.grounded){ PL.grounded=true; A.step(true); } }
+  }
+  /* 머리 흔들림과 발소리 */
+  PL.step += spd*dt*1.55;
+  const prev=PL.bob;
+  PL.bob = Math.sin(PL.step)*0.036*Math.min(1,spd/2.3);
+  if(prev>0 && PL.bob<=0 && spd>0.3 && PL.grounded) A.step(w.run);
+  PL.y = PL.eye + PL.bob + PL.h;
+  return spd;
+}
+let backTimer=0;
+function backLine(){
+  if(backTimer>0) return;
+  backTimer=7;
+  say(ACT.backMsg||'나는 역행하지 않고 정해진 길을 따라 걸었다.',3.8);
+}
+
+/* ───────── 장마다 3D에 얹는 것 ───────── */
+SCENE.extra = function(){
+  const t=ACT.t;
+  /* 목표 자리 */
+  if(ACT.target && !ACT.target.quiet) marker(ACT.target.x, ACT.target.z, t);
+  /* 3장 — 올라오는 몸 */
+  if(ACT.id==='body' && ACT.data.stage===0){
+    const y=lerp(-1.9,0,smooth(ACT.data.rise));
+    figure(MY.x,y,MY.z,0,0,PAL_ME,{headless:true});
+  }
+  /* 4장 이후 — 닫힌 문 */
+  if(doorShutA){
+    MS.reset(); MS.move(ROOM_A.x,DOORH/2,HALL.z0);
+    part(P.box,DOORW,DOORH,0.10,COL.door);
+    MS.reset(); MS.move(ROOM_A.x,DOORH-0.35,HALL.z0-0.06);
+    part(P.box,0.44,0.05,0.03,[0.72,0.24,0.24],{emis:0.6});
+  }
+  /* 8장 — 기동대와, 달아나는 내 몸 */
+  if(ACT.id==='run'){
+    const d=ACT.data;
+    if(d.phase===0){
+      if(d.gd<27) figure(PL.x-d.gd, 0, clampf(PL.z,-1.4,1.4), -Math.PI/2, ACT.t*13, PAL_GUARD, {run:true,lean:0.20});
+    } else {
+      figure(d.bodyX, 0, PL.z, -Math.PI/2, d.ph, PAL_ME, { run:true, headless:true, lean:0.16 });
+      figure(PL.x-0.55, 0, PL.z+0.55, -Math.PI/2, 0, PAL_GUARD, {});
+    }
+  }
+};
+
+/* ═══════════════════ 그리기 ═══════════════════ */
+const proj=m4.make(), view=m4.make();
+const lp=new Float32Array(NL*3), lc=new Float32Array(NL*3), lr=new Float32Array(NL);
+/* 광원 정렬은 매 프레임 할 일이 아니다. 카메라가 충분히 움직였을 때만 다시 고른다. */
+const _lorder=[]; let _lx=1e9,_ly=1e9,_lz=1e9,_ln=0;
+function pickLights(x,y,z){
+  if(Math.abs(x-_lx)+Math.abs(y-_ly)+Math.abs(z-_lz) > 0.6){
+    _lx=x;_ly=y;_lz=z;
+    _lorder.length=0;
+    for(let i=0;i<LIGHTS.length;i++){
+      const L=LIGHTS[i];
+      _lorder.push({i:i,d:Math.hypot(L.p[0]-x,L.p[1]-y,L.p[2]-z)});
+    }
+    _lorder.sort(function(a,b){ return a.d-b.d; });
+    _lorder.length=Math.min(_lorder.length,NL);
+    _ln=_lorder.length;
+  }
+  const arr=_lorder;
+  for(let k=0;k<arr.length;k++){
+    const L=LIGHTS[arr[k].i];
+    lp[k*3]=L.p[0]; lp[k*3+1]=L.p[1]; lp[k*3+2]=L.p[2];
+    lc[k*3]=L.c[0]*lightMul; lc[k*3+1]=L.c[1]*lightMul; lc[k*3+2]=L.c[2]*lightMul;
+    lr[k]=L.r;
+  }
+  return arr.length;
+}
+
+/* 프레임이 밀리면 그리는 해상도를 낮춘다. 60fps가 그림보다 중요하다. */
+let renderScale=1, dtAvg=0.0166, lastHeadsDrawn=0;
+function draw(){
+  const dpr=Math.min(window.devicePixelRatio||1,1.6)*renderScale;
+  const w=Math.max(1,Math.round(cv.clientWidth*dpr)), h=Math.max(1,Math.round(cv.clientHeight*dpr));
+  if(cv.width!==w||cv.height!==h){ cv.width=w; cv.height=h; }
+  gl.viewport(0,0,w,h);
+
+  gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+  gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  gl.clearColor(0.012,0.016,0.022,1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  if(blackout>=0.999) return;
+
+  const cp=Math.cos(look.pitch), sp=Math.sin(look.pitch);
+  const eye=[PL.x,PL.y,PL.z];
+  const at=[PL.x - Math.sin(look.yaw)*cp, PL.y + sp, PL.z - Math.cos(look.yaw)*cp];
+  m4.persp(proj, (ACT.fov||62)*Math.PI/180, w/h, 0.04, 220);
+  m4.look(view, eye, at, [0,1,0]);
+
+  const n=pickLights(eye[0],eye[1],eye[2]);
+  gl.useProgram(MAIN.p);
+  gl.uniformMatrix4fv(MAIN.u.uProj,false,proj);
+  gl.uniformMatrix4fv(MAIN.u.uView,false,view);
+  gl.uniform3fv(MAIN.u.uEye,eye);
+  const fogC=[0.020*fogMul,0.026*fogMul,0.034*fogMul];
+  gl.uniform3fv(MAIN.u.uFog,fogC);
+  gl.uniform1f(MAIN.u.uFogD,52*fogMul);
+  gl.uniform1f(MAIN.u.uAmb,0.150*lightMul);
+  gl.uniform1i(MAIN.u.uNL,n);
+  gl.uniform3fv(MAIN.u.uLP,lp);
+  gl.uniform3fv(MAIN.u.uLC,lc);
+  gl.uniform1fv(MAIN.u.uLR,lr);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+
+  MS.reset();
+  part(HALLM,1,1,1,[1,1,1]);
+  part(ROOMA,1,1,1,[1,1,1]);
+  part(ROOMB,1,1,1,[1,1,1]);
+  if(SCENE.extra) SCENE.extra();
+
+  /* 머리통 — 메시 하나로 전부 */
+  gl.useProgram(HEADS.p);
+  gl.uniformMatrix4fv(HEADS.u.uProj,false,proj);
+  gl.uniformMatrix4fv(HEADS.u.uView,false,view);
+  gl.uniform3fv(HEADS.u.uEye,eye);
+  gl.uniform3f(HEADS.u.uFog,fogC[0],fogC[1],fogC[2]);
+  gl.uniform1f(HEADS.u.uFogD,52*fogMul);
+  gl.uniform1f(HEADS.u.uAmb,0.150*lightMul);
+  gl.uniform1i(HEADS.u.uNL,n);
+  gl.uniform3fv(HEADS.u.uLP,lp);
+  gl.uniform3fv(HEADS.u.uLC,lc);
+  gl.uniform1fv(HEADS.u.uLR,lr);
+  gl.uniform3f(HEADS.u.uHairCol,COL.hair[0],COL.hair[1],COL.hair[2]);
+  gl.uniform3f(HEADS.u.uLipCol,0.34,0.20,0.19);
+  let drawnHeads=0;
+  for(const set of HEAD_SETS){
+    if(!roomNear(set.R,eye[0],eye[2])) continue;
+    gl.bindVertexArray(set.vao);
+    gl.drawArraysInstanced(gl.TRIANGLES,0,HEADM.n,set.n);
+    drawnHeads+=set.n;
+  }
+  lastHeadsDrawn=drawnHeads;
+
+  /* 눈동자 — 전부 나를 본다 */
+  gl.useProgram(EYES.p);
+  gl.uniformMatrix4fv(EYES.u.uProj,false,proj);
+  gl.uniformMatrix4fv(EYES.u.uView,false,view);
+  gl.uniform3fv(EYES.u.uEye,eye);
+  gl.uniform1f(EYES.u.uSize,0.0062);
+  gl.uniform1f(EYES.u.uRoll,SCENE.eyeRoll);
+  gl.uniform3f(EYES.u.uCol,0.045,0.040,0.038);
+  for(const set of HEAD_SETS){
+    if(!roomNear(set.R,eye[0],eye[2])) continue;
+    gl.bindVertexArray(set.eyeVao);
+    gl.drawArraysInstanced(gl.TRIANGLES,0,6,set.n*2);
+  }
+  gl.bindVertexArray(null);
+}
+
+/* ═══════════════════ 루프 ═══════════════════ */
+let last=0, running=false;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min((now-last)/1000,0.06); last=now;
+  if(!running) return;
+  ACT.t+=dt;
+
+  for(let i=TIMERS.length-1;i>=0;i--){
+    TIMERS[i].t-=dt;
+    if(TIMERS[i].t<=0){ const f=TIMERS[i].fn; TIMERS.splice(i,1); f(); }
+  }
+  dtAvg = dtAvg*0.90 + dt*0.10;
+  if(dtAvg>0.0205 && renderScale>0.58) renderScale=Math.max(0.58,renderScale-0.025);
+  else if(dtAvg<0.0152 && renderScale<1) renderScale=Math.min(1,renderScale+0.010);
+  lightMul += (lightTarget-lightMul)*Math.min(1,dt*1.5);
+  fogMul   += (fogTarget-fogMul)*Math.min(1,dt*1.5);
+  if(sayTimer>0){ sayTimer-=dt; if(sayTimer<=0) E.say.classList.remove('on'); }
+  if(bcastTimer>0){ bcastTimer-=dt; if(bcastTimer<=0) E.bcast.classList.remove('on'); }
+  if(backTimer>0) backTimer-=dt;
+  if(quoteTimer>0){
+    quoteTimer-=dt;
+    if(quoteTimer<=0){
+      E.quote.classList.remove('on');
+      const f=quoteAfter; quoteAfter=null;
+      if(f) after(0.9,f);
+    }
+  }
+  /* 미니게임이 열려 있으면 세계는 멈춘다 */
+  if(MG.on){ if(takeInteract()) MG.press(); MG.tick(dt); }
+  else if(TICK[ACT.id]) TICK[ACT.id](dt);
+  updateGuide(dt);
+  draw();
+}
+
+/* ═══════════════════ 시작 ═══════════════════ */
+running=true;
+ACT.go('cover');                         /* 표지 뒤에서 이미 격리실이 돌아간다 */
+document.getElementById('go').addEventListener('click',function(){
+  A.init(); A.resume();
+  E.cover.style.opacity='0';
+  setTimeout(function(){ E.cover.style.display='none'; },1900);
+  E.pad.classList.add('on');            /* 터치 조작판은 여기서 한 번만 켠다 */
+  ACT.go('nose');
+});
+document.getElementById('again').addEventListener('click',function(){ location.reload(); });
+
+if(/[?&]debug=1/.test(location.search)){
+  window.BD = {
+    act:function(){ return ACT.id; },
+    go:function(id){ running=true; E.cover.style.display='none'; ACT.go(id); return ACT.id; },
+    state:function(){
+      return { act:ACT.id, t:+ACT.t.toFixed(2), free:PL.free,
+               pos:[+PL.x.toFixed(2),+PL.y.toFixed(2),+PL.z.toFixed(2)],
+               look:[+look.yaw.toFixed(2),+look.pitch.toFixed(2)],
+               data:JSON.parse(JSON.stringify(ACT.data||{})),
+               eyes:EYE_N, size:[cv.width,cv.height] };
+    },
+    tp:function(x,z){ PL.x=x; PL.z=z; },
+    /* 화면을 직접 볼 수 없을 때 쓰는 검사기: 한 프레임 그리고 픽셀을 읽는다 */
+    probe:function(){
+      draw();
+      const w=cv.width,h=cv.height;
+      const px=new Uint8Array(w*h*4);
+      gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);
+      let sum=0,mx=0,lit=0,n=0;
+      const rs=Math.max(1,Math.floor(w/160));
+      for(let y=0;y<h;y+=rs) for(let x=0;x<w;x+=rs){
+        const i=(y*w+x)*4, v=(px[i]+px[i+1]+px[i+2])/3;
+        sum+=v; if(v>mx) mx=v; if(v>14) lit++; n++;
+      }
+      /* 화면을 3×3으로 나눠 어디가 밝은지 */
+      const cell=[];
+      for(let gy=0;gy<3;gy++) for(let gx=0;gx<3;gx++){
+        let s=0,c=0;
+        for(let y=Math.floor(gy*h/3);y<(gy+1)*h/3;y+=rs)
+          for(let x=Math.floor(gx*w/3);x<(gx+1)*w/3;x+=rs){
+            const i=(y*w+x)*4; s+=(px[i]+px[i+1]+px[i+2])/3; c++;
+          }
+        cell.push(+(s/Math.max(c,1)).toFixed(1));
+      }
+      return { mean:+(sum/n).toFixed(2), max:mx, litPct:+(lit/n*100).toFixed(1),
+               grid:cell, size:[w,h] };
+    },
+    skill:function(v){ if(ACT.data) ACT.data.skill=v; },
+    cursor:function(x,y){ if(ACT.data){ ACT.data.cx=x; ACT.data.cy=y; } },
+    interact:function(){ interactPressed=true; },
+    raw:function(){ return { ACT:ACT, PL:PL, MG:MG, key:key, move:move }; },
+    mgs:function(){ return MG.on ? { on:true, title:E.mgTitle.textContent,
+      t:+MG.t.toFixed(2), r:MG.r, p:MG.p, i:MG.i, hits:MG.hits, want:MG.want,
+      lock:MG.lock, info:E.mgInfo.textContent } : { on:false }; },
+    hud:function(){ return { ch:E.hudCh.textContent, goal:E.hudGl.textContent,
+      sub:E.hudSub.textContent, say:E.say.textContent, quote:E.qp.textContent,
+      bcast:E.bcast.classList.contains('on')?E.bcastMsg.textContent:'' }; },
+    ended:function(){ return E.end.style.display==='flex' ? E.endtxt.textContent : null; },
+    frame:function(n){ last=(n||0)-16; frame(n||16); return this.state(); }
+  };
+}
+requestAnimationFrame(function(n){ last=n; frame(n); });
+
+})();
+</script>
+</body>
+</html>

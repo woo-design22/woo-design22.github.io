@@ -230,6 +230,14 @@ button { font-family: inherit; }
 #roster b { display: block; font-size: 15px; }
 #roster span { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.3; word-break: keep-all; }
 
+#giftGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 400px; }
+#giftGrid button {
+  background: var(--panel); border: 3px solid var(--panel-edge); border-radius: 10px; color: var(--text);
+  padding: 10px 4px 12px; cursor: pointer; box-shadow: 0 3px 0 var(--shadow); font-size: 13px; line-height: 1.35;
+}
+#giftGrid button.own { border-color: var(--accent); }
+#giftGrid button:disabled { opacity: 0.45; cursor: default; }
+#giftGrid button .gi { display: block; font-size: 22px; margin-bottom: 4px; }
 #menuList { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 300px; }
 #goalBox {
   background: var(--panel); border: 2px solid var(--panel-edge); border-radius: 8px; padding: 10px 12px;
@@ -284,9 +292,10 @@ button { font-family: inherit; }
     <p>순서대로 열립니다. 끝낸 장면은 다시 볼 수 있어요.</p>
     <div id="roster"></div>
     <button class="big primary" id="btnEnding" style="display:none">엔딩 보기 ★</button>
-    <button class="big" id="btnCare" style="display:none">마음결 상담 (CBT) 💬</button>
+    <button class="big" id="btnGift">보상함 🎁 <span id="giftCount"></span></button>
+    <button class="big" id="btnCare">마음결 상담 💬</button>
     <button class="big" id="btnToTitle">타이틀로</button>
-    <p id="careHint" style="display:none;font-size:12px">마음결 상담: 둘이 싸우면 꼭 해보세요.</p>
+    <p id="careHint" style="font-size:12px">마음결 상담: 둘이 싸우면 꼭 해보세요. 평소 마음 돌보기도 있어요.</p>
   </div>
 
   <div class="screen" id="scrMenu">
@@ -306,9 +315,16 @@ button { font-family: inherit; }
     <button class="big" id="btnEndClose">장면 선택으로</button>
   </div>
 
+  <div class="screen" id="scrGift">
+    <h1 style="font-size:26px">보상함 🎁</h1>
+    <p>장면을 끝낼 때마다 추억이 하나씩 열립니다. 눌러서 크게 보세요.</p>
+    <div id="giftGrid"></div>
+    <button class="big" id="btnGiftClose">장면 선택으로</button>
+  </div>
+
   <div class="screen show" id="scrLock">
     <h1 style="font-size:26px">🔒 두 사람만의 이야기</h1>
-    <p>비밀번호 네 자리를 눌러 주세요.<br><span style="font-size:12px">힌트: 우리가 시작된 날</span></p>
+    <p>비밀번호 네 자리를 눌러 주세요.</p>
     <div id="lockDots"><i></i><i></i><i></i><i></i></div>
     <div id="lockPad"></div>
   </div>
@@ -333,6 +349,15 @@ button { font-family: inherit; }
         <div id="careDots"><i></i><i></i><i></i><i></i></div>
         <div id="carePad"></div>
         <button class="big" id="careBack" type="button">← 뒤로</button>
+      </div>
+      <div id="careMode" class="carePane" style="display:none">
+        <p id="careModeHi"></p>
+        <div class="careBtns" style="flex-direction:column;gap:10px">
+          <button class="big" data-mode="fight" type="button">🌧 다투고 난 뒤 — 마음 풀기</button>
+          <button class="big" data-mode="daily" type="button">🌤 평소 마음 돌보기</button>
+        </div>
+        <p style="font-size:12px;color:var(--muted)">대화는 보통 20~30번 주고받아요.<br>시작했다면 하루 안에 끝까지 마치는 게 좋아요.</p>
+        <button class="big" id="careBack2" type="button">← 뒤로</button>
       </div>
       <div id="careChat" class="carePane" style="display:none">
         <div id="careLog"></div>
@@ -363,7 +388,7 @@ const SAVE_KEY = 'cs_save';
 // 게임 비밀번호 (관계자 전용)
 const PASSWORD = '0316';
 // 엔딩 크레딧 마지막 메시지. 줄바꿈은 \n
-const FINAL_MESSAGE = '0316, 우리가 시작된 날.\n그날부터 지금까지, 그리고 앞으로도.\n잘 부탁해.';
+const FINAL_MESSAGE = '처음 만난 주민센터에서 지금 우리 집까지.\n이렇게 보고 있으면, 고맙고 사랑해.\n앞으로도 잘 부탁해.';
 const ERA = '장충동에서 시작된 이야기';
 const MAKER = '철우가 수지에게';
 
@@ -378,7 +403,7 @@ const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const FRIENDS = [
   { id: 'cw', name: '철우', tag: '중구 공무원 · 예쁜 눈, 다정한 성격',
     pal: { s: '#f1c7a3', h: '#1c1c24', t: '#3f7fd9', p: '#2f3f73', b: '#2b2b33', a: '#ffffff' } },
-  { id: 'sj', name: '수지', tag: '중구 공무원 · 귀여운 목소리', female: true,
+  { id: 'sj', name: '수지', tag: '사회복지 공무원 · 귀여운 목소리', female: true,
     pal: { s: '#f7d3b3', h: '#4a2f24', t: '#ff9eb5', p: '#6b5a8c', b: '#f4f4f4', a: '#fff1f4' } }
 ];
 const F = {}; FRIENDS.forEach(f => { F[f.id] = f; });
@@ -391,7 +416,7 @@ const CHAPTERS = [
   { id: 'c4', hero: 'cw', title: '결혼식', sub: '부산 목장원' },
   { id: 'c5', hero: 'cw', title: '화해의 기술', sub: '성수동 신혼집' },
   { id: 'c6', hero: 'sj', title: '저녁 메뉴의 신', sub: '성수동 신혼집' },
-  { id: 'c7', hero: 'cw', title: '내 집 마련', sub: '월곡두산아파트' }
+  { id: 'c7', hero: 'cw', title: '내 집 마련', sub: '월곡 두산위브' }
 ];
 const CH = {}; CHAPTERS.forEach(c => { CH[c.id] = c; });
 
@@ -409,6 +434,7 @@ const NPC_PAL = {
   guestB:  { s: '#f1c7a3', h: '#3a2a20', t: '#e9c44c', p: '#4a5d8c', b: '#2b2b33', a: '#fff7d6', female: true },
   guestC:  { s: '#e6b48f', h: '#1c1c24', t: '#d94b4b', p: '#2f3f73', b: '#f4f4f4', a: '#ffffff' },
   agent:   { s: '#f1c7a3', h: '#3a2a20', t: '#c95c8a', p: '#4a3a3a', b: '#2b2b33', a: '#ffffff', female: true }, // 중개인
+  senior:  { s: '#e6c8a8', h: '#c9c9c9', t: '#8a6a4a', p: '#5a5a5a', b: '#2b2b33', a: '#d9c9a8' },   // 어르신
   runner:  { s: '#f1c7a3', h: '#2a2a2a', t: '#7bd389', p: '#3a3a4a', b: '#f4f4f4', a: '#ffffff' },   // 한강 러너
   // 결혼식 예복 (철우 턱시도 / 수지 드레스)
   cwTux:   { s: '#f1c7a3', h: '#1c1c24', t: '#22242c', p: '#22242c', b: '#1e1e22', a: '#ffffff' },
@@ -695,7 +721,7 @@ const MAPS = {
     '|FFFFFFFFFFFFFFFF|',
     '|vFFFFFFFFFFFFFFi|',
     '|||||||||D||||||||'
-  ], exits: [], signs: { '16,1': '게시판\n「이달의 친절 직원: 김수지」' },
+  ], exits: [], signs: { '16,1': '게시판\n「이달의 친절 직원: 설수지」' },
   labels: [ { x: 6, y: 3, t: '민원 창구' }, { x: 9, y: 8, t: '정문' } ] },
 
   hangang: { name: '한강공원', base: '.', rows: [
@@ -727,7 +753,7 @@ const MAPS = {
   ], exits: [], signs: { '1,1': '철우의 침대. 이불이 그날따라 각 잡혀 있었다.' },
   labels: [ { x: 4, y: 0, t: '장충동 원룸' } ] },
 
-  sjhome: { name: '성수동 신혼집', base: 'f', rows: [
+  sjhome: { name: '성수르하임 (성수동)', base: 'f', rows: [
     '||||||||||||||',
     '|eeff|kzzffff|',
     '|ffff|fffffvf|',
@@ -736,7 +762,7 @@ const MAPS = {
     '|offfffrrfffi|',
     '|ffffffffffff|',
     '||||||D|||||||'
-  ], exits: [], signs: { '2,1': '분리형 원룸의 침실. 문이 있다는 것만으로 어른이 된 기분.' },
+  ], exits: [], signs: { '2,1': '분리형 침실. 문이 있다는 것만으로 어른이 된 기분.' },
   labels: [ { x: 2, y: 1, t: '침실' }, { x: 10, y: 1, t: '층고 3.4m ↑' } ] },
 
   mokjang: { name: '목장원 (부산)', base: 'F', rows: [
@@ -756,7 +782,7 @@ const MAPS = {
   ], exits: [], signs: { '9,2': '부산 앞바다. 배가 지나간다.' },
   labels: [ { x: 10, y: 1, t: '부산 앞바다' }, { x: 9, y: 4, t: '♥' }, { x: 10, y: 11, t: '목장원 야외 예식장' } ] },
 
-  apt: { name: '월곡두산아파트', base: 'f', rows: [
+  apt: { name: '월곡 두산위브', base: 'f', rows: [
     '||||||||||||',
     '|wwffffffww|',
     '|ffffffffff|',
@@ -788,9 +814,10 @@ Object.keys(MAPS).forEach(id => {
 const NPCS = {
   office: [
     { id: 'boss', spr: 'boss', x: 2, y: 2, dir: 'down', name: '팀장님' },
-    { id: 'coA', spr: 'coA', x: 6, y: 2, dir: 'down', name: '최 주무관' },
-    { id: 'civil', spr: 'civil', x: 3, y: 4, dir: 'up', name: '민원인 아저씨' },
-    { id: 'civil2', spr: 'civil2', x: 10, y: 4, dir: 'up', name: '민원인 아주머니' }
+    { id: 'coA', spr: 'coA', x: 10, y: 1, dir: 'down', name: '최 주무관' },
+    { id: 'senior', spr: 'senior', x: 4, y: 4, dir: 'up', name: '어르신' },
+    { id: 'civil', spr: 'civil', x: 16, y: 4, dir: 'up', name: '민원인 아저씨' },
+    { id: 'civil2', spr: 'civil2', x: 2, y: 4, dir: 'up', name: '민원인 아주머니' }
   ],
   hangang: [ { id: 'runner', spr: 'runner', x: 17, y: 3, dir: 'left', name: '러너' } ],
   cwhome: [],
@@ -1043,7 +1070,7 @@ async function walkEnt(e, path) {
 // ----- 상호작용 -----
 const GENERIC_LOOK = {
   d: '책상. 결재 서류가 얌전히 쌓여 있다.', m: '업무 포털. 새로고침해도 일은 줄지 않는다.', K: '민원 창구. 오늘도 평화롭기를.',
-  B: '게시판. 「이달의 친절 직원: 김수지」', v: '자판기. 밀크커피 300원.', C: '의자.', i: '화분. 잘 자라고 있다.',
+  B: '게시판. 「이달의 친절 직원: 설수지」', v: '자판기. 밀크커피 300원.', C: '의자.', i: '화분. 잘 자라고 있다.',
   e: '침대. 이불이 폭신하다.', k: '책장. 나란히 꽂힌 두 사람의 책.', o: '소파. 두 사람 자리가 딱 정해져 있다.',
   r: '러그. 발이 따뜻하다.', z: '조리대. 오늘 저녁은 뭐 먹지.', w: '큰 창. 뷰가 좋다.', D: '문.',
   0: '물이 반짝인다.', j: '흰 난간. 바람이 좋다.', T: '나무.', t: '덤불.', L: '가로등.', ',': '꽃이 피었다.',
@@ -1062,6 +1089,7 @@ function pressB() {
   else if (S.screen === 'menu') closeMenu();
 }
 function onDirPress(d) {
+  if (MG.active && MG.dir) { MG.dir(d); return; }
   if (dlgState && dlgState.choices) moveChoice(d === 'up' ? -1 : d === 'down' ? 1 : 0);
 }
 async function interact() {
@@ -1195,6 +1223,7 @@ function drawMini() {
 // ----- 추억 사진 연출: photos/<이름>.jpg 를 ms 동안 보여준다. 파일이 없으면 설명 카드로 대신 -----
 async function showPhoto(keys, caption, ms) {
   if (typeof keys === 'string') keys = [keys];
+  const wasBusy = S.busy; S.busy = true;   // 사진 나오는 동안 조작 잠금
   const ph = $('photo'), img = $('photoImg'), cap = $('photoCap');
   let ok = false;
   // 1) 뒤섞어 둔 .bin (비밀번호 기반 XOR) 먼저 — 공개 저장소에 원본이 그대로 올라가지 않게
@@ -1225,6 +1254,7 @@ async function showPhoto(keys, caption, ms) {
   ph.classList.add('on'); void ph.offsetWidth; ph.classList.add('show');
   await sleep(ms);
   ph.classList.remove('show'); await sleep(380); ph.classList.remove('on');
+  S.busy = wasBusy;
 }
 
 // ----- 미니게임 공통 오버레이 (#mg) -----
@@ -1328,7 +1358,123 @@ function playRhythm(label, total, need) {
     }, 16);
   });
 }
-$('mg').addEventListener('pointerdown', e => { e.preventDefault(); if (MG.tap) MG.tap(); });
+// 시세 타이밍: 금색 구간에서 탭 = +5천만, 놓치면 -5천만. 누적 +2.5억이면 성공
+function playPrice() {
+  return new Promise(resolve => {
+    const g = mgOpen();
+    let t = 0, sum = 0, zone = 80, flash = 0, over = false, shots = 0;
+    const newZone = () => { zone = 28 + Math.random() * 104; };
+    newZone();
+    const finish = val => { mgClose(timer); resolve(val); };
+    MG.cancel = () => finish(false);
+    MG.forceWin = () => finish(true);
+    MG.dbg = () => ({ sum, shots, over });
+    const cursor = () => 80 + Math.sin(t / 20) * 68;
+    MG.tap = () => {
+      if (over) { finish(true); return; }
+      const ok = Math.abs(cursor() - zone) < 15;
+      sum = Math.round((sum + (ok ? 0.5 : -0.5)) * 10) / 10;
+      shots++; flash = ok ? 8 : -8;
+      if (sum >= 2.5) over = true; else newZone();
+    };
+    const timer = setInterval(() => {
+      t++;
+      g.fillStyle = '#1a2436'; g.fillRect(0, 0, 160, 200);
+      g.fillStyle = '#26406b';
+      for (let i = 0; i < 8; i++) g.fillRect(10 + i * 18, 158 - i * 5 - Math.sin(t / 30 + i) * 4, 12, 44);
+      g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
+      g.fillText('월곡 두산위브 실거래가', 80, 22);
+      g.font = 'bold 18px sans-serif';
+      g.fillStyle = sum >= 0 ? '#7bd389' : '#ef6f6c';
+      g.fillText((sum >= 0 ? '+' : '') + sum.toFixed(1) + '억', 80, 50);
+      g.fillStyle = '#3a3352'; g.fillRect(10, 108, 140, 14);
+      g.fillStyle = '#ffd166'; g.fillRect(zone - 14, 106, 28, 18);
+      const c = cursor();
+      g.fillStyle = flash > 0 ? '#7bd389' : flash < 0 ? '#ef6f6c' : '#ffffff';
+      if (flash > 0) flash--; if (flash < 0) flash++;
+      g.fillRect(c - 2, 100, 4, 30);
+      $('mgInfo').textContent = over
+        ? '누적 +2.5억 달성! 계속 보유합니다\n탭(Z)해서 계속'
+        : '금색에서 탭 = +5천만 / 놓치면 -5천만\n목표 +2.5억 · B(X) 그만';
+    }, 16);
+  });
+}
+// 리플릿 그리기 (퍼즐 원본이자 보상함 이미지)
+function drawLeaflet(g) {
+  g.fillStyle = '#f7f2e2'; g.fillRect(0, 0, 144, 144);
+  g.fillStyle = '#2f7a4f'; g.fillRect(0, 0, 144, 34);
+  g.fillStyle = '#ffffff'; g.font = 'bold 13px sans-serif'; g.textAlign = 'center';
+  g.fillText('한국사회복지연구회', 72, 22);
+  const ppl = ['#ef6f6c', '#ffd166', '#7bd389', '#3f7fd9'];
+  ppl.forEach((c, i) => {
+    const x = 27 + i * 30;
+    g.fillStyle = c;
+    g.beginPath(); g.arc(x, 60, 9, 0, 7); g.fill();
+    g.fillRect(x - 10, 72, 20, 20);
+  });
+  g.fillStyle = '#ef6f6c';
+  g.beginPath(); g.arc(66, 114, 7, 0, 7); g.fill();
+  g.beginPath(); g.arc(79, 114, 7, 0, 7); g.fill();
+  g.beginPath(); g.moveTo(59, 117); g.lineTo(72.5, 132); g.lineTo(86, 117); g.fill();
+  g.fillStyle = '#8a8272';
+  g.fillRect(14, 106, 32, 3); g.fillRect(14, 114, 32, 3); g.fillRect(14, 122, 24, 3);
+  g.fillRect(98, 106, 32, 3); g.fillRect(98, 114, 32, 3); g.fillRect(106, 122, 24, 3);
+  g.fillStyle = '#2f7a4f'; g.font = 'bold 10px sans-serif';
+  g.fillText('함께하는 복지', 72, 141);
+}
+// 리플릿 조각 퍼즐: 기울어진 조각을 탭해서 90도씩 돌려 바로 세우면 완성
+function playPuzzle() {
+  return new Promise(resolve => {
+    const g = mgOpen(), cvm = $('mgCv');
+    const art = document.createElement('canvas'); art.width = 144; art.height = 144;
+    drawLeaflet(art.getContext('2d'));
+    const CS = 48, X0 = 8, Y0 = 40;
+    let rot, cur = 4, over = false;
+    const reset = () => {
+      rot = Array.from({ length: 9 }, () => [1, 2, 3][Math.floor(Math.random() * 3)]);
+      rot[4] = 0; rot[1] = 0;   // 가운데·제목 일부는 바로 두어 기준이 되게
+      if (rot.every(r => r === 0)) rot[0] = 2;
+    };
+    reset();
+    const finish = val => { mgClose(timer); resolve(val); };
+    MG.cancel = () => finish(false);
+    MG.forceWin = () => finish(true);
+    MG.dbg = () => ({ rot: rot.join(''), over });
+    MG.dir = d => { if (over) return; if (d === 'left') cur = (cur + 8) % 9; else if (d === 'right') cur = (cur + 1) % 9; else if (d === 'up') cur = (cur + 6) % 9; else cur = (cur + 3) % 9; };
+    MG.tap = e => {
+      if (over) { finish(true); return; }
+      if (e && e.clientX !== undefined) {
+        const r = cvm.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width * 160, py = (e.clientY - r.top) / r.height * 200;
+        const cx = Math.floor((px - X0) / CS), cy = Math.floor((py - Y0) / CS);
+        if (cx < 0 || cx > 2 || cy < 0 || cy > 2) return;
+        cur = cy * 3 + cx;
+      }
+      rot[cur] = (rot[cur] + 1) % 4;
+      if (rot.every(r => r === 0)) over = true;
+    };
+    const timer = setInterval(() => {
+      g.fillStyle = '#241a2e'; g.fillRect(0, 0, 160, 200);
+      g.fillStyle = '#f4f1ff'; g.font = '10px sans-serif'; g.textAlign = 'center';
+      g.fillText(over ? '리플릿 완성!' : '기울어진 조각을 바로 세우자', 80, 22);
+      for (let i = 0; i < 9; i++) {
+        const cx = i % 3, cy = (i / 3) | 0, x = X0 + cx * CS, y = Y0 + cy * CS;
+        g.save();
+        g.translate(x + CS / 2, y + CS / 2);
+        g.rotate(rot[i] * Math.PI / 2);
+        g.drawImage(art, cx * CS, cy * CS, CS, CS, -CS / 2, -CS / 2, CS, CS);
+        g.restore();
+        g.strokeStyle = over ? 'rgba(123,211,137,0.9)' : i === cur ? '#ffd166' : 'rgba(0,0,0,0.35)';
+        g.lineWidth = (i === cur && !over) ? 2 : 1;
+        g.strokeRect(x + 0.5, y + 0.5, CS - 1, CS - 1);
+      }
+      $('mgInfo').textContent = over
+        ? '「한국사회복지연구회」 리플릿 완성!\n탭(Z)해서 계속'
+        : '조각을 탭(Z)하면 90도씩 돈다 · 방향키로 칸 이동\nB(X) 그만';
+    }, 50);
+  });
+}
+$('mg').addEventListener('pointerdown', e => { e.preventDefault(); if (MG.tap) MG.tap(e); });
 
 // ----- HUD·저장·화면 -----
 function setHud() {
@@ -1341,7 +1487,7 @@ function save() {
   store.set(SAVE_KEY, d);
 }
 function showScreen(name) {
-  ['Title', 'Select', 'Menu', 'End', 'Lock'].forEach(n => $('scr' + n).classList.toggle('show', name === n.toLowerCase()));
+  ['Title', 'Select', 'Menu', 'End', 'Lock', 'Gift'].forEach(n => $('scr' + n).classList.toggle('show', name === n.toLowerCase()));
   S.screen = name; keysDown.clear(); held = null;
   dpad.querySelectorAll('.k').forEach(k => k.classList.remove('on'));
 }
@@ -1374,9 +1520,7 @@ function buildRoster() {
     r.appendChild(b);
   });
   $('btnEnding').style.display = S.done.c7 ? '' : 'none';
-  const care = !!S.care;
-  $('btnCare').style.display = care ? '' : 'none';
-  $('careHint').style.display = care ? '' : 'none';
+  $('giftCount').textContent = rewardsOwned().length + '/' + REWARDS.length;
 }
 function showSelect() { S.lock = false; buildRoster(); showScreen('select'); save(); }
 async function pickChapter(id) {
@@ -1396,6 +1540,7 @@ async function startHero(id, fresh) {
 }
 async function finishQuest() {
   S.q.finished = true; S.done[S.ch] = true; save(); setHud();
+  grantReward(S.ch);
   toast('장면 완료!');
   const n = CHAPTERS.filter(c => S.done[c.id]).length;
   await say('', CH[S.ch].title + ' — 완료! (' + n + '/7)');
@@ -1474,6 +1619,7 @@ const NPC_LINES = {
   coA: '두 분… 요즘 뭔가 있죠? 아, 아니면 말고요.',
   civil: '등본 한 통이요. 어, 총각 친절하네.',
   civil2: '이 서류가 맞는 건가 몰라…',
+  senior: '이 주민센터 선생님들이 아주 친절햐.',
   runner: '한강은 역시 바람이죠. 드론 조심하시고요!',
   fil: '허허. 우리 사위.',
   mil: '우리 수지, 잘 부탁해요.',
@@ -1495,54 +1641,64 @@ const QUESTS = {};
 QUESTS.c1 = {
   start: { map: 'office', x: 9, y: 6, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal(q) { return q.stage <= 1 ? '창구 너머 김수지 주무관에게 서류 전달하기' : q.stage === 2 ? '기다리는 민원인 아주머니 도와드리기' : '수지에게 돌아가기'; },
-  hint(q) { return q.stage <= 1 ? '창구 앞(아래쪽)에 서서 위를 보고 A. 창구 너머로도 말이 걸린다.' : '오른쪽에 서 계신 아주머니에게 A.'; },
+  goal(q) { return q.stage <= 1 ? '창구 쪽으로 가 보기 (왼쪽 위)' : q.stage === 2 ? '내 자리 컴퓨터에서 홍보 리플릿 만들기' : '설수지 주무관에게 리플릿 전해 주기'; },
+  hint(q) { return q.stage <= 1 ? '창구 앞줄(위쪽)로 걸어가면 상담 중인 목소리가 들린다.' : q.stage === 2 ? '창구 오른쪽 끝이 열려 있다. 그 틈으로 들어가 직원 자리 컴퓨터 앞에서 위를 보고 A.' : '어르신이 떠난 창구 앞(왼쪽)에 서서 위를 보고 A.'; },
   async intro() {
-    await say('', '3월. 장충동 주민센터. 발령 온 지 얼마 안 된 철우의 하루.');
-    await say('팀장님', '철우 씨, 이 서류 민원팀 김수지 주무관한테 좀 전해 줘요.');
-    await say('철우', '네! …김수지 주무관이 누구지?');
+    await say('', '어느 봄날, 장충동 주민센터. 행정팀 오철우의 하루.');
+    await say('팀장님', '철우 씨. 복지팀 설수지 주무관이 부탁할 게 있다던데? 창구 쪽에 가 봐요.');
+    await say('철우', '복지팀… 설수지 주무관이 누구지?');
     S.q.stage = 1; setHud(); this.marks();
   },
-  marks() { const q = S.q; markEnts(q.stage <= 1 ? ['sj'] : q.stage === 2 ? ['civil2'] : ['sj']); },
-  friendPos(fid) { return fid === 'sj' ? { map: 'office', x: 3, y: 2, dir: 'down' } : null; },
+  marks() { const q = S.q; markEnts(q.stage === 3 ? ['sj'] : q.stage <= 1 ? ['senior'] : []); },
+  friendPos(fid) { return fid === 'sj' ? { map: 'office', x: 4, y: 2, dir: 'down' } : null; },
+  async onStep(mapId, x, y) {
+    const q = S.q;
+    if (mapId !== 'office' || q.stage !== 1 || y !== 4 || x < 3 || x > 7) return;
+    S.lock = true;
+    await say('', '창구 앞. 어르신 한 분이 상담을 받고 계신다.');
+    await say('수지', '어르신~ 이 노인일자리는 주 3회고요, 댁에서 버스 한 번이면 가요.');
+    await say('어르신', '아이고, 그럼 나도 할 수 있겄네.');
+    await say('수지', '그럼요! 신청서는 제가 같이 봐 드릴게요. 천천히 오세요~');
+    await say('철우', '(목소리가… 귀엽다. 그리고 어르신께 진짜 다정하다.)');
+    const sn = findEnt('senior');
+    if (sn) { await say('어르신', '고마워요, 선생님. (총총)'); await walkEnt(sn, ['down', 'right', 'right', 'down']); sn.gone = true; }
+    await say('수지', '어! 행정팀 오철우 주무관님 맞죠? 부탁이 하나 있어서요.');
+    await say('수지', '한국사회복지연구회 홍보자료가 필요한데… 리플릿 만들 줄 아는 분이 철우 님뿐이래요.');
+    const i = await ask('철우', '(부탁을 받았다!)', ['맡겨 주세요. 오늘 안에 만들어 드릴게요', '어… 일정이 좀…', '리플릿이 뭐죠?']);
+    if (i === 0) await say('수지', '와, 시원시원하다! 감사해요!');
+    else if (i === 1) { await say('수지', '아… 바쁘시구나…'); await say('철우', '농담입니다! 바로 만들게요. (내가 왜 그랬지)'); }
+    else { await say('수지', '접는 홍보물이요! 후후.'); await say('철우', '(알면서 물어봤다. 바보냐 나는)'); }
+    q.stage = 2; setHud(); save(); QUESTS.c1.marks();
+    await say('', '창구 오른쪽 끝이 열려 있다. 직원 자리로 들어가 컴퓨터 앞에 앉자.');
+    S.lock = false;
+  },
+  interact(mapId, x, y, ch) {
+    if (mapId !== 'office' || (ch !== 'm' && ch !== 'd') || S.q.stage !== 2) return null;
+    return async () => {
+      await say('철우', '한국사회복지연구회 홍보 리플릿… 조각부터 바로 세우자.');
+      const win = await playPuzzle();
+      if (!win) { await say('철우', '음, 다시 해 보자. (컴퓨터 앞에서 A)'); return; }
+      S.q.stage = 3; setHud(); save(); QUESTS.c1.marks();
+      await say('철우', '완성! 우리 부서 역대급 리플릿이다. 가져다 드리자.');
+    };
+  },
   friendTalk: {
     sj: async e => {
       const q = S.q;
-      if (q.stage === 1) {
-        await say('철우', '저, 이 서류… 팀장님이 전해 드리라고.');
-        await say('수지', '아, 네~! 감사합니다아.');
-        await say('철우', '(목소리가… 귀엽다. 얼굴도 예쁘고, 어딜 봐도 다 예쁘다. 정신 차리자. 나는 공무원이다.)');
-        await say('수지', '새로 오신 분이죠? 저 김수지예요. 잘 부탁드려요!');
-        await say('철우', '오철우입니다. 잘 부탁드립니다!');
-        await say('수지', '(눈이 참 예쁘네. 말투도 다정하고…)');
-        q.stage = 2; got('서류 전달 완료'); QUESTS.c1.marks();
-        await say('', '그때, 창구 앞에 서 계신 아주머니가 두리번거린다.');
-        return;
-      }
       if (q.stage === 3) {
-        await say('수지', '방금 보니까… 민원인분께 진짜 다정하시더라고요.');
-        await say('철우', '아, 그게 일이니까요. 하하.');
-        await say('수지', '(다정한 사람이구나.) 커피는 자판기 밀크커피가 진리인 거 아시죠? 300원.');
-        await say('철우', '(같이 마시자는 뜻인가?) 바, 바로 뽑겠습니다.');
+        await say('철우', '설수지 주무관님, 리플릿 완성했습니다.');
+        await say('수지', '벌써요?! …우와, 예쁘다. 연구회 분들이 진짜 좋아하시겠어요!');
+        await say('수지', '(일도 잘하고, 눈도 예쁘고, 말투도 다정하고…)');
+        await say('철우', '(칭찬받았다. 오늘 밤 자기 전에 열 번은 다시 재생할 예정)');
+        await say('수지', '보답으로 제가 밀크커피 쏠게요! 자판기지만. 300원이지만.');
         await say('', '이렇게 두 사람의 이야기가 시작됐다.');
         await finishQuest();
-        return;
-      }
-      await defaultTalk(e);
+      } else if (q.stage === 2) await say(e.name, '리플릿 부탁드려요! 직원 자리는 창구 오른쪽 끝으로 돌아 들어오시면 돼요.');
+      else await defaultTalk(e);
     }
   },
   npcTalk: {
-    civil2: async e => {
-      const q = S.q;
-      if (q.stage !== 2) { await defaultTalk(e); return; }
-      await say(e.name, '총각… 내가 이 서류를 어디다 내야 하는지 몰라서…');
-      await say('철우', '천천히 하셔도 돼요. 제가 같이 봐 드릴게요.');
-      await say('', '(철우는 서류 세 장을 하나하나 짚어 가며 도와드렸다)');
-      await say(e.name, '아이고 고마워라. 요즘 이런 총각 없어요.');
-      await say('', '창구 너머에서 수지가 그 모습을 보고 있었다.');
-      q.stage = 3; got('민원 응대 완료'); QUESTS.c1.marks();
-    },
-    boss: async e => { await say(e.name, S.q.stage === 1 ? '김수지 주무관은 창구 안쪽에 있어요.' : '결재는 두 번 읽고 올리세요.'); }
+    boss: async e => { await say(e.name, S.q.stage <= 1 ? '창구는 왼쪽 위요.' : '결재는 두 번 읽고 올리세요.'); }
   }
 };
 
@@ -1576,6 +1732,7 @@ QUESTS.c2 = {
       await say('', '(수지가 조종간을 잡았다. …의외로 철우보다 잘 날렸다.)');
       await say('수지', '이거 재밌네요! 우리 다음에 또 날려요.');
       await say('철우', '(다음이 생겼다!!!)');
+      await showPhoto('drone', '그날의 한강, 그리고 드론', 2000);
       await say('', '해 질 무렵까지, 두 사람은 한강에서 웃었다.');
       await finishQuest();
     }
@@ -1613,7 +1770,7 @@ QUESTS.c3 = {
       await say('철우', '우리… 사귀자.');
       await say('수지', '…응.');
       S.tint = null;
-      await say('', '그날이 3월 16일이었다.');
+      await say('', '그날이 2022년 10월 28일이었다.');
       await finishQuest();
     }
   }
@@ -1627,9 +1784,10 @@ QUESTS.c4 = {
   hint() { return '박자 게임: 바늘이 금색 구간에 들어왔을 때 탭(Z). 8번 중 6번이면 성공.'; },
   async intro() {
     S.heroSpr = 'cwTux';
-    await say('', '부산, 목장원. 바다가 보이는 야외 예식장.');
+    await say('', '2023년 10월 7일. 부산, 목장원. 바다가 보이는 야외 예식장.');
     await say('', '흰 난간 너머로 배가 지나가고, 하객들이 자리에 앉았다.');
     await say('철우', '(턱시도가 조금 조인다. 아니, 심장이 조이는 건가.)');
+    await showPhoto('venue', '2023년 10월 7일, 부산 목장원', 2000);
     S.q.stage = 0; setHud(); this.marks();
   },
   marks() { markEnts([]); },
@@ -1638,7 +1796,7 @@ QUESTS.c4 = {
     const q = S.q;
     if (mapId === 'mokjang' && q.stage === 0 && y === 5 && x >= 8 && x <= 11) {
       S.lock = true;
-      await say('주례 선생님', '신랑 오철우 군과 신부 김수지 양의 결혼식을 시작하겠습니다.');
+      await say('주례 선생님', '신랑 오철우 군과 신부 설수지 양의 결혼식을 시작하겠습니다.');
       await say('', '(짝짝짝짝—)');
       await say('주례 선생님', '먼저, 신부 아버님의 색소폰 축주가 있겠습니다.');
       await say('장인어른', '험험. (색소폰을 든다)');
@@ -1665,13 +1823,13 @@ QUESTS.c4 = {
     if (!win) { await say('철우', '(헛기침) 마이크 탓입니다. 다시!'); const r = await this.song(); return r; }
     await say('', '(수지의 눈가가 조금 붉어졌다)');
     await say('수지', '…바보. 노래를 언제 연습했대.');
-    await say('주례 선생님', '신랑 오철우 군은 신부 김수지 양을 아내로 맞아 평생 아끼고 사랑하겠습니까?');
+    await say('주례 선생님', '신랑 오철우 군은 신부 설수지 양을 아내로 맞아 평생 아끼고 사랑하겠습니까?');
     await say('철우', '네!!');
-    await say('주례 선생님', '신부 김수지 양은 신랑 오철우 군을 남편으로 맞아 평생 아끼고 사랑하겠습니까?');
+    await say('주례 선생님', '신부 설수지 양은 신랑 오철우 군을 남편으로 맞아 평생 아끼고 사랑하겠습니까?');
     await say('수지', '네에~!');
     await say('주례 선생님', '두 사람이 부부가 되었음을 선언합니다!');
     await say('', '(꽃가루, 박수, 바다, 그리고 두 사람)');
-    await showPhoto('wedding', '목장원 — 그날의 우리', 4000);
+    await showPhoto('wedding', '목장원 — 그날의 우리', 2000);
     S.q.stage = 3;
     await finishQuest();
   },
@@ -1688,7 +1846,8 @@ QUESTS.c5 = {
   goal() { return '침실의 수지 달래기 (선택지를 잘 고르자)'; },
   hint(q) { return q.fails ? '정답은 늘 같다: 서두르지 말고, 탓하지 말고, 구체적으로. 그리고 마지막은 손.' : '수지는 쉽게 안 풀린다. 다섯 번 중 네 번은 마음에 닿아야 한다.'; },
   async intro() {
-    await say('', '수지의 성수동 집이 두 사람의 신혼집이 됐다. 층고가 높아서 좋다.');
+    await say('', '수지의 성수동 오피스텔, 성수르하임. 층고 높은 이 집이 두 사람의 신혼집이 됐다.');
+    await showPhoto('loft', '성수르하임 — 층고 높은 우리 신혼집', 2000);
     await say('', '…그런데 오늘은 공기가 낮다. 두 사람은 성격이 좀 다르고, 가끔 이런 날이 있다.');
     await say('', '(무슨 일 때문인지는 중요하지 않다. 정말로.)');
     await say('철우', '(화해는 늘 내가 먼저. 그런데 수지 달래기는… 난이도가 높다.)');
@@ -1736,6 +1895,7 @@ QUESTS.c6 = {
   hint() { return '"아무거나"에는 늘 정답이 있다. 철우의 어제 메뉴와 말투를 떠올리자.'; },
   async intro() {
     await say('', '평화로운 평일 저녁의 성수동. 화가 안 난 날의 수지는… 철우에게 다 맞춰 준다.');
+    await showPhoto('street', '어느 주말의 성수동 거리', 2000);
     await say('수지', '(맞춰 주는 게 아니라, 맞히는 거지. 나는 철우 메뉴 리더기니까.)');
     S.q.stage = 1; setHud(); this.marks();
   },
@@ -1768,14 +1928,15 @@ QUESTS.c6 = {
   }
 };
 
-// --- 7. 내 집 마련 (철우 · 월곡두산아파트) ---
+// --- 7. 내 집 마련 (철우 · 월곡 두산위브) ---
 QUESTS.c7 = {
-  start: { map: 'apt', x: 6, y: 6, dir: 'up' },
+  start: { map: 'apt', x: 6, y: 7, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal(q) { return q.stage < 1 ? '이삿날 — 수지·중개사와 이야기' : '거실 큰 창 앞에서 A — 1년 버티기 (+2.5억이 목표)'; },
-  hint() { return '큰 창(왼쪽 위 유리) 앞에 서서 위를 보고 A. 무슨 일이 있어도 팔지 않는 게 요령.'; },
+  goal(q) { return q.stage < 1 ? '이삿날 — 공인중개사와 이야기' : '거실 큰 창 앞에서 A — 시세 +2.5억 만들기'; },
+  hint() { return '큰 창(왼쪽 위 유리) 앞에서 위를 보고 A. 타이밍 게임: 금색에서 탭이면 +5천만, 놓치면 -5천만. 파는 게 아니라 계속 보유!'; },
   async intro() {
-    await say('', '2025년 8월. 두 사람은 월곡두산아파트로 이사했다.');
+    await say('', '2025년 8월. 두 사람은 월곡 두산위브로 이사했다.');
+    await showPhoto('weve', '월곡 두산위브 — 2025년 8월', 2000);
     await say('수지', '우리… 진짜 샀네? 우리 집이네?');
     await say('철우', '응. 우리 집이야. (등기부등본을 세 번째 읽는 중)');
     S.q.stage = 0; setHud(); this.marks();
@@ -1786,43 +1947,23 @@ QUESTS.c7 = {
     agent: async e => {
       const q = S.q;
       await say(e.name, '남향에 뷰 좋고, 단지 관리 잘되고. 두 분, 정말 잘 사신 거예요.');
-      if (q.stage < 1) { q.stage = 1; setHud(); save(); await say('철우', '(그 말, 1년 뒤에도 유효하길.)'); }
+      if (q.stage < 1) { q.stage = 1; setHud(); save(); QUESTS.c7.marks(); await say('철우', '(그 말, 1년 뒤에도 유효하길.)'); }
     }
   },
   interact(mapId, x, y, ch) {
     if (mapId !== 'apt' || ch !== 'w' || S.q.stage < 1) return null;
     return async () => {
-      const q = S.q;
-      await say('', '거실 큰 창 앞. 여기서 두 사람은 1년을 보냈다.');
-      const months = [
-        ['2025.09', 0.2], ['2025.10', 0.3], ['2025.11', 0.1], ['2025.12', -0.1],
-        ['2026.01', 0.4], ['2026.02', 0.2], ['2026.03', 0.3], ['2026.04', -0.2],
-        ['2026.05', 0.5], ['2026.06', 0.3], ['2026.07', 0.2], ['2026.08', 0.3]
-      ];
-      let sum = 0;
-      for (let i = 0; i < months.length; i++) {
-        const [mLabel, d] = months[i];
-        sum = Math.round((sum + d) * 10) / 10;
-        await say('', mLabel + ' — 실거래가 ' + (d > 0 ? '+' : '') + d + '억 (누적 ' + (sum > 0 ? '+' : '') + sum + '억)');
-        if (mLabel === '2025.12') {
-          const j = await ask('철우', '(첫 하락이다. 어떡하지?)', ['존버한다', '부동산 앱을 새로고침한다', '파, 팔까…?']);
-          if (j === 2) { await say('수지', '오빠?'); await say('철우', '아닙니다. 존버합니다.'); }
-          else if (j === 1) await say('수지', '그만 봐~ 닳겠다.');
-          else await say('수지', '그렇지. 우린 실거주야.');
-        }
-        if (mLabel === '2026.04') {
-          const j = await ask('수지', '(또 내렸다…)', ['괜찮아, 우량 단지야', '뉴스 댓글을 읽는다', '중개사님께 전화해 본다']);
-          if (j === 0) await say('철우', '응. 흔들리지 말자.');
-          else if (j === 1) await say('철우', '댓글은 마음 건강에 해로워…');
-          else await say('공인중개사', '(전화) 걱정 마세요~ 좋은 단지예요.');
-        }
-      }
-      await say('', '2026년 8월. 누적 +2.5억.');
+      await say('', '거실 큰 창 앞. 실거래가 알림이 울릴 때마다 두 사람은 여기 섰다.');
+      await say('수지', '오빠, 우리 파는 건 아니지만… 오르는 건 좋다?');
+      await say('철우', '응. 파는 게 아니라, 우리 집이 일을 잘하는 거야.');
+      const win = await playPrice();
+      if (!win) { await say('철우', '시세는 길게 보는 거야. 숨 고르고 다시. (창 앞에서 A)'); return; }
+      await say('', '2026년 8월. 매수가 대비 누적 +2.5억.');
       await say('수지', '오빠!! 우리 집이 일했어!! +2.5억!!');
       await say('철우', '집이 나보다 연봉이 높다…!');
       await say('', '(둘은 거실에서 잠깐 춤을 췄다. 층간소음이 걱정돼서 아주 작게.)');
-      await say('수지', '근데 오빠, 우리 안 팔 거잖아. 그치?');
-      await say('철우', '응. 여긴 우리 집이니까.');
+      await say('수지', '그래도 우리, 계속 여기 살 거지?');
+      await say('철우', '당연하지. 여긴 우리 집이니까.');
       await finishQuest();
     };
   }
@@ -1845,7 +1986,7 @@ async function playEnding() {
   await say('철우', '그리고 지금, 우리 집.');
   await say('수지', '…잘 살고 있네, 우리.');
   await say('철우', '응. 앞으로도 그럴 거야.');
-  await showPhoto('card', '두 사람은 지금도, 잘 살고 있습니다', 5000);
+  await showPhoto('postcard', '두 사람은 지금도, 잘 살고 있습니다', 2000);
   await fade(true);
   const c = $('credits'); c.innerHTML = '';
   const add = (t, cls) => { const pp = document.createElement('p'); pp.textContent = t; if (cls) pp.className = cls; pp.style.margin = '0 0 10px'; c.appendChild(pp); };
@@ -1854,8 +1995,9 @@ async function playEnding() {
   FINAL_MESSAGE.split('\n').forEach(l => add(l));
   add('BGM: 평화로운 피아노 브금 · A hisa – Dreamin’');
   add('— ' + MAKER + ' —');
-  add('★ 특전이 열렸습니다: 마음결 상담 (CBT)');
-  add('둘이 싸우면 꼭 해보세요.');
+  add('★ 보상함에 마지막 추억이 들어왔습니다.');
+  add('마음결 상담도 잊지 마세요. 둘이 싸우면 꼭!');
+  grantReward('end');
   S.tint = null; S.focus = null; quest = null;
   S.ending = true; S.care = true; save();
   showScreen('end');
@@ -1882,34 +2024,129 @@ $('btnBgm').addEventListener('click', e => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) bgm.pause(); else if (bgmOn && bgmTried) bgmPlay(); });
 bgmBtn();
 
-// ===== 마음결 상담 (CBT) — 엔딩 특전 =====
-// 마음톡(counsel-chat)과 같은 프록시를 쓴다. 대화는 이 기기(localStorage)에만 저장되고,
-// 보낼 때 최근 40개를 함께 보내 AI가 이어서 기억한다.
+// ===== 보상함 =====
+const REWARDS = [
+  { id: 'leaflet', ch: 'c1', name: '완성 리플릿', kind: 'draw', icon: '📄' },
+  { id: 'drone', ch: 'c2', name: '한강 드론 그림', kind: 'photo', icon: '🚁' },
+  { id: 'ticket', ch: 'c3', name: '2022.10.28 티켓', kind: 'draw', icon: '🎬' },
+  { id: 'venue', ch: 'c4', name: '목장원 풍경', kind: 'photo', icon: '🌊' },
+  { id: 'wedding', ch: 'c4', name: '결혼식 사진', kind: 'photo', icon: '💍' },
+  { id: 'loft', ch: 'c5', name: '성수르하임', kind: 'photo', icon: '🏠' },
+  { id: 'street', ch: 'c6', name: '성수동 거리', kind: 'photo', icon: '🌆' },
+  { id: 'weve', ch: 'c7', name: '월곡 두산위브', kind: 'photo', icon: '🏢' },
+  { id: 'postcard', ch: 'end', name: '우리의 엽서', kind: 'photo', icon: '💌' }
+];
+function rewardsOwned() { return store.get('cs_rewards', []); }
+function grantReward(chId) {
+  const owned = rewardsOwned();
+  REWARDS.filter(r => r.ch === chId && !owned.includes(r.id)).forEach(r => { owned.push(r.id); toast('🎁 보상 획득: ' + r.name); });
+  store.set('cs_rewards', owned);
+}
+function drawTicket(g) {
+  g.fillStyle = '#fff4d6'; g.fillRect(0, 0, 160, 110);
+  g.strokeStyle = '#c9a25c'; g.setLineDash([4, 3]); g.strokeRect(4.5, 4.5, 151, 101); g.setLineDash([]);
+  g.fillStyle = '#d94b4b'; g.fillRect(0, 0, 160, 26);
+  g.fillStyle = '#ffffff'; g.font = 'bold 12px sans-serif'; g.textAlign = 'center';
+  g.fillText('CINEMA TICKET', 80, 17);
+  g.fillStyle = '#4a3a20'; g.font = 'bold 15px sans-serif';
+  g.fillText('2022. 10. 28.', 80, 52);
+  g.font = '11px sans-serif';
+  g.fillText('그날, 우리는 사귀기로 했다', 80, 74);
+  g.fillStyle = '#ff8fb1'; g.font = '14px sans-serif'; g.fillText('♥', 80, 94);
+}
+// 사진 키 → 표시 가능한 src (.bin 복호 → jpg → 없음)
+async function resolvePhotoSrc(key) {
+  try {
+    const res = await fetch('photos/' + key + '.bin');
+    if (res.ok) {
+      const buf = new Uint8Array(await res.arrayBuffer());
+      const k2 = (PASSWORD + PASSWORD).split('').map(ch => ch.charCodeAt(0));
+      for (let i = 0; i < buf.length; i++) buf[i] ^= k2[i % k2.length] ^ ((i * 7) & 0xff);
+      return URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }));
+    }
+  } catch (e) { /* 다음 */ }
+  for (const ext of ['jpg', 'png']) {
+    const ok = await new Promise(r => { const im = new Image(); im.onload = () => r(true); im.onerror = () => r(false); im.src = 'photos/' + key + '.' + ext; });
+    if (ok) return 'photos/' + key + '.' + ext;
+  }
+  return null;
+}
+let viewerOpen = false;
+async function viewReward(r) {
+  const ph = $('photo'), img = $('photoImg'), cap = $('photoCap');
+  let src = null;
+  if (r.kind === 'draw') {
+    const c = document.createElement('canvas');
+    if (r.id === 'leaflet') { c.width = 288; c.height = 288; const g = c.getContext('2d'); g.scale(2, 2); drawLeaflet(g); }
+    else { c.width = 320; c.height = 220; const g = c.getContext('2d'); g.scale(2, 2); drawTicket(g); }
+    src = c.toDataURL();
+  } else src = await resolvePhotoSrc(r.id);
+  img.style.display = src ? '' : 'none'; if (src) img.src = src;
+  cap.textContent = r.name + (src ? '' : '\n(사진 파일이 아직 준비되지 않았어요)') + '\n— 탭하면 닫혀요 —';
+  viewerOpen = true;
+  ph.classList.add('on'); void ph.offsetWidth; ph.classList.add('show');
+}
+$('photo').addEventListener('pointerdown', () => {
+  if (!viewerOpen) return;
+  viewerOpen = false;
+  const ph = $('photo'); ph.classList.remove('show');
+  setTimeout(() => ph.classList.remove('on'), 380);
+});
+function buildGift() {
+  const grid = $('giftGrid'); grid.innerHTML = '';
+  const owned = rewardsOwned();
+  REWARDS.forEach(r => {
+    const b = document.createElement('button'); b.type = 'button';
+    const has = owned.includes(r.id);
+    const gi = document.createElement('span'); gi.className = 'gi'; gi.textContent = has ? r.icon : '🔒';
+    const nm = document.createElement('span'); nm.textContent = has ? r.name : (r.ch === 'end' ? '엔딩 보상' : (CH[r.ch] ? CH[r.ch].title : '') + ' 보상');
+    b.append(gi, nm);
+    if (has) { b.classList.add('own'); b.addEventListener('click', () => viewReward(r)); }
+    else b.disabled = true;
+    grid.appendChild(b);
+  });
+}
+$('btnGift').addEventListener('click', () => { buildGift(); showScreen('gift'); });
+$('btnGiftClose').addEventListener('click', () => showSelect());
+
+// ===== 마음결 상담 — 언제든 열 수 있는 두 사람의 상담실 =====
+// 마음톡(counsel-chat)과 같은 프록시. 대화는 이 기기(localStorage)에만 저장되고,
+// 보낼 때 최근 40개를 함께 보내 AI가 이어서 기억한다. 모드: 다툰 뒤 / 평소.
 const CARE_PROXY = 'https://stormy-cuttlefish-2376.woo-design22.deno.net';
 const CARE_TURNS = 40;
 const CARE_NAMES = { sj: '수지', cw: '철우' };
-const CARE_HELLO = '생각을 같이 정리해 볼까요.\n최근에 마음이 크게 흔들렸던 순간 하나만 떠올려 주세요. 언제, 어디서, 무슨 일이 있었나요?';
+const CARE_MODES = {
+  fight: { api: 'cbt', label: '다투고 난 뒤', hello: '많이 속상했겠어요. 생각을 같이 정리해 볼까요.\n오늘 마음이 크게 흔들렸던 순간 하나만 떠올려 주세요. 언제, 어디서, 무슨 일이 있었나요?' },
+  daily: { api: 'dbt', label: '평소 마음 돌보기', hello: '와 줘서 반가워요. 오늘 마음은 어땠나요?\n있었던 일 하나부터 편하게 들려주세요.' }
+};
+const CARE_NOTICE = '이 상담은 보통 20~30번 정도 주고받아요. 시작했다면 하루 안에 끝까지 마치는 게 좋아요.';
 const CARE_CRISIS = ['자살', '죽고 싶', '죽고싶', '죽어버리', '살기 싫', '살기싫', '자해', '손목', '목숨', '없어지고 싶', '사라지고 싶', '유서', '끝내고 싶', '끝내버리'];
 const CARE_HOTLINE = '혹시 지금 마음이 많이 위험하게 느껴진다면, 혼자 견디지 마세요.\n자살예방 상담전화 109 (24시간) · 정신건강 위기상담 1577-0199';
-const CARE = { who: null, step: null, buf: '', first: '', busy: false };
+const CARE = { who: null, mode: null, step: null, buf: '', first: '', busy: false };
 
 async function careHash(t) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('cs:' + t));
   return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
 }
-function carePane(name) { ['careWho', 'carePw', 'careChat'].forEach(id => { $(id).style.display = id === name ? '' : 'none'; }); }
+function carePane(name) { ['careWho', 'carePw', 'careMode', 'careChat'].forEach(id => { $(id).style.display = id === name ? '' : 'none'; }); }
 function careDots() { const els = $('careDots').children; for (let i = 0; i < 4; i++) els[i].classList.toggle('on', i < CARE.buf.length); }
-function openCare() { $('care').classList.add('show'); CARE.who = null; carePane('careWho'); }
+function openCare() { $('care').classList.add('show'); CARE.who = null; CARE.mode = null; carePane('careWho'); }
 $('btnCare').addEventListener('click', openCare);
 $('careClose').addEventListener('click', () => $('care').classList.remove('show'));
 $('careBack').addEventListener('click', () => { CARE.who = null; carePane('careWho'); });
+$('careBack2').addEventListener('click', () => { CARE.who = null; carePane('careWho'); });
 document.querySelectorAll('#careWho [data-who]').forEach(b => b.addEventListener('click', () => carePick(b.dataset.who)));
+document.querySelectorAll('#careMode [data-mode]').forEach(b => b.addEventListener('click', () => { CARE.mode = b.dataset.mode; careEnterChat(); }));
 
 function carePick(who) {
   CARE.who = who; CARE.buf = ''; CARE.first = '';
   CARE.step = store.get('cs_pw_' + who, null) ? 'enter' : 'set1';
   $('carePwMsg').textContent = CARE_NAMES[who] + (CARE.step === 'enter' ? '의 비밀번호 네 자리' : '의 새 비밀번호 네 자리를 정해 주세요');
   careDots(); carePane('carePw');
+}
+function careShowMode() {
+  $('careModeHi').textContent = CARE_NAMES[CARE.who] + ', 오늘은 어떤 마음인가요?';
+  carePane('careMode');
 }
 async function careKey(k) {
   if (!CARE.who) return;
@@ -1924,21 +2161,23 @@ async function careKey(k) {
     careDots(); return;
   }
   if (CARE.step === 'set2') {
-    if (h === CARE.first) { store.set('cs_pw_' + who, h); careEnterChat(); }
+    if (h === CARE.first) { store.set('cs_pw_' + who, h); careShowMode(); }
     else { CARE.step = 'set1'; CARE.buf = ''; $('carePwMsg').textContent = '달라요! 새 비밀번호 네 자리부터 다시'; careDots(); }
     return;
   }
-  if (h === store.get('cs_pw_' + who, '')) careEnterChat();
+  if (h === store.get('cs_pw_' + who, '')) careShowMode();
   else { CARE.buf = ''; $('carePwMsg').textContent = '앗, 다시 한 번!'; careDots(); }
 }
-function careMsgs() { return store.get('cs_chat_' + CARE.who, []); }
-function careSave(list) { store.set('cs_chat_' + CARE.who, list.slice(-200)); }
+function careChatKey() { return 'cs_chat_' + CARE.who + '_' + CARE.mode; }
+function careMsgs() { return store.get(careChatKey(), []); }
+function careSave(list) { store.set(careChatKey(), list.slice(-200)); }
 function careRender(liveText) {
   const log = $('careLog'); log.innerHTML = '';
   const add = (cls, text) => { const d = document.createElement('div'); d.className = 'careMsg ' + cls; d.textContent = text; log.appendChild(d); };
-  add('note', CARE_NAMES[CARE.who] + '의 상담실 · 대화는 이 휴대폰에만 저장됩니다');
+  add('note', CARE_NAMES[CARE.who] + '의 상담실 — ' + CARE_MODES[CARE.mode].label + ' · 대화는 이 휴대폰에만 저장됩니다');
+  add('note', CARE_NOTICE);
   const list = careMsgs();
-  if (!list.length) add('ai', CARE_HELLO);
+  if (!list.length) add('ai', CARE_MODES[CARE.mode].hello);
   list.forEach(m => add(m.r === 'user' ? 'user' : m.r === 'crisis' ? 'crisis' : 'ai', m.t));
   if (liveText !== undefined) add('ai', liveText || '…');
   log.scrollTop = log.scrollHeight;
@@ -1958,10 +2197,10 @@ async function careSend() {
   try {
     const hist = careMsgs().filter(m => m.r === 'user' || m.r === 'ai').slice(-CARE_TURNS)
       .map(m => ({ role: m.r === 'user' ? 'user' : 'assistant', content: m.t }));
-    if (careMsgs().filter(m => m.r === 'ai').length === 0) hist.unshift({ role: 'assistant', content: CARE_HELLO });
+    if (careMsgs().filter(m => m.r === 'ai').length === 0) hist.unshift({ role: 'assistant', content: CARE_MODES[CARE.mode].hello });
     const res = await fetch(CARE_PROXY, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'cbt', messages: hist })
+      body: JSON.stringify({ mode: CARE_MODES[CARE.mode].api, messages: hist })
     });
     if (!res.ok) throw new Error(res.status === 429 ? '너무 빠르게 여러 번 보냈어요. 잠시 뒤에 다시.' : '지금은 상담 서버가 응답하지 않아요. (' + res.status + ')');
     const reader = res.body.getReader(), dec = new TextDecoder();

@@ -204,7 +204,6 @@
     <div class="sndinfo" id="ovSndInfo"></div>
     <div class="hint" id="ovHint"></div>
   </div>
-</div>
   <div class="panel wide" id="panelLobby" style="display:none">
     <h1>여러 명이서 하기</h1>
     <div class="sub">아이디(닉네임)를 정하고 방에 들어가세요. 회원가입은 없습니다.</div>
@@ -216,6 +215,7 @@
     <div class="row">
       <input type="text" id="lbServer" placeholder="서버 주소 (비우면 이 페이지를 준 서버)" style="width:min(340px,80vw)">
     </div>
+    <div id="lbNote" class="hint" style="margin-top:0;min-height:1.6em;white-space:pre-line"></div>
     <div id="lbAfter" style="display:none">
       <div class="row" style="justify-content:space-between">
         <b style="font-size:14px">방 목록</b>
@@ -258,6 +258,7 @@
     <button class="btn go" id="msgRetry" type="button">다시 시도</button>
     <button class="btn" id="msgHome" type="button" style="margin-left:6px">처음으로</button>
   </div>
+</div>
 <div id="nogl">이 브라우저는 캔버스를 지원하지 않아 게임을 실행할 수 없습니다. 최신 크롬 또는 엣지를 사용해 주세요.</div>
 
 <script src="game-core.js"></script>
@@ -1058,16 +1059,23 @@
      주소 우선순위: ①주소창 `?server=` ②직접 입력한 값 ③게시판 ④이 페이지를 준 서버.
      `REGISTRY` 가 비어 있으면 이 기능은 그냥 꺼진 것과 같다(서버가 페이지도 서빙하는 평소 경로에는 필요 없다). */
   var REGISTRY = 'https://gray-macaque-4849.woo-design22.deno.net';   // 주소 게시판 (2026-08-25 배포)
+  var OFF_NOTE = [
+    '이 게임은 만든 사람의 컴퓨터에서 서버를 켜 두는 동안만 여러 명이서 할 수 있습니다.',
+    '켜지면 위 주소 칸이 자동으로 채워집니다. 직접 받은 주소가 있으면 거기에 넣고 「접속」을 누르세요.',
+    '혼자라도 「뒤로」 → 「혼자 하기」로 인공지능과 2:2 경기를 할 수 있습니다.'
+  ].join(String.fromCharCode(10));
+  function lbNote(t) { var e = $('lbNote'); if (e) e.textContent = t || ''; }
   function fetchServerUrl() {
     var reg = (params.get('registry') || REGISTRY || '').replace(/\/+$/, '');
     if (!reg) return;
     $('lbState').textContent = '서버 주소 확인 중…';
     fetch(reg + '/', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.url) { $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; return; }
-      if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; return; }
+      if (!d || !d.url) { $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; lbNote(OFF_NOTE); return; }
+      if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; lbNote(OFF_NOTE); return; }
       if (!$('lbServer').value.trim()) $('lbServer').value = d.url;
+      lbNote('');
       $('lbState').textContent = '서버 주소를 받았습니다';
-    }).catch(function () { $('lbState').textContent = '서버 주소를 받지 못했습니다'; });
+    }).catch(function () { $('lbState').textContent = '서버 주소를 받지 못했습니다'; lbNote(OFF_NOTE); });
   }
   function wsUrl() {
     var s = ($('lbServer') ? $('lbServer').value : '').trim();

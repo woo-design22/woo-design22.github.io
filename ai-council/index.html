@@ -1,0 +1,2022 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI 회의실</title>
+<style>
+  :root {
+    --bg: #f2f1ee;
+    --surface: #ffffff;
+    --surface-2: #eceae5;
+    --line: #ddd9d2;
+    --line-soft: #eae7e1;
+    --ink: #201e1b;
+    --ink-2: #59544d;
+    --ink-3: #918b82;
+    --accent: #3f6d7d;
+    --accent-ink: #ffffff;
+    --accent-soft: #e4edf0;
+    --warn: #b5462f;
+    --warn-soft: #fbe9e4;
+    --gold: #b58a3a;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 18px rgba(0,0,0,.045);
+    --sheet-shadow: 0 18px 60px rgba(0,0,0,.22);
+
+    --p1: #3f6d7d;
+    --p2: #a1663a;
+    --p3: #5c7a3d;
+    --p4: #6f5192;
+    --p5: #a8506a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181a;
+      --surface: #1f2427;
+      --surface-2: #272e32;
+      --line: #353d43;
+      --line-soft: #2a3136;
+      --ink: #e9e7e3;
+      --ink-2: #b0aca6;
+      --ink-3: #837e77;
+      --accent: #7fb3c4;
+      --accent-ink: #10171a;
+      --accent-soft: #24343a;
+      --warn: #e0876f;
+      --warn-soft: #3a2620;
+      --gold: #d8ac5c;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+      --sheet-shadow: 0 18px 60px rgba(0,0,0,.6);
+
+      --p1: #7fb3c4;
+      --p2: #d3a071;
+      --p3: #a6c176;
+      --p4: #b39cd8;
+      --p5: #d693ab;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Segoe UI', Pretendard, sans-serif;
+    font-size: 15px;
+    line-height: 1.62;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ================= 상단 바 ================= */
+  header {
+    flex: none;
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    z-index: 5;
+  }
+  header h1 { margin: 0; font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; }
+  header .sub { font-size: 12px; color: var(--ink-3); }
+  header .spacer { flex: 1; }
+
+  #faces { display: flex; align-items: center; }
+  #faces .face {
+    width: 26px; height: 26px; margin-left: -7px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 11.5px; font-weight: 700; color: #fff;
+    border: 2px solid var(--surface);
+    background: var(--f, var(--accent));
+  }
+  #faces .face:first-child { margin-left: 0; }
+
+  /* ================= 공통 폼 ================= */
+  button {
+    font: inherit; font-size: 14px;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s, transform .06s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover { border-color: var(--ink-3); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .42; cursor: default; transform: none; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 650; }
+  button.primary:hover { filter: brightness(1.07); }
+  button.danger { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+  button.mini { padding: 4px 10px; font-size: 13px; border-radius: 8px; }
+  button.ghost { background: transparent; }
+
+  input, textarea, select {
+    font: inherit; font-size: 14px;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 8px 11px;
+    width: 100%;
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus, select:focus, button:focus-visible { outline: none; border-color: var(--accent); }
+  textarea { resize: vertical; line-height: 1.55; }
+  label { font-size: 12.5px; color: var(--ink-2); display: block; margin-bottom: 5px; font-weight: 550; }
+
+  /* ================= 본문 ================= */
+  main {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 16px 14px 22px;
+    display: flex; flex-direction: column; gap: 14px;
+    max-width: 820px; width: 100%; margin: 0 auto;
+    scroll-behavior: smooth;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 15px 16px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    margin: 0 0 11px;
+    font-size: 12.5px; font-weight: 700;
+    color: var(--ink-3); letter-spacing: .06em; text-transform: uppercase;
+  }
+  .card h2:not(:first-child) { margin-top: 18px; }
+  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+  /* min-width 를 0 으로 두면 좁은 화면에서 줄바꿈 대신 0까지 눌려
+     라벨이 세로 한 줄이 되고 입력칸이 사라진다. 줄을 바꾸게 하한을 준다. */
+  .row > .grow { flex: 1; min-width: 190px; }
+  .row > .fixed { flex: none; }
+  .spacer { flex: 1; }
+  .hint { font-size: 12.5px; color: var(--ink-3); margin: 9px 0 0; line-height: 1.55; }
+
+  /* ================= 참가자 자리 ================= */
+  .seat {
+    border: 1px solid var(--line-soft);
+    border-radius: 13px;
+    background: var(--bg);
+    padding: 9px 11px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--seat-color, var(--accent));
+  }
+  .seat .r1 { display: flex; gap: 8px; align-items: center; }
+  .seat .r2 { margin-top: 7px; }
+  .seat .av {
+    flex: none; width: 29px; height: 29px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 12.5px; font-weight: 700; color: #fff;
+    background: var(--seat-color, var(--accent));
+  }
+  .seat .who { flex: none; width: 84px; }
+  .seat .eff { flex: none; width: 112px; }
+  .seat .del { flex: none; }
+
+  /* 모델 고르기 단추 */
+  .mbtn {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 8px;
+    text-align: left; background: var(--surface);
+  }
+  .mbtn .mname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mbtn .mprice {
+    margin-left: auto; flex: none;
+    font-size: 11px; color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+  .mbtn.unknown { border-color: var(--warn); }
+
+  /* ================= 모델 고르기 창 ================= */
+  .modal {
+    position: fixed; inset: 0; z-index: 40;
+    background: rgba(0,0,0,.42);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px 14px;
+    animation: fade .16s;
+  }
+  @keyframes fade { from { opacity: 0; } }
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--sheet-shadow);
+    width: 100%; max-width: 560px;
+    max-height: 100%;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    animation: pop .2s cubic-bezier(.2,.8,.3,1);
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+  .sheet .top { padding: 12px 13px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+  .sheet .top input { flex: 1; }
+  .sheet .list { overflow-y: auto; flex: 1; padding: 5px 0 8px; }
+  .sheet .bot {
+    padding: 9px 13px; border-top: 1px solid var(--line);
+    display: flex; gap: 9px; align-items: center;
+    font-size: 12px; color: var(--ink-3);
+  }
+  .vend {
+    padding: 9px 14px 3px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    color: var(--ink-3); text-transform: uppercase;
+  }
+  .mrow {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 14px; cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .mrow:hover { background: var(--surface-2); }
+  .mrow.on { border-left-color: var(--accent); background: var(--accent-soft); }
+  .mrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+  .mrow .id { display: block; font-size: 11px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+  .mrow .pr { flex: none; font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; text-align: right; }
+  .mrow .pr small { display: block; color: var(--ink-3); font-size: 10.5px; }
+  .badge {
+    flex: none; font-size: 10px; font-weight: 650;
+    padding: 1px 6px; border-radius: 20px;
+    border: 1px solid var(--line); color: var(--ink-3);
+  }
+  .badge.fix { border-color: var(--gold); color: var(--gold); }
+
+  /* ================= 채팅방 ================= */
+  #log { display: flex; flex-direction: column; gap: 3px; }
+  .msg { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; animation: rise .28s cubic-bezier(.2,.7,.3,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(9px); } }
+  .msg .av {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 700; color: #fff;
+    background: var(--c, var(--accent));
+    margin-top: 17px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.14);
+  }
+  .msg.cont .av { visibility: hidden; }
+  .msg .col { min-width: 0; flex: 1; }
+  .msg .head { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; font-size: 12.5px; flex-wrap: wrap; }
+  .msg .head .nm { font-weight: 700; color: var(--c, var(--accent)); }
+  .msg .chip {
+    font-size: 10.5px; font-weight: 650;
+    padding: 1px 7px; border-radius: 20px;
+    background: var(--surface-2); color: var(--ink-3);
+    border: 1px solid var(--line-soft); white-space: nowrap;
+  }
+  .msg .bubble {
+    display: inline-block; max-width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px 15px 15px 15px;
+    padding: 9px 14px;
+    box-shadow: var(--shadow);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .dots { display: inline-flex; gap: 4px; padding: 3px 1px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); animation: bob 1.15s ease-in-out infinite; }
+  .dots i:nth-child(2) { animation-delay: .16s; }
+  .dots i:nth-child(3) { animation-delay: .32s; }
+  @keyframes bob { 0%,60%,100% { opacity:.3; transform:translateY(0);} 30% { opacity:1; transform:translateY(-4px);} }
+
+  .divider {
+    display: flex; align-items: center; gap: 11px;
+    margin: 13px 0 5px;
+    color: var(--ink-3); font-size: 11.5px; font-weight: 650; letter-spacing: .06em;
+  }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .divider span { padding: 2px 11px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); }
+
+  .empty {
+    text-align: center; padding: 34px 18px 30px;
+    border: 1px dashed var(--line); border-radius: var(--radius);
+    color: var(--ink-3); font-size: 13px;
+  }
+  .empty .ring { display: flex; justify-content: center; margin-bottom: 13px; }
+  .empty .ring .face {
+    width: 42px; height: 42px; margin-left: -10px;
+    border-radius: 50%; display: grid; place-items: center;
+    font-size: 16px; font-weight: 700; color: #fff;
+    background: var(--f, var(--accent));
+    border: 3px solid var(--bg);
+    box-shadow: 0 2px 6px rgba(0,0,0,.13);
+  }
+  .empty .ring .face:first-child { margin-left: 0; }
+  .empty .who { color: var(--ink-2); font-weight: 600; margin-bottom: 5px; font-size: 13.5px; }
+
+  .note {
+    text-align: center; font-size: 12.5px; color: var(--ink-2);
+    padding: 9px 12px; margin: 4px auto;
+    background: var(--surface-2); border-radius: 20px; max-width: 90%;
+  }
+  .note.bad { background: var(--warn-soft); color: var(--warn); }
+  .note button { margin-left: 7px; }
+
+  #outline {
+    white-space: pre-wrap; word-break: break-word;
+    font-size: 14px; line-height: 1.66;
+    background: var(--bg); border: 1px solid var(--line-soft);
+    border-radius: 11px; padding: 13px 15px;
+    max-height: 55vh; overflow-y: auto;
+  }
+  #outCard { border-color: var(--gold); }
+  #outCard h2 { color: var(--gold); }
+
+  /* ================= 하단 ================= */
+  footer {
+    flex: none;
+    display: flex; align-items: center; gap: 7px 14px; flex-wrap: wrap;
+    padding: 10px 16px;
+    background: var(--surface); border-top: 1px solid var(--line);
+    font-size: 12.5px; color: var(--ink-2);
+  }
+  footer .meter { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; }
+  footer b { color: var(--ink); font-weight: 650; }
+  #stat { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ================= 잠금 화면 ================= */
+  #lock {
+    position: fixed; inset: 0; z-index: 60;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    padding: 22px;
+  }
+  #lock .box {
+    width: 100%; max-width: 340px; text-align: center;
+  }
+  #lock .ico { font-size: 38px; line-height: 1; margin-bottom: 12px; }
+  #lock h2 { margin: 0 0 6px; font-size: 19px; font-weight: 700; }
+  #lock p { margin: 0 0 18px; font-size: 13px; color: var(--ink-3); line-height: 1.55; }
+  #lock .go { width: 100%; margin-top: 10px; }
+  #lock .bad { color: var(--warn); font-size: 13px; margin-top: 10px; min-height: 1.4em; }
+  #lock input { text-align: center; letter-spacing: .1em; }
+
+  /* 비밀번호 만들기 (?setpass=1) */
+  #setpass .out {
+    margin-top: 12px; padding: 11px 12px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    border-radius: 10px;
+    font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+    word-break: break-all; text-align: left; user-select: all;
+  }
+
+  /* ================= 누계 ================= */
+  #totalBtn { cursor: pointer; border-bottom: 1px dashed var(--ink-3); }
+  #totCard table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #totCard th, #totCard td { padding: 6px 8px; border-bottom: 1px solid var(--line-soft); text-align: right; }
+  #totCard th { color: var(--ink-3); font-weight: 600; font-size: 11.5px; letter-spacing: .04em; }
+  #totCard th:first-child, #totCard td:first-child { text-align: left; }
+  #totCard td { font-variant-numeric: tabular-nums; }
+  #totCard tfoot td { font-weight: 700; border-bottom: 0; border-top: 1px solid var(--line); }
+  .totgrid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 13px; }
+  .totgrid .cell {
+    flex: 1; min-width: 92px;
+    background: var(--bg); border: 1px solid var(--line-soft);
+    border-radius: 11px; padding: 9px 11px;
+  }
+  .totgrid .cell b { display: block; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .totgrid .cell span { font-size: 11.5px; color: var(--ink-3); }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 620px) {
+    main { padding: 13px 11px 20px; }
+    .seat .r1 { flex-wrap: wrap; }
+    .seat .who { flex: 1 1 0; width: auto; min-width: 0; }
+    .seat .eff { flex: 1 1 0; width: auto; min-width: 0; }
+    .seat .mbtn { order: 1; flex-basis: 100%; }
+    .msg .av { width: 30px; height: 30px; font-size: 12px; }
+    footer { font-size: 12px; }
+    .modal { padding: 0; }
+    .sheet { max-width: none; height: 100%; border-radius: 0; border: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AI 회의실</h1>
+  <span class="sub" id="hdrSub"></span>
+  <span class="spacer"></span>
+  <span id="faces"></span>
+  <button id="btnKey" class="mini ghost">키</button>
+  <button id="btnClear" class="mini ghost">비우기</button>
+</header>
+
+<main>
+  <!-- ===== 연결 ===== -->
+  <section class="card hidden" id="keyCard">
+    <h2>연결</h2>
+    <div class="row">
+      <div class="fixed" style="width:230px">
+        <label for="provider">어디를 통해 부를까</label>
+        <select id="provider">
+          <option value="openrouter">오픈라우터 — 모든 모델</option>
+          <option value="anthropic">앤트로픽 직통 — 클로드만</option>
+        </select>
+      </div>
+      <div class="grow">
+        <label for="keyInput" id="keyLabel">API 키</label>
+        <input id="keyInput" type="password" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="primary fixed" id="btnKeySave">저장</button>
+      <button class="fixed" id="btnKeyDel">지우기</button>
+    </div>
+    <p class="hint" id="keyHint"></p>
+  </section>
+
+  <!-- ===== 회의 설정 ===== -->
+  <section class="card" id="setupCard">
+    <h2>안건</h2>
+    <textarea id="topic" rows="3" placeholder="예) 신입사원 정보보안 교육 PPT 12장. 딱딱하지 않게, 사례 위주로."></textarea>
+
+    <h2>참가자</h2>
+    <div id="seats"></div>
+    <div class="row" style="margin-top:9px">
+      <button class="mini fixed" id="btnAddSeat">+ 참가자</button>
+      <button class="mini fixed ghost" id="btnReset">기본값으로</button>
+      <span class="spacer"></span>
+      <div class="fixed" style="width:104px">
+        <label for="rounds">라운드</label>
+        <select id="rounds">
+          <option value="2">2바퀴</option>
+          <option value="3" selected>3바퀴</option>
+          <option value="4">4바퀴</option>
+          <option value="6">6바퀴</option>
+        </select>
+      </div>
+      <div class="fixed" style="width:150px">
+        <label for="scribe">서기 (정리 담당)</label>
+        <select id="scribe"></select>
+      </div>
+    </div>
+    <p class="hint" id="estimate"></p>
+  </section>
+
+  <!-- ===== 채팅방 ===== -->
+  <section id="log"></section>
+
+  <!-- ===== 누계 ===== -->
+  <section class="card hidden" id="totCard">
+    <h2>지금까지 쓴 것</h2>
+    <div class="totgrid">
+      <div class="cell"><b id="tMeet">0</b><span>회의</span></div>
+      <div class="cell"><b id="tCall">0</b><span>호출</span></div>
+      <div class="cell"><b id="tTok">0</b><span>토큰</span></div>
+      <div class="cell"><b id="tCost">$0</b><span>비용</span></div>
+    </div>
+    <div style="overflow-x:auto"><table id="tTable"></table></div>
+    <p class="hint" id="tSince"></p>
+    <div class="row" style="margin-top:10px">
+      <button class="fixed mini" id="btnTotClose">닫기</button>
+      <span class="spacer"></span>
+      <button class="fixed mini ghost" id="btnTotReset">누계 지우기</button>
+    </div>
+  </section>
+
+  <!-- ===== 결과 ===== -->
+  <section class="card hidden" id="outCard">
+    <h2>PPT 개요</h2>
+    <div id="outline"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="fixed" id="btnCopy">복사</button>
+      <button class="fixed" id="btnDownload">.md 내려받기</button>
+      <span class="spacer"></span>
+    </div>
+    <p class="hint">
+      이 파일을 클로드 코드에 넘기고 “이걸로 PPT 만들어”라고 하면 pptx 스킬이 진짜 파일을 만든다.
+      회사 서식이 있으면 그 파일도 같이 준다.
+    </p>
+  </section>
+</main>
+
+<footer>
+  <span id="stat">대기 중</span>
+  <span class="spacer"></span>
+  <span class="meter">호출 <b id="statCalls">0</b></span>
+  <span class="meter">토큰 <b id="statTok">0</b></span>
+  <span class="meter">비용 <b id="statCost">$0.0000</b></span>
+  <span class="meter" id="totalBtn" title="지금까지 쓴 것 전부 보기">누계 <b id="statTotal">$0.0000</b></span>
+  <button class="primary" id="btnRun">회의 시작</button>
+  <button class="danger hidden" id="btnStop">중지</button>
+</footer>
+
+<!-- ===== 잠금 =====
+     자물쇠는 화면을 가리는 것이지 서버가 막는 것이 아니다.
+     소스를 뜯어볼 줄 아는 사람은 통과한다 — 「아무나 들어오지 않게」 하는 문턱이다. -->
+<div id="lock" class="hidden">
+  <div class="box">
+    <div class="ico">🔒</div>
+    <h2>AI 회의실</h2>
+    <p id="lockMsg">비밀번호를 넣어 주세요.</p>
+    <input id="lockInput" type="password" autocomplete="off" spellcheck="false" placeholder="비밀번호">
+    <button class="primary go" id="lockGo">들어가기</button>
+    <div class="bad" id="lockBad"></div>
+  </div>
+</div>
+
+<!-- ===== 비밀번호 만들기 (?setpass=1) ===== -->
+<div id="setpass" class="modal hidden">
+  <div class="sheet" style="max-width:440px">
+    <div class="top"><b style="flex:1">비밀번호 만들기</b><button class="mini" id="spClose">닫기</button></div>
+    <div style="padding:14px 15px">
+      <p class="hint" style="margin-top:0">
+        쓰고 싶은 비밀번호를 넣으면 아래에 <code>index.html</code> 에 붙여 넣을 한 줄이 나온다.
+        <b>비밀번호 자체는 파일에 안 들어간다</b> — 되돌릴 수 없게 뭉갠 값만 들어간다.
+        이 화면은 <b>내 컴퓨터에서만</b> 열린다. 웹에 올라간 판에는 비밀번호를 바꾸는 통로가 없다.
+      </p>
+      <label for="spPw">새 비밀번호</label>
+      <input id="spPw" type="text" autocomplete="off" spellcheck="false" placeholder="4자 이상. 길수록 안전하다">
+      <div class="out" id="spOut">비밀번호를 넣으면 여기에 나온다</div>
+      <div class="row" style="margin-top:11px">
+        <button class="primary fixed" id="spCopy">한 줄 복사</button>
+        <span class="spacer"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 모델 고르기 ===== -->
+<div class="modal hidden" id="picker">
+  <div class="sheet">
+    <div class="top">
+      <input id="pickSearch" placeholder="모델·회사 이름으로 검색" autocomplete="off" spellcheck="false">
+      <button class="fixed" id="pickClose">닫기</button>
+    </div>
+    <div class="list" id="pickList"></div>
+    <div class="bot">
+      <span id="pickCount"></span>
+      <span class="spacer"></span>
+      <button class="mini ghost" id="pickRefresh">목록 새로 받기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ==================================================================
+   * AI 회의실 — 회사가 다른 모델들을 한 방에 앉히고 순번제로 토론시킨다.
+   *
+   * 원리는 단순하다. 모델끼리 연결선이 있는 게 아니라,
+   * "[이름]: 발언" 형태의 평문 회의록 한 덩어리를 매 차례 통째로 넘긴다.
+   * role 구조(assistant/user 교대)로 옮기지 않는 이유가 있다 — 벤더마다
+   * 교대 규칙이 달라 남의 발언을 assistant 로 넣으면 400 이 난다.
+   * 평문이면 어떤 모델에든 똑같이 먹으므로 회의 로직은 벤더를 모른다.
+   * ================================================================== */
+
+  const store = {
+    get(key, fallback) {
+      try {
+        const v = localStorage.getItem(key);
+        return v === null ? fallback : JSON.parse(v);
+      } catch (e) { return fallback; }
+    },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} },
+    del(key) { try { localStorage.removeItem(key); } catch (e) {} }
+  };
+
+  /* ==================================================================
+   * 자물쇠
+   *
+   * PASS_HASH 가 비어 있으면 잠그지 않는다. 값이 있으면 그 값과 맞아야 들어온다.
+   * 비밀번호 자체는 파일에 넣지 않는다 — 되돌릴 수 없게 뭉갠 값만 넣는다.
+   * 새 비밀번호는 주소에 ?setpass=1 을 붙여 만든다.
+   *
+   * 분명히 해 둘 것: 이건 서버가 막는 것이 아니라 화면을 가리는 문턱이다.
+   * 소스를 뜯어볼 줄 아는 사람은 통과한다. 「아무나 들어오지 않게」 하는 용도다.
+   * ================================================================== */
+  // 임시 비밀번호: council2026 — 주소에 ?setpass=1 을 붙여 새로 만들어 이 줄을 갈아 끼운다
+  const PASS_HASH = '5ae5fa4b6ab33244ffdbd5bcc52f172663941301d63b1c9d8c73097472668691';
+
+  /* SHA-256 을 직접 구현한 이유: crypto.subtle 은 안전한 문맥에서만 열리는데
+   * 이 저장소의 앱은 file:// 로 열어도 돌아가야 한다(집 규칙). 여기 의존을 두면
+   * 어떤 브라우저에서는 자물쇠가 통째로 죽는다. */
+  const SHA_K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  function sha256(msg) {
+    const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+    let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    const b = Array.from(new TextEncoder().encode(msg));
+    const bitLen = b.length * 8;
+    b.push(0x80);
+    while (b.length % 64 !== 56) b.push(0);
+    b.push(0, 0, 0, 0);   // 길이의 상위 32비트. 입력이 512MB 를 넘을 일이 없다.
+    b.push((bitLen >>> 24) & 255, (bitLen >>> 16) & 255, (bitLen >>> 8) & 255, bitLen & 255);
+
+    const w = new Uint32Array(64);
+    for (let off = 0; off < b.length; off += 64) {
+      for (let i = 0; i < 16; i++) {
+        w[i] = (b[off+i*4] << 24) | (b[off+i*4+1] << 16) | (b[off+i*4+2] << 8) | b[off+i*4+3];
+      }
+      for (let i = 16; i < 64; i++) {
+        const s0 = rotr(w[i-15], 7) ^ rotr(w[i-15], 18) ^ (w[i-15] >>> 3);
+        const s1 = rotr(w[i-2], 17) ^ rotr(w[i-2], 19) ^ (w[i-2] >>> 10);
+        w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+      }
+      let a = H[0], c1 = H[1], c2 = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+      for (let i = 0; i < 64; i++) {
+        const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+        const ch = (e & f) ^ (~e & g);
+        const t1 = (h + S1 + ch + SHA_K[i] + w[i]) >>> 0;
+        const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        const mj = (a & c1) ^ (a & c2) ^ (c1 & c2);
+        const t2 = (S0 + mj) >>> 0;
+        h = g; g = f; f = e; e = (d + t1) >>> 0;
+        d = c2; c2 = c1; c1 = a; a = (t1 + t2) >>> 0;
+      }
+      H = [(H[0]+a)>>>0, (H[1]+c1)>>>0, (H[2]+c2)>>>0, (H[3]+d)>>>0,
+           (H[4]+e)>>>0, (H[5]+f)>>>0, (H[6]+g)>>>0, (H[7]+h)>>>0];
+    }
+    return H.map((x) => ('00000000' + x.toString(16)).slice(-8)).join('');
+  }
+  // 소금을 섞어 흔한 비밀번호가 무지개표에 그대로 걸리지 않게 한다
+  const hashPass = (pw) => sha256('ai-council:' + pw);
+
+  /* ==================================================================
+   * 노력도(생각의 깊이)
+   *
+   * 모델마다 받는 값이 다르다. 손으로 적어 두면 반드시 틀리므로
+   * 오픈라우터가 모델별로 알려 주는 reasoning.supported_efforts 를 그대로 쓴다.
+   *  - 'off'     : 생각을 끈다 (reasoning.enabled=false). 못 끄는 모델에는 안 보여 준다.
+   *  - 'default' : 아무것도 안 보낸다. 노력도 목록이 없는 모델용.
+   * ================================================================== */
+  const EFFORT_LABEL = {
+    off: '생각 끔', none: '생각 끔', default: '기본값',
+    minimal: '아주 조금', low: '조금', medium: '보통',
+    high: '많이', xhigh: '아주 많이', max: '최대'
+  };
+  // 노력도별 max_tokens. 생각 토큰도 여기서 나가므로 깊을수록 넉넉해야 발언이 안 잘린다.
+  const EFFORT_TOKENS = {
+    off: 900, none: 900, default: 2000, minimal: 1100,
+    low: 1500, medium: 2800, high: 4500, xhigh: 6500, max: 9000
+  };
+  // 비용 어림용 — 실제로 나올 출력 토큰의 거친 짐작값 (실측이 오면 이건 안 쓴다)
+  const EFFORT_OUT = {
+    off: 230, none: 230, default: 400, minimal: 320,
+    low: 520, medium: 1000, high: 1800, xhigh: 2600, max: 3600
+  };
+  const EFFORT_ORDER = ['off', 'default', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+  /* ---------- 회사 이름 ---------- */
+  const VENDOR_KO = {
+    openai: 'GPT', anthropic: '클로드', google: '제미나이', 'x-ai': '그록',
+    deepseek: '딥시크', qwen: '큐원', 'meta-llama': '라마', meta: '메타',
+    mistralai: '미스트랄', upstage: '업스테이지', 'z-ai': 'Z.ai',
+    moonshotai: '문샷', minimax: '미니맥스', nvidia: 'NVIDIA', cohere: '코히어',
+    perplexity: '퍼플렉시티', amazon: '아마존', microsoft: 'MS'
+  };
+  // 고를 일이 많은 회사를 위로 올린다
+  const VENDOR_TOP = ['anthropic', 'openai', 'google', 'x-ai', 'deepseek', 'qwen', 'mistralai', 'meta-llama'];
+
+  /* ==================================================================
+   * 모델 목록
+   *
+   * 오픈라우터는 https://openrouter.ai/api/v1/models 에서 통째로 받는다
+   * (키가 필요 없는 공개 주소다). 값·노력도·출력 상한이 매일 바뀌므로
+   * 손으로 적은 표를 정본으로 삼지 않는다 — 아래 표는 못 받았을 때의 폴백일 뿐이다.
+   * 값은 2026-08-26 실측.
+   * ================================================================== */
+  const OR_URL = 'https://openrouter.ai/api/v1/models';
+  const CAT_TTL = 24 * 3600 * 1000;   // 하루 지나면 다시 받는다
+
+  const OR_FALLBACK = [
+    { id:'anthropic/claude-opus-5',       label:'Claude Opus 5',    i:5,    o:25, mx:128000, md:0, ef:['max','xhigh','high','medium','low'] },
+    { id:'anthropic/claude-sonnet-5',     label:'Claude Sonnet 5',  i:2,    o:10, mx:128000, md:0, ef:['max','xhigh','high','medium','low'] },
+    { id:'anthropic/claude-haiku-4.5',    label:'Claude Haiku 4.5', i:1,    o:5,  mx:64000,  md:0, ef:[] },
+    { id:'anthropic/claude-fable-5',      label:'Claude Fable 5',   i:10,   o:50, mx:128000, md:1, ef:['max','xhigh','high','medium','low'] },
+    { id:'openai/gpt-5.6-sol',            label:'GPT-5.6 Sol',      i:2,    o:10, mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.6-sol-pro',        label:'GPT-5.6 Sol Pro',  i:2,    o:10, mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.6-terra',          label:'GPT-5.6 Terra',    i:2,    o:12, mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.6-luna',           label:'GPT-5.6 Luna',     i:0.2,  o:1.2,mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.4',                label:'GPT-5.4',          i:2.5,  o:15, mx:128000, md:0, ef:['xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5-mini',             label:'GPT-5 Mini',       i:0.25, o:2,  mx:128000, md:1, ef:['high','medium','low','minimal'] },
+    { id:'google/gemini-3.1-pro-preview', label:'Gemini 3.1 Pro',   i:2,    o:12, mx:65536,  md:1, ef:['high','medium','low'] },
+    { id:'google/gemini-3.7-flash',       label:'Gemini 3.7 Flash', i:0.375,o:1.875,mx:65536,md:1, ef:['high','medium','low'] },
+    { id:'x-ai/grok-4.6',                 label:'Grok 4.6',         i:2,    o:6,  mx:450000, md:1, ef:['xhigh','high','medium','low'] },
+    { id:'deepseek/deepseek-chat-v3.1',   label:'DeepSeek V3.1',    i:0.55, o:1.65,mx:144900,md:0, ef:[] }
+  ];
+
+  /* 앤트로픽 직통 — 이미 앤트로픽 키가 있는 사람용. 여기는 목록 API 가 없어 손으로 적는다.
+   * 파라미터 규칙이 오픈라우터와 다르다:
+   *  ef  — output_config.effort 로 받는 값. 빈 배열이면 effort 자체를 모른다(Haiku 4.5 는 400).
+   *  md  — 생각을 못 끄는가. Fable 5 는 thinking:{type:'disabled'} 를 거부한다(400).
+   * temperature·top_p 는 Opus 5/Sonnet 5/Fable 5 에서 제거됐다(400) —
+   * 발언의 다양성은 파라미터가 아니라 역할 프롬프트로 벌린다.
+   */
+  const ANT_LIST = [
+    { id:'claude-opus-5',    label:'Opus 5',    i:5,  o:25, mx:64000, md:0, ef:['max','xhigh','high','medium','low'], fb:1 },
+    { id:'claude-sonnet-5',  label:'Sonnet 5',  i:3,  o:15, mx:64000, md:0, ef:['max','xhigh','high','medium','low'], fb:0 },
+    { id:'claude-haiku-4-5', label:'Haiku 4.5', i:1,  o:5,  mx:64000, md:0, ef:[],                                    fb:0 },
+    { id:'claude-fable-5',   label:'Fable 5',   i:10, o:50, mx:64000, md:1, ef:['max','xhigh','high','medium','low'], fb:1 }
+  ];
+
+  const PROVIDERS = {
+    openrouter: {
+      label: '오픈라우터',
+      keyPrefix: 'sk-or-',
+      keyPlaceholder: 'sk-or-v1-...',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      seats: [
+        { who:'기획자',   model:'openai/gpt-5.6-sol',      effort:'medium', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
+        { who:'반론자',   model:'anthropic/claude-opus-5', effort:'low',    persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
+        { who:'청중대변', model:'google/gemini-3.7-flash', effort:'low',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
+      ]
+    },
+    anthropic: {
+      label: '앤트로픽 직통',
+      keyPrefix: 'sk-ant-',
+      keyPlaceholder: 'sk-ant-...',
+      url: 'https://api.anthropic.com/v1/messages',
+      seats: [
+        { who:'기획자',   model:'claude-opus-5',    effort:'medium', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
+        { who:'반론자',   model:'claude-sonnet-5',  effort:'low',    persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
+        { who:'청중대변', model:'claude-haiku-4-5', effort:'off',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
+      ]
+    }
+  };
+
+  const ANT_VERSION = '2023-06-01';
+  const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
+
+  /* ---------- 폭주 방어선 ----------
+   * 모델끼리 대화시키면 토큰이 곱셈으로 는다. 최후의 방어선은 코드가 아니라
+   * 각 사이트의 지출 상한이다(오픈라우터는 키마다 Credit limit 을 걸 수 있다).
+   */
+  const MAX_SEATS = 5;
+  const MAX_CALLS = 40;
+  const TRANSCRIPT_MAX = 7000;
+
+  const COLORS = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)', 'var(--p5)'];
+
+  /* ---------- 상태 ---------- */
+  const S = {
+    prov: store.get('council_prov', 'openrouter'),
+    seats: null,
+    cat: null,          // 지금 프로바이더의 모델 목록 (배열)
+    catAt: 0,           // 언제 받았는가
+    catLive: false,     // 오픈라우터에서 진짜 받아 온 것인가
+    running: false, stop: false,
+    transcript: [],
+    calls: 0, inTok: 0, outTok: 0, cost: 0,
+    estimated: false,
+    abort: null,
+    pickSeat: -1
+  };
+  if (!PROVIDERS[S.prov]) S.prov = 'openrouter';
+  let apiKey = '';
+
+  const P = () => PROVIDERS[S.prov];
+
+  /* ---------- 모델 조회 ---------- */
+  const catIndex = {};
+  function reindex() {
+    Object.keys(catIndex).forEach((k) => delete catIndex[k]);
+    S.cat.forEach((m) => { catIndex[m.id] = m; });
+  }
+  function M(id) {
+    return catIndex[id] || { id: id, label: id, i: 0, o: 0, mx: 8192, md: 0, ef: [], unknown: true };
+  }
+  const vendorOf = (id) => (id.indexOf('/') > 0 ? id.split('/')[0] : 'anthropic');
+  const vendorKo = (v) => VENDOR_KO[v] || v;
+
+  /* 이 모델에서 고를 수 있는 노력도. 모델이 알려 준 목록을 그대로 쓰되
+   * 화면에 보여 줄 순서(약함→강함)로 다시 세운다. */
+  function effortsFor(id) {
+    const m = M(id);
+    const list = [];
+    if (!m.md) list.push('off');            // 생각을 끌 수 있는 모델만
+    if (!m.ef || !m.ef.length) {
+      // 노력도 단계를 안 알려 주는 모델. 끄거나(off), 아무것도 안 보내거나(default) 둘뿐이다.
+      list.push('default');
+      return list;
+    }
+    m.ef.forEach((e) => { if (e !== 'none' && list.indexOf(e) < 0) list.push(e); });
+    return list.sort((a, b) => EFFORT_ORDER.indexOf(a) - EFFORT_ORDER.indexOf(b));
+  }
+  // 저장된 노력도가 그 모델에 없으면 가장 가까운 것으로 끌어온다
+  function fixEffort(id, want) {
+    const opts = effortsFor(id);
+    if (opts.indexOf(want) >= 0) return want;
+    const wi = EFFORT_ORDER.indexOf(want);
+    let best = opts[0], bd = 99;
+    opts.forEach((e) => {
+      const d = Math.abs(EFFORT_ORDER.indexOf(e) - wi);
+      if (d < bd) { bd = d; best = e; }
+    });
+    return best;
+  }
+  const tokensFor = (id, eff) => Math.min(EFFORT_TOKENS[eff] || 2000, M(id).mx || 8192);
+
+  /* ==================================================================
+   * 모델 목록 받아 오기
+   * ================================================================== */
+  function normalize(raw) {
+    const out = [];
+    raw.forEach((m) => {
+      const a = m.architecture || {};
+      const mods = a.output_modalities || [];
+      // 글을 못 내놓는 모델(그림·소리 전용), 묶음 처리용, 별명은 뺀다
+      if (mods.indexOf('text') < 0) return;
+      if (m.id.indexOf(':batch') >= 0) return;
+      if (m.alias_target) return;
+      const p = m.pricing || {};
+      const r = m.reasoning || null;
+      const tp = m.top_provider || {};
+      out.push({
+        id: m.id,
+        label: (m.name || m.id).replace(/^[^:]+:\s*/, ''),
+        i: (parseFloat(p.prompt) || 0) * 1e6,
+        o: (parseFloat(p.completion) || 0) * 1e6,
+        mx: tp.max_completion_tokens || m.context_length || 8192,
+        md: r && r.mandatory ? 1 : 0,
+        ef: (r && r.supported_efforts) || [],
+        ctx: m.context_length || 0
+      });
+    });
+    return out;
+  }
+
+  async function loadCatalog(force) {
+    if (S.prov === 'anthropic') {
+      S.cat = ANT_LIST.slice(); S.catLive = false; reindex(); return;
+    }
+    const cached = store.get('council_cat', null);
+    if (!force && cached && cached.list && (Date.now() - cached.at) < CAT_TTL) {
+      S.cat = cached.list; S.catAt = cached.at; S.catLive = true; reindex(); return;
+    }
+    // 못 받아도 앱은 돌아야 한다 — 폴백을 먼저 깔고 시작한다
+    S.cat = (cached && cached.list) || OR_FALLBACK.slice();
+    S.catLive = !!(cached && cached.list);
+    reindex();
+    try {
+      const res = await fetch(OR_URL, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      const list = normalize(json.data || []);
+      if (!list.length) throw new Error('빈 목록');
+      S.cat = list; S.catAt = Date.now(); S.catLive = true;
+      reindex();
+      store.set('council_cat', { at: S.catAt, list: list });
+      return true;
+    } catch (e) {
+      // file:// 이나 오프라인. 폴백으로 계속 간다.
+      return false;
+    }
+  }
+
+  /* ---------- 자리 ---------- */
+  function loadSeats() {
+    const saved = store.get('council_seats_' + S.prov, null);
+    const ok = Array.isArray(saved) && saved.length >= 2 && saved.every((s) => s && s.model && s.who !== undefined);
+    S.seats = ok ? saved : P().seats.map((s) => Object.assign({}, s));
+    // 모델이 바뀌어 없어진 노력도를 가진 자리가 있을 수 있다
+    S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort || 'low'); });
+  }
+  function saveSeats() { store.set('council_seats_' + S.prov, S.seats); updateEstimate(); renderFaces(); }
+
+  /* ---------- DOM ---------- */
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    keyCard: $('keyCard'), keyInput: $('keyInput'), keyLabel: $('keyLabel'), keyHint: $('keyHint'),
+    provider: $('provider'), hdrSub: $('hdrSub'), faces: $('faces'),
+    topic: $('topic'), seats: $('seats'), rounds: $('rounds'), scribe: $('scribe'), estimate: $('estimate'),
+    log: $('log'), outCard: $('outCard'), outline: $('outline'),
+    stat: $('stat'), statCalls: $('statCalls'), statTok: $('statTok'), statCost: $('statCost'),
+    statTotal: $('statTotal'), totCard: $('totCard'),
+    lock: $('lock'), lockInput: $('lockInput'), lockBad: $('lockBad'),
+    setpass: $('setpass'), spPw: $('spPw'), spOut: $('spOut'),
+    btnRun: $('btnRun'), btnStop: $('btnStop'),
+    picker: $('picker'), pickSearch: $('pickSearch'), pickList: $('pickList'), pickCount: $('pickCount')
+  };
+
+  const initial = (name) => (name || '?').trim().charAt(0) || '?';
+
+  /* 조사 고르기 — 참가자 이름을 사용자가 직접 바꾸므로 "가/이"를 고정할 수 없다.
+   * 한글 음절은 0xAC00 부터 28개 단위로 받침이 돈다. 나머지가 0이면 받침이 없다. */
+  function josa(word, withBatchim, without) {
+    const s = (word || '').trim();
+    if (!s) return without;
+    const c = s.charCodeAt(s.length - 1);
+    if (c < 0xAC00 || c > 0xD7A3) return without;
+    return ((c - 0xAC00) % 28) ? withBatchim : without;
+  }
+
+  const money = (n) => (n >= 1 ? n.toFixed(n % 1 ? 2 : 0) : n.toFixed(n < 0.1 ? 3 : 2).replace(/0+$/, '').replace(/\.$/, ''));
+
+  /* ==================================================================
+   * 그리기
+   * ================================================================== */
+
+  function renderFaces() {
+    el.faces.innerHTML = '';
+    S.seats.forEach((s, i) => {
+      const d = document.createElement('span');
+      d.className = 'face';
+      d.style.setProperty('--f', COLORS[i % COLORS.length]);
+      d.textContent = initial(s.who);
+      d.title = s.who + ' · ' + M(s.model).label;
+      el.faces.appendChild(d);
+    });
+    el.hdrSub.textContent = P().label + (S.prov === 'openrouter' && !S.catLive ? ' (목록 못 받음)' : '');
+  }
+
+  function renderSeats() {
+    el.seats.innerHTML = '';
+    S.seats.forEach((seat, i) => {
+      const box = document.createElement('div');
+      box.className = 'seat';
+      box.style.setProperty('--seat-color', COLORS[i % COLORS.length]);
+      box.innerHTML =
+        '<div class="r1">' +
+          '<span class="av"></span>' +
+          '<input class="who" maxlength="12" aria-label="역할 이름">' +
+          '<button class="mbtn" aria-label="모델 고르기"><span class="mname"></span><span class="mprice"></span></button>' +
+          '<select class="eff" aria-label="노력도"></select>' +
+          '<button class="mini ghost del" aria-label="빼기" title="빼기">✕</button>' +
+        '</div>' +
+        '<div class="r2"><input class="persona" maxlength="200" aria-label="성격" placeholder="이 사람은 어떤 눈으로 보는가"></div>';
+
+      // value 는 innerHTML 로 넣지 않는다 — 따옴표가 든 글이 들어오면 깨진다
+      const who = box.querySelector('.who');
+      const persona = box.querySelector('.persona');
+      const av = box.querySelector('.av');
+      const mbtn = box.querySelector('.mbtn');
+      const eff = box.querySelector('.eff');
+      who.value = seat.who;
+      persona.value = seat.persona;
+      av.textContent = initial(seat.who);
+
+      const paint = () => {
+        const m = M(seat.model);
+        mbtn.querySelector('.mname').textContent = m.label;
+        mbtn.querySelector('.mprice').textContent = '$' + money(m.i) + '/' + money(m.o);
+        mbtn.title = seat.model + '\n100만 토큰당 입력 $' + m.i + ' · 출력 $' + m.o;
+        mbtn.classList.toggle('unknown', !!m.unknown);
+        const opts = effortsFor(seat.model);
+        seat.effort = fixEffort(seat.model, seat.effort);
+        eff.innerHTML = opts.map((e) =>
+          '<option value="' + e + '"' + (e === seat.effort ? ' selected' : '') + '>' + EFFORT_LABEL[e] + '</option>'
+        ).join('');
+        eff.disabled = opts.length < 2;
+        eff.title = M(seat.model).md ? '이 모델은 생각을 끌 수 없다' : '';
+      };
+      paint();
+      seat._paint = paint;
+
+      who.addEventListener('input', (e) => {
+        seat.who = e.target.value;
+        av.textContent = initial(seat.who);
+        // renderSeats() 를 다시 부르지 않는다 — 타자 치는 중에 입력칸이 새로 그려지면 초점을 잃는다.
+        saveSeats(); renderScribe(); refreshEmpty();
+      });
+      persona.addEventListener('input', (e) => { seat.persona = e.target.value; saveSeats(); });
+      eff.addEventListener('change', (e) => { seat.effort = e.target.value; saveSeats(); });
+      mbtn.addEventListener('click', () => openPicker(i));
+      box.querySelector('.del').addEventListener('click', () => {
+        if (S.seats.length <= 2) { flash('참가자는 둘은 있어야 대화가 된다.'); return; }
+        S.seats.splice(i, 1); saveSeats(); renderSeats(); renderScribe();
+      });
+
+      el.seats.appendChild(box);
+    });
+    renderFaces();
+    refreshEmpty();
+  }
+
+  function renderScribe() {
+    const cur = +el.scribe.value;
+    el.scribe.innerHTML = S.seats.map((s, i) =>
+      '<option value="' + i + '">' + (s.who || ('참가자' + (i + 1))) + '</option>'
+    ).join('');
+    // 기본은 가장 비싼(=대개 가장 똑똑한) 자리. 정리는 한 번뿐이라 여기서 아끼지 않는다.
+    let best = 0;
+    S.seats.forEach((s, i) => { if (M(s.model).o > M(S.seats[best].model).o) best = i; });
+    el.scribe.value = String(cur >= 0 && cur < S.seats.length ? cur : best);
+    updateEstimate();
+  }
+
+  function updateEstimate() {
+    if (!S.seats || !S.cat) return;
+    const rounds = +el.rounds.value;
+    const turns = rounds * S.seats.length;
+    const base = 600;
+    let inTot = 0, cost = 0, grown = 0;
+    for (let t = 0; t < turns; t++) {
+      const seat = S.seats[t % S.seats.length];
+      const m = M(seat.model);
+      const outPer = EFFORT_OUT[seat.effort] || 500;
+      const inTok = base + grown;
+      grown += outPer * 0.7;
+      inTot += inTok;
+      cost += (inTok / 1e6) * m.i + (outPer / 1e6) * m.o;
+    }
+    const si = Math.min(+el.scribe.value || 0, S.seats.length - 1);
+    const sm = M(S.seats[si].model);
+    cost += (inTot / turns / 1e6) * sm.i + (1500 / 1e6) * sm.o;
+    el.estimate.textContent =
+      '발언 ' + turns + '회 + 정리 1회 ≒ $' + cost.toFixed(3) +
+      ' (어림값 · 한화 약 ' + Math.round(cost * 1400).toLocaleString('ko-KR') + '원). ' +
+      '노력도를 올리면 값이 빠르게 뛴다. 키에 지출 상한을 걸어 둘 것.';
+  }
+
+  /* ==================================================================
+   * 모델 고르기 창
+   * ================================================================== */
+
+  function openPicker(seatIdx) {
+    S.pickSeat = seatIdx;
+    el.picker.classList.remove('hidden');
+    el.pickSearch.value = '';
+    renderPickList('');
+    el.pickSearch.focus();
+  }
+  function closePicker() { el.picker.classList.add('hidden'); S.pickSeat = -1; }
+
+  function renderPickList(q) {
+    const cur = S.pickSeat >= 0 ? S.seats[S.pickSeat].model : '';
+    q = (q || '').trim().toLowerCase();
+    const hit = S.cat.filter((m) => {
+      if (!q) return true;
+      const v = vendorOf(m.id);
+      return (m.id + ' ' + m.label + ' ' + v + ' ' + vendorKo(v)).toLowerCase().indexOf(q) >= 0;
+    });
+
+    // 회사별로 묶고, 자주 쓰는 회사를 위로
+    const groups = {};
+    hit.forEach((m) => { const v = vendorOf(m.id); (groups[v] = groups[v] || []).push(m); });
+    const vendors = Object.keys(groups).sort((a, b) => {
+      const ia = VENDOR_TOP.indexOf(a), ib = VENDOR_TOP.indexOf(b);
+      if (ia >= 0 || ib >= 0) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+      return a.localeCompare(b);
+    });
+
+    el.pickList.innerHTML = '';
+    let shown = 0;
+    const LIMIT = 260;   // 한 번에 너무 많이 그리면 느려진다
+    outer:
+    for (const v of vendors) {
+      const head = document.createElement('div');
+      head.className = 'vend';
+      head.textContent = vendorKo(v) + (VENDOR_KO[v] ? ' · ' + v : '');
+      el.pickList.appendChild(head);
+      groups[v].sort((a, b) => b.o - a.o);
+      for (const m of groups[v]) {
+        if (shown >= LIMIT) break outer;
+        const row = document.createElement('div');
+        row.className = 'mrow' + (m.id === cur ? ' on' : '');
+        const nm = document.createElement('div');
+        nm.className = 'nm';
+        nm.textContent = m.label;
+        const sub = document.createElement('small');
+        sub.className = 'id';
+        sub.textContent = m.id;
+        nm.appendChild(sub);
+        row.appendChild(nm);
+        if (m.md) {
+          const b = document.createElement('span');
+          b.className = 'badge fix';
+          b.textContent = '생각 고정';
+          b.title = '이 모델은 생각을 끌 수 없다';
+          row.appendChild(b);
+        } else if (!m.ef.length) {
+          const b = document.createElement('span');
+          b.className = 'badge';
+          b.textContent = '노력도 없음';
+          row.appendChild(b);
+        }
+        const pr = document.createElement('div');
+        pr.className = 'pr';
+        pr.textContent = '$' + money(m.i) + ' / $' + money(m.o);
+        const s2 = document.createElement('small');
+        s2.textContent = m.ef.length ? m.ef.length + '단계' : '—';
+        pr.appendChild(s2);
+        row.appendChild(pr);
+        row.addEventListener('click', () => pick(m.id));
+        el.pickList.appendChild(row);
+        shown++;
+      }
+    }
+    el.pickCount.textContent =
+      hit.length + '개' + (shown < hit.length ? ' 중 ' + shown + '개 표시 — 검색으로 좁힐 것' : '') +
+      (S.catLive ? '' : ' · 목록을 못 받아 기본 표로 보여 준다');
+  }
+
+  function pick(id) {
+    if (S.pickSeat < 0) return;
+    const seat = S.seats[S.pickSeat];
+    seat.model = id;
+    seat.effort = fixEffort(id, seat.effort);
+    closePicker();
+    saveSeats();
+    renderSeats(); renderScribe();
+    flash(seat.who + ' → ' + M(id).label);
+  }
+
+  el.pickSearch.addEventListener('input', (e) => renderPickList(e.target.value));
+  $('pickClose').addEventListener('click', closePicker);
+  el.picker.addEventListener('click', (e) => { if (e.target === el.picker) closePicker(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !el.picker.classList.contains('hidden')) closePicker();
+  });
+  $('pickRefresh').addEventListener('click', async () => {
+    el.pickCount.textContent = '받는 중…';
+    const ok = await loadCatalog(true);
+    renderSeats(); renderScribe(); renderPickList(el.pickSearch.value);
+    flash(ok ? '모델 목록을 새로 받았다. ' + S.cat.length + '개.' : '목록을 받지 못했다. 기본 표로 계속한다.');
+  });
+
+  /* ==================================================================
+   * 채팅방 화면
+   * ================================================================== */
+
+  let lastSpeaker = null;
+
+  function renderEmpty() {
+    el.log.innerHTML = '';
+    const d = document.createElement('div');
+    d.className = 'empty';
+    const ring = document.createElement('div');
+    ring.className = 'ring';
+    S.seats.forEach((s, i) => {
+      const f = document.createElement('span');
+      f.className = 'face';
+      f.style.setProperty('--f', COLORS[i % COLORS.length]);
+      f.textContent = initial(s.who);
+      ring.appendChild(f);
+    });
+    const last = S.seats[S.seats.length - 1].who;
+    const who = document.createElement('div');
+    who.className = 'who';
+    who.textContent = S.seats.map((s) => s.who).join(' · ') + josa(last, '이', '가') + ' 기다리고 있다';
+    const tip = document.createElement('div');
+    tip.textContent = '안건을 적고 「회의 시작」을 누르면 여기서 순서대로 말한다.';
+    d.appendChild(ring); d.appendChild(who); d.appendChild(tip);
+    el.log.appendChild(d);
+  }
+  // 아직 회의를 안 열었으면 빈 방 안내를 새 참가자로 갈아 준다.
+  // 회의록이 남아 있는 화면은 건드리지 않는다.
+  function refreshEmpty() {
+    if (!S.running && (!el.log.children.length || el.log.querySelector('.empty'))) renderEmpty();
+  }
+
+  function addMsg(seat, idx) {
+    const cont = lastSpeaker === seat.who;   // 같은 사람이 이어 말하면 얼굴을 숨긴다
+    lastSpeaker = seat.who;
+    const wrap = document.createElement('div');
+    wrap.className = 'msg' + (cont ? ' cont' : '');
+    wrap.style.setProperty('--c', COLORS[idx % COLORS.length]);
+    wrap.innerHTML =
+      '<span class="av"></span>' +
+      '<div class="col">' +
+        '<div class="head"><span class="nm"></span><span class="chip"></span><span class="chip ef"></span></div>' +
+        '<div class="bubble"><span class="dots"><i></i><i></i><i></i></span></div>' +
+      '</div>';
+    wrap.querySelector('.av').textContent = initial(seat.who);
+    wrap.querySelector('.nm').textContent = seat.who;
+    wrap.querySelector('.chip').textContent = M(seat.model).label;
+    wrap.querySelector('.ef').textContent = EFFORT_LABEL[seat.effort] || seat.effort;
+    el.log.appendChild(wrap);
+    scrollDown();
+    return wrap.querySelector('.bubble');
+  }
+
+  function addNote(text, bad) {
+    lastSpeaker = null;
+    const d = document.createElement('div');
+    d.className = 'note' + (bad ? ' bad' : '');
+    d.textContent = text;
+    el.log.appendChild(d);
+    scrollDown();
+    return d;
+  }
+
+  function addDivider(text) {
+    lastSpeaker = null;
+    const d = document.createElement('div');
+    d.className = 'divider';
+    const s = document.createElement('span');
+    s.textContent = text;
+    d.appendChild(s);
+    el.log.appendChild(d);
+    scrollDown();
+  }
+
+  function scrollDown() {
+    const m = document.querySelector('main');
+    // 사용자가 위로 올려 읽는 중이면 끌어내리지 않는다
+    if (m.scrollHeight - m.scrollTop - m.clientHeight < 260) m.scrollTop = m.scrollHeight;
+  }
+
+  function flash(msg) { el.stat.textContent = msg; }
+
+  function updateStats() {
+    el.statCalls.textContent = S.calls;
+    el.statTok.textContent = (S.inTok + S.outTok).toLocaleString('ko-KR');
+    el.statCost.textContent = (S.estimated ? '≈$' : '$') + S.cost.toFixed(4);
+    el.statTotal.textContent = '$' + TOT.cost.toFixed(4);
+  }
+
+  /* ---------- 누계 ----------
+   * 회의를 몇 번을 열었든 지금까지 쓴 토큰과 돈을 한군데 모아 둔다.
+   * 모델별로도 나눠 두는 이유는 "어느 자리가 돈을 먹는지"가 실제로 궁금하기 때문이다.
+   */
+  const TOTAL_KEY = 'council_total';
+  /* 날짜는 로컬 시간으로만 만든다. toISOString() 은 UTC 로 바꿔 버려서
+   * 자정 근처에 하루가 밀린다(실제로 26일에 25일로 찍혔다). 집 규칙이기도 하다. */
+  function todayStr() {
+    const d = new Date();
+    const p = (n) => (n < 10 ? '0' : '') + n;
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  const freshTotal = () => ({
+    meetings: 0, calls: 0, inTok: 0, outTok: 0, cost: 0,
+    since: todayStr(), byModel: {}
+  });
+  let TOT = (function () {
+    const t = store.get(TOTAL_KEY, null);
+    if (!t || typeof t !== 'object' || typeof t.cost !== 'number') return freshTotal();
+    if (!t.byModel || typeof t.byModel !== 'object') t.byModel = {};
+    return t;
+  })();
+  const saveTotal = () => store.set(TOTAL_KEY, TOT);
+
+  function renderTotals() {
+    $('tMeet').textContent = TOT.meetings.toLocaleString('ko-KR');
+    $('tCall').textContent = TOT.calls.toLocaleString('ko-KR');
+    $('tTok').textContent = (TOT.inTok + TOT.outTok).toLocaleString('ko-KR');
+    $('tCost').textContent = '$' + TOT.cost.toFixed(2);
+
+    const rows = Object.keys(TOT.byModel)
+      .map((id) => Object.assign({ id: id }, TOT.byModel[id]))
+      .sort((a, b) => b.cost - a.cost);
+
+    const tbl = $('tTable');
+    if (!rows.length) {
+      tbl.innerHTML = '';
+      $('tSince').textContent = '아직 회의를 연 적이 없다.';
+      return;
+    }
+    const cell = (v) => '<td>' + v + '</td>';
+    tbl.innerHTML =
+      '<thead><tr><th>모델</th><th>호출</th><th>입력</th><th>출력</th><th>비용</th></tr></thead><tbody>' +
+      rows.map((r) =>
+        '<tr><td>' + escapeHtml(M(r.id).unknown ? r.id : M(r.id).label) + '</td>' +
+        cell(r.calls.toLocaleString('ko-KR')) +
+        cell(r.inTok.toLocaleString('ko-KR')) +
+        cell(r.outTok.toLocaleString('ko-KR')) +
+        cell('$' + r.cost.toFixed(4)) + '</tr>'
+      ).join('') +
+      '</tbody><tfoot><tr><td>합계</td>' +
+        cell(TOT.calls.toLocaleString('ko-KR')) +
+        cell(TOT.inTok.toLocaleString('ko-KR')) +
+        cell(TOT.outTok.toLocaleString('ko-KR')) +
+        cell('$' + TOT.cost.toFixed(4)) +
+      '</tr></tfoot>';
+    $('tSince').textContent =
+      TOT.since + ' 부터 회의 ' + TOT.meetings + '번. 한화로 대략 ' +
+      Math.round(TOT.cost * 1400).toLocaleString('ko-KR') + '원. ' +
+      '이 숫자는 이 브라우저에만 쌓인다 — 실제 청구는 오픈라우터 쪽이 정본이다.';
+  }
+  // 모델 이름이 표에 그대로 들어가므로 한 번 걸러 준다
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  /* ==================================================================
+   * 회의록 → 평문
+   * 길어지면 앞부분을 잘라낸다. 요약을 부르지 않는 이유는 그것도 호출이라
+   * 비용이 또 늘기 때문이다. 자른 사실은 명시해 둔다.
+   * ================================================================== */
+  function transcriptText() {
+    const lines = S.transcript.map((t) => '[' + t.who + ']: ' + t.text);
+    let body = lines.join('\n\n');
+    if (body.length > TRANSCRIPT_MAX) {
+      const keep = [];
+      let len = 0;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (len + lines[i].length > TRANSCRIPT_MAX) break;
+        keep.unshift(lines[i]);
+        len += lines[i].length;
+      }
+      body = '…(앞부분 생략)…\n\n' + keep.join('\n\n');
+    }
+    return body;
+  }
+
+  /* ==================================================================
+   * 벤더가 다른 부분은 전부 여기 안에 갇혀 있다
+   * ================================================================== */
+
+  function buildRequest(model, effort, system, userText, maxTok, useFallback) {
+    const m = M(model);
+
+    if (S.prov === 'openrouter') {
+      const body = {
+        model: model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userText }
+        ],
+        max_tokens: maxTok,
+        stream: true,
+        usage: { include: true }   // 마지막 조각에 실제 토큰 수를 실어 준다
+      };
+      // 노력도는 모델이 알려 준 값만 보낸다. 모르는 값을 보내면 400 이 난다.
+      if (effort === 'off') { if (m.ef.length || m.md) body.reasoning = { enabled: false }; }
+      else if (effort !== 'default') body.reasoning = { effort: effort };
+      return {
+        url: P().url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey,
+          // 오픈라우터 순위표에 앱을 남기는 선택 헤더.
+          // 한글을 넣으면 비ASCII 헤더라 fetch 가 막는다 — 영문으로 둔다.
+          'HTTP-Referer': location.origin || 'http://localhost',
+          'X-Title': 'AI Council'
+        },
+        body: body
+      };
+    }
+
+    // 앤트로픽 직통
+    const body = {
+      model: model,
+      max_tokens: maxTok,
+      stream: true,
+      system: system,
+      messages: [{ role: 'user', content: userText }]
+    };
+    if (effort === 'off') {
+      // Opus 5 는 effort 가 high 이하일 때만 생각을 끌 수 있다 — low 로 낮춰 함께 보낸다
+      if (m.ef.length) body.output_config = { effort: 'low' };
+      if (!m.md) body.thinking = { type: 'disabled' };
+    } else if (effort !== 'default' && m.ef.length) {
+      body.output_config = { effort: effort };
+    }
+    const useFb = useFallback && m.fb;
+    if (useFb) body.fallbacks = 'default';
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANT_VERSION,
+      'anthropic-dangerous-direct-browser-access': 'true'
+    };
+    if (useFb) headers['anthropic-beta'] = FALLBACK_BETA;
+    return { url: P().url, headers: headers, body: body };
+  }
+
+  /* ---------- SSE 한 조각 해석 ----------
+   * 두 형식을 모두 받는다:
+   *   앤트로픽  { type:'content_block_delta', delta:{ type:'text_delta', text } }
+   *   오픈라우터{ choices:[{ delta:{ content } }] }  (OpenAI 호환)
+   */
+  function handleChunk(json, st) {
+    // --- 오픈라우터 / OpenAI 호환 ---
+    if (json.choices) {
+      const d = json.choices[0] && json.choices[0].delta;
+      if (d && typeof d.content === 'string') st.text += d.content;   // delta.reasoning 은 생각이라 버린다
+      const fr = json.choices[0] && json.choices[0].finish_reason;
+      if (fr) st.stopReason = fr;
+    }
+    if (json.usage) {
+      // 오픈라우터는 OpenAI 이름(prompt/completion), 앤트로픽은 input/output 을 쓴다
+      if (typeof json.usage.prompt_tokens === 'number') st.inTok = json.usage.prompt_tokens;
+      if (typeof json.usage.completion_tokens === 'number') st.outTok = json.usage.completion_tokens;
+      if (typeof json.usage.output_tokens === 'number') st.outTok = json.usage.output_tokens;
+    }
+    if (json.error) st.errorText = json.error.message || '스트림 오류';
+
+    // --- 앤트로픽 ---
+    if (json.type === 'content_block_delta' && json.delta && json.delta.type === 'text_delta') {
+      st.text += json.delta.text;
+    } else if (json.type === 'message_start' && json.message) {
+      st.stopReason = json.message.stop_reason || st.stopReason;
+      if (json.message.usage) st.inTok = json.message.usage.input_tokens || 0;
+    } else if (json.type === 'message_delta') {
+      if (json.delta && json.delta.stop_reason) st.stopReason = json.delta.stop_reason;
+    } else if (json.type === 'error') {
+      st.errorText = (json.error && json.error.message) || '스트림 오류';
+    }
+  }
+
+  async function readStream(res, onDelta) {
+    const st = { text: '', stopReason: null, errorText: null, inTok: 0, outTok: 0 };
+    const feed = (line) => {
+      // 오픈라우터는 살아 있다는 표시로 ": OPENROUTER PROCESSING" 주석 줄을 보낸다
+      if (!line.startsWith('data:')) return;
+      const p = line.slice(5).trim();
+      if (!p || p === '[DONE]') return;
+      try { handleChunk(JSON.parse(p), st); } catch (e) {}
+      if (onDelta) onDelta(st.text);
+    };
+    if (!res.body || !res.body.getReader) {
+      (await res.text()).split('\n').forEach(feed);
+      return st;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      lines.forEach(feed);
+    }
+    return st;
+  }
+
+  async function callApi(model, effort, system, userText, maxTok, onDelta) {
+    if (S.calls >= MAX_CALLS) throw new Error('호출 상한(' + MAX_CALLS + '회)에 닿았다. 회의를 멈춘다.');
+
+    let useFallback = true;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const req = buildRequest(model, effort, system, userText, maxTok, useFallback);
+      S.abort = new AbortController();
+      const res = await fetch(req.url, {
+        method: 'POST', headers: req.headers,
+        body: JSON.stringify(req.body), signal: S.abort.signal
+      });
+
+      if (!res.ok) {
+        const raw = await res.text().catch(() => '');
+        // 거절 우회(fallbacks·beta)를 모르는 경우가 있다. 그 둘만 빼고 딱 한 번 다시.
+        if (res.status === 400 && useFallback && S.prov === 'anthropic' && attempt === 0) {
+          useFallback = false; continue;
+        }
+        throw new Error(friendlyError(res.status, raw, model));
+      }
+      S.calls++;
+      const st = await readStream(res, onDelta);
+
+      // 실측 토큰이 안 왔으면 글자 수로 어림한다 (한국어 대략 1.6자 = 1토큰).
+      // 비용이 0 으로 보이는 것보다 어림이라도 보이는 편이 안전하다.
+      if (!st.inTok && !st.outTok) {
+        st.inTok = Math.round((system.length + userText.length) / 1.6);
+        st.outTok = Math.round(st.text.length / 1.6);
+        S.estimated = true;
+      }
+      return st;
+    }
+  }
+
+  function friendlyError(status, raw, model) {
+    const or = S.prov === 'openrouter';
+    if (status === 401) return '키가 올바르지 않다. 「키」에서 확인할 것.';
+    if (status === 402) return '오픈라우터 잔액이 부족하거나 이 키의 Credit limit 에 닿았다.';
+    if (status === 403) return '이 키로는 접근할 수 없다.';
+    if (status === 404 && or) return '「' + M(model).label + '」 을(를) 오픈라우터에서 못 찾았다. 「목록 새로 받기」를 눌러 볼 것.';
+    if (status === 429) return '요청이 몰렸다. 잠시 뒤 다시.';
+    if (status === 400 && /credit|balance/i.test(raw)) return '잔액이 부족하다.';
+    if (status === 400 && /effort|reasoning/i.test(raw)) {
+      return '「' + M(model).label + '」 이(가) 이 노력도를 받지 않는다. 다른 단계로 바꿀 것. (' + raw.slice(0, 90) + ')';
+    }
+    if (status >= 500) return '서버가 일시적으로 응답하지 않는다.';
+    return '응답을 받지 못했다. (' + status + ') ' + raw.slice(0, 120);
+  }
+
+  function charge(model, st) {
+    const m = M(model);
+    const cost = (st.inTok / 1e6) * m.i + (st.outTok / 1e6) * m.o;
+    S.inTok += st.inTok;
+    S.outTok += st.outTok;
+    S.cost += cost;
+
+    // 누계는 회의가 끝나도 남는다. 이 앱에서 "얼마나 썼나"는
+    // 이번 판이 아니라 지금까지 전부가 궁금한 숫자다.
+    TOT.calls++;
+    TOT.inTok += st.inTok;
+    TOT.outTok += st.outTok;
+    TOT.cost += cost;
+    const b = TOT.byModel[model] || (TOT.byModel[model] = { calls: 0, inTok: 0, outTok: 0, cost: 0 });
+    b.calls++; b.inTok += st.inTok; b.outTok += st.outTok; b.cost += cost;
+    saveTotal();
+
+    updateStats();
+  }
+
+  /* ==================================================================
+   * 지시문
+   * ================================================================== */
+
+  function seatSystem(seat, topic, roundNow, roundTotal) {
+    return [
+      '당신은 「AI 회의실」에 앉은 참가자다. 역할 이름은 「' + seat.who + '」다.',
+      '당신의 성격: ' + (seat.persona || '특별한 성향 없이 상식적으로 판단한다.'),
+      '',
+      '# 이 회의의 안건',
+      topic,
+      '',
+      '# 규칙',
+      '- 한국어로 말한다.',
+      '- 세 문장 이내로 짧게 말한다. 인사·서론·"제 생각에는" 같은 군말을 붙이지 않는다.',
+      '- 회의록을 받으면 앞사람들이 한 말을 읽고 거기에 이어서 말한다.',
+      '  같은 말을 다시 하지 않는다. 동의하면 한 마디로 동의하고 새로운 것을 보탠다.',
+      '- 이름표를 스스로 붙이지 않는다. 발언 내용만 쓴다.',
+      '- 당신의 역할에서 벗어나지 않는다. 남의 역할을 대신 하지 않는다.',
+      '- 내부나 시스템의 XML 태그를 응답에 넣지 않는다.',
+      '',
+      '지금은 ' + roundTotal + '바퀴 중 ' + roundNow + '바퀴째다.',
+      roundNow === roundTotal
+        ? '마지막 바퀴다. 새 논점을 벌이지 말고 결론 쪽으로 좁힌다.'
+        : '아직 좁힐 때가 아니다. 빠진 것을 찾는다.'
+    ].join('\n');
+  }
+
+  function scribeSystem(topic) {
+    return [
+      '당신은 방금 끝난 회의의 서기다. 회의록을 읽고 PPT 개요를 만든다.',
+      '',
+      '# 안건',
+      topic,
+      '',
+      '# 규칙',
+      '- 한국어로 쓴다.',
+      '- 회의에서 실제로 나온 이야기만 쓴다. 나오지 않은 내용을 지어내지 않는다.',
+      '- 반대 의견이 끝까지 좁혀지지 않았으면 맨 아래 「남은 쟁점」에 그대로 적는다. 억지로 합의시키지 않는다.',
+      '- 아래 형식을 그대로 지킨다. 형식 밖의 말(인사·설명)을 앞뒤에 붙이지 않는다.',
+      '',
+      '# 형식',
+      '# (발표 제목)',
+      '> (한 줄 요약 — 이 발표가 듣는 사람에게 남길 단 하나의 메시지)',
+      '',
+      '## 1. (장표 제목)',
+      '- 핵심: (이 장이 말하는 것 한 줄)',
+      '- 내용: (불릿 2~4개)',
+      '- 노트: (발표자가 말로 덧붙일 것)',
+      '',
+      '## 2. (장표 제목)',
+      '...',
+      '',
+      '## 남은 쟁점',
+      '- (합의 못 본 것. 없으면 "없음")'
+    ].join('\n');
+  }
+
+  /* ==================================================================
+   * 회의 진행 — 순번제
+   * ================================================================== */
+
+  async function speak(seat, idx, topic, roundNow, roundTotal) {
+    const bubble = addMsg(seat, idx);
+    const userText = S.transcript.length
+      ? '# 지금까지의 회의록\n\n' + transcriptText() + '\n\n---\n\n당신 차례다. 위 회의록에 이어서 말하라.'
+      : '아직 아무도 말하지 않았다. 당신이 첫 발언자다. 안건에 대해 말하라.';
+
+    const st = await callApi(
+      seat.model, seat.effort,
+      seatSystem(seat, topic, roundNow, roundTotal),
+      userText,
+      tokensFor(seat.model, seat.effort),
+      (partial) => { if (partial) { bubble.textContent = partial; scrollDown(); } }
+    );
+    charge(seat.model, st);
+
+    let text = (st.text || '').trim();
+    if (st.stopReason === 'refusal') text = '(이 발언은 안전 정책으로 거절됐다. 안건을 조금 바꿔 다시 열어 보라.)';
+    else if (!text) {
+      // 생각만 하다 예산이 끝난 경우가 대부분이다 — 원인을 알려 준다
+      text = st.stopReason === 'length' || st.stopReason === 'max_tokens'
+        ? '(생각하다 분량이 끝났다. 이 자리의 노력도를 낮추면 발언이 나온다.)'
+        : '(빈 응답)';
+    }
+    bubble.textContent = text;
+    S.transcript.push({ who: seat.who, text: text });
+  }
+
+  async function runMeeting() {
+    const topic = el.topic.value.trim();
+    if (!topic) { flash('안건을 먼저 적을 것.'); el.topic.focus(); return; }
+    if (!apiKey) { flash('API 키가 없다.'); openKey(); return; }
+    if (S.seats.some((s) => !s.who.trim())) { flash('이름이 빈 자리가 있다.'); return; }
+
+    const roundTotal = +el.rounds.value;
+
+    TOT.meetings++; saveTotal();
+    S.running = true; S.stop = false;
+    S.transcript = []; S.calls = 0; S.inTok = 0; S.outTok = 0; S.cost = 0; S.estimated = false;
+    lastSpeaker = null;
+    el.log.innerHTML = '';
+    el.outCard.classList.add('hidden');
+    el.btnRun.classList.add('hidden');
+    el.btnStop.classList.remove('hidden');
+    updateStats();
+
+    addNote('안건 — ' + topic);
+
+    try {
+      outer:
+      for (let r = 1; r <= roundTotal; r++) {
+        addDivider(r + '바퀴');
+        for (let i = 0; i < S.seats.length; i++) {
+          if (S.stop) break outer;
+          flash(r + '바퀴 · ' + S.seats[i].who + ' 발언 중…');
+          await speak(S.seats[i], i, topic, r, roundTotal);
+        }
+      }
+      if (S.stop) {
+        offerOutline(topic);
+      } else {
+        addNote('회의 끝. 서기가 정리한다.');
+        if (S.transcript.length >= 2) await writeOutline(topic);
+      }
+    } catch (err) {
+      // 발언 도중에 끊으면 여기로 온다. 중지와 같은 처리를 해야 한다 —
+      // 루프 사이에서 멈췄을 때와 화면이 달라지면 사용자가 헷갈린다.
+      if (err && err.name === 'AbortError') offerOutline(topic);
+      else addNote(err.message || String(err), true);
+    } finally {
+      S.running = false; S.abort = null;
+      el.btnRun.classList.remove('hidden');
+      el.btnStop.classList.add('hidden');
+      flash(S.stop ? '중지됨' : '완료');
+    }
+  }
+
+  /* 중지했을 때는 개요를 자동으로 만들지 않는다 —
+   * 중지는 "돈을 그만 쓰겠다"는 뜻인데 곧바로 또 부르면 그 뜻을 배반한다. */
+  function offerOutline(topic) {
+    if (S.transcript.length < 2) { addNote('중지했다.'); return; }
+    const note = addNote('중지했다. 여기까지의 회의록으로 개요를 만들 수 있다.');
+    const b = document.createElement('button');
+    b.className = 'mini';
+    b.textContent = '개요 만들기';
+    b.addEventListener('click', async () => {
+      if (S.running) return;
+      b.disabled = true;
+      S.running = true; S.stop = false;
+      el.btnRun.classList.add('hidden');
+      el.btnStop.classList.remove('hidden');
+      try { await writeOutline(topic); }
+      catch (e) {
+        if (!(e && e.name === 'AbortError')) addNote(e.message || String(e), true);
+        b.disabled = false;
+      }
+      finally {
+        S.running = false; S.abort = null;
+        el.btnRun.classList.remove('hidden');
+        el.btnStop.classList.add('hidden');
+        flash('완료');
+      }
+    });
+    note.appendChild(b);
+  }
+
+  async function writeOutline(topic) {
+    const idx = Math.min(+el.scribe.value || 0, S.seats.length - 1);
+    const seat = S.seats[idx];
+    flash(seat.who + josa(seat.who, '이', '가') + ' 개요를 쓰는 중…');
+
+    el.outCard.classList.remove('hidden');
+    el.outline.textContent = '';
+
+    // 개요는 발언보다 길다. 생각 토큰까지 여기서 나가므로 넉넉히 준다.
+    const maxTok = Math.min(Math.max(tokensFor(seat.model, seat.effort) * 2, 4000), M(seat.model).mx || 8192);
+    const st = await callApi(
+      seat.model, seat.effort,
+      scribeSystem(topic),
+      '# 회의록\n\n' + transcriptText() + '\n\n---\n\n위 회의를 PPT 개요로 정리하라.',
+      maxTok,
+      (partial) => { el.outline.textContent = partial; scrollDown(); }
+    );
+    charge(seat.model, st);
+    el.outline.textContent = (st.text || '(빈 응답)').trim();
+    el.outCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /* ==================================================================
+   * 조작
+   * ================================================================== */
+
+  const KEY_HINTS = {
+    openrouter:
+      '오픈라우터에 한 번 충전해 두면 GPT·클로드·제미나이·그록이 키 하나로 다 열린다. ' +
+      '키는 openrouter.ai/keys 에서 만들고 충전은 openrouter.ai/credits 에서 한다. ' +
+      '키를 만들 때 Credit limit 을 걸어 두면 그 금액에서 멈춘다 — 꼭 걸 것. ' +
+      '토큰 값은 각 회사 정가 그대로이고(마진 없음) 대신 충전할 때 5.5% 를 뗀다.',
+    anthropic:
+      '앤트로픽 키(sk-ant-…)를 그대로 쓴다. 클로드끼리만 회의한다. ' +
+      'ChatGPT Plus·Claude Pro 같은 구독은 여기서 안 통한다 — API 는 별도 결제다.'
+  };
+
+  function syncKeyCard() {
+    el.provider.value = S.prov;
+    el.keyInput.placeholder = P().keyPlaceholder;
+    el.keyLabel.textContent = P().label + ' API 키';
+    el.keyHint.textContent = KEY_HINTS[S.prov];
+    el.keyInput.value = apiKey;
+  }
+  function openKey() { el.keyCard.classList.remove('hidden'); syncKeyCard(); el.keyInput.focus(); }
+
+  async function switchProvider(next) {
+    S.prov = next;
+    store.set('council_prov', next);
+    apiKey = store.get('council_key_' + next, '');
+    await loadCatalog(false);
+    loadSeats();
+    renderSeats(); renderScribe(); syncKeyCard(); updateEstimate();
+    // 조사를 붙이지 않는다 — 「오픈라우터」는 "로", 「앤트로픽 직통」은 "으로" 라 갈린다
+    flash('연결을 바꿨다 — ' + P().label + '.' + (apiKey ? '' : ' 키를 넣어야 한다.'));
+  }
+
+  el.provider.addEventListener('change', (e) => switchProvider(e.target.value));
+
+  $('btnKey').addEventListener('click', () => {
+    if (el.keyCard.classList.contains('hidden')) openKey();
+    else el.keyCard.classList.add('hidden');
+  });
+  $('btnKeySave').addEventListener('click', () => {
+    const v = el.keyInput.value.trim();
+    if (v && v.indexOf(P().keyPrefix) !== 0) {
+      flash('이 키는 ' + P().keyPlaceholder + ' 모양이어야 한다. 연결 대상을 확인할 것.');
+      return;
+    }
+    apiKey = v;
+    if (apiKey) store.set('council_key_' + S.prov, apiKey); else store.del('council_key_' + S.prov);
+    el.keyCard.classList.add('hidden');
+    flash(apiKey ? '키를 저장했다.' : '키를 지웠다.');
+  });
+  $('btnKeyDel').addEventListener('click', () => {
+    apiKey = ''; store.del('council_key_' + S.prov); el.keyInput.value = '';
+    flash('키를 지웠다.');
+  });
+
+  $('btnAddSeat').addEventListener('click', () => {
+    if (S.seats.length >= MAX_SEATS) { flash('자리는 ' + MAX_SEATS + '개까지. 늘릴수록 비용이 곱으로 는다.'); return; }
+    // 새 자리는 값이 싼 모델로 앉힌다 — 늘리는 쪽이 기본으로 비싸지면 안 된다
+    let cheap = S.cat[0];
+    S.cat.forEach((m) => { if (m.o > 0 && (cheap.o <= 0 || m.o < cheap.o)) cheap = m; });
+    S.seats.push({ who: '참가자' + (S.seats.length + 1), model: cheap.id, effort: fixEffort(cheap.id, 'low'), persona: '' });
+    saveSeats(); renderSeats(); renderScribe();
+  });
+
+  $('btnReset').addEventListener('click', () => {
+    S.seats = P().seats.map((s) => Object.assign({}, s));
+    S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort); });
+    saveSeats(); renderSeats(); renderScribe();
+    flash('기본 참가자로 되돌렸다.');
+  });
+
+  $('btnClear').addEventListener('click', () => {
+    if (S.running) { flash('회의 중에는 비울 수 없다. 먼저 중지할 것.'); return; }
+    S.transcript = []; lastSpeaker = null; renderEmpty();
+    el.outCard.classList.add('hidden');
+    S.calls = 0; S.inTok = 0; S.outTok = 0; S.cost = 0; S.estimated = false;
+    updateStats(); flash('비웠다.');
+  });
+
+  el.btnRun.addEventListener('click', runMeeting);
+  el.btnStop.addEventListener('click', () => {
+    S.stop = true;
+    if (S.abort) S.abort.abort();
+    flash('중지하는 중…');
+  });
+
+  el.rounds.addEventListener('change', updateEstimate);
+  el.scribe.addEventListener('change', updateEstimate);
+  el.topic.addEventListener('input', () => store.set('council_topic', el.topic.value));
+
+  $('btnCopy').addEventListener('click', () => {
+    const text = el.outline.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => flash('복사했다.'), () => flash('복사에 실패했다.'));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); flash('복사했다.'); } catch (e) { flash('복사에 실패했다.'); }
+      document.body.removeChild(ta);
+    }
+  });
+
+  /* ---------- 누계 패널 ---------- */
+  $('totalBtn').addEventListener('click', () => {
+    const open = !el.totCard.classList.contains('hidden');
+    if (open) { el.totCard.classList.add('hidden'); return; }
+    renderTotals();
+    el.totCard.classList.remove('hidden');
+    el.totCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  $('btnTotClose').addEventListener('click', () => el.totCard.classList.add('hidden'));
+  $('btnTotReset').addEventListener('click', () => {
+    // 실수로 지우면 되돌릴 수 없다 — 한 번 더 묻는다
+    if (!confirm('지금까지의 누계를 전부 지운다. 되돌릴 수 없다. 계속할까?')) return;
+    TOT = freshTotal(); saveTotal();
+    renderTotals(); updateStats();
+    flash('누계를 지웠다.');
+  });
+
+  /* ---------- 자물쇠 ----------
+   * 다섯 번 안에 맞히면 된다. 다섯 번을 다 틀리면 잠긴다.
+   * 잠기는 시간은 틀린 묶음이 늘 때마다 길어지고 한 시간에서 멈춘다.
+   *
+   * 잠긴 시각을 localStorage 에 두는 이유는 새로고침으로 못 풀게 하려는 것이다.
+   * (브라우저 저장소를 통째로 비울 줄 아는 사람은 빠져나간다 —
+   *  서버가 없는 앱의 한계이고, 이건 자물쇠지 금고가 아니다.)
+   */
+  const MAX_TRIES = 5;
+  const LOCK_MINUTES = [5, 10, 15, 20, 30, 60];   // 마지막 값이 상한이다
+  const GATE_KEY = 'council_gate';
+
+  function gate() {
+    const g = store.get(GATE_KEY, null);
+    if (!g || typeof g !== 'object') return { fails: 0, strikes: 0, until: 0 };
+    return { fails: g.fails || 0, strikes: g.strikes || 0, until: g.until || 0 };
+  }
+  const setGate = (g) => store.set(GATE_KEY, g);
+  const lockLeft = () => Math.max(0, gate().until - Date.now());
+
+  function fmtLeft(ms) {
+    const s = Math.ceil(ms / 1000);
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + '분 ' + (r < 10 ? '0' : '') + r + '초';
+  }
+
+  let gateTimer = null;
+  let wasLocked = false;
+  function paintGate() {
+    const left = lockLeft();
+    const g = gate();
+    const go = $('lockGo');
+    if (left > 0) {
+      wasLocked = true;
+      el.lockInput.disabled = true;
+      go.disabled = true;
+      el.lockBad.textContent = '너무 여러 번 틀렸습니다. ' + fmtLeft(left) + ' 뒤에 다시 시도할 수 있습니다.';
+      if (!gateTimer) gateTimer = setInterval(paintGate, 1000);
+      return;
+    }
+    if (gateTimer) { clearInterval(gateTimer); gateTimer = null; }
+    el.lockInput.disabled = false;
+    go.disabled = false;
+    if (g.fails > 0) {
+      const left2 = MAX_TRIES - g.fails;
+      const mins = LOCK_MINUTES[Math.min(g.strikes, LOCK_MINUTES.length - 1)];
+      el.lockBad.textContent = '비밀번호가 다릅니다. ' + left2 + '번 더 틀리면 ' + mins + '분 동안 잠깁니다.';
+    } else {
+      // 잠금이 풀렸는데 옛 문구를 그대로 두면 "아직 잠겼다"고 읽힌다
+      el.lockBad.textContent = wasLocked ? '이제 다시 시도할 수 있습니다.' : '';
+      wasLocked = false;
+    }
+  }
+
+  function tryUnlock() {
+    if (lockLeft() > 0) { paintGate(); return; }
+    const v = el.lockInput.value;
+    if (!v) return;
+
+    if (hashPass(v) === PASS_HASH) {
+      store.del(GATE_KEY);                       // 들어왔으면 틀린 기록도 지운다
+      store.set('council_unlock', PASS_HASH);
+      el.lock.classList.add('hidden');
+      el.lockInput.value = '';
+      el.lockBad.textContent = '';
+      if (gateTimer) { clearInterval(gateTimer); gateTimer = null; }
+      boot();
+      return;
+    }
+
+    const g = gate();
+    g.fails++;
+    el.lockInput.value = '';
+    if (g.fails >= MAX_TRIES) {
+      // 한 묶음을 다 틀렸다. 잠그고 다음 묶음은 더 오래 잠근다.
+      const mins = LOCK_MINUTES[Math.min(g.strikes, LOCK_MINUTES.length - 1)];
+      g.strikes++;
+      g.fails = 0;
+      g.until = Date.now() + mins * 60000;
+    }
+    setGate(g);
+    paintGate();
+    if (!el.lockInput.disabled) el.lockInput.focus();
+  }
+  $('lockGo').addEventListener('click', tryUnlock);
+  el.lockInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+
+  /* ---------- 비밀번호 만들기 ---------- */
+  function spRender() {
+    const pw = el.spPw.value;
+    if (pw.length < 4) {
+      el.spOut.textContent = pw ? '4자 이상으로 해 주세요.' : '비밀번호를 넣으면 여기에 나온다';
+      el.spOut.dataset.line = '';
+      return;
+    }
+    const line = "  const PASS_HASH = '" + hashPass(pw) + "';";
+    el.spOut.textContent = line;
+    el.spOut.dataset.line = line;
+  }
+  el.spPw.addEventListener('input', spRender);
+  $('spClose').addEventListener('click', () => el.setpass.classList.add('hidden'));
+  el.setpass.addEventListener('click', (e) => { if (e.target === el.setpass) el.setpass.classList.add('hidden'); });
+  $('spCopy').addEventListener('click', () => {
+    const line = el.spOut.dataset.line;
+    if (!line) { el.spOut.textContent = '먼저 비밀번호를 넣어 주세요.'; return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(line).then(
+        () => { $('spCopy').textContent = '복사했다'; setTimeout(() => { $('spCopy').textContent = '한 줄 복사'; }, 1600); },
+        () => {}
+      );
+    }
+  });
+
+  $('btnDownload').addEventListener('click', () => {
+    const blob = new Blob([el.outline.textContent], { type: 'text/markdown;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'ppt-개요.md';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  /* ---------- 시작 ----------
+   * 목록을 받기 전에도 화면이 서 있어야 한다 — 폴백으로 한 번 그리고,
+   * 목록이 오면 값·노력도만 갈아 끼운다.
+   * 자물쇠가 걸려 있으면 풀기 전에는 아무것도 부르지 않는다
+   * (모델 목록 요청조차 나가지 않게 한다).
+   */
+  let booted = false;
+  let ready = null;
+  function boot() {
+    if (booted) return ready;
+    booted = true;
+    apiKey = store.get('council_key_' + S.prov, '');
+    S.cat = S.prov === 'anthropic' ? ANT_LIST.slice() : OR_FALLBACK.slice();
+    reindex();
+    loadSeats();
+    el.topic.value = store.get('council_topic', '');
+    renderSeats();
+    renderScribe();
+    syncKeyCard();
+    updateEstimate();
+    updateStats();
+    if (!apiKey) openKey();
+
+    ready = loadCatalog(false).then((ok) => {
+      S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort); });
+      renderSeats(); renderScribe();
+      if (S.prov === 'openrouter') {
+        flash(S.catLive
+          ? '모델 ' + S.cat.length + '개를 불러왔다.'
+          : '모델 목록을 못 받아 기본 표(' + S.cat.length + '개)로 시작한다.');
+      }
+      return ok;
+    });
+    return ready;
+  }
+
+  /* 비밀번호 만들기는 **내 컴퓨터에서만** 열린다.
+   * 비밀번호는 처음 정한 것으로 고정이고, 비밀번호를 아는 사람이라도 바꿀 수 없어야 한다.
+   * 웹에 올라간 판에서는 이 통로가 아예 없다 — 바꾸려면 소스의 PASS_HASH 를 고쳐 다시 올려야 한다. */
+  const isLocalhost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || location.protocol === 'file:';
+  if (/[?&]setpass=1/.test(location.search) && isLocalhost) {
+    el.setpass.classList.remove('hidden');
+    spRender();
+    setTimeout(() => el.spPw.focus(), 50);
+  }
+
+  if (PASS_HASH && store.get('council_unlock', '') !== PASS_HASH) {
+    el.lock.classList.remove('hidden');
+    paintGate();
+    setTimeout(() => { if (!el.lockInput.disabled) el.lockInput.focus(); }, 50);
+  } else {
+    boot();
+  }
+
+  // 자동화 검증용 훅. ?debug=1 일 때만 연다.
+  if (/[?&]debug=1/.test(location.search)) {
+    window.AC = {
+      S: S, PROVIDERS: PROVIDERS,
+      get ready() { return ready || Promise.resolve(false); },
+      get TOT() { return TOT; },
+      boot: boot, run: runMeeting, transcript: transcriptText, prov: switchProvider,
+      M: M, efforts: effortsFor, reload: () => loadCatalog(true),
+      hash: hashPass, locked: () => !el.lock.classList.contains('hidden'),
+      unlock: (pw) => { el.lockInput.value = pw; tryUnlock(); return el.lockBad.textContent; },
+      gate: gate, gateLeft: lockLeft, clearGate: () => store.del(GATE_KEY),
+      totals: renderTotals,
+      // 실제 호출과 같은 경로로 만든다 — 여기만 다르면 검증이 거짓말을 한다
+      req: (model, effort) => buildRequest(model, effort, 'sys', 'user', tokensFor(model, effort), true)
+    };
+  }
+})();
+</script>
+</body>
+</html>

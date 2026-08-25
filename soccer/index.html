@@ -100,15 +100,26 @@
   .panel .sides .row { margin: 6px 0; gap: 5px; }
   .panel .sides label { font-size: 12.5px; color: var(--muted); }
   .panel .sideinfo { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin-bottom: 4px; }
-  .panel .bdwin { font-size: 17px; font-weight: 700; margin-bottom: 12px; }
-  .panel table.board { width: 100%; border-collapse: collapse; font-size: 14px; margin: 6px 0 10px; }
-  .panel table.board th { color: var(--muted); font-weight: 600; font-size: 12.5px; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.16); }
-  .panel table.board td { padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .panel .picks { margin: 2px 0 8px; }
+  .panel .pickrow { display: inline-flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
+  .panel .pickrow button { font: inherit; font-size: 12.5px; padding: 5px 10px; border-radius: 8px; cursor: pointer;
+    color: var(--muted); background: transparent; border: 1px solid rgba(255,255,255,0.18); }
+  .panel .pickrow button.sel { border-color: var(--accent); color: var(--text); background: rgba(34,197,94,0.16); }
+  .panel .pickrow button img { width: 18px; height: 18px; vertical-align: -4px; margin-right: 4px; }
+  .panel.board { min-width: min(720px, 96vw); }
+  .panel.board h1 { font-size: 40px; }
+  .panel.board .final { font-size: 52px; margin: 10px 0 6px; }
+  .panel .bdwin { font-size: 26px; font-weight: 800; margin-bottom: 14px; }
+  .panel table.board { width: 100%; border-collapse: collapse; font-size: 18px; margin: 4px 0 10px; }
+  .panel table.board th { color: var(--muted); font-weight: 700; font-size: 15px; padding: 6px 6px; border-bottom: 1px solid rgba(255,255,255,0.16); }
+  .panel table.board td { padding: 7px 6px; border-bottom: 1px solid rgba(255,255,255,0.07); }
   .panel table.board td.who { text-align: left; }
   .panel table.board td.num { text-align: center; font-variant-numeric: tabular-nums; }
   .panel table.board tr.me td { color: var(--text); font-weight: 700; }
   .panel table.board .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-  .panel .mom { margin: 4px 0 2px; font-size: 15px; }
+  .panel .mom { margin: 8px 0 2px; font-size: 21px; font-weight: 600; }
+  .panel table.board tr.teamhead td { padding-top: 12px; font-size: 16px; font-weight: 800; letter-spacing: .02em; }
+  .panel table.board td.rank { text-align: center; color: var(--muted); width: 2.2em; }
   .panel .mom b { color: var(--ult); }
   .panel .ultinfo { font-size: 13px; color: var(--muted); min-height: 20px; margin-bottom: 12px; }
   .panel .ultinfo b { color: var(--ult); }
@@ -191,7 +202,7 @@
 <body>
 <canvas id="game"></canvas>
 <div class="hud"><span class="a" id="nameA">1반</span><span class="score" id="score">0 : 0</span><span class="b" id="nameB">2반</span><span class="clock" id="clock">전반 02:30</span></div>
-<div id="snd"><button id="btnSfx" type="button" title="효과음 (N)">🔊</button><button id="btnBgm" type="button" title="배경음악 (B)">♪</button></div>
+<div id="snd"><button id="btnSfx" type="button" title="효과음 (N)">🔊</button><button id="btnBgm" type="button" title="배경음악 (B)">♪</button><button id="btnExit" type="button" title="경기 나가기 (Esc)" style="display:none">나가기</button></div>
 <div id="stamBar"><div class="track"><div class="fill" id="stamFill"></div></div><span class="cap">체력</span></div>
 <div id="ultBar"><div class="lbl"><span id="ultName">필살기</span><span id="ultPct">0%</span></div><div class="track"><div class="fill" id="ultFill"></div></div></div>
 <div id="banner"></div>
@@ -232,6 +243,11 @@
         <select id="ovB"></select><label for="ovB">상대</label>
       </div>
       <div class="sideinfo" id="ovSides"></div>
+    </div>
+    <div class="picks">
+      <div class="row"><label>공</label><span id="ovBalls" class="pickrow"></span></div>
+      <div class="row"><label>경기장</label><span id="ovFields" class="pickrow"></span></div>
+      <div class="sideinfo" id="ovFieldInfo"></div>
     </div>
     <button class="start" id="ovStart">혼자 하기</button>
     <button class="btn" id="ovOnline" type="button" style="margin-top:8px">여러 명이서 하기</button>
@@ -287,14 +303,20 @@
     <div class="err" id="rmErr"></div>
   </div>
 
-  <div class="panel wide" id="panelBoard" style="display:none">
+  <div class="panel wide board" id="panelBoard" style="display:none">
     <h1 id="bdTitle">하프타임</h1>
     <div class="final" id="bdScore"></div>
     <div class="bdwin" id="bdWin"></div>
-    <table class="board"><thead><tr><th>선수</th><th>골</th><th>도움</th><th>유효슈팅</th><th>결정적 수비</th><th>기절시킴</th></tr></thead>
+    <table class="board"><thead><tr><th></th><th>선수</th><th>골</th><th>도움</th><th>유효슈팅</th><th>결정적 수비</th><th>기절시킴</th></tr></thead>
       <tbody id="bdRows"></tbody></table>
     <div class="mom" id="bdMom"></div>
     <div class="hint" id="bdHint"></div>
+  </div>
+  <div class="panel" id="panelQuit" style="display:none">
+    <h1>경기를 나갈까요?</h1>
+    <div class="sub">지금 나가면 이번 경기 기록은 사라집니다.</div>
+    <button class="btn go" id="qtYes" type="button">나가기</button>
+    <button class="btn" id="qtNo" type="button" style="margin-left:8px">계속하기</button>
   </div>
   <div class="panel" id="panelMsg" style="display:none">
     <h1 id="msgTitle">안내</h1>
@@ -322,15 +344,21 @@
     remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   var SETTINGS_KEY = 'soc_settings';
-  var settings = { interpMs: 100, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even' };
+  var settings = { interpMs: 100, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
+                   ball: 'classic', field: 'school' };
   try {
     var saved = JSON.parse(store.get(SETTINGS_KEY) || '{}');
     if (saved && typeof saved === 'object') {
       if (saved.interpMs >= 50 && saved.interpMs <= 150) settings.interpMs = saved.interpMs;
-      if (saved.char >= 0 && saved.char < 6) settings.char = saved.char | 0;
+      if (saved.char >= 0 && saved.char < core.CHARACTERS.length) settings.char = saved.char | 0;
       if (typeof saved.minimap === 'boolean') settings.minimap = saved.minimap;
       if (typeof saved.sfx === 'boolean') settings.sfx = saved.sfx;
       if (typeof saved.bgm === 'boolean') settings.bgm = saved.bgm;
+      if (saved.teamA >= 1 && saved.teamA <= 10) settings.teamA = saved.teamA | 0;
+      if (saved.teamB >= 1 && saved.teamB <= 10) settings.teamB = saved.teamB | 0;
+      if (saved.sideTab === 'even' || saved.sideTab === 'odd') settings.sideTab = saved.sideTab;
+      if (typeof saved.ball === 'string') settings.ball = saved.ball;
+      if (typeof saved.field === 'string') settings.field = saved.field;
     }
   } catch (e) {}
   function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(settings)); }
@@ -368,6 +396,14 @@
   var VIEW_W_MIN = 300;         // 세로 폰 대비 하한 (선수 지름 28 기준 약 10명 폭)
   var VIEW_H_MIN = 288;         // 골대 폭 200 + 위아래 여유 44씩 — 골 앞에서 두 기둥이 같이 보이는 하한
   var view = { scale: 1, dpr: 1, w: 0, h: 0, cssW: 0, cssH: 0, worldW: 0, worldH: 0 };
+  /* 경기장 크기는 방마다 다르다(동네·학교·프로·월드컵). 스냅샷이 경기장 번호를 실어 주므로
+     그때마다 FLD 를 갱신하고, 그리기·카메라·미니맵은 전부 이 값을 쓴다. C.FIELD_* 는 기본값일 뿐이다. */
+  var FLD = { W: C.FIELD_W, H: C.FIELD_H, goalY0: C.GOAL_Y0, goalY1: C.GOAL_Y1, id: 'school', crowd: 0.75 };
+  function setField(id) {
+    var f = core.fieldOf(id);
+    FLD.id = f.id; FLD.W = f.w; FLD.H = f.h; FLD.crowd = f.crowd;
+    FLD.goalY0 = f.h / 2 - f.h * C.GOAL_RATIO; FLD.goalY1 = f.h / 2 + f.h * C.GOAL_RATIO;
+  }
   var cam = { x: C.FIELD_W / 2, y: C.FIELD_H / 2, init: false };
   // 2026-08-25 7차 지시: **내 선수가 항상 화면 한가운데**. 그래서 데드존을 없앴다(0).
   // "경기장 가장자리에서는 가운데가 아니어도 된다"는 아래 클램프가 그대로 처리한다 — 경기장 밖을 보여 주지 않으려고 카메라를 붙잡기 때문.
@@ -411,10 +447,10 @@
     // 경기장 밖으로 CAM_OUT 만큼은 보여 준다 — 그래야 가장자리에서 관중석이 보인다.
     // (전에는 딱 경기장까지만 보여 줘서 밖이 검게 잘렸다.)
     var hw = view.worldW / 2, hh = view.worldH / 2, D = C.GOAL_DEPTH, EX = CAM_OUT;
-    var minX = -D - EX + hw, maxX = C.FIELD_W + D + EX - hw;
-    var minY = -EX + hh, maxY = C.FIELD_H + EX - hh;
-    cam.x = minX > maxX ? C.FIELD_W / 2 : clamp(cam.x, minX, maxX);
-    cam.y = minY > maxY ? C.FIELD_H / 2 : clamp(cam.y, minY, maxY);
+    var minX = -D - EX + hw, maxX = FLD.W + D + EX - hw;
+    var minY = -EX + hh, maxY = FLD.H + EX - hh;
+    cam.x = minX > maxX ? FLD.W / 2 : clamp(cam.x, minX, maxX);
+    cam.y = minY > maxY ? FLD.H / 2 : clamp(cam.y, minY, maxY);
   }
   function px(x) { return (x - cam.x) * view.scale + view.w / 2; }
   function py(y) { return (y - cam.y) * view.scale + view.h / 2; }
@@ -453,12 +489,13 @@
     if (e.code === 'F3') { debugOn = !debugOn; $('debug').classList.toggle('show', debugOn); e.preventDefault(); return; }
     audio.unlock();
     if (e.code === 'KeyM' && !overlayMode) { settings.minimap = !settings.minimap; saveSettings(); return; }
+    if (e.code === 'Escape') { if (net.screen === 'quit') { hideOverlay(); syncExitBtn(); } else askQuit(); e.preventDefault(); return; }
     if (e.code === 'KeyN') { audio.set('sfx', !settings.sfx); syncAudioBtns(); if (settings.sfx) audio.sfx('pass'); return; }
     if (e.code === 'KeyB') { audio.set('bgm', !settings.bgm); syncAudioBtns(); return; }
     if (PREVENT[e.code]) e.preventDefault();
     keys[e.code] = true;
     if (overlayMode) {
-      if (e.code === 'Enter') startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB });
+      if (e.code === 'Enter') startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB, field: settings.field });
       else if (e.code.indexOf('Digit') === 0) { var n = +e.code.slice(5); if (n >= 1 && n <= 6) selectChar(n - 1); }
     }
   });
@@ -567,6 +604,7 @@
       rs.keepers[j].save = sb.keepers[j].save;
     }
     rs.phase = sb.phase; rs.half = sb.half; rs.score[0] = sb.score[0]; rs.score[1] = sb.score[1]; rs.clock = sb.clock; rs.tick = sb.tick;
+    if (sb.field && sb.field !== FLD.id) setField(sb.field);   // 방마다 경기장이 다르다(스냅샷이 알려 준다)
     rs.has = true;
   }
   function myRenderPlayer() {
@@ -588,7 +626,7 @@
 
   // ── 렌더 ──
   function drawPitch() {
-    var s = view.scale, W = C.FIELD_W, H = C.FIELD_H, D = C.GOAL_DEPTH;
+    var s = view.scale, W = FLD.W, H = FLD.H, D = C.GOAL_DEPTH;
     ctx.fillStyle = COLOR.bg; ctx.fillRect(0, 0, view.w, view.h);
     drawSurround();                     // 경기장 밖 — 잔디 여백 · 트랙 · 관중석
     // 잔디: 보이는 범위의 줄무늬만 그린다
@@ -605,7 +643,7 @@
     ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), 3 * s, 0, TAU); ctx.fillStyle = COLOR.line; ctx.fill();
     ctx.strokeRect(px(0), py(H / 2 - 180), 160 * s, 360 * s); ctx.strokeRect(px(W - 160), py(H / 2 - 180), 160 * s, 360 * s);
     ctx.strokeRect(px(0), py(H / 2 - 110), 60 * s, 220 * s); ctx.strokeRect(px(W - 60), py(H / 2 - 110), 60 * s, 220 * s);
-    var y0 = C.GOAL_Y0, y1 = C.GOAL_Y1;
+    var y0 = FLD.goalY0, y1 = FLD.goalY1;
     // 골대 안쪽도 잔디다 — 예전에는 배경색이 그대로 비쳐 **검은 상자**로 보였다(2026-08-25 지시).
     ctx.fillStyle = COLOR.pitch;
     ctx.fillRect(px(-D), py(y0), D * s, (y1 - y0) * s);
@@ -620,7 +658,7 @@
      그 바깥에 관중석을 그린다. 관중은 그림 파일 없이 **머리+몸통 두 도형**으로 그린다 —
      스무 명이 뛰는 화면에 256px 그림을 수백 장 얹으면 그대로 렉이 된다.
      응원 동작은 `sin` 하나로 위아래로 튀게 하고, 골이 들어가면 `cheerT` 가 올라 크게 뛴다. */
-  var OUT = 110;             // 경기장 밖으로 그리는 폭(트랙 + 관중석)
+  var OUT_BASE = 110;        // 경기장 밖으로 그리는 폭(트랙 + 관중석). 큰 경기장은 더 넓다
   var TRACK = 16;            // 트랙(주로) 폭
   var SEAT = 13;             // 관중 한 명이 차지하는 폭
   var ROW = 15;              // 관중석 한 줄 간격
@@ -628,8 +666,9 @@
   var CROWD_COL = ["#e2e8f0", "#fca5a5", "#93c5fd", "#fcd34d", "#86efac", "#f5d0fe", "#fdba74", "#a5b4fc"];
   function rnd(i) { var v = Math.sin(i * 12.9898) * 43758.5453; return v - Math.floor(v); }
   function drawSurround() {
-    var s = view.scale, W = C.FIELD_W, H = C.FIELD_H, D = C.GOAL_DEPTH;
+    var s = view.scale, W = FLD.W, H = FLD.H, D = C.GOAL_DEPTH;
     var t = performance.now() / 1000;
+    var OUT = OUT_BASE * (0.8 + 0.4 * FLD.crowd);   // 관중석 폭도 규모에 따라
     var x0 = -D, x1 = W + D;                    // 골대까지 포함한 경기 영역
     // 1) 바깥 잔디
     ctx.fillStyle = COLOR.outGrass;
@@ -675,7 +714,8 @@
       var av = (side === 0 || side === 2) ? a0 + r * ROW + ROW * 0.85 : a1 - r * ROW - ROW * 0.15;
       for (var c = c0; c <= c1; c++) {
         var id = c * 31 + r * 7 + side * 101;
-        if (rnd(id) < 0.12) continue;                          // 빈자리
+        // 경기장이 작을수록 관중이 드문드문하다(동네 55% ~ 월드컵 100%).
+        if (rnd(id) > FLD.crowd) continue;                       // 빈자리
         var bob = Math.abs(Math.sin(t * 3.4 + rnd(id + 1) * 6.28)) * 3.2 * boost;
         var cv = c * SEAT + SEAT * 0.5;
         var sx = vert ? px(av) : px(cv);
@@ -705,8 +745,8 @@
   // 스프라이트 파일이 없을 때 쓰는 기본 그림(원 + 방향 삼각형)
   function fallbackDraw(o) {
     var R = o.r, x = o.x, y = o.y - R * 0.2;
-    var col = o.charId === 6 ? COLOR.keeper : COLOR.team[o.team];
-    var dark = o.charId === 6 ? COLOR.keeperDark : COLOR.teamDark[o.team];
+    var col = o.charId === 9 ? COLOR.keeper : COLOR.team[o.team];
+    var dark = o.charId === 9 ? COLOR.keeperDark : COLOR.teamDark[o.team];
     ctx.fillStyle = COLOR.shadow; ctx.beginPath(); ctx.ellipse(o.x, o.y, R * 1.05, R * 0.6, 0, 0, TAU); ctx.fill();
     ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fill();
     ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, R * 0.18); ctx.stroke();
@@ -739,7 +779,7 @@
       var g = rs.keepers[k];
       if (!onScreen(g.x, g.y, 80)) continue;
       var x = px(g.x), y = py(g.y);   // 월드 좌표 = 발 밑(스프라이트 기준점)
-      drawChar({ x: x, y: y, r: R, charId: 6, team: rs.half === 1 ? k : 1 - k, facing: k === 0 ? 0 : Math.PI,
+      drawChar({ x: x, y: y, r: R, charId: 9, team: (rs.half % 2 === 1) ? k : 1 - k, facing: k === 0 ? 0 : Math.PI,
                  motion: g.save ? 'kick' : 'idle', t: now / 1000, phase: 0.5, hasBall: false, ultActive: false, charge: 0 });
       if (g.save) {
         ctx.strokeStyle = COLOR.stun; ctx.lineWidth = Math.max(2, 3 * s);
@@ -771,43 +811,46 @@
         ctx.strokeStyle = COLOR.text; ctx.lineWidth = Math.max(1, 1.6 * s); ctx.globalAlpha = 0.8;
         ctx.beginPath(); ctx.ellipse(x, y, R * 1.3, R * 0.5, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
       }
-      // 방귀는 **뒤쪽**, 앞차기는 **앞쪽** 정사각형이다 — 판정 식과 똑같은 사각형을 그려 준다.
-      // (모서리 하나가 선수 중심에 걸리고 2×half 만큼 뻗으며 옆으로 ±half). 그림과 판정이 어긋나면 안 된다.
+      // **판정 범위는 이펙트로만 보인다**(2026-08-26 지시 — 네모 테두리는 걷어냈다).
+      // 이펙트 크기를 판정 사각형 한 변에 정확히 맞추므로 '보이는 것 = 맞는 범위'는 그대로다.
       var fartNow = p.motionName === 'fart', kickNow = p.motionName === 'kick' && !p.hasBall;
       if (fartNow || kickNow) {
         var K = core.TUNING.kick;
-        var half = (fartNow ? K.fartHalf : K.kickHalf) * (core.CHARACTERS[charOfSlot(p.slot)] || core.CHARACTERS[0]).kickRange * s;
+        var half = (fartNow ? K.fartHalf : K.kickHalf) * s;   // 캐릭터별 배율은 모두 1.00 이다
         var fade = 1 - Math.min(1, animPhase(p, now));
+        var img = fartNow ? fartImg() : kickImg();
         ctx.save();
         ctx.translate(x, y); ctx.rotate(p.facing);   // 보간을 껐으므로 판정에 쓰인 방향과 같다
-        var x0 = fartNow ? -2 * half : 0;          // 방귀는 뒤로, 앞차기는 앞으로 뻗는다
-        var fx = fartNow ? fartImg() : null;
-        if (fx) {
-          // 그림을 판정 사각형에 **정확히 맞춰** 늘린다 — 보이는 것이 곧 맞는 범위여야 한다
-          ctx.globalAlpha = 0.55 + 0.45 * fade;
-          ctx.drawImage(fx, x0, -half, 2 * half, 2 * half);
-          ctx.globalAlpha = 0.30 + 0.35 * fade;
-          ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
-          ctx.strokeRect(x0, -half, 2 * half, 2 * half);
+        ctx.globalAlpha = 0.35 + 0.6 * fade;
+        var cxE = fartNow ? -half : half;             // 사각형 한가운데
+        if (img) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(img, cxE - half, -half, 2 * half, 2 * half);
         } else {
           var col = fartNow ? COLOR.fart : COLOR.kickBox;
-          ctx.globalAlpha = 0.18 + 0.24 * fade;
-          ctx.fillStyle = col; ctx.fillRect(x0, -half, 2 * half, 2 * half);
-          ctx.globalAlpha = 0.55 + 0.4 * fade;
-          ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, 2 * s);
-          ctx.strokeRect(x0, -half, 2 * half, 2 * half);
+          var g = ctx.createRadialGradient(cxE, 0, half * 0.15, cxE, 0, half);
+          g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(cxE, 0, half, 0, TAU); ctx.fill();
         }
         ctx.restore();
+        ctx.globalAlpha = 1;
       }
-      label(isMe ? '나' : String(p.slot + 1), x, y - R * 2.9, isMe ? COLOR.text : COLOR.muted);
+            label(isMe ? '나' : String(p.slot + 1), x, y - R * 2.9, isMe ? COLOR.text : COLOR.muted);
     }
   }
   /* 방귀 그림(chars/fart-effect.png). 없으면 예전처럼 색 사각형으로 그린다. */
-  var fartIm = null;
+  var fartIm = null, kickIm = null;
   function fartImg() {
     if (typeof Image === 'undefined') return null;
     if (!fartIm) { fartIm = new Image(); fartIm.src = 'chars/fart-effect.png'; return null; }
     return (fartIm.complete && fartIm.naturalWidth > 0) ? fartIm : null;
+  }
+  /* 앞차기 이펙트(chars/kick-impact.png). 없으면 빛 번짐으로 그린다. */
+  function kickImg() {
+    if (typeof Image === 'undefined') return null;
+    if (!kickIm) { kickIm = new Image(); kickIm.src = 'chars/kick-impact.png'; return null; }
+    return (kickIm.complete && kickIm.naturalWidth > 0) ? kickIm : null;
   }
   /* ── 하프타임·경기 종료 상황판 ────────────────────────────────────────────
      game-core 가 `half`·`end` 이벤트에 기록표(`table`)와 MOM(`mom`)을 실어 보낸다.
@@ -843,25 +886,34 @@
       win.textContent = TEAM_NAMES[w] + " 승리!";
       win.style.color = w ? "var(--team-b)" : "var(--team-a)";
     }
-    // 기록표 — 골 많은 순 → 유효슈팅 → 결정적 수비
-    var t = (e.table || []).slice().sort(function (a, b) {
-      return (b.g - a.g) || (b.a - a.a) || (b.s - a.s) || (b.d - a.d) || (b.k - a.k);
-    });
+    /* 기록표 — **팀별로 나눠 각 팀 안에서 순위**를 매긴다(2026-08-26 지시).
+       순위 기준은 MOM 과 같은 점수: 골 10 · 도움 6 · 유효슈팅 2 · 수비 2 · 기절 0.25. */
+    function score(r) { return r.g * 10 + (r.a || 0) * 6 + r.s * 2 + r.d * 2 + (r.k || 0) * 0.25; }
+    var all = (e.table || []).slice();
     var rows = $("bdRows"); rows.innerHTML = "";
-    if (!t.length) {
+    if (!all.length) {
       var tr0 = document.createElement("tr");
-      tr0.innerHTML = '<td class="who" colspan="6" style="color:var(--muted)">아직 기록이 없습니다</td>';
+      tr0.innerHTML = '<td class="who" colspan="7" style="color:var(--muted)">아직 기록이 없습니다</td>';
       rows.appendChild(tr0);
     }
-    for (var i = 0; i < t.length; i++) {
-      var r = t[i], tr = document.createElement("tr");
-      if (game && r.slot === game.mySlot) tr.className = "me";
-      var col = r.team ? "var(--team-b)" : "var(--team-a)";
-      tr.innerHTML = '<td class="who"><span class="dot" style="background:' + col + '"></span>' +
-        nickOfSlot(r.slot) + ' <span style="color:var(--muted);font-size:12px">' + charNameOfSlot(r.slot) + '</span></td>' +
-        '<td class="num">' + r.g + '</td><td class="num">' + (r.a || 0) + '</td><td class="num">' + r.s +
-        '</td><td class="num">' + r.d + '</td><td class="num">' + (r.k || 0) + '</td>';
-      rows.appendChild(tr);
+    for (var tm = 0; tm < 2; tm++) {
+      var list = all.filter(function (r) { return r.team === tm; })
+                    .sort(function (a, b) { return score(b) - score(a) || b.g - a.g; });
+      if (!list.length) continue;
+      var col = tm ? "var(--team-b)" : "var(--team-a)";
+      var th = document.createElement("tr"); th.className = "teamhead";
+      th.innerHTML = '<td colspan="7" style="color:' + col + '">' + TEAM_NAMES[tm] + ' (' + sc[tm] + '골)</td>';
+      rows.appendChild(th);
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i], tr = document.createElement("tr");
+        if (game && r.slot === game.mySlot) tr.className = "me";
+        tr.innerHTML = '<td class="rank">' + (i + 1) + '</td>' +
+          '<td class="who"><span class="dot" style="background:' + col + '"></span>' +
+          nickOfSlot(r.slot) + ' <span style="color:var(--muted);font-size:14px">' + charNameOfSlot(r.slot) + '</span></td>' +
+          '<td class="num">' + r.g + '</td><td class="num">' + (r.a || 0) + '</td><td class="num">' + r.s +
+          '</td><td class="num">' + r.d + '</td><td class="num">' + (r.k || 0) + '</td>';
+        rows.appendChild(tr);
+      }
     }
     var mom = $("bdMom");
     if (end && e.mom) {
@@ -884,9 +936,36 @@
     var p = game && game.state && game.state.players[slot];
     return p ? p.char : 0;
   }
+  /* 공 그림 3종(chars/soccer-ball-*.png). 파일이 없으면 예전처럼 흰 원으로 그린다.
+     공은 굴러가는 느낌이 나야 하므로 **이동 거리에 비례해 돌린다** — 시각만으로 도는 게 아니라
+     공이 멈추면 회전도 멈춰야 자연스럽다. */
+  var BALLS = [
+    { id: 'classic',   name: '클래식',   file: 'soccer-ball-classic.png' },
+    { id: 'aqua',      name: '아쿠아',   file: 'soccer-ball-aqua.png' },
+    { id: 'lightning', name: '라이트닝', file: 'soccer-ball-lightning.png' }
+  ];
+  var ballImgs = {}, ballSpin = 0, ballPrev = null;
+  function ballImg() {
+    var b = BALLS[0];
+    for (var i = 0; i < BALLS.length; i++) if (BALLS[i].id === settings.ball) b = BALLS[i];
+    var im = ballImgs[b.id];
+    if (im === undefined) { im = new Image(); im.src = 'chars/' + b.file; ballImgs[b.id] = im; return null; }
+    return (im.complete && im.naturalWidth > 0) ? im : null;
+  }
   function drawBall(now) {
     var s = view.scale, R = C.BALL_R * s, x = px(rs.ball.x), y = py(rs.ball.y);
     ctx.fillStyle = COLOR.shadow; ctx.beginPath(); ctx.ellipse(x + 2 * s, y + 4 * s, R * 1.1, R * 0.7, 0, 0, TAU); ctx.fill();
+    if (ballPrev) ballSpin += Math.hypot(rs.ball.x - ballPrev[0], rs.ball.y - ballPrev[1]) / C.BALL_R * 0.5;
+    ballPrev = [rs.ball.x, rs.ball.y];
+    var im = ballImg();
+    if (im) {
+      var D = R * 2.2;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(ballSpin);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(im, -D / 2, -D / 2, D, D);
+      ctx.restore();
+      return;
+    }
     ctx.fillStyle = COLOR.ball; ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fill();
     ctx.strokeStyle = COLOR.ballMark; ctx.lineWidth = Math.max(1, 1 * s); ctx.stroke();
     var a = (rs.ball.x + rs.ball.y) / 30;
@@ -917,18 +996,18 @@
   function drawMinimap() {
     if (!settings.minimap) return;
     var pad = 10 * view.dpr;
-    var w = (touchOn ? 108 : 168) * view.dpr, h = w * C.FIELD_H / C.FIELD_W;
+    var w = (touchOn ? 108 : 168) * view.dpr, h = w * FLD.H / FLD.W;
     var x0 = view.w - w - pad, y0 = pad + (touchOn ? 30 : 44) * view.dpr;
     ctx.save();
     ctx.globalAlpha = 0.82;
     ctx.fillStyle = COLOR.mapBg; ctx.fillRect(x0, y0, w, h);
     ctx.strokeStyle = COLOR.net; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, w, h);
-    var sx = w / C.FIELD_W, sy = h / C.FIELD_H;
+    var sx = w / FLD.W, sy = h / FLD.H;
     ctx.beginPath(); ctx.moveTo(x0 + w / 2, y0); ctx.lineTo(x0 + w / 2, y0 + h); ctx.stroke();
     // 골대
     ctx.fillStyle = COLOR.line;
-    ctx.fillRect(x0 - 2, y0 + C.GOAL_Y0 * sy, 2, (C.GOAL_Y1 - C.GOAL_Y0) * sy);
-    ctx.fillRect(x0 + w, y0 + C.GOAL_Y0 * sy, 2, (C.GOAL_Y1 - C.GOAL_Y0) * sy);
+    ctx.fillRect(x0 - 2, y0 + FLD.goalY0 * sy, 2, (FLD.goalY1 - FLD.goalY0) * sy);
+    ctx.fillRect(x0 + w, y0 + FLD.goalY0 * sy, 2, (FLD.goalY1 - FLD.goalY0) * sy);
     // 카메라 범위
     ctx.strokeStyle = 'rgba(255,255,255,0.55)';
     ctx.strokeRect(x0 + (cam.x - view.worldW / 2) * sx, y0 + (cam.y - view.worldH / 2) * sy, view.worldW * sx, view.worldH * sy);
@@ -1025,6 +1104,30 @@
     });
     $("tabOdd").addEventListener("click", function () { settings.sideTab = "odd"; saveSettings(); renderSides(); });
   }
+  /* 공 3종·경기장 4종 고르기. 경기장은 넓이가 커질수록 관중도 많아진다(§7.2). */
+  function buildPicks() {
+    var bw = $("ovBalls"), fw = $("ovFields");
+    BALLS.forEach(function (b) {
+      var t = document.createElement("button"); t.type = "button";
+      t.innerHTML = '<img src="chars/' + b.file + '" alt="">' + b.name;
+      t.addEventListener("click", function () { settings.ball = b.id; saveSettings(); renderPicks(); });
+      bw.appendChild(t);
+    });
+    core.FIELDS.forEach(function (f) {
+      var t = document.createElement("button"); t.type = "button"; t.textContent = f.name.replace(" 축구장", "");
+      t.addEventListener("click", function () { settings.field = f.id; saveSettings(); renderPicks(); });
+      fw.appendChild(t);
+    });
+  }
+  function renderPicks() {
+    if (!$("ovBalls").children.length) buildPicks();
+    var bs = $("ovBalls").children;
+    for (var i = 0; i < bs.length; i++) bs[i].className = (BALLS[i].id === settings.ball) ? "sel" : "";
+    var fs = $("ovFields").children, F = core.FIELDS;
+    for (var j = 0; j < fs.length; j++) fs[j].className = (F[j].id === settings.field) ? "sel" : "";
+    var f = core.fieldOf(settings.field);
+    $("ovFieldInfo").textContent = f.name + " — " + f.w + " × " + f.h + " (관중 " + Math.round(f.crowd * 100) + "%)";
+  }
   function renderSides() {
     if (!$("sideEven").children.length) buildSides();   // 처음 한 번만 만든다
     clampSides();
@@ -1053,6 +1156,7 @@
       chars.appendChild(b);
     });
     renderSides();
+    renderPicks();
     var sel = core.CHARACTERS[settings.char];
     $('ovUlt').innerHTML = '필살기 <b>' + sel.ult.name + '</b> — ' + ultDesc(sel) +
       ' · 속도 ×' + sel.speed.toFixed(2) + ' · 슛 ×' + sel.shot.toFixed(2);
@@ -1084,9 +1188,9 @@
       : '<kbd>1</kbd>~<kbd>6</kbd> 캐릭터 · <kbd>Enter</kbd> 시작<br>방향키 이동 · <kbd>W</kbd> 드리블(길게=멀리) · <kbd>D</kbd> 슛/발차기 · <kbd>S</kbd> 방귀 · <kbd>Q</kbd><kbd>E</kbd> 감아차기 · <kbd>Z</kbd> 패스 · <kbd>A</kbd> 필살기';
     renderOverlay();
   }
-  function hideOverlay() { overlayMode = false; $('overlay').classList.remove('show'); }
+  function hideOverlay() { overlayMode = false; $('overlay').classList.remove('show'); if ($('btnExit')) syncExitBtn(); }
   $('ovStart').addEventListener('click', function () {
-    startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB });
+    startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB, field: settings.field });
   });
   $('ovOnline').addEventListener('click', function () {
     audio.unlock();
@@ -1385,7 +1489,7 @@
     net.screen = name;
     $('overlay').classList.add('show');
     overlayMode = true;
-    var map = { home: 'panelHome', lobby: 'panelLobby', room: 'panelRoom', msg: 'panelMsg', board: 'panelBoard' };
+    var map = { home: 'panelHome', lobby: 'panelLobby', room: 'panelRoom', msg: 'panelMsg', board: 'panelBoard', quit: 'panelQuit' };
     for (var k in map) $(map[k]).style.display = (k === name) ? '' : 'none';
   }
   function netMsg(title, body, retry) {
@@ -1560,21 +1664,22 @@
   // 혼자 할 때는 2:2 (내 팀에 인공지능 1명, 상대 인공지능 2명). `dummies` 를 주면 옛 허수아비 모드 — 검증 도구가 쓴다.
   function startPractice(opts) {
     opts = opts || {};
-    var state = core.createState({ halfSec: opts.halfSec || 180 });
+    var state = core.createState({ halfSec: opts.halfSec, field: opts.field || settings.field });
+    setField(state.field);
     var charId = opts.char != null ? opts.char : settings.char;
     core.addPlayer(state, 0, 0, charId);
     var i, aiSlots = [];
     if (opts.dummies != null) {
       for (i = 0; i < opts.dummies; i++) {
-        var d = core.addPlayer(state, 1 + i, 1, (charId + 1 + i) % 6);
+        var d = core.addPlayer(state, 1 + i, 1, (charId + 1 + i) % core.CHARACTERS.length);
         if (d) { d.x = 820 + (i % 3) * 70; d.y = 320 + Math.floor(i / 3) * 120 + (i % 3) * 60; }
       }
     } else {
       // 우리 편 A 명(나 + 인공지능), 상대 B 명. 슬롯은 0..A-1 이 팀0, A..A+B-1 이 팀1.
       var A = Math.min(10, Math.max(1, opts.teamA || 2));
       var B = Math.min(10, Math.max(1, opts.teamB || 2));
-      for (i = 1; i < A; i++) { core.addPlayer(state, i, 0, (charId + 2 + i) % 6); aiSlots.push(i); }
-      for (i = 0; i < B; i++) { core.addPlayer(state, A + i, 1, (charId + 1 + i) % 6); aiSlots.push(A + i); }
+      for (i = 1; i < A; i++) { core.addPlayer(state, i, 0, (charId + 2 + i) % core.CHARACTERS.length); aiSlots.push(i); }
+      for (i = 0; i < B; i++) { core.addPlayer(state, A + i, 1, (charId + 1 + i) % core.CHARACTERS.length); aiSlots.push(A + i); }
       core.AI.reset();
     }
     core.startMatch(state);
@@ -1584,6 +1689,7 @@
     snaps.length = 0; injected.length = 0; eventLog.length = 0; animState.length = 0;
     cam.init = false;
     hideOverlay();
+    syncExitBtn();
     doTick(performance.now());
     banner('킥오프', 1200);
   }
@@ -1759,6 +1865,23 @@
   // 소리 토글 버튼 + 첫 조작에 오디오 해제(자동재생 정책)
   $('btnSfx').addEventListener('click', function () { audio.unlock(); audio.set('sfx', !settings.sfx); syncAudioBtns(); if (settings.sfx) audio.sfx('pass'); });
   $('btnBgm').addEventListener('click', function () { audio.unlock(); audio.set('bgm', !settings.bgm); syncAudioBtns(); });
+  /* ── 경기 도중 나가기 (2026-08-26 지시) ────────────────────────────────
+     혼자 하기는 시작 화면으로, 온라인은 방을 떠난다. Esc 로도 열린다. */
+  function askQuit() {
+    if (!game || overlayMode) return;
+    showPanel('quit');
+  }
+  function doQuit() {
+    var online = game && game.mode === 'online';
+    game = null; snaps.length = 0; injected.length = 0;
+    if (online) { netSend({ t: 'room.leave' }); showPanel('lobby'); netSend({ t: 'room.list' }); }
+    else showOverlay(null);
+    syncExitBtn();
+  }
+  function syncExitBtn() { $('btnExit').style.display = (game && !overlayMode) ? '' : 'none'; }
+  $('btnExit').addEventListener('click', askQuit);
+  $('qtYes').addEventListener('click', doQuit);
+  $('qtNo').addEventListener('click', function () { hideOverlay(); syncExitBtn(); });
   window.addEventListener('pointerdown', function () { audio.unlock(); }, { passive: true });
   // 소리 시험: 마스터·효과음 게인을 건너뛰고 목적지에 바로 1.2초 순음을 낸다.
   // 이게 안 들리면 원인은 이 페이지 코드가 아니라 브라우저·시스템 쪽이다(사이트 음소거 등).

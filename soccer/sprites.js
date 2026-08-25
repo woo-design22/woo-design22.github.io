@@ -63,6 +63,7 @@
   /* ── 3. 캐릭터 체형표 ───────────────────────────────────────────────────
      h(총 키) = headH + neck + torsoH + shortsH + thighH + sockH + shoeH
      가로 폭은 전부 홀수(중심 열 CX 에 맞추기 위해).                        */
+  var KEEPER_ID = 9;      // 캐릭터 9종(0~8) 다음 자리가 골키퍼다
   var BODY = [
     /* 0 체육부장형 — 균형형·리더. 머리띠 + 호루라기, 어깨가 벌어진 다부진 체형 */
     { key: 'captain', h: 23, headW: 9, headH: 8, hairH: 3, neck: 1, torsoH: 5,
@@ -100,7 +101,25 @@
       legW: 3, footW: 3, armW: 2, hair: 'spike', num: '2',
       skin: '#f7cfa2', hairC: '#4a2a12', shoe: '#2e2836', acc: '#77e07d', tag: 'grin' },
 
-    /* 6 골키퍼 — 밝은 대비 유니폼 + 장갑 + 모자 */
+    /* 6 농구부형 — 키가 크고 팔다리가 길다. 주황 머리띠 */
+    { key: 'basket', h: 25, headW: 8, headH: 7, hairH: 2, neck: 2, torsoH: 6,
+      shoulderW: 10, torsoW: 7, shortsH: 3, thighH: 3, sockH: 2, shoeH: 2,
+      legW: 2, footW: 3, armW: 2, hair: 'headband', num: '3',
+      skin: '#a9714a', hairC: '#171310', shoe: '#f0f3f8', acc: '#ff8c2f', tag: 'band' },
+
+    /* 7 밴드부형 — 분홍 뾰족머리에 헤드폰 */
+    { key: 'rocker', h: 23, headW: 9, headH: 8, hairH: 4, neck: 1, torsoH: 5,
+      shoulderW: 10, torsoW: 8, shortsH: 3, thighH: 2, sockH: 2, shoeH: 2,
+      legW: 3, footW: 3, armW: 2, hair: 'spike', num: '6',
+      skin: '#f3cba4', hairC: '#e0257d', shoe: '#2b2f3d', acc: '#8b5cf6', tag: 'grin' },
+
+    /* 8 수영부형 — 하늘색 단발에 물안경을 머리에 걸쳤다 */
+    { key: 'swimmer', h: 23, headW: 9, headH: 8, hairH: 3, neck: 1, torsoH: 5,
+      shoulderW: 9, torsoW: 7, shortsH: 3, thighH: 2, sockH: 2, shoeH: 2,
+      legW: 3, footW: 3, armW: 2, hair: 'long', num: '8', female: true,
+      skin: '#f4d3b2', hairC: '#3fc0d8', shoe: '#e9f4fb', acc: '#22d3ee', tag: 'glasses' },
+
+    /* 9 골키퍼 — 밝은 대비 유니폼 + 장갑 + 모자 */
     { key: 'keeper', h: 23, headW: 9, headH: 8, hairH: 3, neck: 1, torsoH: 5,
       shoulderW: 11, torsoW: 9, shortsH: 3, thighH: 2, sockH: 2, shoeH: 2,
       legW: 3, footW: 3, armW: 3, hair: 'cap', num: '1',
@@ -489,7 +508,7 @@
     var hit = cache[key];
     if (hit) return hit;
     var m = BODY[charId];
-    var kit = (charId === 6 ? KEEPER_KIT : TEAM_KIT)[team];
+    var kit = (charId === KEEPER_ID ? KEEPER_KIT : TEAM_KIT)[team];
     clearBuf();
     paint(view, m, kit, getPose(pose, frame));
     cache[key] = flush();
@@ -515,12 +534,12 @@
   var PHOTO_POSE = { idle: '', run: '-run', kick: '-kick', fart: '-fart', stun: '-stun', ult: '-goal' };
   // 달리기는 두 장을 번갈아 써야 뛰는 느낌이 난다 — `-run` 과 다리만 좌우로 뒤집은 `-run2`.
   // frameOf('run') 이 0~3 을 주므로 그 홀짝으로 갈라 쓴다. 걸음 속도가 도트판과 같아진다.
-  var PHOTO_RUN2 = '-run2';
+  var PHOTO_RUN = ['-run-1', '-run-2', '-run-3'];   // 원본 팩이 준 달리기 3장
   var PHOTO_SCALE = 3.2;    // 그림 한 변 = 반지름 × 이 값 (사람 키 ≈ 3.0r, 어깨 폭 ≈ 판정 지름)
   var photoCache = {}, photoOK = (typeof Image !== "undefined");
   function photoOf(key, pose, f) {
     if (!photoOK || !key) return null;
-    var name = key + (pose === "run" && (f & 1) ? PHOTO_RUN2 : (PHOTO_POSE[pose] || ""));
+    var name = key + (pose === "run" ? PHOTO_RUN[f % PHOTO_RUN.length] : (PHOTO_POSE[pose] || ""));
     var im = photoCache[name];
     if (im === undefined) {
       im = new Image();
@@ -532,12 +551,12 @@
   }
   function draw(ctx, o) {
     var charId = o.charId | 0;
-    if (charId < 0 || charId > 6) charId = 0;
+    if (charId < 0 || charId > KEEPER_ID) charId = 0;
     var team = o.team ? 1 : 0;
     var r = o.r || 14;
     var t = o.t || 0, phase = o.phase || 0;
     var m = BODY[charId];
-    var kit = (charId === 6 ? KEEPER_KIT : TEAM_KIT)[team];
+    var kit = (charId === KEEPER_ID ? KEEPER_KIT : TEAM_KIT)[team];
 
     var S = Math.max(1, Math.round(r * 3.3 / GH));
     var x = Math.round(o.x), y = Math.round(o.y);
@@ -551,7 +570,7 @@
     var f = frameOf(pose, t + charId * 0.137, phase) % frameCount(pose);   // 캐릭터마다 걸음 위상차
     // 그림은 팀에 상관없이 똑같이 생겼다 — 발밑 원반을 팀 색으로 칠해야 아군·적군이 구분된다.
     // 골키퍼 그림은 아직 없어서 덩치형 그림을 빌려 쓴다(chars/keeper.png 를 넣으면 그 줄만 바꾸면 된다).
-    var ph = photoOf(charId === 6 ? 'big' : m.key, pose, f);
+    var ph = photoOf(charId === KEEPER_ID ? 'big' : m.key, pose, f);
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
@@ -655,7 +674,10 @@
       { id: 2, key: 'transfer', name: '전학생형',     look: '동그란 안경과 가방을 멘 전학 첫날 차림' },
       { id: 3, key: 'big',      name: '덩치형',       look: '떡 벌어진 몸집에 짧은 스포츠머리, 느긋한 표정' },
       { id: 4, key: 'runner',   name: '육상부형',     look: '노란 머리에 주황 머리띠, 소매 없는 러닝셔츠' },
-      { id: 5, key: 'prank',    name: '장난꾸러기형', look: '머리 위로 묶은 상투와 주황 띠, 장난기 어린 웃음' }
+      { id: 5, key: 'prank',    name: '장난꾸러기형', look: '머리 위로 묶은 상투와 주황 띠, 장난기 어린 웃음' },
+      { id: 6, key: 'basket',   name: '농구부형',     look: '키가 크고 팔다리가 길다. 주황 머리띠' },
+      { id: 7, key: 'rocker',   name: '밴드부형',     look: '분홍 뾰족머리에 목에 건 헤드폰' },
+      { id: 8, key: 'swimmer',  name: '수영부형',     look: '하늘색 단발에 머리 위로 올린 물안경' }
     ],
     draw: draw
   };

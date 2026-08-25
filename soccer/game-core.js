@@ -17,18 +17,33 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var PROTOCOL_VERSION = 14;   // 14: 드리블·감아차기 충전 분리, 슛 뒤 발차기 래치
+  /* 경기장 4종 — 넓어질수록 사람이 적어 보이므로 관중 수도 넓이에 비례해 늘린다(클라이언트 §7.2).
+     세로:가로 비율은 대체로 유지하고, 골대는 세로의 25%(GOAL_RATIO×2)로 함께 커진다. */
+  var FIELDS = [
+    { id: 'town',  name: '동네 축구장',   w: 1000, h: 660,  crowd: 0.55 },
+    { id: 'school', name: '학교 축구장',  w: 1200, h: 800,  crowd: 0.75 },
+    { id: 'pro',   name: '프로리그 축구장', w: 1500, h: 1000, crowd: 0.90 },
+    { id: 'world', name: '월드컵 축구장', w: 1800, h: 1200, crowd: 1.00 }
+  ];
+  function fieldOf(id) {
+    for (var i = 0; i < FIELDS.length; i++) if (FIELDS[i].id === id) return FIELDS[i];
+    return FIELDS[1];   // 기본은 학교 축구장(예전 크기)
+  }
+  var PROTOCOL_VERSION = 15;   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
 
   // ── 구조 상수 (CLAUDE.md §3) ─────────────────────────────────────────────
   var C = {
     TICK_HZ: 20, DT: 1 / 20,
     FIELD_W: 1200, FIELD_H: 800,
-    GOAL_Y0: 300, GOAL_Y1: 500, GOAL_DEPTH: 40,
+    GOAL_Y0: 300, GOAL_Y1: 500, GOAL_DEPTH: 40,   // 기본(학교) 값. 실제 경기는 state.goalY0/Y1 을 쓴다
+    GOAL_RATIO: 0.125,   // 골대 반폭 = 경기장 세로 × 이 값. 경기장이 커져도 골대 비율은 같다
     PLAYER_R: 18, BALL_R: 6,     // 2026-08-25 4차 지시로 14 → 18. 서로 때리기 쉬워지고 그림도 같이 커진다
     MAX_PLAYERS: 20,
     KICKOFF_TICKS: 40,    // 경기 시작·후반 시작 킥오프 정지 2초
     GOAL_TICKS: 24,       // 득점 후 세리머니 1.2초 (공은 골망 안에서 계속 구른다)
     REKICKOFF_TICKS: 16,  // 득점 후 킥오프 정지 0.8초 (세리머니와 합쳐 2초)
+    HALF_SEC: 120,        // 전·후반 각 2분 (2026-08-26 — 3분은 골이 너무 많아 늘어졌다)
+    EXTRA_SEC: 30,        // 연장 전·후반 각 30초. 그래도 동점이면 무승부로 끝낸다
     HALF_TICKS: 100,      // 하프타임 5초
     END_TICKS: 200        // 종료 화면 10초
   };
@@ -87,7 +102,11 @@
       // **앞차기도 정사각형이다**(2026-08-26 지시). 부채꼴은 어디까지 맞는지 눈으로 알 수 없었다.
       // 뒷모서리가 선수 중심을 지나고 앞으로 2×kickHalf 만큼 뻗으며 옆으로 ±kickHalf.
       // 옛 부채꼴(반지름 56 · ±60°)의 넓이 3,284 와 비슷하게 맞춘 값이다(4 × 28.7² = 3,294).
-      kickHalf: 28.7
+      kickHalf: 28.7,
+      // **논스톱 슛**(2026-08-26): 공을 잡지 않은 채 D 를 눌렀을 때, 발 앞 아주 좁은 범위에
+      // 굴러오는 공이 있으면 그대로 강하게 차 낸다. 발차기 범위보다 훨씬 좁아야 '타이밍 기술'이 된다.
+      volleyR: 26,        // 논스톱 판정 반지름 (앞차기 네모 앞길이 57 의 절반 이하)
+      volleyMul: 1.3      // 그때 공이 이만큼 세게 나간다
     },
     ball: {
       possessRadius: 28,  // 선수 중심에서 이 거리 안이면 소유 (선수 반지름 18 + 10)
@@ -137,19 +156,22 @@
   var CHARACTERS = [
     { id: 0, key: 'captain',  name: '체육부장형',   speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '집합 호루라기', kind: 'stunWave', radius: 200, stunTicks: 24, durTicks: 12 } },
-    // 대포알은 시간이 아니라 "다음 슛 한 발"을 강화한다. 5초 안에 쏘지 않으면 사라진다.
-    { id: 1, key: 'ace',      name: '에이스형',     speed: 1.00, shot: 1.00, kickRange: 0.90,
+    { id: 1, key: 'ace',      name: '에이스형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '대포알',       kind: 'power',    shotMul: 1.55, durTicks: 100, oneShot: true } },
     { id: 2, key: 'transfer', name: '전학생형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '슬쩍 이동',    kind: 'blink',    dist: 240, durTicks: 12 } },
-    { id: 3, key: 'big',      name: '덩치형',       speed: 1.00, shot: 1.00, kickRange: 1.40,
+    { id: 3, key: 'big',      name: '덩치형',       speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '황소 돌진',    kind: 'charge',   speedMul: 1.45, stunTicks: 16, durTicks: 60 } },
-    // 질주는 공을 몰고 있을 때는 배율이 낮다(carryMul) — 혼자 필드를 종단해 버리지 못하게
-    { id: 4, key: 'runner',   name: '육상부형',     speed: 1.00, shot: 1.00, kickRange: 0.90,
+    { id: 4, key: 'runner',   name: '육상부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '전력 질주',    kind: 'dash',     speedMul: 1.60, carryMul: 1.25, durTicks: 100 } },
-    // 장판은 발동한 자리에 고정된다(시전자를 따라다니지 않는다)
     { id: 5, key: 'prank',    name: '장난꾸러기형', speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '미끄러운 잔디', kind: 'slow',    radius: 190, speedMul: 0.60, durTicks: 100 } }
+      ult: { name: '미끄러운 잔디', kind: 'slow',    radius: 190, speedMul: 0.60, durTicks: 100 } },
+    { id: 6, key: 'basket',   name: '농구부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
+      ult: { name: '덩크 슛',      kind: 'power',    shotMul: 1.40, durTicks: 120, oneShot: true } },
+    { id: 7, key: 'rocker',   name: '밴드부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
+      ult: { name: '고음 지르기',  kind: 'stunWave', radius: 160, stunTicks: 20, durTicks: 12 } },
+    { id: 8, key: 'swimmer',  name: '수영부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
+      ult: { name: '물살 가르기',  kind: 'blink',    dist: 200, durTicks: 12 } }
   ];
 
   // 포메이션: 왼쪽 진영 기준 좌표. 팀 안에서 슬롯 순서대로 배정. 0번이 중앙 공격수.
@@ -189,8 +211,8 @@
   function noteDefence(state, slot) {
     var p = state.players[slot];
     if (!p) return;
-    var third = C.FIELD_W / 3;   // 우리 진영 3분의 1 안 — 여기서 끊어야 '결정적'이다
-    var own = sideOf(state, p.team) === 0 ? state.ball.x < third : state.ball.x > C.FIELD_W - third;
+    var third = state.W / 3;   // 우리 진영 3분의 1 안 — 여기서 끊어야 '결정적'이다
+    var own = sideOf(state, p.team) === 0 ? state.ball.x < third : state.ball.x > state.W - third;
     if (own) note(state, slot, 'd');
   }
   function note(state, slot, key) {
@@ -209,23 +231,23 @@
     }
     return out;
   }
-  /* MOM — 골 5점, 유효슈팅 2점, 결정적 수비 2점. 같으면 골 많은 쪽, 그다음 슬롯 순.
-     이긴 팀에 1점을 더 얹는다(같은 기록이면 이긴 팀 선수가 뽑히도록). */
+  /* MOM — **승패와 무관하게** 가장 잘한 선수를 뽑는다(2026-08-26 지시).
+     골 10점 · 도움 6점 · 유효슈팅 2점 · 결정적 수비 2점 · 기절 0.25점. 같으면 골 많은 쪽. */
   function pickMom(state) {
     var t = statTable(state), best = null, bestV = -1;
-    var win = state.score[0] === state.score[1] ? -1 : (state.score[0] > state.score[1] ? 0 : 1);
     for (var i = 0; i < t.length; i++) {
       var r = t[i];
       // 골이 확실히 앞서도록 무겁게 준다. 기절은 발차기 연타로 수십 개가 쌓여서 0.25 만 센다
       // (실측: 같은 무게로 두면 골 2개 + 기절 36개가 골 3개를 이겼다).
-      var v = r.g * 10 + r.a * 6 + r.s * 2 + r.d * 2 + r.k * 0.25 + (r.team === win ? 1 : 0);
+      var v = r.g * 10 + r.a * 6 + r.s * 2 + r.d * 2 + r.k * 0.25;
       if (v > bestV || (v === bestV && best && r.g > best.g)) { bestV = v; best = r; }
     }
     return best ? { slot: best.slot, team: best.team, g: best.g, a: best.a, s: best.s, d: best.d, k: best.k, score: bestV } : null;
   }
   function createState(opts) {
     opts = opts || {};
-    var halfSec = opts.halfSec || 180;   // 전·후반 각 3분 (2026-08-25 사용자 지시). 세리머니·킥오프 정지 중에는 clock 이 줄지 않는다
+    var halfSec = opts.halfSec || C.HALF_SEC;   // 전·후반 각 2분(2026-08-26). 세리머니·킥오프 정지 중에는 clock 이 줄지 않는다
+    var F = fieldOf(opts.field);
     var players = new Array(C.MAX_PLAYERS);
     for (var i = 0; i < C.MAX_PLAYERS; i++) players[i] = null;
     return {
@@ -237,9 +259,12 @@
       clock: halfSec * C.TICK_HZ,   // 이번 하프에 남은 틱 (PLAY 중에만 줄어든다)
       score: [0, 0],
       kickoffTeam: 0,
-      ball: { x: C.FIELD_W / 2, y: C.FIELD_H / 2, vx: 0, vy: 0, range: 0, spin: 0, spinLeft: 0, pierce: 0,
+      // 경기장 크기는 방마다 다르다(§3). C.FIELD_* 는 기본값일 뿐이고 계산은 전부 state.W/H 로 한다.
+      field: F.id, W: F.w, H: F.h,
+      goalY0: F.h / 2 - F.h * C.GOAL_RATIO, goalY1: F.h / 2 + F.h * C.GOAL_RATIO,
+      ball: { x: F.w / 2, y: F.h / 2, vx: 0, vy: 0, range: 0, spin: 0, spinLeft: 0, pierce: 0,
               owner: -1, lastKicker: -1, assist: -1, kickCd: 0, keeperCd: 0 },
-      keepers: [{ side: 0, y: C.FIELD_H / 2, hitT: 0 }, { side: 1, y: C.FIELD_H / 2, hitT: 0 }],
+      keepers: [{ side: 0, y: F.h / 2, hitT: 0 }, { side: 1, y: F.h / 2, hitT: 0 }],
       players: players,
       // 경기 기록 — 슬롯마다 { g 골, s 유효슈팅, d 결정적 수비 }.
       // 하프타임·종료 때 이벤트에 실어 보내 상황판을 띄운다(스냅샷에는 넣지 않는다 — 매 틱 보낼 값이 아니다).
@@ -247,12 +272,13 @@
       events: []
     };
   }
-  function keeperX(side) { return side === 0 ? TUNING.keeper.x : C.FIELD_W - TUNING.keeper.x; }
+  function keeperX(W, side) { return side === 0 ? TUNING.keeper.x : W - TUNING.keeper.x; }
   // 골키퍼 y 는 tick 만의 함수 — 공·선수와 무관하게 주기적으로 왕복한다(사용자 지시).
-  function keeperY(tick, side) {
+  function keeperY(H, tick, side) {
     var K = TUNING.keeper;
     var w = TAU / (K.periodSec * C.TICK_HZ);
-    return C.FIELD_H / 2 + K.amp * Math.sin(w * tick + (side === 0 ? 0 : Math.PI));
+    // 진폭도 경기장 세로에 맞춰 늘린다(기본 800 기준)
+    return H / 2 + K.amp * (H / 800) * Math.sin(w * tick + (side === 0 ? 0 : Math.PI));
   }
 
   function createPlayer(slot, team, charId) {
@@ -276,20 +302,23 @@
   }
 
   // 어느 팀이 어느 쪽(0 왼쪽, 1 오른쪽)인가. 후반엔 교대.
-  function sideOf(state, team) { return state.half === 1 ? team : 1 - team; }
-  function teamOnSide(state, side) { return state.half === 1 ? side : 1 - side; }
+  // 하프 1·3(연장 전반)은 처음 진영, 2·4 는 바꾼 진영. 홀수 하프 = 처음 그대로.
+  function sideOf(state, team) { return (state.half % 2 === 1) ? team : 1 - team; }
+  function teamOnSide(state, side) { return (state.half % 2 === 1) ? side : 1 - side; }
 
-  function formationSpot(side, index, isKickoff) {
+  // FORMATION 좌표는 기본 경기장(1200×800) 기준이라 실제 크기에 맞춰 늘린다.
+  function formationSpot(W, H, side, index, isKickoff) {
     var f = FORMATION[index % FORMATION.length];
-    var fx = f[0], fy = f[1];
-    if (index >= FORMATION.length) fy = clamp(fy + 60 * Math.floor(index / FORMATION.length), 60, C.FIELD_H - 60);
-    if (isKickoff && index === 0) fx = C.FIELD_W / 2 - 15;  // 킥오프 팀 공격수는 공 바로 옆
-    return [side === 0 ? fx : C.FIELD_W - fx, fy];
+    var sx = W / 1200, sy = H / 800;
+    var fx = f[0] * sx, fy = f[1] * sy;
+    if (index >= FORMATION.length) fy = clamp(fy + 60 * sy * Math.floor(index / FORMATION.length), 60, H - 60);
+    if (isKickoff && index === 0) fx = W / 2 - 15;  // 킥오프 팀 공격수는 공 바로 옆
+    return [side === 0 ? fx : W - fx, fy];
   }
 
   function placePlayer(state, p, index, isKickoff) {
     var side = sideOf(state, p.team);
-    var spot = formationSpot(side, index, isKickoff);
+    var spot = formationSpot(state.W, state.H, side, index, isKickoff);
     p.x = spot[0]; p.y = spot[1]; p.vx = 0; p.vy = 0;
     p.facing = side === 0 ? 0 : Math.PI;
     p.stunT = 0; p.immuneT = 0; p.charge = 0; p.chargeKind = 0; p.chargeD = 0; p.chargeQ = 0; p.curveSide = 0; p.kickLatch = 0; p.touchCd = 0; p.knockT = 0;
@@ -307,7 +336,7 @@
 
   function resetBall(state) {
     var b = state.ball;
-    b.x = C.FIELD_W / 2; b.y = C.FIELD_H / 2; b.vx = 0; b.vy = 0; b.range = 0; b.range0 = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
+    b.x = state.W / 2; b.y = state.H / 2; b.vx = 0; b.vy = 0; b.range = 0; b.range0 = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
     b.owner = -1; b.lastKicker = -1; b.assist = -1; b.kickCd = 0; b.keeperCd = 0;
   }
 
@@ -383,10 +412,10 @@
         stunPlayer(state, q, u.stunTicks, Math.atan2(q.y - p.y, q.x - p.x), ev, p.slot);
       }
     } else if (u.kind === 'blink') {
-      var nx = clamp(p.x + Math.cos(p.facing) * u.dist, C.PLAYER_R, C.FIELD_W - C.PLAYER_R);
-      var ny = clamp(p.y + Math.sin(p.facing) * u.dist, C.PLAYER_R, C.FIELD_H - C.PLAYER_R);
+      var nx = clamp(p.x + Math.cos(p.facing) * u.dist, C.PLAYER_R, state.W - C.PLAYER_R);
+      var ny = clamp(p.y + Math.sin(p.facing) * u.dist, C.PLAYER_R, state.H - C.PLAYER_R);
       p.x = nx; p.y = ny;
-      if (state.ball.owner === p.slot) { var pos = carryPos(p); state.ball.x = pos[0]; state.ball.y = pos[1]; clampCarried(state.ball); }
+      if (state.ball.owner === p.slot) { var pos = carryPos(p); state.ball.x = pos[0]; state.ball.y = pos[1]; clampCarried(state, state.ball); }
     }
   }
 
@@ -475,8 +504,8 @@
         p.prevButtons = 0;
       }
       if (p.knockT > 0) { p.knockT--; p.vx = Math.cos(p.knockDir) * T.knockback; p.vy = Math.sin(p.knockDir) * T.knockback; }
-      p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, C.FIELD_W - C.PLAYER_R);
-      p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, C.FIELD_H - C.PLAYER_R);
+      p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, state.W - C.PLAYER_R);
+      p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, state.H - C.PLAYER_R);
       return;
     }
 
@@ -518,9 +547,11 @@
         kickShoot(state, p, ev);
         startKick(state, p, 3, ev);              // 3 = 공만 차는 동작(사람을 때리지 않는다)
         p.kickLatch = 1;
-      // 앞차기 (D, 공이 없을 때) — 꾹 누르면 쿨다운마다 반복(연타와 같은 성능)
+      // 앞차기 (D, 공이 없을 때) — 꾹 누르면 쿨다운마다 반복(연타와 같은 성능).
+      // 단 **발 앞 좁은 범위에 공이 굴러오면 논스톱 슛**이 먼저 나간다.
       } else if ((buttons & BTN.KICK) && !mine && !p.kickLatch && p.kickCd === 0) {
-        startKick(state, p, 1, ev);
+        if (kickVolley(state, p, ev)) startKick(state, p, 3, ev);   // 공만 차는 동작(사람은 안 때린다)
+        else startKick(state, p, 1, ev);
       // 패스 (Z)
       } else if (mine && (pressed & BTN.PASS)) {
         kickPass(state, p, ev);
@@ -539,8 +570,8 @@
       p.charge = 0; p.chargeKind = 0; p.chargeD = 0; p.chargeQ = 0;
     }
 
-    p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, C.FIELD_W - C.PLAYER_R);
-    p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, C.FIELD_H - C.PLAYER_R);
+    p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, state.W - C.PLAYER_R);
+    p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, state.H - C.PLAYER_R);
   }
 
   // 동작 시작: 시전자 정지 + 판정용 타이머.
@@ -548,6 +579,8 @@
   // 3 을 따로 둔 이유: 슛을 쐈는데 앞에 있던 상대가 발차기에 맞아 기절하는 게 이상하다는 6차 지시.
   function startKick(state, p, kind, ev) {
     var K = TUNING.kick;
+    // 발차기·방귀를 쓰면 모아 둔 감아차기·드리블 게이지는 사라진다(2026-08-26 지시).
+    if (kind === 1 || kind === 2) { p.charge = 0; p.chargeKind = 0; p.chargeD = 0; p.chargeQ = 0; }
     p.kickT = K.animTicks; p.kickKind = kind;
     p.freezeT = kind === 2 ? K.fartFreezeTicks : (kind === 3 ? K.shootFreezeTicks : K.freezeTicks);
     p.kickCd = kind === 2 ? K.fartCdTicks : K.cdTicks;
@@ -592,7 +625,7 @@
           var b = state.ball, pos = carryPos(a);
           b.owner = a.slot; b.lastKicker = a.slot; b.kickCd = 0;
           b.x = pos[0]; b.y = pos[1]; b.vx = 0; b.vy = 0; b.range = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
-          clampCarried(b);
+          clampCarried(state, b);
           a.touchCd = 0;
           noteDefence(state, a.slot);                                 // 기록: 우리 진영에서 끊었을 때만
           ev.push({ kind: 'steal', slot: a.slot, victim: v.slot });
@@ -622,7 +655,7 @@
   function separatePlayers(state) {
     for (var i = 0; i < C.MAX_PLAYERS; i++) {
       var a = state.players[i]; if (!a) continue;
-      a.x = clamp(a.x, C.PLAYER_R, C.FIELD_W - C.PLAYER_R); a.y = clamp(a.y, C.PLAYER_R, C.FIELD_H - C.PLAYER_R);
+      a.x = clamp(a.x, C.PLAYER_R, state.W - C.PLAYER_R); a.y = clamp(a.y, C.PLAYER_R, state.H - C.PLAYER_R);
     }
   }
 
@@ -630,7 +663,7 @@
   function updateKeepers(state) {
     for (var k = 0; k < 2; k++) {
       var g = state.keepers[k];
-      g.y = keeperY(state.tick, k);
+      g.y = keeperY(state.H, state.tick, k);
       if (g.hitT > 0) g.hitT--;
     }
   }
@@ -654,7 +687,7 @@
     for (var k = 0; k < 2; k++) {
       if (k === pierceSide) continue;
       if (carrier && k !== stealSide) continue;
-      var gx = keeperX(k), gy = state.keepers[k].y;
+      var gx = keeperX(state.W, k), gy = state.keepers[k].y;
       // 선분 (prev → 현재) 위에서 골키퍼 중심에 가장 가까운 점
       var sx = b.x - prevX, sy = b.y - prevY, len2 = sx * sx + sy * sy;
       var t = len2 > 0 ? clamp(((gx - prevX) * sx + (gy - prevY) * sy) / len2, 0, 1) : 0;
@@ -692,10 +725,10 @@
   // 들고 있는 공은 경기장 안에 둔다 — **단 골대 입구 폭 안에서는 골라인을 넘어간다**(2026-08-25 사용자 지시:
   // "공을 가지고 골대로 들어가도 넣을 수 있게"). 즉 몰고 골문으로 들어가면 득점이다.
   // 그래서 골키퍼가 **몰고 오는 공도 걷어내도록** 바꿨다(keeperSave) — 그것이 유일한 방어 수단이다.
-  function clampCarried(b) {
-    var R = C.BALL_R, W = C.FIELD_W, D = C.GOAL_DEPTH;
-    b.y = clamp(b.y, R, C.FIELD_H - R);
-    if (b.y > C.GOAL_Y0 + R && b.y < C.GOAL_Y1 - R) b.x = clamp(b.x, -D + R, W + D - R);
+  function clampCarried(state, b) {
+    var R = C.BALL_R, W = state.W, D = C.GOAL_DEPTH;
+    b.y = clamp(b.y, R, state.H - R);
+    if (b.y > state.goalY0 + R && b.y < state.goalY1 - R) b.x = clamp(b.x, -D + R, W + D - R);
     else b.x = clamp(b.x, R, W - R);
   }
 
@@ -711,7 +744,7 @@
     b.assist = (prevP && prev !== p.slot && prevP.team === p.team) ? prev : -1;
     b.owner = -1; b.lastKicker = p.slot; b.kickCd = TUNING.ball.kickCdTicks;
     p.charge = 0; p.chargeKind = 0;
-    clampCarried(b);
+    clampCarried(state, b);
   }
 
   function kickPass(state, p, ev) {
@@ -737,6 +770,20 @@
   }
 
   // 충전이 없다: 누르면 항상 같은 속도·같은 거리로 나간다(5차 지시). 캐릭터 shot 배율과 대포알만 세기를 바꾼다.
+  /* 논스톱 슛 — 공을 잡지 않은 채 발 앞의 굴러오는 공을 그대로 찬다.
+     범위 안에 없으면 false 를 돌려 평범한 앞차기로 넘어간다. */
+  function kickVolley(state, p, ev) {
+    var K = TUNING.kick, S = TUNING.shoot, b = state.ball;
+    if (b.owner >= 0) return false;                     // 누군가 몰고 있으면 논스톱이 아니다
+    if (b.kickCd > 0 && b.lastKicker === p.slot) return false;
+    var fx = p.x + Math.cos(p.facing) * TUNING.ball.carryOffset;
+    var fy = p.y + Math.sin(p.facing) * TUNING.ball.carryOffset;
+    if (Math.hypot(b.x - fx, b.y - fy) > K.volleyR) return false;
+    var mul = CHARACTERS[p.char].shot * K.volleyMul * (ultActive(p, 'power') ? ultOf(p).shotMul : 1);
+    releaseBall(state, p, p.facing, S.speed * mul, S.range * K.volleyMul, 0, 0);
+    ev.push({ kind: 'volley', slot: p.slot });
+    return true;
+  }
   function kickShoot(state, p, ev) {
     var S = TUNING.shoot, ch = CHARACTERS[p.char];
     var boosted = ultActive(p, 'power');
@@ -769,15 +816,15 @@
     ev.push({ kind: 'dribble', slot: p.slot, charge: Math.round(k * 100), curve: Math.round(kq * 100) });
   }
 
-  function inNet(b) { return b.x < 0 || b.x > C.FIELD_W; }
+  function inNet(state, b) { return b.x < 0 || b.x > state.W; }
 
   // 벽·골망 처리. 속도 크기는 유지하고 방향만 반사한다. 반환값 = 반사 횟수 (남은 거리 감소용).
   // wasInNet: 이동 전에 이미 골망 안이었나(한 틱에 벽을 뚫는 빠른 공을 골망 진입과 구분). bounce=false 면 밀어 넣기만.
   // prevX/prevY: 이동 전 위치. 주면 골라인을 **넘는 순간**의 y 로 입구를 판정한다.
   // (이동이 끝난 뒤의 y 로 판정하면 한 틱에 최대 72단위 움직이는 강슛이 기둥 바깥을 지나고도 골이 된다)
-  function clampBall(b, bounce, wasInNet, prevX, prevY) {
-    var R = C.BALL_R, W = C.FIELD_W, H = C.FIELD_H, D = C.GOAL_DEPTH, e = bounce ? 1 : 0, n = 0;
-    var Y0 = C.GOAL_Y0 + R, Y1 = C.GOAL_Y1 - R;
+  function clampBall(state, b, bounce, wasInNet, prevX, prevY) {
+    var R = C.BALL_R, W = state.W, H = state.H, D = C.GOAL_DEPTH, e = bounce ? 1 : 0, n = 0;
+    var Y0 = state.goalY0 + R, Y1 = state.goalY1 - R;
     if (wasInNet) {
       // 골망 안: 그물은 부드럽다(반사 뒤 남은 거리는 moveBall 이 크게 줄인다). 골라인 쪽으로 다시 나오지 못한다.
       if (b.y < Y0) { b.y = Y0; b.vy = -b.vy * e; n++; } else if (b.y > Y1) { b.y = Y1; b.vy = -b.vy * e; n++; }
@@ -811,9 +858,9 @@
   }
 
   // 등속 이동: 남은 거리(range)만큼만 간다. spin 이 있으면 방향이 매 틱 회전한다(감아차기).
-  function moveBall(b) {
+  function moveBall(state, b) {
     if (b.range <= 0) { b.vx = 0; b.vy = 0; b.range = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0; return; }
-    var wasInNet = inNet(b);
+    var wasInNet = inNet(state, b);
     var sp = Math.hypot(b.vx, b.vy);
     if (sp === 0) { b.range = 0; b.spin = 0; b.spinLeft = 0; return; }
     if (b.spin) {
@@ -832,7 +879,7 @@
     var prevX = b.x, prevY = b.y;
     b.x += b.vx / sp * move; b.y += b.vy / sp * move;
     b.range -= move;
-    var bounces = clampBall(b, true, wasInNet, prevX, prevY);
+    var bounces = clampBall(state, b, true, wasInNet, prevX, prevY);
     for (var i = 0; i < bounces; i++) { b.range *= wasInNet ? 0.3 : TUNING.ball.bounceRangeKeep; b.spin *= 0.5; }
     if (b.range < 1) { b.range = 0; b.vx = 0; b.vy = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0; }
   }
@@ -842,11 +889,11 @@
     if (b.kickCd > 0) b.kickCd--;
     if (b.owner >= 0) {
       var p = state.players[b.owner];
-      if (!p) { b.owner = -1; moveBall(b); return; }
+      if (!p) { b.owner = -1; moveBall(state, b); return; }
       var pos = carryPos(p);
       b.x = pos[0]; b.y = pos[1]; b.vx = p.vx; b.vy = p.vy; b.range = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
-      clampCarried(b);
-    } else moveBall(b);
+      clampCarried(state, b);
+    } else moveBall(state, b);
   }
 
   function possession(state) {
@@ -864,13 +911,13 @@
       b.owner = best; b.kickCd = 0; b.range = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
       var pos = carryPos(state.players[best]);   // 잡는 순간 발 앞으로 (한 틱 지연 없이)
       b.x = pos[0]; b.y = pos[1]; b.vx = 0; b.vy = 0;
-      clampCarried(b);
+      clampCarried(state, b);
     }
   }
 
   function goalCheck(state, ev) {
     var b = state.ball;
-    if (b.x >= 0 && b.x <= C.FIELD_W) return;
+    if (b.x >= 0 && b.x <= state.W) return;
     // 왼쪽 골(x<0)은 왼쪽 진영 팀이 지킨다 → 오른쪽 팀 득점
     var side = b.x < 0 ? 1 : 0;
     var team = teamOnSide(state, side);
@@ -900,8 +947,17 @@
       case PHASE.PLAY:
         if (--state.clock <= 0) {
           state.clock = 0;
-          if (state.half === 1) { state.phase = PHASE.HALF; state.phaseTimer = C.HALF_TICKS; ev.push({ kind: 'half', score: [state.score[0], state.score[1]], table: statTable(state) }); }
-          else { state.phase = PHASE.END; state.phaseTimer = C.END_TICKS; ev.push({ kind: 'end', score: [state.score[0], state.score[1]], table: statTable(state), mom: pickMom(state) }); }
+          // 1하프 끝 → 하프타임. 2하프 끝에 동점이면 연장(3·4하프 각 30초). 4하프 끝나면 동점이어도 무승부로 끝낸다.
+          var tied = state.score[0] === state.score[1];
+          var goExtra = (state.half === 2 && tied) || state.half === 3;
+          if (state.half === 1 || goExtra) {
+            state.phase = PHASE.HALF; state.phaseTimer = C.HALF_TICKS;
+            ev.push({ kind: 'half', half: state.half, next: state.half + 1,
+                      score: [state.score[0], state.score[1]], table: statTable(state) });
+          } else {
+            state.phase = PHASE.END; state.phaseTimer = C.END_TICKS;
+            ev.push({ kind: 'end', score: [state.score[0], state.score[1]], table: statTable(state), mom: pickMom(state) });
+          }
         }
         return;
       case PHASE.LOBBY:
@@ -915,9 +971,13 @@
         resetPositions(state);
         state.phase = PHASE.KICKOFF; state.phaseTimer = C.REKICKOFF_TICKS; ev.push({ kind: 'kickoff', team: state.kickoffTeam }); break;
       case PHASE.HALF:
-        state.half = 2; state.clock = state.halfTicks; state.kickoffTeam = 1;
+        state.half++;
+        // 연장(3·4하프)은 30초씩. 킥오프는 하프마다 번갈아.
+        state.clock = (state.half >= 3 ? C.EXTRA_SEC * C.TICK_HZ : state.halfTicks);
+        state.kickoffTeam = (state.half - 1) % 2;
         resetPositions(state);
-        state.phase = PHASE.KICKOFF; state.phaseTimer = C.KICKOFF_TICKS; ev.push({ kind: 'kickoff', team: 1, half: 2 }); break;
+        state.phase = PHASE.KICKOFF; state.phaseTimer = C.KICKOFF_TICKS;
+        ev.push({ kind: 'kickoff', team: state.kickoffTeam, half: state.half }); break;
       case PHASE.END:
         state.phase = PHASE.LOBBY; ev.push({ kind: 'lobby' }); break;
     }
@@ -1000,7 +1060,9 @@
   // 스냅샷: 헤더 29B + 선수당 13B (CLAUDE.md §6)
   // 선수 13B: slot u8, x i16, y i16, vx i16, vy i16, facing u8, state u8, ult u8, motion u8
   //   motion 바이트: 하위 4비트 동작(MOTION), 상위 4비트 충전 0~15
-  var SNAP_HEADER = 29, SNAP_PLAYER = 13;
+  // 헤더 30B: … 28 인원수 + **29 경기장 번호**(FIELDS 색인). 경기장 크기가 방마다 달라서
+  // 클라이언트가 스냅샷만 보고도 골대·골키퍼 위치를 알 수 있어야 한다.
+  var SNAP_HEADER = 30, SNAP_PLAYER = 13;
   function snapshotSize(state) {
     var n = 0;
     for (var s = 0; s < C.MAX_PLAYERS; s++) if (state.players[s]) n++;
@@ -1022,7 +1084,8 @@
     dv.setUint8(0, 0x02);
     dv.setUint32(1, state.tick >>> 0, true);
     dv.setUint32(5, (serverMs || 0) >>> 0, true);
-    dv.setUint8(9, (state.phase & 127) | (state.half === 2 ? 128 : 0));
+    // 하프가 4개(연장 포함)라 1비트로는 모자란다 → 하위 4비트 단계 + 4~5비트 하프(0~3)
+    dv.setUint8(9, (state.phase & 15) | (((state.half - 1) & 3) << 4));
     dv.setUint8(10, Math.min(255, state.score[0]));
     dv.setUint8(11, Math.min(255, state.score[1]));
     dv.setUint16(12, Math.min(65535, state.clock), true);
@@ -1052,6 +1115,8 @@
       off += SNAP_PLAYER;
     }
     dv.setUint8(28, n);
+    var fi = 0; for (var q = 0; q < FIELDS.length; q++) if (FIELDS[q].id === state.field) fi = q;
+    dv.setUint8(29, fi);
     return u8.length === size ? u8 : u8.subarray(0, size);
   }
   function decodeSnapshot(u8) {
@@ -1061,14 +1126,17 @@
     var n = dv.getUint8(28);
     if (u8.length < SNAP_HEADER + SNAP_PLAYER * n) return null;
     var kf = dv.getUint8(27);
+    var F = FIELDS[dv.getUint8(29)] || FIELDS[1];
+    var W = F.w, H = F.h;
     var snap = {
+      field: F.id, W: W, H: H, goalY0: H / 2 - H * C.GOAL_RATIO, goalY1: H / 2 + H * C.GOAL_RATIO,
       tick: dv.getUint32(1, true), serverMs: dv.getUint32(5, true),
-      phase: phaseByte & 127, phaseName: PHASE_NAME[phaseByte & 127] || 'lobby', half: (phaseByte & 128) ? 2 : 1,
+      phase: phaseByte & 15, phaseName: PHASE_NAME[phaseByte & 15] || 'lobby', half: ((phaseByte >> 4) & 3) + 1,
       score: [dv.getUint8(10), dv.getUint8(11)], clock: dv.getUint16(12, true),
       ball: { x: dv.getInt16(14, true) / 4, y: dv.getInt16(16, true) / 4, vx: dv.getInt16(18, true) / 4, vy: dv.getInt16(20, true) / 4, owner: dv.getUint8(22) },
       keepers: [
-        { side: 0, x: keeperX(0), y: dv.getInt16(23, true) / 4, save: !!(kf & 1) },
-        { side: 1, x: keeperX(1), y: dv.getInt16(25, true) / 4, save: !!(kf & 2) }
+        { side: 0, x: keeperX(W, 0), y: dv.getInt16(23, true) / 4, save: !!(kf & 1) },
+        { side: 1, x: keeperX(W, 1), y: dv.getInt16(25, true) / 4, save: !!(kf & 2) }
       ],
       players: []
     };
@@ -1120,19 +1188,34 @@
       }
       return true;
     }
+    /* 팀 안에서의 역할. 2 = 수비(팀마다 하나 보장), 0 = 공격, 1 = 중원. */
+    function roleOf(state, slot) {
+      var me = state.players[slot];
+      if (!me) return 1;
+      var mates = [];
+      for (var s = 0; s < C.MAX_PLAYERS; s++) {
+        var q = state.players[s];
+        if (q && q.team === me.team) mates.push(s);
+      }
+      if (mates.length <= 1) return 1;                 // 혼자면 중원(수비만 하면 공격을 못 한다)
+      if (slot === mates[mates.length - 1]) return 2;  // 팀의 마지막 슬롯 = 수비 담당
+      return mates.indexOf(slot) % 2 === 0 ? 0 : 1;
+    }
     function think(state, slot) {
       var out = { dx: 0, dy: 0, buttons: 0 };
       var p = state.players[slot];
       if (!p || state.phase !== PHASE.PLAY || p.stunT > 0) { memOf(slot).ch = 0; return out; }
       var b = state.ball, T = TUNING;
       var att = 1 - sideOf(state, p.team);              // 내가 공격하는 쪽
-      var goalX = att === 0 ? 0 : C.FIELD_W, goalY = C.FIELD_H / 2;
-      var myGoalX = att === 0 ? C.FIELD_W : 0;           // 내가 지키는 골대
+      var goalX = att === 0 ? 0 : state.W, goalY = state.H / 2;
+      var myGoalX = att === 0 ? state.W : 0;           // 내가 지키는 골대
       /* 성향 3종 — 같은 인공지능이 다 몰려다니지 않게 슬롯마다 역할을 준다(2026-08-26 지시).
          0 공격형: 앞으로 나가 있고 멀리서도 슛한다. 수비 가담이 적다.
          1 중원형: 예전 그대로. 공을 쫓고 연결한다.
          2 수비형: 우리 진영을 지킨다. 공이 우리 쪽으로 넘어와야 달려든다. */
-      var role = slot % 3;
+      /* 팀마다 **수비 하나는 반드시** 둔다(2026-08-26 지시) — 그 팀에서 슬롯이 가장 큰 인공지능이 수비다.
+         사람이 섞여 있으면 사람은 세지 않는다. 나머지는 슬롯 차례대로 공격형·중원형이 번갈아 온다. */
+      var role = roleOf(state, slot);
       var ROLE = [{ up: 0.80, home: 0.62, shootAt: 360, chase: 0.55, lane: 150 },
                   { up: 0.55, home: 0.45, shootAt: 300, chase: 1.00, lane: 90 },
                   { up: 0.30, home: 0.20, shootAt: 250, chase: 0.75, lane: 55 }][role];
@@ -1156,7 +1239,7 @@
         // 팀원이 갖고 있다 — 앞쪽으로 벌려서 받을 자리를 잡는다
         m.ch = 0;
         var mate = state.players[b.owner];
-        tx = mate.x + (goalX - mate.x) * ROLE.up; ty = clamp(mate.y + lane, 80, C.FIELD_H - 80);
+        tx = mate.x + (goalX - mate.x) * ROLE.up; ty = clamp(mate.y + lane, 80, state.H - 80);
         sprint = p.stam > T.player.staminaMax * 0.6;
       } else if (b.owner >= 0) {
         // 상대가 갖고 있다 — 가장 가까운 한 명만 달려들고 나머지는 골문 앞을 지킨다
@@ -1185,7 +1268,7 @@
             if (od < md) { md = od; mark = o; }
           }
           if (mark) { tx = mark.x + (myGoalX - mark.x) * 0.28; ty = mark.y + (goalY - mark.y) * 0.28; }
-          else { tx = myGoalX + (b.x - myGoalX) * 0.4; ty = clamp(goalY + (b.y - goalY) * 0.6 + lane * 0.35, 80, C.FIELD_H - 80); }
+          else { tx = myGoalX + (b.x - myGoalX) * 0.4; ty = clamp(goalY + (b.y - goalY) * 0.6 + lane * 0.35, 80, state.H - 80); }
         }
       } else {
         // 주인 없는 공
@@ -1194,7 +1277,7 @@
         var mine2 = isClosest(state, p) &&
           (role !== 0 || Math.hypot(b.x - myGoalX, b.y - goalY) > 300);
         if (mine2) { tx = b.x; ty = b.y; sprint = p.stam > T.player.staminaMax * 0.4; }
-        else { tx = myGoalX + (b.x - myGoalX) * (0.25 + ROLE.home); ty = clamp(b.y + lane * 0.7, 80, C.FIELD_H - 80); }
+        else { tx = myGoalX + (b.x - myGoalX) * (0.25 + ROLE.home); ty = clamp(b.y + lane * 0.7, 80, state.H - 80); }
       }
 
       var vx = tx - p.x, vy = ty - p.y, len = Math.hypot(vx, vy);
@@ -1245,10 +1328,12 @@
     var b = { x: startX != null ? startX : C.FIELD_W / 2, y: startY != null ? startY : C.FIELD_H / 2,
               vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
               range: range, spin: spin || 0, spinLeft: spin ? TUNING.curve.turnMax : 0, pierce: 0, owner: -1 };
+    // moveBall 이 경기장 크기를 쓰므로 기본 경기장으로 가짜 state 를 하나 만든다(검증 도구 전용)
+    var fake = { W: C.FIELD_W, H: C.FIELD_H, goalY0: C.GOAL_Y0, goalY1: C.GOAL_Y1 };
     var x0 = b.x, y0 = b.y;
     var t = 0, dist = 0, px = b.x, py = b.y, a0 = a, aLast = a, lateral = 0;
     while (b.range > 0 && t < 60) {
-      moveBall(b); t += DT;
+      moveBall(fake, b); t += DT;
       dist += Math.hypot(b.x - px, b.y - py); px = b.x; py = b.y;
       if (b.vx || b.vy) aLast = Math.atan2(b.vy, b.vx);
       // 처음 방향의 직선에서 옆으로 벗어난 거리(부호 있음) — 얼마나 휘었는지 눈에 보이는 값
@@ -1271,6 +1356,7 @@
     step: step, hashState: hashState, sideOf: sideOf, teamOnSide: teamOnSide, keeperX: keeperX, keeperY: keeperY,
     ultReady: ultReady, ultOf: ultOf, AI: AI,
     INPUT_BYTES: INPUT_BYTES, encodeInput: encodeInput, decodeInput: decodeInput,
+    FIELDS: FIELDS, fieldOf: fieldOf,
     encodeSnapshot: encodeSnapshot, decodeSnapshot: decodeSnapshot, snapshotSize: snapshotSize,
     selfTest: selfTest, sim: { ballTravel: ballTravel, rng: rng }
   };

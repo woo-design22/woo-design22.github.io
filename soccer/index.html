@@ -912,10 +912,13 @@
   $('ovOnline').addEventListener('click', function () {
     audio.unlock();
     $('lbNick').value = store.get('soc_nick') || '';
-    $('lbServer').value = params.get('server') || store.get('soc_server') || '';
+    // 주소 우선순위: ①주소창 ?server= ②게시판 ③지난번에 쓴 주소 ④이 페이지를 준 서버.
+    // 게시판이 저장값보다 앞선다 — 터널 주소는 켤 때마다 바뀌므로 **지난번 주소는 거의 항상 죽어 있다**.
+    var forced = params.get('server') || '';
+    $('lbServer').value = forced;
     showPanel('lobby');
-    if (!$('lbServer').value.trim()) fetchServerUrl();   // 비어 있으면 게시판에서 자동으로 받아온다
-    else maybeAutoConnect();
+    if (forced) maybeAutoConnect();
+    else fetchServerUrl();
     if (net.ws && net.ws.readyState === 1) { $('lbAfter').style.display = ''; netSend({ t: 'room.list' }); }
   });
   $('lbBack').addEventListener('click', function () { showOverlay(null); });
@@ -1167,6 +1170,11 @@
      게시판이 KV 없이 메모리로 도는 동안에는 인스턴스가 바뀌면 빈 값이 오는 일이 있다 —
      실제로 켜져 있는데 '서버가 없습니다'가 뜨는 원인이었다. 2.5초 뒤 한 번만 다시 본다. */
   var regTried = 0;
+  /* 게시판이 주소를 못 주면 지난번에 쓴 주소라도 넣어 준다. 죽어 있을 수 있지만 아무것도 없는 것보다는 낫다. */
+  function useSavedServer() {
+    var s = store.get('soc_server') || '';
+    if (s && !$('lbServer').value.trim()) $('lbServer').value = s;
+  }
   function fetchServerUrl() {
     var reg = (params.get('registry') || REGISTRY || '').replace(/\/+$/, '');
     if (!reg) return;
@@ -1174,15 +1182,15 @@
     fetch(reg + '/', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.url) {
         if (regTried < 2) { regTried++; $('lbState').textContent = '서버 주소 확인 중…'; setTimeout(fetchServerUrl, 2500); return; }
-        $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; lbNote(OFF_NOTE); return;
+        $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; lbNote(OFF_NOTE); useSavedServer(); return;
       }
-      if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; lbNote(OFF_NOTE); return; }
-      if (!$('lbServer').value.trim()) $('lbServer').value = d.url;
+      if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; lbNote(OFF_NOTE); useSavedServer(); return; }
+      $('lbServer').value = d.url;   // 게시판이 정본이다
       regTried = 0;
       lbNote('');
       maybeAutoConnect();
       $('lbState').textContent = '서버 주소를 받았습니다';
-    }).catch(function () { $('lbState').textContent = '서버 주소를 받지 못했습니다'; lbNote(OFF_NOTE); });
+    }).catch(function () { $('lbState').textContent = '서버 주소를 받지 못했습니다'; lbNote(OFF_NOTE); useSavedServer(); });
   }
   function wsUrl() {
     var s = ($('lbServer') ? $('lbServer').value : '').trim();

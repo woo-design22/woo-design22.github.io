@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>반대항축구</title>
+<style>
+  :root {
+    --bg: #0d1710;
+    --pitch: #3f9a4a;
+    --pitch-2: #3a9044;
+    --line: rgba(255, 255, 255, 0.85);
+    --net: rgba(255, 255, 255, 0.35);
+    --team-a: #3b82f6;
+    --team-b: #ef4444;
+    --team-a-dark: #1d4ed8;
+    --team-b-dark: #b91c1c;
+    --keeper: #facc15;
+    --keeper-dark: #a16207;
+    --ball: #f8fafc;
+    --ball-mark: #1f2937;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --stun: #fde047;
+    --charge: #fb923c;
+    --curve: #a78bfa;
+    --ult: #f472b6;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --hud-bg: rgba(15, 23, 42, 0.72);
+    --accent: #22c55e;
+    --danger: #ef4444;
+    --fart: #a3e635;
+    --btn: rgba(255, 255, 255, 0.14);
+    --btn-border: rgba(255, 255, 255, 0.38);
+    --btn-on: rgba(34, 197, 94, 0.5);
+    --btn-ult: rgba(244, 114, 182, 0.28);
+    --stick: rgba(255, 255, 255, 0.16);
+    --stick-knob: rgba(255, 255, 255, 0.5);
+    --map-bg: rgba(10, 20, 12, 0.6);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', Pretendard, sans-serif; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; }
+  #game { display: block; width: 100vw; height: 100vh; }
+  .hud { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%); display: flex; gap: 12px; align-items: center;
+    background: var(--hud-bg); padding: 5px 14px; border-radius: 10px; font-size: 17px; font-weight: 600; pointer-events: none; white-space: nowrap; z-index: 2; }
+  .hud .score { font-size: 24px; letter-spacing: 1px; }
+  .hud .a { color: var(--team-a); } .hud .b { color: var(--team-b); }
+  .hud .clock { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+  #ultBar { position: fixed; right: calc(14px + env(safe-area-inset-right)); bottom: calc(12px + env(safe-area-inset-bottom));
+    width: 230px; pointer-events: none; z-index: 2; }
+  #ultBar .lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  #ultBar .track { height: 10px; border-radius: 5px; background: var(--hud-bg); overflow: hidden; border: 1px solid rgba(255,255,255,0.14); }
+  #ultBar .fill { height: 100%; width: 0%; background: var(--ult); transition: width .1s linear; }
+  #ultBar.ready .fill { background: var(--accent); }
+  #ultBar.ready .lbl { color: var(--accent); }
+  #ultBar.on .fill { background: var(--stun); }
+  /* 달리기 체력 — 필살기 게이지 바로 위 */
+  #stamBar { position: fixed; right: calc(14px + env(safe-area-inset-right)); bottom: calc(50px + env(safe-area-inset-bottom));
+    width: 230px; pointer-events: none; z-index: 2; display: flex; align-items: center; gap: 6px; }
+  #stamBar .cap { font-size: 11px; color: var(--muted); flex: none; }
+  #stamBar .track { flex: 1; height: 6px; border-radius: 3px; background: var(--hud-bg); overflow: hidden; border: 1px solid rgba(255,255,255,0.14); }
+  #stamBar .fill { height: 100%; width: 100%; background: var(--accent); transition: width .1s linear; }
+  #stamBar.low .fill { background: var(--stun); }
+  #stamBar.low .cap { color: var(--stun); }
+  /* 소리 토글 — 마우스·터치 양쪽에서 눌린다(키보드는 N / B) */
+  #snd { position: fixed; left: calc(10px + env(safe-area-inset-left)); top: calc(8px + env(safe-area-inset-top));
+    display: flex; gap: 6px; z-index: 4; }
+  #snd button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.22);
+    background: var(--hud-bg); color: var(--text); font-size: 15px; cursor: pointer; padding: 0;
+    font-family: inherit; touch-action: manipulation; }
+  #snd button.off { color: var(--muted); opacity: .5; }
+  #banner { position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%) scale(0.9); font-size: 52px; font-weight: 800;
+    text-shadow: 0 4px 18px rgba(0,0,0,0.65); opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; white-space: nowrap; z-index: 2; }
+  #banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #help { position: fixed; left: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); font-size: 12.5px; color: var(--muted); background: var(--hud-bg);
+    padding: 6px 10px; border-radius: 8px; line-height: 1.55; pointer-events: none; z-index: 2; }
+  #help b { color: var(--text); font-weight: 600; }
+  #debug { position: fixed; left: 12px; top: calc(12px + env(safe-area-inset-top)); font: 12px/1.45 Consolas, 'Courier New', monospace; color: var(--text);
+    background: var(--hud-bg); padding: 6px 10px; border-radius: 8px; white-space: pre; display: none; pointer-events: none; z-index: 3; }
+  #debug.show { display: block; }
+  #overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); z-index: 5; }
+  #overlay.show { display: flex; }
+  .panel { background: var(--hud-bg); border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 20px 26px; text-align: center; max-width: 94vw; max-height: 94vh; overflow: auto; }
+  .panel h1 { margin: 0 0 4px; font-size: 30px; }
+  .panel .sub { color: var(--muted); margin-bottom: 12px; font-size: 13.5px; }
+  .panel .chars { display: flex; gap: 7px; justify-content: center; flex-wrap: wrap; margin: 10px 0 6px; }
+  .panel .chars button { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.18);
+    background: transparent; color: var(--muted); cursor: pointer; }
+  .panel .chars button.sel { border-color: var(--accent); color: var(--text); background: rgba(34,197,94,0.16); }
+  .panel .ultinfo { font-size: 13px; color: var(--muted); min-height: 20px; margin-bottom: 12px; }
+  .panel .ultinfo b { color: var(--ult); }
+  .panel .final { font-size: 36px; font-weight: 800; margin: 6px 0 12px; }
+  .panel .hint { color: var(--muted); font-size: 13px; margin-top: 10px; line-height: 1.6; }
+  .panel kbd { display: inline-block; padding: 1px 6px; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; font: 12.5px Consolas, monospace; color: var(--text); }
+  .panel button.start { font: inherit; font-size: 18px; font-weight: 700; color: var(--text); background: var(--accent); border: 0; border-radius: 10px; padding: 11px 34px; cursor: pointer; }
+  #nogl { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 18px; }
+
+  /* ── 터치 조작 ── */
+  #touch { position: fixed; inset: 0; display: none; z-index: 3; }
+  #touch.show { display: block; }
+  #stickZone { position: absolute; left: 0; bottom: 0; width: 42%; height: 72%; }
+  #stick { position: absolute; width: 116px; height: 116px; margin: -58px 0 0 -58px; border-radius: 50%; background: var(--stick); display: none; pointer-events: none; }
+  #stick .knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: var(--stick-knob); }
+  #stick.show { display: block; }
+  .tbtn { position: absolute; border-radius: 50%; background: var(--btn); border: 2px solid var(--btn-border); color: var(--text);
+    font-weight: 700; display: flex; align-items: center; justify-content: center; touch-action: none; text-align: center; line-height: 1.1; }
+  .tbtn.on { background: var(--btn-on); }
+  #bKick    { right: calc(24px + env(safe-area-inset-right));  bottom: calc(96px + env(safe-area-inset-bottom)); width: 88px; height: 88px; font-size: 17px; }
+  #bDribble { right: calc(120px + env(safe-area-inset-right)); bottom: calc(152px + env(safe-area-inset-bottom)); width: 66px; height: 66px; font-size: 14px; }
+  #bPass    { right: calc(120px + env(safe-area-inset-right)); bottom: calc(62px + env(safe-area-inset-bottom));  width: 66px; height: 66px; font-size: 14px; }
+  #bFart    { right: calc(34px + env(safe-area-inset-right));  bottom: calc(16px + env(safe-area-inset-bottom));  width: 66px; height: 66px; font-size: 14px; }
+  #bCurveL  { right: calc(200px + env(safe-area-inset-right)); bottom: calc(120px + env(safe-area-inset-bottom)); width: 58px; height: 58px; font-size: 13px; }
+  #bCurveR  { right: calc(200px + env(safe-area-inset-right)); bottom: calc(46px + env(safe-area-inset-bottom));  width: 58px; height: 58px; font-size: 13px; }
+  #bSprint  { left: calc(90px + env(safe-area-inset-left));    bottom: calc(118px + env(safe-area-inset-bottom)); width: 58px; height: 58px; font-size: 13px; }
+  #bUlt     { left: calc(18px + env(safe-area-inset-left));    bottom: calc(124px + env(safe-area-inset-bottom)); width: 62px; height: 62px; font-size: 13px;
+              background: var(--btn-ult); border-color: var(--ult); opacity: .45; }
+  #bUlt.ready { opacity: 1; border-color: var(--accent); box-shadow: 0 0 14px rgba(34,197,94,0.5); }
+  /* 온라인 화면 (로비·방) */
+  .panel.wide { min-width: min(560px, 92vw); }
+  .panel .row { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 8px 0; }
+  .panel input[type=text], .panel input[type=password], .panel select {
+    font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; color: var(--text);
+    border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.06); }
+  .panel input::placeholder { color: rgba(255,255,255,0.35); }
+  .panel .btn { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 9px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.06); color: var(--text); }
+  .panel .btn:hover { border-color: rgba(255,255,255,0.5); }
+  .panel .btn.go { background: var(--accent); border-color: var(--accent); color: #06210f; font-weight: 700; }
+  .panel .btn.go:disabled { opacity: .4; cursor: default; }
+  .panel .btn.sm { font-size: 12.5px; padding: 5px 10px; }
+  .roomlist { max-height: 42vh; overflow: auto; margin: 6px 0; }
+  .roomlist table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .roomlist th { color: var(--muted); font-weight: 500; font-size: 12px; text-align: left; padding: 4px 6px; }
+  .roomlist td { padding: 5px 6px; border-top: 1px solid rgba(255,255,255,0.08); text-align: left; }
+  .roomlist tr.full td { color: var(--muted); }
+  .members { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+  .members .m { display: flex; gap: 8px; align-items: center; font-size: 13.5px; padding: 5px 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.05); }
+  .members .m.me { outline: 1px solid rgba(255,255,255,0.28); }
+  .members .m .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; }
+  .members .m .a { background: rgba(63,132,246,0.28); } .members .m .b { background: rgba(239,75,75,0.28); }
+  .members .m .rd { color: var(--accent); font-weight: 700; }
+  .members .m .no { color: var(--muted); }
+  .chatbox { text-align: left; font-size: 12.5px; color: var(--muted); max-height: 96px; overflow: auto;
+    background: rgba(0,0,0,0.22); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+  .err { color: var(--danger); font-size: 12.5px; min-height: 1em; margin-top: 4px; }
+  .panel .sndtest { margin-top: 8px; background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,0.22);
+    border-radius: 8px; padding: 5px 12px; font-size: 13px; font-family: inherit; cursor: pointer; }
+  .panel .sndtest:hover { color: var(--text); border-color: rgba(255,255,255,0.45); }
+  .panel .sndinfo { font-size: 11.5px; color: var(--muted); margin-top: 6px; min-height: 1em; white-space: pre-line; }
+  #rotateHint { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--hud-bg);
+    padding: 6px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); display: none; pointer-events: none; white-space: nowrap; z-index: 4; }
+  @media (orientation: portrait) { body.touch #rotateHint { display: block; } }
+  @media (max-width: 760px) {
+    .hud { font-size: 13px; padding: 3px 9px; gap: 7px; } .hud .score { font-size: 19px; }
+    #banner { font-size: 34px; }
+    #ultBar { width: 150px; bottom: calc(8px + env(safe-area-inset-bottom)); }
+    #stamBar { width: 150px; bottom: calc(46px + env(safe-area-inset-bottom)); }
+    .panel h1 { font-size: 23px; } .panel .chars button { padding: 6px 8px; font-size: 12px; }
+  }
+  body.touch #help { display: none; }
+  /* 터치에서는 화면 아래 가운데(조이스틱과 버튼 사이 빈 곳)에 둔다 — 우상단은 미니맵 자리라 겹친다 */
+  body.touch #ultBar { left: 50%; right: auto; transform: translateX(-50%); width: 150px; bottom: calc(8px + env(safe-area-inset-bottom)); }
+  body.touch #ultBar .lbl { font-size: 11px; }
+  body.touch #stamBar { left: 50%; right: auto; transform: translateX(-50%); width: 150px; bottom: calc(46px + env(safe-area-inset-bottom)); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud"><span class="a" id="nameA">1반</span><span class="score" id="score">0 : 0</span><span class="b" id="nameB">2반</span><span class="clock" id="clock">전반 02:30</span></div>
+<div id="snd"><button id="btnSfx" type="button" title="효과음 (N)">🔊</button><button id="btnBgm" type="button" title="배경음악 (B)">♪</button></div>
+<div id="stamBar"><div class="track"><div class="fill" id="stamFill"></div></div><span class="cap">체력</span></div>
+<div id="ultBar"><div class="lbl"><span id="ultName">필살기</span><span id="ultPct">0%</span></div><div class="track"><div class="fill" id="ultFill"></div></div></div>
+<div id="banner"></div>
+<div id="help">
+  <b>이동</b> 방향키 · <b>달리기</b> 왼쪽 Shift(체력만큼) · <b>드리블</b> W(길게 = 멀리) · <b>슛·발차기</b> D(누르면 바로) · <b>방귀</b> S(뒤쪽 네모)<br>
+  <b>감아차기</b> Q(왼쪽)·E(오른쪽), 꾹 누를수록 많이 휨 · <b>패스</b> Z · <b>필살기</b> A<br>
+  <b>효과음</b> N · <b>배경음악</b> B · <b>미니맵</b> M · <b>디버그</b> F3
+</div>
+<div id="debug"></div>
+<div id="touch">
+  <div id="stickZone"><div id="stick"><div class="knob"></div></div></div>
+  <div class="tbtn" id="bKick" data-key="KeyD">슛<br>발차기</div>
+  <div class="tbtn" id="bDribble" data-key="KeyW">드리블</div>
+  <div class="tbtn" id="bPass" data-key="KeyZ">패스</div>
+  <div class="tbtn" id="bFart" data-key="KeyS">방귀</div>
+  <div class="tbtn" id="bCurveL" data-key="KeyQ">감아◀</div>
+  <div class="tbtn" id="bCurveR" data-key="KeyE">감아▶</div>
+  <div class="tbtn" id="bSprint" data-key="ShiftLeft">달리기</div>
+  <div class="tbtn" id="bUlt" data-key="KeyA">필살</div>
+</div>
+<div id="rotateHint">가로로 돌리면 경기장이 더 잘 보입니다</div>
+<div id="overlay">
+  <div class="panel" id="panelHome">
+    <h1>반대항축구</h1>
+    <div class="sub" id="ovSub">혼자 하기 — 인공지능과 2:2. 전·후반 각 3분, 골키퍼는 자동. 캐릭터를 고르고 시작하세요.</div>
+    <div class="final" id="ovFinal" style="display:none"></div>
+    <div class="chars" id="ovChars"></div>
+    <div class="ultinfo" id="ovUlt"></div>
+    <button class="start" id="ovStart">혼자 하기</button>
+    <button class="btn" id="ovOnline" type="button" style="margin-top:8px">여러 명이서 하기</button>
+    <button class="sndtest" id="ovSndTest" type="button">소리 시험</button>
+    <div class="sndinfo" id="ovSndInfo"></div>
+    <div class="hint" id="ovHint"></div>
+  </div>
+</div>
+  <div class="panel wide" id="panelLobby" style="display:none">
+    <h1>여러 명이서 하기</h1>
+    <div class="sub">아이디(닉네임)를 정하고 방에 들어가세요. 회원가입은 없습니다.</div>
+    <div class="row">
+      <input type="text" id="lbNick" maxlength="12" placeholder="아이디 2~12자">
+      <button class="btn go" id="lbConnect" type="button">접속</button>
+      <span id="lbState" style="font-size:12.5px;color:var(--muted)"></span>
+    </div>
+    <div class="row">
+      <input type="text" id="lbServer" placeholder="서버 주소 (비우면 이 페이지를 준 서버)" style="width:min(340px,80vw)">
+    </div>
+    <div id="lbAfter" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <b style="font-size:14px">방 목록</b>
+        <span><button class="btn sm" id="lbRefresh" type="button">새로고침</button></span>
+      </div>
+      <div class="roomlist"><table><thead><tr><th>방 이름</th><th>인원</th><th>전후반</th><th>방장</th><th></th></tr></thead><tbody id="lbRooms"></tbody></table></div>
+      <div class="row" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px">
+        <input type="text" id="crName" maxlength="20" placeholder="방 이름" style="width:150px">
+        <select id="crSize"><option value="1">1:1</option><option value="2" selected>2:2</option><option value="3">3:3</option><option value="4">4:4</option><option value="5">5:5</option><option value="10">10:10</option></select>
+        <select id="crHalf"><option value="90">전후반 1분30초</option><option value="180" selected>전후반 3분</option><option value="300">전후반 5분</option></select>
+        <input type="password" id="crPass" maxlength="12" placeholder="비밀번호(없으면 공개)" style="width:150px">
+        <button class="btn go" id="crMake" type="button">방 만들기</button>
+      </div>
+      <div class="err" id="lbErr"></div>
+    </div>
+    <button class="btn sm" id="lbBack" type="button" style="margin-top:10px">뒤로</button>
+  </div>
+
+  <div class="panel wide" id="panelRoom" style="display:none">
+    <h1 id="rmName">방</h1>
+    <div class="sub" id="rmSub"></div>
+    <div class="members" id="rmMembers"></div>
+    <div class="row">
+      <button class="btn" id="rmTeam" type="button">팀 바꾸기</button>
+      <span id="rmChars" class="chars" style="margin:0"></span>
+    </div>
+    <div class="row">
+      <button class="btn go" id="rmReady" type="button">준비</button>
+      <button class="btn go" id="rmStart" type="button">시작</button>
+      <button class="btn" id="rmLeave" type="button">나가기</button>
+    </div>
+    <div class="chatbox" id="rmChat"></div>
+    <div class="row"><input type="text" id="rmChatIn" maxlength="200" placeholder="채팅 (Enter)" style="width:70%"></div>
+    <div class="err" id="rmErr"></div>
+  </div>
+
+  <div class="panel" id="panelMsg" style="display:none">
+    <h1 id="msgTitle">안내</h1>
+    <div class="sub" id="msgBody"></div>
+    <button class="btn go" id="msgRetry" type="button">다시 시도</button>
+    <button class="btn" id="msgHome" type="button" style="margin-left:6px">처음으로</button>
+  </div>
+<div id="nogl">이 브라우저는 캔버스를 지원하지 않아 게임을 실행할 수 없습니다. 최신 크롬 또는 엣지를 사용해 주세요.</div>
+
+<script src="game-core.js"></script>
+<script src="sprites.js"></script>
+<script>
+(function () {
+  'use strict';
+  var core = window.SoccerCore;
+  var C = core.C, BTN = core.BTN, ST = core.ST, PHASE = core.PHASE, MOTION_NAME = core.MOTION_NAME;
+  var TAU = Math.PI * 2;
+  var sprite = window.SoccerSprite || null;   // sprites.js 가 있으면 그림을 그쪽에 맡긴다
+
+  // ── store: localStorage 를 try/catch 로 감싼다 (file://·쿠키 차단 환경 대비) ──
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+  var SETTINGS_KEY = 'soc_settings';
+  var settings = { interpMs: 100, char: 0, minimap: true, sfx: true, bgm: true };
+  try {
+    var saved = JSON.parse(store.get(SETTINGS_KEY) || '{}');
+    if (saved && typeof saved === 'object') {
+      if (saved.interpMs >= 50 && saved.interpMs <= 150) settings.interpMs = saved.interpMs;
+      if (saved.char >= 0 && saved.char < 6) settings.char = saved.char | 0;
+      if (typeof saved.minimap === 'boolean') settings.minimap = saved.minimap;
+      if (typeof saved.sfx === 'boolean') settings.sfx = saved.sfx;
+      if (typeof saved.bgm === 'boolean') settings.bgm = saved.bgm;
+    }
+  } catch (e) {}
+  function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(settings)); }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $('game');
+  var ctx = canvas.getContext && canvas.getContext('2d');
+  if (!ctx) { $('nogl').style.display = 'flex'; return; }
+  var params = new URLSearchParams(location.search);
+  var debugOn = params.get('debug') === '1';
+  $('debug').classList.toggle('show', debugOn);
+
+  // 색은 :root 변수에서 읽는다
+  var cs = getComputedStyle(document.documentElement);
+  function cssVar(n) { return cs.getPropertyValue(n).trim(); }
+  var COLOR = {
+    bg: cssVar('--bg'), pitch: cssVar('--pitch'), pitch2: cssVar('--pitch-2'), line: cssVar('--line'), net: cssVar('--net'),
+    team: [cssVar('--team-a'), cssVar('--team-b')], teamDark: [cssVar('--team-a-dark'), cssVar('--team-b-dark')],
+    keeper: cssVar('--keeper'), keeperDark: cssVar('--keeper-dark'),
+    ball: cssVar('--ball'), ballMark: cssVar('--ball-mark'), shadow: cssVar('--shadow'),
+    stun: cssVar('--stun'), charge: cssVar('--charge'), curve: cssVar('--curve'), ult: cssVar('--ult'), fart: cssVar('--fart'),
+    text: cssVar('--text'), muted: cssVar('--muted'), mapBg: cssVar('--map-bg')
+  };
+  var TEAM_NAMES = ['1반', '2반'];
+
+  // ── 뷰포트 + RPG 카메라 ──────────────────────────────────────────────────
+  // 시야는 "보이는 월드 **넓이**"로 고정한다 — 화면이 커도 더 많이 보이지 않아야 온라인에서 공평하다.
+  // 세로만 고정하면 화면비가 극단일 때 무너진다(세로 폰은 가로 138단위만 보이고, 32:9는 경기장 75%가 보인다).
+  var VIEW_AREA_PC = 230400;    // 16:9 에서 정확히 640×360
+  var VIEW_AREA_TOUCH = 195000; // 812×375 에서 정확히 650×300 (폰은 화면이 작아 조금 덜 본다)
+  var VIEW_W_MAX = 880;         // 이 이상 보이면 "전체 맵"이 되어 좁은 시야의 의미가 사라진다
+  var VIEW_W_MIN = 300;         // 세로 폰 대비 하한 (선수 지름 28 기준 약 10명 폭)
+  var VIEW_H_MIN = 288;         // 골대 폭 200 + 위아래 여유 44씩 — 골 앞에서 두 기둥이 같이 보이는 하한
+  var view = { scale: 1, dpr: 1, w: 0, h: 0, cssW: 0, cssH: 0, worldW: 0, worldH: 0 };
+  var cam = { x: C.FIELD_W / 2, y: C.FIELD_H / 2, init: false };
+  // 2026-08-25 7차 지시: **내 선수가 항상 화면 한가운데**. 그래서 데드존을 없앴다(0).
+  // "경기장 가장자리에서는 가운데가 아니어도 된다"는 아래 클램프가 그대로 처리한다 — 경기장 밖을 보여 주지 않으려고 카메라를 붙잡기 때문.
+  var CAM = { deadX: 0, deadY: 0, tau: 0.055 };   // 데드존(월드 단위)과 추종 시상수(초)
+
+  function resize() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    view.dpr = dpr; view.w = canvas.width; view.h = canvas.height; view.cssW = w; view.cssH = h;
+    var cw = canvas.width, chh = canvas.height;
+    var area = touchOn ? VIEW_AREA_TOUCH : VIEW_AREA_PC;
+    var sc = Math.sqrt(cw * chh / area);                              // 넓이 고정
+    var sMax = Math.min(cw / VIEW_W_MIN, chh / VIEW_H_MIN);           // 더 크면 너무 조금 보인다
+    var sMin = cw / VIEW_W_MAX;                                       // 더 작으면 너무 많이 보인다(공평성)
+    sc = sMin > sMax ? sMin : clamp(sc, sMin, sMax);                  // 충돌하면 공평성 우선
+    view.scale = Math.max(0.02, sc);                                  // 크기 0인 캔버스 방어
+    view.worldW = cw / view.scale;
+    view.worldH = chh / view.scale;
+  }
+  window.addEventListener('resize', resize);
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  // 카메라는 클라이언트 전용이다 — 시뮬레이션 결정성과 무관하다.
+  function updateCamera(dt) {
+    var tx = cam.x, ty = cam.y;
+    var me = myRenderPlayer();
+    if (me) {
+      // 데드존이 0 이면 목표는 곧 내 좌표다(항상 가운데). 0 이 아니면 예전처럼 여유 상자를 둔다.
+      if (me.x > cam.x + CAM.deadX) tx = me.x - CAM.deadX;
+      else if (me.x < cam.x - CAM.deadX) tx = me.x + CAM.deadX;
+      if (me.y > cam.y + CAM.deadY) ty = me.y - CAM.deadY;
+      else if (me.y < cam.y - CAM.deadY) ty = me.y + CAM.deadY;
+      if (!cam.init) { tx = me.x; ty = me.y; cam.init = true; }
+    } else if (rs.has) { tx = rs.ball.x; ty = rs.ball.y; }
+    var k = 1 - Math.exp(-Math.max(0.001, dt) / CAM.tau);   // 프레임률과 무관한 부드러운 추종
+    cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+    // 경기장(골망 포함) 밖이 보이지 않게 클램프. 화면이 경기장보다 크면 가운데 고정.
+    var hw = view.worldW / 2, hh = view.worldH / 2, D = C.GOAL_DEPTH;
+    var minX = -D + hw, maxX = C.FIELD_W + D - hw;
+    var minY = hh, maxY = C.FIELD_H - hh;
+    cam.x = minX > maxX ? C.FIELD_W / 2 : clamp(cam.x, minX, maxX);
+    cam.y = minY > maxY ? C.FIELD_H / 2 : clamp(cam.y, minY, maxY);
+  }
+  function px(x) { return (x - cam.x) * view.scale + view.w / 2; }
+  function py(y) { return (y - cam.y) * view.scale + view.h / 2; }
+
+  // ── 키보드 입력 → 통일된 입력 상태 (CLAUDE.md §6). 터치 버튼도 같은 keys 맵에 키 코드를 넣는다 ──
+  // 조작: 이동 방향키 · 왼쪽 Shift 달리기 · W 드리블(누른 만큼) · Q/E 감아차기 · D 슛·발차기 · S 방귀 · A 필살기 · Z 패스
+  var keys = Object.create(null);
+  var KEY = {
+    up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
+    dribble: ['KeyW'], curveL: ['KeyQ'], curveR: ['KeyE'], kick: ['KeyD'], fart: ['KeyS'], ult: ['KeyA'], pass: ['KeyZ'],
+    sprint: ['ShiftLeft']
+  };
+  var stickVec = { active: false, dx: 0, dy: 0 };   // 터치 조이스틱
+  function down(list) { for (var i = 0; i < list.length; i++) if (keys[list[i]]) return true; return false; }
+  function readInput(out) {
+    var dx = (down(KEY.right) ? 1 : 0) - (down(KEY.left) ? 1 : 0);
+    var dy = (down(KEY.down) ? 1 : 0) - (down(KEY.up) ? 1 : 0);
+    if (stickVec.active) { dx = stickVec.dx; dy = stickVec.dy; }
+    var b = 0;
+    if (down(KEY.pass)) b |= BTN.PASS;
+    if (down(KEY.kick)) b |= BTN.KICK;
+    if (down(KEY.dribble)) b |= BTN.DRIBBLE;
+    if (down(KEY.curveL)) b |= BTN.CURVE_L;
+    if (down(KEY.curveR)) b |= BTN.CURVE_R;
+    if (down(KEY.fart)) b |= BTN.FART;
+    if (down(KEY.ult)) b |= BTN.ULT;
+    if (down(KEY.sprint)) b |= BTN.SPRINT;
+    out.dx = dx; out.dy = dy; out.buttons = b;
+    return out;
+  }
+  var PREVENT = { ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1, F3: 1 };
+  window.addEventListener('keydown', function (e) {
+    // 아이디·채팅을 칠 때 게임 조작키가 먹으면 안 된다
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.code === 'F3') { debugOn = !debugOn; $('debug').classList.toggle('show', debugOn); e.preventDefault(); return; }
+    audio.unlock();
+    if (e.code === 'KeyM' && !overlayMode) { settings.minimap = !settings.minimap; saveSettings(); return; }
+    if (e.code === 'KeyN') { audio.set('sfx', !settings.sfx); syncAudioBtns(); if (settings.sfx) audio.sfx('pass'); return; }
+    if (e.code === 'KeyB') { audio.set('bgm', !settings.bgm); syncAudioBtns(); return; }
+    if (PREVENT[e.code]) e.preventDefault();
+    keys[e.code] = true;
+    if (overlayMode) {
+      if (e.code === 'Enter') startPractice({ char: settings.char });
+      else if (e.code.indexOf('Digit') === 0) { var n = +e.code.slice(5); if (n >= 1 && n <= 6) selectChar(n - 1); }
+    }
+  });
+  window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+  window.addEventListener('blur', function () { keys = Object.create(null); stickVec.active = false; });
+  window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // ── 터치 조작 ──
+  var touchOn = false;
+  function setTouch(on) {
+    touchOn = !!on;
+    $('touch').classList.toggle('show', touchOn);
+    document.body.classList.toggle('touch', touchOn);
+    if (!touchOn) stickVec.active = false;
+    resize();
+  }
+  // 포인터 캡처: 손가락이 버튼 밖으로 나가도 up 을 받기 위해. 합성 이벤트 등 활성 포인터가 없으면 조용히 넘어간다
+  function capture(el, id) { try { el.setPointerCapture(id); } catch (e) {} }
+  (function initTouch() {
+    var zone = $('stickZone'), stick = $('stick'), knob = stick.firstElementChild;
+    var stickId = null, baseX = 0, baseY = 0, RADIUS = 58, DEAD = 9;
+    zone.addEventListener('pointerdown', function (e) {
+      if (stickId !== null) return;
+      stickId = e.pointerId; baseX = e.clientX; baseY = e.clientY;
+      capture(zone, e.pointerId);
+      stick.style.left = baseX + 'px'; stick.style.top = baseY + 'px'; stick.classList.add('show');
+      knob.style.transform = 'translate(0,0)';
+      stickVec.active = true; stickVec.dx = 0; stickVec.dy = 0;
+      e.preventDefault();
+    });
+    zone.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== stickId) return;
+      var dx = e.clientX - baseX, dy = e.clientY - baseY, d = Math.hypot(dx, dy);
+      if (d < DEAD) { stickVec.dx = 0; stickVec.dy = 0; knob.style.transform = 'translate(0,0)'; return; }
+      var k = Math.min(1, d / RADIUS);
+      stickVec.dx = dx / d; stickVec.dy = dy / d;   // 등속이라 방향만 쓴다
+      knob.style.transform = 'translate(' + (dx / d * k * RADIUS) + 'px,' + (dy / d * k * RADIUS) + 'px)';
+    });
+    function stickEnd(e) {
+      if (e.pointerId !== stickId) return;
+      stickId = null; stickVec.active = false; stickVec.dx = 0; stickVec.dy = 0;
+      stick.classList.remove('show');
+    }
+    zone.addEventListener('pointerup', stickEnd); zone.addEventListener('pointercancel', stickEnd);
+    Array.prototype.forEach.call(document.querySelectorAll('.tbtn'), function (el) {
+      var code = el.getAttribute('data-key');
+      function press(e) { keys[code] = true; el.classList.add('on'); capture(el, e.pointerId); e.preventDefault(); }
+      function release() { keys[code] = false; el.classList.remove('on'); }
+      el.addEventListener('pointerdown', press);
+      el.addEventListener('pointerup', release); el.addEventListener('pointercancel', release);
+    });
+    var wantTouch = params.get('touch') === '1' || (params.get('touch') !== '0' && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window));
+    setTouch(wantTouch);
+  })();
+  resize();
+
+  // ── 스냅샷 버퍼 + 보간 (온라인 모드와 같은 경로) ──
+  var snaps = [];            // { t, s }  t = 수신(생성) 시각 ms
+  var snapBuf = new Uint8Array(core.snapshotSize({ players: new Array(C.MAX_PLAYERS).fill(1) }));
+  var lastSnapshotBytes = 0;
+  function pushSnapshot(bytes, t) {
+    var s = core.decodeSnapshot(bytes);
+    if (!s) return;
+    snaps.push({ t: t, s: s });
+    if (snaps.length > 60) snaps.shift();
+    lastSnapshotBytes = bytes.length;
+  }
+  // 화면용 보간 결과 (프레임마다 같은 객체를 재사용)
+  var rs = { players: [], n: 0, ball: { x: 600, y: 400, owner: -1 },
+             keepers: [{ x: 0, y: 400, save: false }, { x: 0, y: 400, save: false }],
+             phase: 0, half: 1, score: [0, 0], clock: 0, has: false, tick: 0 };
+  for (var i = 0; i < C.MAX_PLAYERS; i++) {
+    rs.players.push({ slot: 0, team: 0, x: 0, y: 0, facing: 0, flags: 0, ult: 0, stam: 1, motion: 0, motionName: 'idle', charge: 0 });
+  }
+  var slotIndex = new Int16Array(C.MAX_PLAYERS);
+  function lerpAngle(a, b, k) { var d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return a + d * k; }
+  function sample(renderT) {
+    var n = snaps.length;
+    if (!n) { rs.has = false; return; }
+    var i = n - 1;
+    while (i > 0 && snaps[i].t > renderT) i--;
+    var a = snaps[i], b = snaps[Math.min(i + 1, n - 1)];
+    var k = (b.t > a.t) ? Math.max(0, Math.min(1, (renderT - a.t) / (b.t - a.t))) : 1;
+    var sa = a.s, sb = b.s;
+    for (var j = 0; j < C.MAX_PLAYERS; j++) slotIndex[j] = -1;
+    for (j = 0; j < sa.players.length; j++) slotIndex[sa.players[j].slot] = j;
+    rs.n = sb.players.length;
+    for (j = 0; j < sb.players.length; j++) {
+      var pb = sb.players[j], ia = slotIndex[pb.slot], pa = ia >= 0 ? sa.players[ia] : pb;
+      var o = rs.players[j];
+      o.slot = pb.slot; o.team = pb.team; o.flags = pb.flags; o.ult = pb.ult; o.stam = pb.stam;
+      o.motion = pb.motion; o.motionName = pb.motionName; o.charge = pb.charge;
+      // **방귀·발차기 동작 중에는 보간하지 않는다.** 그 동안 선수는 서버에서 완전히 고정돼 있으므로
+      // 보간하면 화면 좌표·각도가 판정에 쓰인 값과 어긋나고, 방귀 사각형이 실제 판정과 다른 자리에 그려진다.
+      var acting = pb.motionName === 'fart' || pb.motionName === 'kick';
+      if (acting) { o.x = pb.x; o.y = pb.y; o.facing = pb.facing; }
+      else {
+        o.x = pa.x + (pb.x - pa.x) * k; o.y = pa.y + (pb.y - pa.y) * k;
+        o.facing = lerpAngle(pa.facing, pb.facing, k);
+      }
+    }
+    rs.ball.x = sa.ball.x + (sb.ball.x - sa.ball.x) * k; rs.ball.y = sa.ball.y + (sb.ball.y - sa.ball.y) * k; rs.ball.owner = sb.ball.owner;
+    for (j = 0; j < 2; j++) {
+      rs.keepers[j].x = sb.keepers[j].x;
+      rs.keepers[j].y = sa.keepers[j].y + (sb.keepers[j].y - sa.keepers[j].y) * k;
+      rs.keepers[j].save = sb.keepers[j].save;
+    }
+    rs.phase = sb.phase; rs.half = sb.half; rs.score[0] = sb.score[0]; rs.score[1] = sb.score[1]; rs.clock = sb.clock; rs.tick = sb.tick;
+    rs.has = true;
+  }
+  function myRenderPlayer() {
+    if (!rs.has || !game) return null;
+    for (var i = 0; i < rs.n; i++) if (rs.players[i].slot === game.mySlot) return rs.players[i];
+    return null;
+  }
+
+  // 동작이 바뀐 시각을 기억해 스프라이트에 진행도(phase)를 넘긴다
+  var animState = [];
+  function animPhase(p, now) {
+    var a = animState[p.slot] || (animState[p.slot] = { m: p.motion, since: now, facing: p.facing });
+    // 동작이 시작된 **순간의 방향**을 기억한다. 판정 사각형을 이 각도로 그려야 보간(lerpAngle) 때문에
+    // 처음 한두 프레임 동안 사각형이 돌아 보이는 일이 없다.
+    if (a.m !== p.motion) { a.m = p.motion; a.since = now; a.facing = p.facing; }
+    var dur = (p.motionName === 'kick' || p.motionName === 'fart') ? 250 : 600;
+    return Math.min(1, (now - a.since) / dur);
+  }
+
+  // ── 렌더 ──
+  function drawPitch() {
+    var s = view.scale, W = C.FIELD_W, H = C.FIELD_H, D = C.GOAL_DEPTH;
+    ctx.fillStyle = COLOR.bg; ctx.fillRect(0, 0, view.w, view.h);
+    // 잔디: 보이는 범위의 줄무늬만 그린다
+    ctx.fillStyle = COLOR.pitch; ctx.fillRect(px(0), py(0), W * s, H * s);
+    var stripe = W / 10;
+    var i0 = Math.max(0, Math.floor((cam.x - view.worldW / 2) / stripe));
+    var i1 = Math.min(9, Math.ceil((cam.x + view.worldW / 2) / stripe));
+    ctx.fillStyle = COLOR.pitch2;
+    for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s, H * s);
+    ctx.strokeStyle = COLOR.line; ctx.lineWidth = Math.max(1, 2 * s);
+    ctx.strokeRect(px(0), py(0), W * s, H * s);
+    ctx.beginPath(); ctx.moveTo(px(W / 2), py(0)); ctx.lineTo(px(W / 2), py(H)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), 80 * s, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), 3 * s, 0, TAU); ctx.fillStyle = COLOR.line; ctx.fill();
+    ctx.strokeRect(px(0), py(H / 2 - 180), 160 * s, 360 * s); ctx.strokeRect(px(W - 160), py(H / 2 - 180), 160 * s, 360 * s);
+    ctx.strokeRect(px(0), py(H / 2 - 110), 60 * s, 220 * s); ctx.strokeRect(px(W - 60), py(H / 2 - 110), 60 * s, 220 * s);
+    var y0 = C.GOAL_Y0, y1 = C.GOAL_Y1;
+    ctx.strokeStyle = COLOR.net; ctx.lineWidth = Math.max(1, 1 * s);
+    drawNet(px(-D), py(y0), D * s, (y1 - y0) * s); drawNet(px(W), py(y0), D * s, (y1 - y0) * s);
+    ctx.strokeStyle = COLOR.line; ctx.lineWidth = Math.max(2, 4 * s);
+    ctx.strokeRect(px(-D), py(y0), D * s, (y1 - y0) * s); ctx.strokeRect(px(W), py(y0), D * s, (y1 - y0) * s);
+  }
+  function drawNet(x, y, w, h) {
+    var step = 8 * view.scale;
+    if (step < 3) return;
+    ctx.beginPath();
+    for (var i = step; i < w; i += step) { ctx.moveTo(x + i, y); ctx.lineTo(x + i, y + h); }
+    for (var j = step; j < h; j += step) { ctx.moveTo(x, y + j); ctx.lineTo(x + w, y + j); }
+    ctx.stroke();
+  }
+  function onScreen(wx, wy, pad) {
+    var m = (pad || 60);
+    return wx > cam.x - view.worldW / 2 - m && wx < cam.x + view.worldW / 2 + m &&
+           wy > cam.y - view.worldH / 2 - m && wy < cam.y + view.worldH / 2 + m;
+  }
+
+  // 스프라이트 파일이 없을 때 쓰는 기본 그림(원 + 방향 삼각형)
+  function fallbackDraw(o) {
+    var R = o.r, x = o.x, y = o.y - R * 0.2;
+    var col = o.charId === 6 ? COLOR.keeper : COLOR.team[o.team];
+    var dark = o.charId === 6 ? COLOR.keeperDark : COLOR.teamDark[o.team];
+    ctx.fillStyle = COLOR.shadow; ctx.beginPath(); ctx.ellipse(o.x, o.y, R * 1.05, R * 0.6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = dark; ctx.lineWidth = Math.max(1, R * 0.18); ctx.stroke();
+    ctx.fillStyle = COLOR.text; ctx.beginPath();
+    ctx.moveTo(x + Math.cos(o.facing) * R * 1.15, y + Math.sin(o.facing) * R * 1.15);
+    ctx.lineTo(x + Math.cos(o.facing + 2.4) * R * 0.55, y + Math.sin(o.facing + 2.4) * R * 0.55);
+    ctx.lineTo(x + Math.cos(o.facing - 2.4) * R * 0.55, y + Math.sin(o.facing - 2.4) * R * 0.55);
+    ctx.closePath(); ctx.fill();
+    if (o.motion === 'stun') {
+      ctx.fillStyle = COLOR.stun;
+      for (var k = 0; k < 3; k++) {
+        var a = o.t * 3.3 + k * TAU / 3;
+        ctx.beginPath(); ctx.arc(x + Math.cos(a) * R * 1.5, y - R * 1.4 + Math.sin(a) * R * 0.4, R * 0.18, 0, TAU); ctx.fill();
+      }
+    }
+  }
+  function drawChar(o) {
+    if (sprite && sprite.draw) { ctx.save(); try { sprite.draw(ctx, o); } catch (e) { fallbackDraw(o); } ctx.restore(); }
+    else fallbackDraw(o);
+  }
+  function label(text, x, y, color) {
+    ctx.fillStyle = color || COLOR.text;
+    ctx.font = '600 ' + Math.max(9, Math.round(11 * view.scale / 2)) + 'px ' + "'Segoe UI', Pretendard, sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillText(text, x, y);
+  }
+  function drawKeepers(now) {
+    var s = view.scale, R = C.PLAYER_R * s;
+    for (var k = 0; k < 2; k++) {
+      var g = rs.keepers[k];
+      if (!onScreen(g.x, g.y, 80)) continue;
+      var x = px(g.x), y = py(g.y);   // 월드 좌표 = 발 밑(스프라이트 기준점)
+      drawChar({ x: x, y: y, r: R, charId: 6, team: rs.half === 1 ? k : 1 - k, facing: k === 0 ? 0 : Math.PI,
+                 motion: g.save ? 'kick' : 'idle', t: now / 1000, phase: 0.5, hasBall: false, ultActive: false, charge: 0 });
+      if (g.save) {
+        ctx.strokeStyle = COLOR.stun; ctx.lineWidth = Math.max(2, 3 * s);
+        ctx.beginPath(); ctx.arc(x, y - R, R * 2.1, 0, TAU); ctx.stroke();
+      }
+      label('GK', x, y - R * 3.7, COLOR.keeper);
+    }
+  }
+  function drawPlayers(now) {
+    var s = view.scale, R = C.PLAYER_R * s;
+    for (var i = 0; i < rs.n; i++) {
+      var p = rs.players[i];
+      if (!onScreen(p.x, p.y, 80)) continue;
+      var x = px(p.x), y = py(p.y);   // 월드 좌표 = 발 밑(스프라이트 기준점)
+      var isMe = game && p.slot === game.mySlot;
+      drawChar({
+        x: x, y: y, r: R, charId: charOfSlot(p.slot), team: p.team, facing: p.facing,
+        motion: p.motionName, t: now / 1000, phase: animPhase(p, now),
+        hasBall: !!(p.flags & ST.HAS_BALL), ultActive: !!(p.flags & ST.ULT_ON), charge: p.charge
+      });
+      if (p.charge > 0) {
+        var curving = false;   // 충전 색: 슛은 주황, 감아차기는 보라 (버튼으로 구분 불가하므로 내 것만 정확)
+        if (isMe) curving = down(KEY.curveL) || down(KEY.curveR);
+        ctx.strokeStyle = curving ? COLOR.curve : COLOR.charge;
+        ctx.lineWidth = Math.max(2, 3 * s);
+        ctx.beginPath(); ctx.arc(x, y - R * 1.4, R * 2.2, -Math.PI / 2, -Math.PI / 2 + TAU * p.charge); ctx.stroke();
+      }
+      if (isMe) {
+        ctx.strokeStyle = COLOR.text; ctx.lineWidth = Math.max(1, 1.6 * s); ctx.globalAlpha = 0.8;
+        ctx.beginPath(); ctx.ellipse(x, y, R * 1.3, R * 0.5, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      // 방귀 판정은 **바라보는 방향의 뒤쪽 정사각형**이다 — 판정 식과 똑같은 사각형을 그려 준다
+      // (앞모서리가 선수 중심, 뒤로 2×half, 옆으로 ±half). 그림과 판정이 어긋나면 안 된다.
+      if (p.motionName === 'fart') {
+        var half = core.TUNING.kick.fartHalf * (core.CHARACTERS[charOfSlot(p.slot)] || core.CHARACTERS[0]).kickRange * s;
+        var fade = 1 - Math.min(1, animPhase(p, now));
+        ctx.save();
+        ctx.translate(x, y); ctx.rotate(p.facing);   // 보간을 껐으므로 판정에 쓰인 방향과 같다
+        ctx.globalAlpha = 0.18 + 0.24 * fade;
+        ctx.fillStyle = COLOR.fart; ctx.fillRect(-2 * half, -half, 2 * half, 2 * half);
+        ctx.globalAlpha = 0.55 + 0.4 * fade;
+        ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
+        ctx.strokeRect(-2 * half, -half, 2 * half, 2 * half);
+        ctx.restore();
+      }
+      label(isMe ? '나' : String(p.slot + 1), x, y - R * 2.9, isMe ? COLOR.text : COLOR.muted);
+    }
+  }
+  function charOfSlot(slot) {
+    // 연습장은 로컬 상태에서, 온라인은 방 정보에서 읽는다(온라인은 서버만 state 를 갖는다)
+    if (game && game.mode === 'online') {
+      var ms = net.room && net.room.members;
+      if (ms) for (var i = 0; i < ms.length; i++) if (ms[i].slot === slot) return ms[i].char;
+      return 0;
+    }
+    var p = game && game.state && game.state.players[slot];
+    return p ? p.char : 0;
+  }
+  function drawBall(now) {
+    var s = view.scale, R = C.BALL_R * s, x = px(rs.ball.x), y = py(rs.ball.y);
+    ctx.fillStyle = COLOR.shadow; ctx.beginPath(); ctx.ellipse(x + 2 * s, y + 4 * s, R * 1.1, R * 0.7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = COLOR.ball; ctx.beginPath(); ctx.arc(x, y, R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = COLOR.ballMark; ctx.lineWidth = Math.max(1, 1 * s); ctx.stroke();
+    var a = (rs.ball.x + rs.ball.y) / 30;
+    ctx.fillStyle = COLOR.ballMark; ctx.beginPath(); ctx.arc(x + Math.cos(a) * R * 0.45, y + Math.sin(a) * R * 0.45, R * 0.3, 0, TAU); ctx.fill();
+  }
+  // 화면 밖 공: 가장자리 화살표 + 거리
+  function drawBallArrow() {
+    if (onScreen(rs.ball.x, rs.ball.y, 0)) return;
+    var cx = view.w / 2, cy = view.h / 2;
+    var dx = px(rs.ball.x) - cx, dy = py(rs.ball.y) - cy;
+    var m = Math.min(view.w, view.h) * 0.40;
+    var d = Math.hypot(dx, dy) || 1;
+    var x = cx + dx / d * m, y = cy + dy / d * m, a = Math.atan2(dy, dx);
+    var r = Math.max(8, 9 * view.dpr);
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(a);
+    ctx.fillStyle = COLOR.ball; ctx.globalAlpha = 0.9;
+    ctx.beginPath(); ctx.moveTo(r * 1.6, 0); ctx.lineTo(-r, r * 0.85); ctx.lineTo(-r, -r * 0.85); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    var me = myRenderPlayer();
+    if (me) {
+      var dist = Math.round(Math.hypot(rs.ball.x - me.x, rs.ball.y - me.y));
+      ctx.fillStyle = COLOR.text; ctx.font = Math.max(10, 11 * view.dpr) + 'px ' + "'Segoe UI', Pretendard, sans-serif";
+      ctx.textAlign = 'center'; ctx.fillText(dist + '', x, y + r * 2.6);
+    }
+  }
+  // 미니맵: 좁은 시야를 보완하는 필수 장치
+  function drawMinimap() {
+    if (!settings.minimap) return;
+    var pad = 10 * view.dpr;
+    var w = (touchOn ? 108 : 168) * view.dpr, h = w * C.FIELD_H / C.FIELD_W;
+    var x0 = view.w - w - pad, y0 = pad + (touchOn ? 30 : 44) * view.dpr;
+    ctx.save();
+    ctx.globalAlpha = 0.82;
+    ctx.fillStyle = COLOR.mapBg; ctx.fillRect(x0, y0, w, h);
+    ctx.strokeStyle = COLOR.net; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, w, h);
+    var sx = w / C.FIELD_W, sy = h / C.FIELD_H;
+    ctx.beginPath(); ctx.moveTo(x0 + w / 2, y0); ctx.lineTo(x0 + w / 2, y0 + h); ctx.stroke();
+    // 골대
+    ctx.fillStyle = COLOR.line;
+    ctx.fillRect(x0 - 2, y0 + C.GOAL_Y0 * sy, 2, (C.GOAL_Y1 - C.GOAL_Y0) * sy);
+    ctx.fillRect(x0 + w, y0 + C.GOAL_Y0 * sy, 2, (C.GOAL_Y1 - C.GOAL_Y0) * sy);
+    // 카메라 범위
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.strokeRect(x0 + (cam.x - view.worldW / 2) * sx, y0 + (cam.y - view.worldH / 2) * sy, view.worldW * sx, view.worldH * sy);
+    // 골키퍼
+    for (var k = 0; k < 2; k++) {
+      ctx.fillStyle = COLOR.keeper;
+      ctx.fillRect(x0 + rs.keepers[k].x * sx - 1.5, y0 + rs.keepers[k].y * sy - 2.5, 3, 5);
+    }
+    // 선수
+    for (var i = 0; i < rs.n; i++) {
+      var p = rs.players[i], isMe = game && p.slot === game.mySlot;
+      ctx.fillStyle = COLOR.team[p.team];
+      ctx.beginPath(); ctx.arc(x0 + p.x * sx, y0 + p.y * sy, isMe ? 3.4 : 2.3, 0, TAU); ctx.fill();
+      if (isMe) { ctx.strokeStyle = COLOR.text; ctx.lineWidth = 1.4; ctx.stroke(); }
+    }
+    // 공
+    ctx.fillStyle = COLOR.ball;
+    ctx.beginPath(); ctx.arc(x0 + rs.ball.x * sx, y0 + rs.ball.y * sy, 2.6, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+  var hudCache = { score: '', clock: '', ult: -1, ultCls: '', stam: -1, stamLow: null };
+  function drawHUD() {
+    var sc = rs.has ? rs.score[0] + ' : ' + rs.score[1] : '0 : 0';
+    if (sc !== hudCache.score) { hudCache.score = sc; $('score').textContent = sc; }
+    var secs = rs.has ? Math.ceil(rs.clock / C.TICK_HZ) : 0;
+    var mm = Math.floor(secs / 60), ss = secs % 60;
+    var txt = (rs.half === 2 ? '후반 ' : '전반 ') + (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+    if (txt !== hudCache.clock) { hudCache.clock = txt; $('clock').textContent = txt; }
+    var me = myRenderPlayer();
+    var pct = me ? Math.round(me.ult * 100) : 0;
+    if (pct !== hudCache.ult) {
+      hudCache.ult = pct;
+      $('ultFill').style.width = pct + '%';
+      $('ultPct').textContent = pct + '%';
+    }
+    var cls = me ? ((me.flags & ST.ULT_ON) ? 'on' : (me.flags & ST.ULT_READY) ? 'ready' : '') : '';
+    if (cls !== hudCache.ultCls) { hudCache.ultCls = cls; $('ultBar').className = cls; $('bUlt').classList.toggle('ready', cls === 'ready'); }
+    // 달리기 체력 — 스냅샷의 4비트 값 그대로 쓴다(온라인에서도 같은 경로)
+    var sp = me ? Math.round(me.stam * 100) : 100;
+    if (sp !== hudCache.stam) { hudCache.stam = sp; $('stamFill').style.width = sp + '%'; }
+    var low = sp <= 30;
+    if (low !== hudCache.stamLow) { hudCache.stamLow = low; $('stamBar').classList.toggle('low', low); }
+    drawAudioMeter();
+  }
+  function render(now) {
+    if (!view.w || !view.h) return;   // 크기 0인 캔버스(백그라운드 탭)엔 그릴 게 없다
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var renderT = now - (game ? game.interpMs : settings.interpMs);
+    sample(renderT);
+    drawPitch();
+    if (rs.has) {
+      drawKeepers(now); drawPlayers(now); drawBall(now); drawBallArrow();
+      drawMinimap();
+    }
+    drawHUD();
+  }
+
+  // ── 배너·오버레이 ──
+  var bannerTimer = 0;
+  function banner(text, ms) {
+    var el = $('banner'); el.textContent = text; el.classList.add('show');
+    clearTimeout(bannerTimer);
+    if (ms) bannerTimer = setTimeout(function () { el.classList.remove('show'); }, ms);
+  }
+  var overlayMode = true;
+  function selectChar(i) { settings.char = i; saveSettings(); renderOverlay(); }
+  function renderOverlay() {
+    var chars = $('ovChars'); chars.innerHTML = '';
+    core.CHARACTERS.forEach(function (ch, i) {
+      var b = document.createElement('button');
+      b.textContent = (i + 1) + ' ' + ch.name;
+      if (i === settings.char) b.className = 'sel';
+      b.addEventListener('click', function () { selectChar(i); });
+      chars.appendChild(b);
+    });
+    var sel = core.CHARACTERS[settings.char];
+    $('ovUlt').innerHTML = '필살기 <b>' + sel.ult.name + '</b> — ' + ultDesc(sel) +
+      ' · 속도 ×' + sel.speed.toFixed(2) + ' · 슛 ×' + sel.shot.toFixed(2);
+  }
+  function ultDesc(ch) {
+    var u = ch.ult;
+    switch (u.kind) {
+      case 'stunWave': return '주변 ' + u.radius + ' 안의 상대를 한 번에 넘어뜨린다';
+      case 'power':    return u.durTicks / 20 + '초간 슛이 ' + u.shotMul + '배로 강해지고 골키퍼를 뚫는다';
+      case 'blink':    return '바라보는 쪽으로 ' + u.dist + '만큼 순간이동한다(공도 함께)';
+      case 'charge':   return u.durTicks / 20 + '초간 기절하지 않고 부딪히는 상대를 넘어뜨린다';
+      case 'dash':     return u.durTicks / 20 + '초간 ' + u.speedMul + '배로 달린다';
+      case 'slow':     return u.durTicks / 20 + '초간 주변 ' + u.radius + ' 안의 상대를 느리게 만든다';
+    }
+    return '';
+  }
+  function showOverlay(final) {
+    overlayMode = true;
+    $('overlay').classList.add('show');
+    showPanel('home');
+    $('ovFinal').style.display = final ? '' : 'none';
+    if (final) {
+      $('ovFinal').innerHTML = '<span style="color:var(--team-a)">' + TEAM_NAMES[0] + '</span> ' + final[0] + ' : ' + final[1] + ' <span style="color:var(--team-b)">' + TEAM_NAMES[1] + '</span>';
+      $('ovSub').textContent = '경기 종료';
+    } else $('ovSub').textContent = '혼자 하기 — 인공지능과 2:2. 전·후반 각 3분, 골키퍼는 자동. 캐릭터를 고르고 시작하세요.';
+    $('ovStart').textContent = final ? '다시 시작' : '시작';
+    $('ovHint').innerHTML = touchOn
+      ? '왼쪽 아래를 누른 채 끌면 이동 · 오른쪽 버튼으로 슛·드리블·감아차기'
+      : '<kbd>1</kbd>~<kbd>6</kbd> 캐릭터 · <kbd>Enter</kbd> 시작<br>방향키 이동 · <kbd>W</kbd> 드리블(길게=멀리) · <kbd>D</kbd> 슛/발차기 · <kbd>S</kbd> 방귀 · <kbd>Q</kbd><kbd>E</kbd> 감아차기 · <kbd>Z</kbd> 패스 · <kbd>A</kbd> 필살기';
+    renderOverlay();
+  }
+  function hideOverlay() { overlayMode = false; $('overlay').classList.remove('show'); }
+  $('ovStart').addEventListener('click', function () { startPractice({ char: settings.char }); });
+  $('ovOnline').addEventListener('click', function () {
+    audio.unlock();
+    $('lbNick').value = store.get('soc_nick') || '';
+    $('lbServer').value = params.get('server') || store.get('soc_server') || '';
+    showPanel('lobby');
+    if (!$('lbServer').value.trim()) fetchServerUrl();   // 비어 있으면 게시판에서 자동으로 받아온다
+    if (net.ws && net.ws.readyState === 1) { $('lbAfter').style.display = ''; netSend({ t: 'room.list' }); }
+  });
+  $('lbBack').addEventListener('click', function () { showOverlay(null); });
+  $('lbConnect').addEventListener('click', netConnect);
+  $('lbNick').addEventListener('keydown', function (e) { if (e.code === 'Enter') { e.stopPropagation(); netConnect(); } });
+  $('lbRefresh').addEventListener('click', function () { netSend({ t: 'room.list' }); });
+  $('crMake').addEventListener('click', function () {
+    netSend({ t: 'room.create', name: $('crName').value, teamSize: +$('crSize').value,
+      halfSec: +$('crHalf').value, pass: $('crPass').value });
+  });
+  $('rmTeam').addEventListener('click', function () { var me = myMember(); netSend({ t: 'team', team: me && me.team ? 0 : 1 }); });
+  $('rmReady').addEventListener('click', function () { var me = myMember(); netSend({ t: 'ready', on: !(me && me.ready) }); });
+  $('rmStart').addEventListener('click', function () { netSend({ t: 'start' }); });
+  $('rmLeave').addEventListener('click', function () { netSend({ t: 'room.leave' }); });
+  $('rmChatIn').addEventListener('keydown', function (e) {
+    if (e.code !== 'Enter') return;
+    e.stopPropagation();
+    var v = $('rmChatIn').value.trim();
+    if (v) netSend({ t: 'chat', text: v });
+    $('rmChatIn').value = '';
+  });
+  $('msgHome').addEventListener('click', function () { showOverlay(null); });
+  $('msgRetry').addEventListener('click', function () {
+    if (net.ws) { try { net.ws.close(); } catch (e) {} net.ws = null; }
+    net.room = null; net.roomId = null;
+    showPanel('lobby');
+    $('lbAfter').style.display = 'none';
+    $('lbNick').value = store.get('soc_nick') || '';
+  });
+
+  /* ── 소리 — 파일 없이 WebAudio 로 합성한다 (이 저장소는 CDN·외부 에셋을 쓰지 않는다) ────
+     브라우저 자동재생 정책 때문에 **첫 조작(키·터치·클릭) 뒤에만** AudioContext 를 만든다.
+     만들기 전에는 모든 호출이 조용히 무시되므로 콘솔 경고가 남지 않는다. */
+  var audio = (function () {
+    var ctx = null, master = null, sfxG = null, bgmG = null, noise = null, meter = null;
+    var timer = null, step = 0, nextT = 0;
+    var BPM = 132, EIGHTH = 30 / BPM;              // 8분음표 길이(초)
+    // Am – F – C – G. [베이스, 3화음] (MIDI 번호)
+    var PROG = [[45, [57, 60, 64]], [41, [53, 57, 60]], [48, [60, 64, 67]], [43, [55, 59, 62]]];
+    // 마디마다 4분음표 4개짜리 멜로디(MIDI). 화음만 굴리면 "배경 웅웅"으로 들려서 한 줄 얹었다.
+    var MEL = [[76, 74, 72, 74], [72, 69, 72, 74], [76, 79, 76, 74], [74, 71, 74, 79]];
+    function hz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+    function ensure() {
+      if (ctx) return ctx;
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { ctx = new AC(); } catch (e) { return null; }
+      master = ctx.createGain(); master.gain.value = 0.85; master.connect(ctx.destination);
+      // 소리가 "정말 나오는지"를 눈으로 확인할 수 있게 분석 노드를 단다(debug.audio().level)
+      try { meter = ctx.createAnalyser(); meter.fftSize = 512; master.connect(meter); } catch (e) { meter = null; }
+      sfxG = ctx.createGain(); sfxG.gain.value = settings.sfx ? 1 : 0; sfxG.connect(master);
+      bgmG = ctx.createGain(); bgmG.gain.value = settings.bgm ? 0.75 : 0; bgmG.connect(master);   // 0.20 → 0.55 → 0.75 (재 보며 올렸다)
+      var n = ctx.sampleRate * 0.5, buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+      var seed = 12345;                              // 고정 시드 — 매번 같은 잡음(결정적 검증에 유리)
+      for (var i = 0; i < n; i++) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; d[i] = seed / 0x3fffffff - 1; }
+      noise = buf;
+      return ctx;
+    }
+    function env(g, t, a, dec, peak) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec);
+    }
+    // 지속음(패드): 지수 감쇠 대신 "올라가서 유지하다 내려오는" 포락선. 지수 감쇠는 0.5초면 사실상 사라져서 배경이 비었다.
+    function pad(f, t, dur, peak, dest) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'triangle'; o.frequency.setValueAtTime(f, t);
+      var rel = Math.min(0.3, dur * 0.35);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(peak, t + 0.06);
+      g.gain.setValueAtTime(peak, t + dur - rel);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(dest || bgmG); o.start(t); o.stop(t + dur + 0.05);
+    }
+    function tone(type, f0, f1, t, dur, peak, dest) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f0, t);
+      if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+      env(g, t, Math.min(0.02, dur * 0.2), dur, peak);
+      o.connect(g); g.connect(dest || sfxG); o.start(t); o.stop(t + dur + 0.05);
+    }
+    function hiss(t, dur, peak, f0, f1, q, dest) {
+      var src = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+      src.buffer = noise; src.loop = true;
+      bp.type = 'bandpass'; bp.Q.value = q || 1;
+      bp.frequency.setValueAtTime(f0, t);
+      if (f1) bp.frequency.exponentialRampToValueAtTime(Math.max(40, f1), t + dur);
+      env(g, t, Math.min(0.015, dur * 0.3), dur, peak);
+      src.connect(bp); bp.connect(g); g.connect(dest || sfxG); src.start(t); src.stop(t + dur + 0.05);
+    }
+    function whistle(t) {
+      var o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = 2350;
+      lfo.frequency.value = 32; lg.gain.value = 90; lfo.connect(lg); lg.connect(o.frequency);
+      env(g, t, 0.02, 0.30, 0.25);
+      o.connect(g); g.connect(sfxG); o.start(t); lfo.start(t); o.stop(t + 0.36); lfo.stop(t + 0.36);
+    }
+    function sfx(kind) {
+      if (!ctx || !settings.sfx) return;
+      var t = ctx.currentTime + 0.001;
+      switch (kind) {
+        case 'dribble':   tone('triangle', 300, 170, t, 0.07, 0.16); break;
+        case 'pass':      tone('triangle', 420, 240, t, 0.10, 0.20); hiss(t, 0.05, 0.06, 1800, 900, 1); break;
+        case 'shoot':     tone('sine', 190, 55, t, 0.16, 0.55); hiss(t, 0.07, 0.20, 1400, 400, 0.8); break;
+        case 'curve':     tone('sine', 210, 90, t, 0.14, 0.35); hiss(t, 0.26, 0.13, 700, 2600, 3); break;
+        case 'kick':      hiss(t, 0.09, 0.16, 1100, 380, 1.2); tone('triangle', 150, 80, t, 0.09, 0.20); break;
+        case 'fart':      // 낮게 떨리는 소리 + 새어 나가는 바람
+          tone('sawtooth', 150, 62, t, 0.26, 0.30); tone('square', 74, 44, t + 0.02, 0.22, 0.16);
+          hiss(t + 0.04, 0.30, 0.10, 320, 140, 0.8); break;
+        case 'hit':       hiss(t, 0.13, 0.30, 320, 120, 0.7); tone('square', 95, 48, t, 0.13, 0.24); break;
+        case 'steal':     tone('square', 520, 780, t, 0.07, 0.18); tone('square', 780, 1040, t + 0.06, 0.08, 0.16); break;
+        case 'keeperSave':hiss(t, 0.11, 0.28, 900, 260, 0.6); tone('sine', 260, 150, t, 0.10, 0.20); break;
+        case 'ult':       tone('sawtooth', 180, 900, t, 0.30, 0.22); hiss(t, 0.30, 0.10, 400, 3000, 2); break;
+        case 'whistle':   whistle(t); break;
+        case 'goal':
+          whistle(t);
+          for (var i = 0; i < 4; i++) tone('square', hz([60, 64, 67, 72][i]), 0, t + 0.16 + i * 0.09, 0.22, 0.16);
+          hiss(t + 0.10, 1.10, 0.20, 500, 1500, 0.5);       // 관중 함성
+          break;
+      }
+    }
+    // BGM: 8분음표 격자에 베이스·아르페지오·하이햇을 미리 예약한다(룩어헤드 0.25초)
+    function schedule() {
+      if (!ctx || !settings.bgm) return;
+      while (nextT < ctx.currentTime + 0.25) {
+        var bar = (step >> 3) % 4, e = step & 7, ch = PROG[bar], t = nextT;
+        if (e === 0) {
+          tone('triangle', hz(ch[0] - 12), 0, t, 0.60, 0.55, bgmG);
+          // 한 마디를 덮는 긴 패드 두 음 — 이게 없으면 음과 음 사이가 완전히 비어 "소리가 끊긴다"
+          pad(hz(ch[1][0]), t, 1.85, 0.13, bgmG);
+          pad(hz(ch[1][2]), t, 1.85, 0.09, bgmG);
+        }
+        if (e === 4) tone('triangle', hz(ch[0] - 12), 0, t, 0.45, 0.42, bgmG);
+        tone('square', hz(ch[1][[0, 1, 2, 1, 0, 2, 1, 2][e]] + 12), 0, t, 0.26, 0.13, bgmG);   // 음이 끊기지 않게 8분음표보다 길게
+        if (e % 2 === 0) tone('square', hz(MEL[bar][e >> 1]), 0, t, 0.40, 0.26, bgmG);          // 멜로디(4분음표)
+        hiss(t, e % 2 ? 0.04 : 0.07, e % 4 === 0 ? 0.16 : 0.08, 7000, 5200, 1.2, bgmG);
+        nextT += EIGHTH; step++;
+      }
+    }
+    function startBgm() {
+      if (!ctx || timer) return;
+      nextT = ctx.currentTime + 0.08;
+      timer = setInterval(schedule, 60);
+      schedule();
+    }
+    function stopBgm() { if (timer) { clearInterval(timer); timer = null; } }
+    function unlock() {
+      if (!ensure()) return false;
+      if (ctx.state === 'suspended') ctx.resume();
+      if (settings.bgm) startBgm();
+      return true;
+    }
+    function set(what, on) {
+      settings[what] = !!on; saveSettings();
+      if (!ctx) return settings[what];
+      if (what === 'sfx') sfxG.gain.value = on ? 1 : 0;
+      else { bgmG.gain.value = on ? 0.75 : 0; if (on) startBgm(); else stopBgm(); }
+      return settings[what];
+    }
+    // 진단용 순수 신호: 마스터·효과음 게인을 **전부 건너뛰고** 목적지에 바로 연결한다.
+    // 이게 들리는데 게임 소리가 안 들리면 원인은 내 게인 체인, 이것도 안 들리면 원인은 페이지 밖이다.
+    function beep(sec) {
+      if (!ensure()) return 'AudioContext 생성 실패';
+      if (ctx.state === 'suspended') ctx.resume();
+      var t = ctx.currentTime + 0.02, dur = sec || 1.2;
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(660, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.35, t + 0.05);
+      g.gain.setValueAtTime(0.35, t + dur - 0.1);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(ctx.destination);      // 마스터를 거치지 않는다
+      o.start(t); o.stop(t + dur + 0.05);
+      return { state: ctx.state, sampleRate: ctx.sampleRate,
+               destChannels: ctx.destination.channelCount, destMax: ctx.destination.maxChannelCount,
+               baseLatency: ctx.baseLatency, outputLatency: ctx.outputLatency };
+    }
+    // 마스터 출력의 RMS(0~1). 0 이면 아무 소리도 안 나가고 있다는 뜻이다.
+    function level() {
+      if (!ctx || !meter) return 0;
+      var buf = new Float32Array(meter.fftSize);
+      meter.getFloatTimeDomainData(buf);
+      var sum = 0;
+      for (var i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      return Math.round(Math.sqrt(sum / buf.length) * 10000) / 10000;
+    }
+    return { unlock: unlock, sfx: sfx, set: set, level: level, beep: beep,
+             state: function () { return ctx ? ctx.state : 'none'; },
+             bgmOn: function () { return !!timer; },
+             ready: function () { return !!ctx; },
+             suspend: function () { if (ctx && ctx.state === 'running') ctx.suspend(); },
+             wake: function () { if (ctx && ctx.state === 'suspended') ctx.resume(); } };
+  })();
+  // 소리를 낼지 판단할 때 쓰는 화면 안 검사 (원본 좌표 기준)
+  function onScreenSlot(slot) {
+    for (var i = 0; i < rs.n; i++) if (rs.players[i].slot === slot) return onScreen(rs.players[i].x, rs.players[i].y, 160);
+    return true;
+  }
+  function syncAudioBtns() {
+    $('btnSfx').classList.toggle('off', !settings.sfx);
+    $('btnBgm').classList.toggle('off', !settings.bgm);
+  }
+  // ♪ 단추가 실제 출력 세기에 맞춰 밝아진다. **소리가 안 들리는데 이게 깜빡이면 원인은 페이지 밖**
+  // (탭 음소거·윈도우 볼륨 믹서·출력 장치)이라는 것을 사용자가 바로 알 수 있다.
+  var lvCache = -1;
+  function drawAudioMeter() {
+    var el = $('btnBgm');
+    if (!el) return;
+    var lv = audio.ready() ? Math.min(1, audio.level() * 7) : 0;
+    var step = Math.round(lv * 5);
+    if (step === lvCache) return;
+    lvCache = step;
+    el.style.boxShadow = step > 0 ? '0 0 ' + (3 + step * 3) + 'px rgba(163,230,53,' + (0.25 + step * 0.14).toFixed(2) + ')' : '';
+    el.style.borderColor = step > 0 ? 'rgba(163,230,53,0.85)' : '';
+  }
+
+  /* ── 온라인 모드 (감독 문서 §2·§3·§6) ─────────────────────────────────────
+     서버가 권위를 갖는다. 이쪽은 입력만 20Hz 로 올리고, 받은 스냅샷을 연습장과 **똑같은 경로**로 그린다.
+     보간 기준 시각은 서버 시계가 아니라 **스냅샷이 도착한 로컬 시각**이다(연습장과 같음) — 시계 동기 없이도 부드럽다. */
+  var net = {
+    ws: null, nick: '', roomId: null, room: null, myId: 0, mySlot: -1, rtt: 0,
+    screen: 'home', inputTimer: null, seq: 0, buf: new Uint8Array(core.INPUT_BYTES), listTimer: null
+  };
+  // 서버 주소는 세 곳에서 온다: ①주소창 `?server=` ②입력란(저장됨) ③비어 있으면 이 페이지를 준 서버.
+  // ③ 이 기본인 이유: 서버가 정적 파일까지 서빙하므로 보통은 같은 주소다.
+  // ①②가 필요한 경우: 대문(GitHub Pages)에 올린 사본은 정적이라 서버가 없다 — 그때 내 PC 터널 주소를 넣는다.
+  /* 「지금 서버 주소」 게시판 — Cloudflare 빠른 터널은 켤 때마다 주소가 바뀐다.
+     대문(GitHub Pages)에 올린 정적 사본은 그 주소를 알 수 없으므로, 고정된 게시판 한 곳을 읽어 자동으로 채운다.
+     주소 우선순위: ①주소창 `?server=` ②직접 입력한 값 ③게시판 ④이 페이지를 준 서버.
+     `REGISTRY` 가 비어 있으면 이 기능은 그냥 꺼진 것과 같다(서버가 페이지도 서빙하는 평소 경로에는 필요 없다). */
+  var REGISTRY = 'https://gray-macaque-4849.woo-design22.deno.net';   // 주소 게시판 (2026-08-25 배포)
+  function fetchServerUrl() {
+    var reg = (params.get('registry') || REGISTRY || '').replace(/\/+$/, '');
+    if (!reg) return;
+    $('lbState').textContent = '서버 주소 확인 중…';
+    fetch(reg + '/', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.url) { $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; return; }
+      if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; return; }
+      if (!$('lbServer').value.trim()) $('lbServer').value = d.url;
+      $('lbState').textContent = '서버 주소를 받았습니다';
+    }).catch(function () { $('lbState').textContent = '서버 주소를 받지 못했습니다'; });
+  }
+  function wsUrl() {
+    var s = ($('lbServer') ? $('lbServer').value : '').trim();
+    if (s) {
+      s = s.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
+      if (!/^wss?:\/\//i.test(s)) s = (location.protocol === 'https:' ? 'wss://' : 'ws://') + s;
+      return s.replace(/\/+$/, '') + '/';
+    }
+    var p = location.protocol === 'https:' ? 'wss://' : 'ws://';
+    return p + (location.host || '127.0.0.1:8080') + '/';
+  }
+  function showPanel(name) {
+    net.screen = name;
+    $('overlay').classList.add('show');
+    overlayMode = true;
+    var map = { home: 'panelHome', lobby: 'panelLobby', room: 'panelRoom', msg: 'panelMsg' };
+    for (var k in map) $(map[k]).style.display = (k === name) ? '' : 'none';
+  }
+  function netMsg(title, body, retry) {
+    $('msgTitle').textContent = title;
+    $('msgBody').textContent = body;
+    $('msgRetry').style.display = retry ? '' : 'none';
+    showPanel('msg');
+  }
+  function netSend(o) { if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(o)); }
+
+  function netConnect() {
+    var nick = ($('lbNick').value || '').trim();
+    if (nick.length < 2) { $('lbState').textContent = '아이디는 2자 이상'; return; }
+    store.set('soc_nick', nick);
+    store.set('soc_server', ($('lbServer').value || '').trim());
+    net.nick = nick;
+    $('lbState').textContent = '접속 중…';
+    try { net.ws = new WebSocket(wsUrl()); } catch (e) { $('lbState').textContent = '접속 실패'; return; }
+    net.ws.binaryType = 'arraybuffer';
+    net.ws.onopen = function () { netSend({ t: 'hello', v: core.PROTOCOL_VERSION, nick: net.nick }); };
+    net.ws.onmessage = function (ev) {
+      if (typeof ev.data !== 'string') { pushSnapshot(new Uint8Array(ev.data), performance.now()); return; }
+      var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      onNetText(m);
+    };
+    net.ws.onclose = function (e) {
+      stopInputSender();
+      if (net.screen === 'msg') return;                       // 이미 사유를 보여 주고 있다
+      netMsg('연결이 끊겼습니다', e.reason || ('코드 ' + e.code), true);
+    };
+    net.ws.onerror = function () {};
+  }
+  function onNetText(m) {
+    switch (m.t) {
+      case 'ping': netSend({ t: 'pong', id: m.id }); break;
+      case 'welcome':
+        net.rtt = m.rtt;
+        $('lbState').textContent = '접속됨 · 지연 ' + m.rtt + 'ms';
+        $('lbAfter').style.display = '';
+        netSend({ t: 'room.list' });
+        if (net.listTimer) clearInterval(net.listTimer);
+        net.listTimer = setInterval(function () { if (net.screen === 'lobby') netSend({ t: 'room.list' }); }, 2000);
+        break;
+      case 'reject':
+        netMsg('네트워크 오류',
+          '지연이 커서 접속할 수 없습니다.\n측정 중앙값 ' + m.rtt + 'ms · 상위10% ' + m.p90 + 'ms'
+          + (m.missing ? (' · 무응답 ' + m.missing + '개') : '')
+          + '\n기준 ' + m.limit.median + ' / ' + m.limit.p90 + 'ms', true);
+        break;
+      case 'kick':
+        netMsg('퇴장되었습니다', m.msg || '', true);
+        break;
+      case 'rooms': renderRooms(m.list); break;
+      case 'joined': net.roomId = m.id; break;
+      case 'room':
+        net.room = m.state;
+        if (net.screen !== 'room' && m.state.phase === 'lobby') showPanel('room');
+        renderRoom();
+        break;
+      case 'match.start': onMatchStart(); break;
+      case 'match.end':
+        stopInputSender();
+        game = null; snaps.length = 0;
+        showPanel('room');
+        break;
+      case 'chat': {
+        var box = $('rmChat');
+        box.textContent += (box.textContent ? '\n' : '') + m.from + ': ' + m.text;
+        box.scrollTop = box.scrollHeight;
+        break;
+      }
+      case 'error':
+        $(net.screen === 'room' ? 'rmErr' : 'lbErr').textContent = m.msg;
+        setTimeout(function () { var el = $(net.screen === 'room' ? 'rmErr' : 'lbErr'); if (el) el.textContent = ''; }, 3000);
+        break;
+      case 'left': net.roomId = null; net.room = null; showPanel('lobby'); break;
+      case 'event': handleNetEvent(m); break;
+    }
+  }
+  function renderRooms(list) {
+    var tb = $('lbRooms');
+    tb.innerHTML = '';
+    if (!list.length) { tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">방이 없습니다. 아래에서 만들어 보세요.</td></tr>'; return; }
+    list.forEach(function (r) {
+      var tr = document.createElement('tr');
+      var full = r.players >= r.cap || r.phase === 'playing';
+      if (full) tr.className = 'full';
+      tr.innerHTML = '<td>' + (r.lock ? '🔒 ' : '') + esc(r.name) + '</td><td>' + r.players + '/' + r.cap + '</td><td>'
+        + Math.round(r.halfSec / 60 * 10) / 10 + '분</td><td>' + esc(r.host) + '</td>';
+      var td = document.createElement('td');
+      var b = document.createElement('button');
+      b.className = 'btn sm'; b.type = 'button';
+      b.textContent = r.phase === 'playing' ? '경기중' : (full ? '가득참' : '입장');
+      b.disabled = full;
+      b.addEventListener('click', function () {
+        var pass = r.lock ? (prompt('비밀번호를 입력하세요') || '') : '';
+        netSend({ t: 'room.join', id: r.id, pass: pass });
+      });
+      td.appendChild(b); tr.appendChild(td); tb.appendChild(tr);
+    });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); }
+  function myMember() {
+    if (!net.room) return null;
+    for (var i = 0; i < net.room.members.length; i++) if (net.room.members[i].nick === net.nick) return net.room.members[i];
+    return null;
+  }
+  function renderRoom() {
+    var r = net.room; if (!r) return;
+    $('rmName').textContent = r.name + (r.lock ? ' 🔒' : '');
+    $('rmSub').textContent = r.teamSize + ':' + r.teamSize + ' · 전후반 각 ' + Math.round(r.halfSec / 60 * 10) / 10 + '분 · '
+      + r.members.length + '/' + r.cap + '명';
+    var me = myMember();
+    var box = $('rmMembers'); box.innerHTML = '';
+    r.members.forEach(function (m) {
+      var d = document.createElement('div');
+      d.className = 'm' + (me && m.id === me.id ? ' me' : '');
+      d.innerHTML = '<span class="tag ' + (m.team ? 'b' : 'a') + '">' + (m.team ? TEAM_NAMES[1] : TEAM_NAMES[0]) + '</span>'
+        + '<b>' + esc(m.nick) + '</b>' + (m.host ? ' <span style="color:var(--charge)">방장</span>' : '')
+        + ' <span style="color:var(--muted)">' + esc((core.CHARACTERS[m.char] || {}).name || '') + '</span>'
+        + ' <span style="margin-left:auto" class="' + (m.ready ? 'rd' : 'no') + '">' + (m.ready ? '준비 완료' : '대기') + '</span>';
+      box.appendChild(d);
+    });
+    var chars = $('rmChars'); chars.innerHTML = '';
+    core.CHARACTERS.forEach(function (ch, i) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = (i + 1) + ' ' + ch.name;
+      if (me && me.char === i) b.className = 'sel';
+      b.addEventListener('click', function () { netSend({ t: 'char', id: i }); });
+      chars.appendChild(b);
+    });
+    $('rmReady').textContent = (me && me.ready) ? '준비 해제' : '준비';
+    var host = me && me.host;
+    $('rmStart').style.display = host ? '' : 'none';
+    $('rmStart').disabled = !(r.members.length === r.cap && r.members.every(function (m) { return m.ready; }));
+  }
+  function onMatchStart() {
+    var me = myMember();
+    net.mySlot = me ? me.slot : 0;
+    TEAM_NAMES[0] = (net.room.classes[0]) + '반'; TEAM_NAMES[1] = (net.room.classes[1]) + '반';
+    hudCache.score = '';
+    game = { mode: 'online', state: null, inputs: null, mySlot: net.mySlot, ai: null,
+             acc: 0, last: performance.now(), interpMs: settings.interpMs };
+    snaps.length = 0; eventLog.length = 0; animState.length = 0;
+    cam.init = false;
+    hideOverlay();
+    banner('킥오프', 1200);
+    startInputSender();
+  }
+  function startInputSender() {
+    stopInputSender();
+    var out = { dx: 0, dy: 0, buttons: 0 };
+    net.inputTimer = setInterval(function () {
+      if (!net.ws || net.ws.readyState !== 1) return;
+      readInput(out);
+      net.seq = (net.seq + 1) & 0xffff;
+      core.encodeInput(net.seq, out.buttons, out.dx, out.dy, net.buf);
+      net.ws.send(net.buf);
+    }, 1000 / C.TICK_HZ);
+  }
+  function stopInputSender() { if (net.inputTimer) { clearInterval(net.inputTimer); net.inputTimer = null; } }
+  function handleNetEvent(m) {
+    var e = { kind: m.kind, team: m.team, slot: m.slot, side: m.side, name: m.name, score: m.score };
+    handleEvents([e], 0);
+  }
+
+  // ── 연습장 모드: 같은 step 을 로컬에서 돌리고, 스냅샷으로 인코딩→디코딩해 렌더 경로를 온라인과 똑같이 탄다 ──
+  var game = null;
+  var injected = [];  // 디버그 입력 주입: 슬롯별 { dx, dy, buttons, left, resolve }
+  var eventLog = [];
+  var tickStats = { count: 0, msSum: 0, msMax: 0 };
+  // 혼자 할 때는 2:2 (내 팀에 인공지능 1명, 상대 인공지능 2명). `dummies` 를 주면 옛 허수아비 모드 — 검증 도구가 쓴다.
+  function startPractice(opts) {
+    opts = opts || {};
+    var state = core.createState({ halfSec: opts.halfSec || 180 });
+    var charId = opts.char != null ? opts.char : settings.char;
+    core.addPlayer(state, 0, 0, charId);
+    var i, aiSlots = [];
+    if (opts.dummies != null) {
+      for (i = 0; i < opts.dummies; i++) {
+        var d = core.addPlayer(state, 1 + i, 1, (charId + 1 + i) % 6);
+        if (d) { d.x = 820 + (i % 3) * 70; d.y = 320 + Math.floor(i / 3) * 120 + (i % 3) * 60; }
+      }
+    } else {
+      core.addPlayer(state, 1, 0, (charId + 3) % 6);      // 우리 편 인공지능
+      core.addPlayer(state, 2, 1, (charId + 1) % 6);      // 상대 둘
+      core.addPlayer(state, 3, 1, (charId + 4) % 6);
+      aiSlots = [1, 2, 3];
+      core.AI.reset();
+    }
+    core.startMatch(state);
+    var inputs = [];
+    for (i = 0; i < C.MAX_PLAYERS; i++) inputs[i] = { dx: 0, dy: 0, buttons: 0 };
+    game = { mode: 'practice', state: state, inputs: inputs, mySlot: 0, ai: aiSlots, acc: 0, last: performance.now(), interpMs: 50 };
+    snaps.length = 0; injected.length = 0; eventLog.length = 0; animState.length = 0;
+    cam.init = false;
+    hideOverlay();
+    doTick(performance.now());
+    banner('킥오프', 1200);
+  }
+  function handleEvents(ev, tick) {
+    for (var i = 0; i < ev.length; i++) {
+      var e = ev[i];
+      if (eventLog.length < 800) eventLog.push({ tick: tick, kind: e.kind, team: e.team, slot: e.slot, side: e.side, name: e.name });
+      // 소리: 내 화면 밖에서 일어난 일까지 다 울리면 시끄러우므로 위치가 있는 소리는 화면 안일 때만 낸다
+      var near = e.slot == null || !game || onScreenSlot(e.slot);
+      switch (e.kind) {
+        case 'goal': banner('골! ' + TEAM_NAMES[e.team], 1800); audio.sfx('goal'); break;
+        case 'kickoff': banner('킥오프', 900); audio.sfx('whistle'); break;
+        case 'play': $('banner').classList.remove('show'); break;
+        case 'half': banner('하프타임', 3000); audio.sfx('whistle'); break;
+        case 'end': banner('경기 종료', 2500); audio.sfx('whistle'); break;
+        case 'lobby': showOverlay([game.state.score[0], game.state.score[1]]); break;
+        case 'ult': if (game && e.slot === game.mySlot) banner(e.name + '!', 1200); if (near) audio.sfx('ult'); break;
+        case 'keeperSave': if (game) banner('골키퍼 선방!', 900); audio.sfx('keeperSave'); break;
+        case 'kick': case 'fart': case 'shoot': case 'curve': case 'pass': case 'dribble': case 'hit': case 'steal':
+          if (near) audio.sfx(e.kind);
+          break;
+      }
+    }
+  }
+  function doTick(now) {
+    var g = game, t0 = performance.now();
+    for (var s = 0; s < C.MAX_PLAYERS; s++) {
+      var inj = injected[s];
+      if (inj && inj.left > 0) { g.inputs[s].dx = inj.dx; g.inputs[s].dy = inj.dy; g.inputs[s].buttons = inj.buttons; }
+      else if (s === g.mySlot) readInput(g.inputs[s]);
+      else if (g.ai && g.ai.indexOf(s) >= 0) {
+        var a = core.AI.think(g.state, s);   // step() 밖에서 입력만 만든다 — 서버 권위·결정성 그대로
+        g.inputs[s].dx = a.dx; g.inputs[s].dy = a.dy; g.inputs[s].buttons = a.buttons;
+      }
+      else { g.inputs[s].dx = 0; g.inputs[s].dy = 0; g.inputs[s].buttons = 0; }
+    }
+    var ev = core.step(g.state, g.inputs);
+    handleEvents(ev, g.state.tick);
+    for (s = 0; s < injected.length; s++) {
+      inj = injected[s];
+      if (inj && inj.left > 0 && --inj.left === 0 && inj.resolve) { var r = inj.resolve; inj.resolve = null; r(g.state.tick); }
+    }
+    var bytes = core.encodeSnapshot(g.state, now >>> 0, snapBuf);
+    pushSnapshot(bytes, now);
+    var ms = performance.now() - t0;
+    tickStats.count++; tickStats.msSum += ms; if (ms > tickStats.msMax) tickStats.msMax = ms;
+  }
+
+  // ── 루프 ──
+  var frameTimes = [], lastFrame = performance.now(), fps = 0, frameMs = 0;
+  function frame(now) {
+    var dt = now - lastFrame; lastFrame = now;
+    // resize 이벤트를 놓친 경우(숨겨진 탭에서 돌아올 때 등)를 대비해 창 크기를 직접 확인
+    if (view.cssW !== window.innerWidth || view.cssH !== window.innerHeight) resize();
+    frameTimes.push(dt); if (frameTimes.length > 60) frameTimes.shift();
+    var sum = 0; for (var i = 0; i < frameTimes.length; i++) sum += frameTimes[i];
+    frameMs = sum / frameTimes.length; fps = frameMs > 0 ? 1000 / frameMs : 0;
+    if (game && game.mode === 'practice') {
+      game.acc += now - game.last; game.last = now;
+      if (game.acc > 250) game.acc = 250;  // 탭 전환 뒤 따라잡기 상한 5틱
+      while (game.acc >= 50) { doTick(now - game.acc + 50); game.acc -= 50; }
+    }
+    sample(now - (game ? game.interpMs : settings.interpMs));
+    updateCamera(Math.min(0.1, dt / 1000));
+    render(now);
+    if (debugOn) renderDebug();
+    requestAnimationFrame(frame);
+  }
+  function snapshotHz() {
+    if (snaps.length < 2) return 0;
+    var a = snaps[Math.max(0, snaps.length - 21)], b = snaps[snaps.length - 1], n = snaps.length - 1 - Math.max(0, snaps.length - 21);
+    return b.t > a.t ? Math.round(n / ((b.t - a.t) / 1000) * 10) / 10 : 0;
+  }
+  function stats() {
+    var g = game, me = myRenderPlayer();
+    return {
+      fps: Math.round(fps * 10) / 10, frameMs: Math.round(frameMs * 100) / 100,
+      mode: g ? g.mode : 'idle', rtt: null, p90: null, interpMs: g ? g.interpMs : settings.interpMs,
+      snapshotHz: snapshotHz(), snapshotBytes: lastSnapshotBytes, buffered: snaps.length,
+      slot: g ? g.mySlot : null, touch: touchOn, sprite: sprite ? (sprite.STYLE || 'yes') : 'fallback',
+      cam: { x: Math.round(cam.x), y: Math.round(cam.y), worldW: Math.round(view.worldW), worldH: Math.round(view.worldH), scale: Math.round(view.scale * 100) / 100 },
+      drawn: (function () { var n = 0; for (var i = 0; i < rs.n; i++) if (onScreen(rs.players[i].x, rs.players[i].y, 80)) n++; return n; })(),
+      ult: me ? Math.round(me.ult * 100) : 0, stam: me ? Math.round(me.stam * 100) : 0, motion: me ? me.motionName : null,
+      tick: (g && g.state) ? g.state.tick : (rs.has ? rs.tick : 0),
+      phase: (g && g.state) ? core.PHASE_NAME[g.state.phase] : (rs.has ? core.PHASE_NAME[rs.phase] : 'none'),
+      rtt: net.rtt || null, room: net.room ? net.room.name : null,
+      tickMsAvg: tickStats.count ? Math.round(tickStats.msSum / tickStats.count * 1000) / 1000 : 0, tickMsMax: Math.round(tickStats.msMax * 1000) / 1000
+    };
+  }
+  function renderDebug() {
+    var st = stats();
+    $('debug').textContent = 'fps ' + st.fps + '  frame ' + st.frameMs + 'ms' + (st.touch ? '  touch' : '') + '  sprite:' + st.sprite + '\n' +
+      'mode ' + st.mode + '  tick ' + st.tick + '  phase ' + st.phase + '  motion ' + st.motion + '\n' +
+      'cam ' + st.cam.x + ',' + st.cam.y + '  view ' + st.cam.worldW + '×' + st.cam.worldH + ' @' + st.cam.scale + '  그림 ' + st.drawn + '/' + rs.n + '\n' +
+      'snapshot ' + st.snapshotBytes + 'B @' + st.snapshotHz + 'Hz  buffered ' + st.buffered + '  interp ' + st.interpMs + 'ms  필살 ' + st.ult + '%\n' +
+      'tick ' + st.tickMsAvg + 'ms avg / ' + st.tickMsMax + 'ms max' + (game ? '\nhash ' + core.hashState(game.state) : '');
+  }
+
+  // ── 디버그·검증 API (CLAUDE.md §7) ──
+  core.debug = {
+    stats: stats,
+    state: function () { return snaps.length ? JSON.parse(JSON.stringify(snaps[snaps.length - 1].s)) : null; },
+    raw: function () { return game ? game.state : null; },      // 온라인에서는 null (서버만 state 를 갖는다)
+    net: function () { return { screen: net.screen, nick: net.nick, room: net.room, mySlot: net.mySlot, rtt: net.rtt,
+                                open: !!(net.ws && net.ws.readyState === 1) }; },
+    hash: function () { return game ? core.hashState(game.state) : null; },
+    events: function () { return eventLog.slice(); },
+    setInput: function (partial, ticks) {
+      if (!game) return Promise.reject(new Error('경기가 없다'));
+      var slot = partial.slot || 0;
+      return new Promise(function (resolve) {
+        injected[slot] = { dx: partial.dx || 0, dy: partial.dy || 0, buttons: partial.buttons || 0, left: Math.max(1, ticks | 0), resolve: resolve };
+      });
+    },
+    clearInput: function (slot) { injected[slot || 0] = null; return true; },
+    readInput: function () { return readInput({ dx: 0, dy: 0, buttons: 0 }); },
+    run: function (ticks) {
+      if (!game) throw new Error('경기가 없다');
+      // 동기 실행: 마지막 틱이 "지금"이 되도록 과거 시각으로 찍는다 (렌더러가 최신 스냅샷을 고르게)
+      var from = eventLog.length, now = performance.now();
+      for (var i = 0; i < ticks; i++) doTick(now - (ticks - 1 - i) * 50);
+      game.acc = 0; game.last = performance.now();
+      sample(performance.now());
+      return eventLog.slice(from);
+    },
+    practice: function (opts) { startPractice(opts); return true; },
+    setBall: function (x, y, vx, vy, range, spin) {
+      if (!game) return false;
+      var b = game.state.ball;
+      b.x = x; b.y = y; b.vx = vx || 0; b.vy = vy || 0;
+      b.range = range != null ? range : ((vx || vy) ? 2200 : 0); b.range0 = b.range; b.spin = spin || 0; b.pierce = 0;
+      b.owner = -1; b.kickCd = 0; b.keeperCd = 0; return true;
+    },
+    setPlayer: function (slot, x, y, facing) {
+      var p = game && game.state.players[slot]; if (!p) return false;
+      p.x = x; p.y = y; if (facing != null) p.facing = facing; p.vx = 0; p.vy = 0; return true;
+    },
+    fillUlt: function (slot) { var p = game && game.state.players[slot || 0]; if (!p) return false; p.ult = core.TUNING.ult.fullTicks; return true; },
+    camera: function () { return { x: cam.x, y: cam.y, worldW: view.worldW, worldH: view.worldH, scale: view.scale }; },
+    minimap: function (on) { settings.minimap = !!on; saveSettings(); return settings.minimap; },
+    touch: function (on) { setTouch(on); return touchOn; },
+    beep: function (sec) { return audio.beep(sec); },
+    audio: function (kind) { if (kind) { audio.unlock(); audio.sfx(kind); }
+      return { ready: audio.ready(), state: audio.state(), sfx: settings.sfx, bgm: settings.bgm, bgmRunning: audio.bgmOn(), level: audio.level() }; },
+    ai: function (slot) { return game && game.ai && game.ai.indexOf(slot) >= 0 ? core.AI.think(game.state, slot) : null; },
+    selfTest: function (seed, ticks) { return core.selfTest(seed, ticks); },
+    connect: function (nick) { $('lbNick').value = nick || store.get('soc_nick') || '검증'; showPanel('lobby'); netConnect(); return true; },
+    disconnect: function () { if (net.ws) { try { net.ws.close(); } catch (e) {} } stopInputSender(); return true; },
+    // 숨겨진 탭(rAF 정지)에서도 렌더 경로를 검증할 수 있게 한 프레임을 동기로 그린다
+    renderOnce: function (frames) {
+      var n = Math.max(1, frames | 0), t0 = performance.now(), now = performance.now();
+      for (var i = 0; i < n; i++) { sample(now + i * 16.7 - (game ? game.interpMs : settings.interpMs)); updateCamera(0.0167); render(now + i * 16.7); }
+      return { frames: n, msPerFrame: Math.round((performance.now() - t0) / n * 1000) / 1000 };
+    },
+    renderAt: function (offsetMs, base) {
+      var t = (base || performance.now()) + (game ? game.interpMs : settings.interpMs) + (offsetMs || 0);
+      sample(t - (game ? game.interpMs : settings.interpMs)); updateCamera(1); render(t); return true;
+    },
+    screenshot: function (offsetMs) {
+      core.debug.renderAt(offsetMs || 0);
+      var off = document.createElement('canvas'); off.width = canvas.width; off.height = canvas.height;
+      var o = off.getContext('2d'); o.fillStyle = COLOR.bg; o.fillRect(0, 0, off.width, off.height); o.drawImage(canvas, 0, 0);
+      return off.toDataURL('image/png');
+    },
+    resize: resize,
+    latencyProbe: function () { return net.rtt || null; }   // 서버가 2초마다 재는 왕복 지연(ms)
+  };
+
+  // 소리 토글 버튼 + 첫 조작에 오디오 해제(자동재생 정책)
+  $('btnSfx').addEventListener('click', function () { audio.unlock(); audio.set('sfx', !settings.sfx); syncAudioBtns(); if (settings.sfx) audio.sfx('pass'); });
+  $('btnBgm').addEventListener('click', function () { audio.unlock(); audio.set('bgm', !settings.bgm); syncAudioBtns(); });
+  window.addEventListener('pointerdown', function () { audio.unlock(); }, { passive: true });
+  // 소리 시험: 마스터·효과음 게인을 건너뛰고 목적지에 바로 1.2초 순음을 낸다.
+  // 이게 안 들리면 원인은 이 페이지 코드가 아니라 브라우저·시스템 쪽이다(사이트 음소거 등).
+  $('ovSndTest').addEventListener('click', function () {
+    var r = audio.beep(1.2);
+    var el = $('ovSndInfo');
+    if (typeof r === 'string') { el.textContent = r; return; }
+    el.textContent = '삐 소리가 1.2초 납니다. 들리면 소리 장치는 정상입니다.\n'
+      + '상태 ' + r.state + ' · ' + r.sampleRate + 'Hz · 출력 채널 ' + r.destChannels + '/' + r.destMax;
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') audio.suspend(); else audio.wake();
+  });
+  syncAudioBtns();
+
+  showOverlay(null);
+  requestAnimationFrame(frame);
+
+  // ?selftest=1 : 헤드리스 브라우저(file:// 검증용)가 DOM 만 읽어도 결과를 알 수 있게 #debug 에 JSON 을 쓴다
+  if (params.get('selftest') === '1') {
+    var report = { protocol: location.protocol, sprite: sprite ? (sprite.STYLE || 'yes') : 'fallback', errors: [] };
+    window.addEventListener('error', function (e) { report.errors.push(String(e.message)); $('debug').textContent = JSON.stringify(report); });
+    try {
+      report.selfTest = core.selfTest(1, 600).hash;
+      core.debug.practice({ char: 0, dummies: 2, halfSec: 90 });
+      core.debug.run(100);
+      report.tick = game.state.tick; report.phase = core.PHASE_NAME[game.state.phase];
+      report.renderMs = core.debug.renderOnce(30).msPerFrame;
+      report.cam = core.debug.camera();
+      report.store = (function () { store.set('soc_probe', '1'); var v = store.get('soc_probe'); store.remove('soc_probe'); return v === '1'; })();
+    } catch (e) { report.errors.push(String(e && e.stack || e)); }
+    $('debug').textContent = JSON.stringify(report);
+    $('debug').classList.add('show');
+  }
+})();
+</script>
+</body>
+</html>

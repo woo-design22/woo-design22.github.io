@@ -828,6 +828,7 @@
     $('lbServer').value = params.get('server') || store.get('soc_server') || '';
     showPanel('lobby');
     if (!$('lbServer').value.trim()) fetchServerUrl();   // 비어 있으면 게시판에서 자동으로 받아온다
+    else maybeAutoConnect();
     if (net.ws && net.ws.readyState === 1) { $('lbAfter').style.display = ''; netSend({ t: 'room.list' }); }
   });
   $('lbBack').addEventListener('click', function () { showOverlay(null); });
@@ -1065,6 +1066,16 @@
     '혼자라도 「뒤로」 → 「혼자 하기」로 인공지능과 2:2 경기를 할 수 있습니다.'
   ].join(String.fromCharCode(10));
   function lbNote(t) { var e = $('lbNote'); if (e) e.textContent = t || ''; }
+  /* 주소가 준비됐고 저장된 아이디가 있으면 스스로 접속한다.
+     게시판을 둔 목적 자체가 "방문자가 주소를 손으로 넣지 않게" 하는 것이라 여기까지 자동이어야 한다.
+     아이디가 없으면(첫 방문) 자동 접속하지 않는다 — 이름은 본인이 정해야 한다. */
+  function maybeAutoConnect() {
+    if (net.screen !== 'lobby') return;
+    if (net.ws && net.ws.readyState <= 1) return;
+    if (!$('lbServer').value.trim()) return;
+    if (($('lbNick').value || '').trim().length < 2) return;
+    netConnect();
+  }
   function fetchServerUrl() {
     var reg = (params.get('registry') || REGISTRY || '').replace(/\/+$/, '');
     if (!reg) return;
@@ -1074,6 +1085,7 @@
       if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; lbNote(OFF_NOTE); return; }
       if (!$('lbServer').value.trim()) $('lbServer').value = d.url;
       lbNote('');
+      maybeAutoConnect();
       $('lbState').textContent = '서버 주소를 받았습니다';
     }).catch(function () { $('lbState').textContent = '서버 주소를 받지 못했습니다'; lbNote(OFF_NOTE); });
   }

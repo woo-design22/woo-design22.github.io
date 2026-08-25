@@ -100,13 +100,13 @@ Write-Host "  확인:  node loadtest.js --url $url --players 4" -ForegroundColor
 Write-Host ""
 Write-Host "닫으려면 Ctrl+C 를 누르세요." -ForegroundColor DarkGray
 try {
-  # 게시판이 주소를 잊어도 스스로 되살아나도록 4분마다 같은 주소를 다시 올린다.
+  # 게시판이 주소를 잊어도 스스로 되살아나도록 90초마다 같은 주소를 다시 올린다.
   # (게시판이 메모리 저장으로 도는 동안에는 앱이 잠들 때 주소를 잊는다 — 실제로 겪었다.)
   $beat = 0
   while (-not $proc.HasExited) {
     Start-Sleep -Seconds 10
     $beat += 10
-    if ($beat -ge 240 -and $regUrl -and $regKey) {
+    if ($beat -ge 90 -and $regUrl -and $regKey) {
       $beat = 0
       try {
         $body = @{ url = $url; key = $regKey } | ConvertTo-Json -Compress

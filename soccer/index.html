@@ -99,6 +99,16 @@
   .panel .sides .row { margin: 6px 0; gap: 5px; }
   .panel .sides label { font-size: 12.5px; color: var(--muted); }
   .panel .sideinfo { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin-bottom: 4px; }
+  .panel .bdwin { font-size: 17px; font-weight: 700; margin-bottom: 12px; }
+  .panel table.board { width: 100%; border-collapse: collapse; font-size: 14px; margin: 6px 0 10px; }
+  .panel table.board th { color: var(--muted); font-weight: 600; font-size: 12.5px; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.16); }
+  .panel table.board td { padding: 5px 6px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .panel table.board td.who { text-align: left; }
+  .panel table.board td.num { text-align: center; font-variant-numeric: tabular-nums; }
+  .panel table.board tr.me td { color: var(--text); font-weight: 700; }
+  .panel table.board .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .panel .mom { margin: 4px 0 2px; font-size: 15px; }
+  .panel .mom b { color: var(--ult); }
   .panel .ultinfo { font-size: 13px; color: var(--muted); min-height: 20px; margin-bottom: 12px; }
   .panel .ultinfo b { color: var(--ult); }
   .panel .final { font-size: 36px; font-weight: 800; margin: 6px 0 12px; }
@@ -276,6 +286,15 @@
     <div class="err" id="rmErr"></div>
   </div>
 
+  <div class="panel wide" id="panelBoard" style="display:none">
+    <h1 id="bdTitle">하프타임</h1>
+    <div class="final" id="bdScore"></div>
+    <div class="bdwin" id="bdWin"></div>
+    <table class="board"><thead><tr><th>선수</th><th>골</th><th>유효슈팅</th><th>결정적 수비</th></tr></thead>
+      <tbody id="bdRows"></tbody></table>
+    <div class="mom" id="bdMom"></div>
+    <div class="hint" id="bdHint"></div>
+  </div>
   <div class="panel" id="panelMsg" style="display:none">
     <h1 id="msgTitle">안내</h1>
     <div class="sub" id="msgBody"></div>
@@ -784,6 +803,67 @@
     if (!fartIm) { fartIm = new Image(); fartIm.src = 'chars/fart-effect.png'; return null; }
     return (fartIm.complete && fartIm.naturalWidth > 0) ? fartIm : null;
   }
+  /* ── 하프타임·경기 종료 상황판 ────────────────────────────────────────────
+     game-core 가 `half`·`end` 이벤트에 기록표(`table`)와 MOM(`mom`)을 실어 보낸다.
+     여기서는 이름만 붙여 표로 그린다. 온라인은 방 명단의 닉네임, 혼자 하기는 슬롯 번호. */
+  function nickOfSlot(slot) {
+    if (game && game.mode === "online" && net.room && net.room.members) {
+      var ms = net.room.members;
+      for (var i = 0; i < ms.length; i++) if (ms[i].slot === slot) return ms[i].nick;
+    }
+    if (game && slot === game.mySlot) return "나";
+    return (slot + 1) + "번";
+  }
+  function charNameOfSlot(slot) {
+    var c = core.CHARACTERS[charOfSlot(slot)];
+    return c ? c.name : "";
+  }
+  var boardT = 0;                       // 상황판이 남은 시간(초). 0 이면 안 띄운다
+  function showBoard(kind, e) {
+    var sc = e.score || [0, 0];
+    var end = kind === "end";
+    $("bdTitle").textContent = end ? "경기 종료" : "하프타임";
+    $("bdScore").innerHTML = '<span style="color:var(--team-a)">' + TEAM_NAMES[0] + '</span> ' +
+      sc[0] + " : " + sc[1] + ' <span style="color:var(--team-b)">' + TEAM_NAMES[1] + '</span>';
+    var win = $("bdWin");
+    if (!end) {
+      win.textContent = sc[0] === sc[1] ? "동점입니다 — 후반에 갈립니다" :
+        (sc[0] > sc[1] ? TEAM_NAMES[0] : TEAM_NAMES[1]) + " 앞서는 중";
+      win.style.color = "var(--muted)";
+    } else if (sc[0] === sc[1]) {
+      win.textContent = "무승부";  win.style.color = "var(--muted)";
+    } else {
+      var w = sc[0] > sc[1] ? 0 : 1;
+      win.textContent = TEAM_NAMES[w] + " 승리!";
+      win.style.color = w ? "var(--team-b)" : "var(--team-a)";
+    }
+    // 기록표 — 골 많은 순 → 유효슈팅 → 결정적 수비
+    var t = (e.table || []).slice().sort(function (a, b) { return (b.g - a.g) || (b.s - a.s) || (b.d - a.d); });
+    var rows = $("bdRows"); rows.innerHTML = "";
+    if (!t.length) {
+      var tr0 = document.createElement("tr");
+      tr0.innerHTML = '<td class="who" colspan="4" style="color:var(--muted)">아직 기록이 없습니다</td>';
+      rows.appendChild(tr0);
+    }
+    for (var i = 0; i < t.length; i++) {
+      var r = t[i], tr = document.createElement("tr");
+      if (game && r.slot === game.mySlot) tr.className = "me";
+      var col = r.team ? "var(--team-b)" : "var(--team-a)";
+      tr.innerHTML = '<td class="who"><span class="dot" style="background:' + col + '"></span>' +
+        nickOfSlot(r.slot) + ' <span style="color:var(--muted);font-size:12px">' + charNameOfSlot(r.slot) + '</span></td>' +
+        '<td class="num">' + r.g + '</td><td class="num">' + r.s + '</td><td class="num">' + r.d + '</td>';
+      rows.appendChild(tr);
+    }
+    var mom = $("bdMom");
+    if (end && e.mom) {
+      mom.innerHTML = '오늘의 선수 <b>' + nickOfSlot(e.mom.slot) + '</b> — 골 ' + e.mom.g +
+        ' · 유효슈팅 ' + e.mom.s + ' · 결정적 수비 ' + e.mom.d;
+    } else mom.textContent = "";
+    $("bdHint").textContent = end ? "잠시 뒤 처음 화면으로 돌아갑니다." : "곧 후반이 시작됩니다.";
+    boardT = end ? 9 : 4.4;
+    showPanel("board");
+  }
+  function hideBoard() { if (boardT > 0) { boardT = 0; hideOverlay(); } }
   function charOfSlot(slot) {
     // 연습장은 로컬 상태에서, 온라인은 방 정보에서 읽는다(온라인은 서버만 state 를 갖는다)
     if (game && game.mode === 'online') {
@@ -1295,7 +1375,7 @@
     net.screen = name;
     $('overlay').classList.add('show');
     overlayMode = true;
-    var map = { home: 'panelHome', lobby: 'panelLobby', room: 'panelRoom', msg: 'panelMsg' };
+    var map = { home: 'panelHome', lobby: 'panelLobby', room: 'panelRoom', msg: 'panelMsg', board: 'panelBoard' };
     for (var k in map) $(map[k]).style.display = (k === name) ? '' : 'none';
   }
   function netMsg(title, body, retry) {
@@ -1507,10 +1587,10 @@
         case 'goal':
           cheerT = 2.2;   // 관중이 크게 뛴다
           banner('골! ' + TEAM_NAMES[e.team], 1800); audio.sfx('goal'); break;
-        case 'kickoff': banner('킥오프', 900); audio.sfx('whistle'); break;
+        case 'kickoff': hideBoard(); banner('킥오프', 900); audio.sfx('whistle'); break;
         case 'play': $('banner').classList.remove('show'); break;
-        case 'half': banner('하프타임', 3000); audio.sfx('whistle'); break;
-        case 'end': banner('경기 종료', 2500); audio.sfx('whistle'); break;
+        case 'half': audio.sfx('whistle'); showBoard('half', e); break;
+        case 'end': audio.sfx('whistle'); showBoard('end', e); break;
         case 'lobby': showOverlay([game.state.score[0], game.state.score[1]]); break;
         case 'ult': if (game && e.slot === game.mySlot) banner(e.name + '!', 1200); if (near) audio.sfx('ult'); break;
         case 'keeperSave': if (game) banner('골키퍼 선방!', 900); audio.sfx('keeperSave'); break;
@@ -1559,6 +1639,7 @@
       while (game.acc >= 50) { doTick(now - game.acc + 50); game.acc -= 50; }
     }
     if (cheerT > 0) cheerT = Math.max(0, cheerT - dt / 1000);   // 골 뒤 환호가 잦아든다
+    if (boardT > 0) { boardT -= dt / 1000; if (boardT <= 0) { boardT = 0; if (net.screen === "board") hideOverlay(); } }
     sample(now - (game ? game.interpMs : settings.interpMs));
     updateCamera(Math.min(0.1, dt / 1000));
     render(now);

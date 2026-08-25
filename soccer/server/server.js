@@ -157,7 +157,9 @@ function startMatch(r) {
     // 이벤트는 텍스트로, 스냅샷은 바이너리로
     for (const e of ev) {
       if (e.kind === 'lobby') { stopMatch(r, '종료'); return; }
-      broadcast(r, { t: 'event', kind: e.kind, team: e.team, slot: e.slot, side: e.side, name: e.name, score: e.score });
+      // table/mom 은 하프타임·종료에만 실린다(상황판). 매 틱 나가는 값이 아니라 크기 걱정이 없다.
+      broadcast(r, { t: 'event', kind: e.kind, team: e.team, slot: e.slot, side: e.side, name: e.name,
+                     score: e.score, table: e.table, mom: e.mom, scorer: e.scorer });
     }
     const bytes = core.encodeSnapshot(r.state, Date.now() >>> 0, snapBuf);
     broadcastBin(r, bytes);

@@ -919,6 +919,7 @@ void main(){
 precision highp float;
 in vec3 vN; in vec3 vC; in vec3 vW; in vec3 vSkin; in float vHair; in vec3 vL; in vec3 vLE;
 uniform vec3 uHairCol,uLipCol;
+uniform float uTrack;   /* 1 = 눈동자가 플레이어를 좇는다, 0 = 정면 고정(검사용) */
 ${GLSL_LIGHT}
 out vec4 outColor;
 
@@ -980,15 +981,21 @@ void main(){
     float gyaw  = clamp(atan(ge.x, ge.z), -0.95, 0.95);
     float gpit  = clamp(asin(clamp(ge.y,-1.0,1.0)), -0.42, 0.42);
     vec3  gz    = vec3(sin(gyaw)*cos(gpit), sin(gpit), cos(gyaw)*cos(gpit));
+    gz = normalize(mix(vec3(0.0,0.0,1.0), gz, uTrack));   /* uTrack=0 이면 정면 고정(검사용) */
     float a     = dot(d, gz);
-    vec3  eyeC  = vec3(0.93,0.91,0.87);                                  /* 흰자 */
-    eyeC = mix(eyeC, vec3(0.34,0.21,0.11), smoothstep(0.850,0.884,a));   /* 홍채 12mm */
-    eyeC = mix(eyeC, vec3(0.02,0.02,0.02), smoothstep(0.977,0.988,a));   /* 동공 4mm */
+    vec3  eyeC  = vec3(0.95,0.93,0.89);                                  /* 흰자 */
+    /* 홍채·동공을 해부학적 크기보다 크게 그린다.
+       실측: 12mm 홍채 / 4mm 동공으로 두었더니 1m 거리에서 눈동자가 움직여도
+       화면에서 달라지는 화소가 50만 중 60개(0.01%)뿐이었다 — 선반 위 머리는
+       2~10m 밖이라 사람 눈에 보일 수가 없다. '모두가 나를 본다'가 이 장면의 전부이므로
+       읽히는 쪽을 택한다. 눈꺼풀 틈도 조금 넓혀 눈알이 더 드러나게 한다. */
+    eyeC = mix(eyeC, vec3(0.30,0.18,0.09), smoothstep(0.740,0.792,a));   /* 홍채 */
+    eyeC = mix(eyeC, vec3(0.02,0.02,0.02), smoothstep(0.918,0.950,a));   /* 동공 */
     vec3  hl    = normalize(vec3(sideE*0.34, 0.42, 1.0));
     eyeC = mix(eyeC, vec3(1.0,1.0,0.98), smoothstep(0.984,0.997,dot(d,hl))*0.88);
     /* 눈꺼풀 — 아몬드 밖은 살갗으로 덮는다. 없으면 눈알이 통째로 드러난다. */
     float lid = 1.0 - smoothstep(0.86,1.08,
-                  length((vec2(vL.x,vL.y)-vec2(sideE*0.132,-0.017))/vec2(0.064,0.0260)));
+                  length((vec2(vL.x,vL.y)-vec2(sideE*0.132,-0.017))/vec2(0.068,0.0330)));
     alb     = mix(vSkin*0.78, eyeC, lid);
     eyeEmis = lid*0.20;               /* 어두운 방에서도 눈은 살아 있어야 한다 */
   }
@@ -1001,7 +1008,7 @@ void main(){
 
   outColor=vec4(shade(alb,normalize(vN),vW,eyeEmis,0.035),1.0);
 }`,
-['uProj','uView','uHairCol','uLipCol'].concat(LIGHT_UNIFORMS));
+['uProj','uView','uHairCol','uLipCol','uTrack'].concat(LIGHT_UNIFORMS));
 
 let HEAD_N=0;
 /* 세트마다 VAO를 하나씩 만든다. 인스턴스 버퍼는 같고 시작 오프셋만 다르다 —
@@ -1307,6 +1314,32 @@ function buildDynVAO(cap){
 /* 시야 원뿔 안의 머리만 골라 담고, 담은 개수를 돌려준다.
    화면 가장자리에서 머리가 툭 나타나지 않게 각을 넉넉히 잡는다(실화각 반각은 약 49°). */
 let HEAD_CONE = Math.cos(Math.min(3.10, Math.PI/3 + 0.30));
+
+/* 머리가 나를 향해 돌아본다.
+   눈동자만으로는 안 된다 — 2m만 떨어져도 눈 전체가 화면에서 1~2화소라,
+   홍채·동공을 키워도 추적을 켜고 끈 화면이 5~23화소밖에 안 달랐다(실측).
+   선반 위 백 개의 얼굴이 나를 본다는 것이 이 장면의 전부이므로, 눈이 아니라 고개가 돌아야 읽힌다.
+   원래 향하던 방향에서 HEAD_TURN 만큼만 돌고, 천천히 따라온다 — 홱 돌면 인형처럼 보인다. */
+let HEAD_TURN = 1.02;                    /* 고개가 돌아갈 수 있는 한계 (약 58°) */
+let headSnap = false;                    /* 검사용: 한 프레임에 곧바로 목표 각도로 */
+let HEAD_YAW_CUR = null;
+function headYaw(i,px,pz,ex,ez){
+  if(!HEAD_YAW_CUR){
+    HEAD_YAW_CUR=new Float32Array(HEAD_RSH.length/3);
+    for(let k=0;k<HEAD_YAW_CUR.length;k++) HEAD_YAW_CUR[k]=HEAD_RSH[k*3];
+  }
+  const base=HEAD_RSH[i*3];
+  /* 셰이더에서 머리의 앞쪽(국소 +z)은 월드 (sin θ, cos θ) 로 간다 */
+  let d=Math.atan2(ex-px, ez-pz)-base;
+  d=Math.atan2(Math.sin(d),Math.cos(d));                 /* -π..π 로 접는다 */
+  const want=base+clampf(d,-HEAD_TURN,HEAD_TURN);
+  let cur=HEAD_YAW_CUR[i];
+  const e=Math.atan2(Math.sin(want-cur),Math.cos(want-cur));
+  cur+=e*(headSnap?1:Math.min(1,dtAvg*2.6));
+  HEAD_YAW_CUR[i]=cur;
+  return cur;
+}
+
 function fillHeads(ex,ey,ez, fx,fy,fz){
   let m=0;
   for(const set of HEAD_SETS){
@@ -1319,7 +1352,8 @@ function fillHeads(ex,ey,ez, fx,fy,fz){
       /* 코앞의 머리는 각을 재지 않는다 — 얼굴에 닿을 만큼 가까우면 무조건 보인다 */
       if(dist>1.6 && (dx*fx+dy*fy+dz*fz)/dist < HEAD_CONE) continue;
       dynP[m*3]=px; dynP[m*3+1]=py; dynP[m*3+2]=pz;
-      dynR[m*3]=HEAD_RSH[i*3]; dynR[m*3+1]=HEAD_RSH[i*3+1]; dynR[m*3+2]=HEAD_RSH[i*3+2];
+      dynR[m*3]=headYaw(i,px,pz,ex,ez);
+      dynR[m*3+1]=HEAD_RSH[i*3+1]; dynR[m*3+2]=HEAD_RSH[i*3+2];
       dynS[m*3]=HEAD_SKIN[i*3]; dynS[m*3+1]=HEAD_SKIN[i*3+1]; dynS[m*3+2]=HEAD_SKIN[i*3+2];
       m++;
     }
@@ -1501,6 +1535,10 @@ window.addEventListener('keydown',function(e){
   if(tag==='INPUT'||tag==='TEXTAREA') return;
   key[e.key.toLowerCase()]=true;
   if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
+  /* 키를 누르고 있으면 OS 가 keydown 을 초당 수십 번 되쏜다.
+     그대로 두면 '세 번 눌러야 들어간다'는 확인 절차가 한 번 눌러 두는 것으로 통과돼 버린다.
+     자동 반복은 누름으로 세지 않는다(preventDefault 는 위에서 이미 했다). */
+  if(e.repeat) return;
   hurryText();
   if(e.key.toLowerCase()==='e') interactPressed=true;
   /* 스페이스는 상황에 따라 다르다: 미니게임 중엔 누르기, 걸어 다닐 땐 뛰기 */
@@ -2134,18 +2172,21 @@ TICK.nose = function(dt){
 const mgSmell = {
   title:'냄 새 맡 기', key:'스페이스 · E', keyT:'화면을 누른다',
   info:'숨이 가장 크게 부풀 때 <b>붙잡는다</b>.',
-  setup:function(m){ m.r=10; m.speed=112; m.hits=0; m.flashT=0; m.lock=0; },
+  setup:function(m){ m.r=10; m.speed=112; m.hits=0; m.flashT=0; m.lock=0; m.okT=0; },
   tick:function(dt,m){
+    if(m.okT>0) m.okT-=dt;
+    /* 다 맡고 나면 숨을 멈춘다. 성공했는데도 고리가 계속 부풀어 오르면
+       내가 해낸 것인지 아닌지 알 수가 없다(실측 지적). */
+    if(m.lock>0){ m.lock-=dt; if(m.lock<=0) MG.close(); return; }
     m.r += m.speed*dt;
     if(m.r>300){ m.r=10; m.speed=112+m.hits*16; }
     if(m.flashT>0) m.flashT-=dt;
-    if(m.lock>0){ m.lock-=dt; if(m.lock<=0) MG.close(); }
   },
   press:function(m){
     if(m.lock>0) return;
     const T=196, tol=30;
     if(Math.abs(m.r-T)<tol){
-      A.sniff(); m.hits++; m.flashT=0.45; m.r=10;
+      A.sniff(); m.hits++; m.flashT=0.45; m.okT=0.85; m.r=10;
       MG.info(SMELLS[Math.min(m.hits-1,SMELLS.length-1)]);
       if(m.hits>=3){ m.lock=2.4; }
     } else {
@@ -2169,12 +2210,24 @@ const mgSmell = {
     MGC.restore();
     if(m.flashT>0) mgRing(cx,cy,T,MGP.amber,6,m.flashT/0.45*0.8);
     if(m.flashT<0) mgRing(cx,cy,m.r,MGP.bad,2,Math.max(0,(0.3+m.flashT)/0.3)*0.6);
-    /* 몇 번 맡았는지 */
-    for(let i=0;i<3;i++){
-      const x=cx-46+i*46;
-      MGC.fillStyle = i<m.hits ? MGP.phos : 'rgba(231,227,218,.16)';
-      MGC.fillRect(x-9,MH-40,18,2);
+    /* 붙잡았다는 표시 — 초록 고리가 크게 번지고 글자가 뜬다.
+       고리 하나만 깜빡여서는 성공했는지 알기 어려웠다. */
+    if(m.okT>0){
+      const k=m.okT/0.85;
+      mgRing(cx,cy,T+(1-k)*60,MGP.phos,4,k*0.9);
+      mgText('맡았다', cx, cy-T-30, 17, MGP.phos, 'center', 4);
     }
+    /* 다 맡고 나면 멈춰 서서 끝났다고 말해 준다 */
+    if(m.lock>0) mgText('세 번 다 맡았다', cx, cy+T+36, 16, MGP.phos, 'center', 4);
+    /* 몇 번 맡았는지 — 얇은 선은 눈에 안 띄어 굵은 칸으로 바꿨다 */
+    for(let i=0;i<3;i++){
+      const x=cx-46+i*46, on=i<m.hits;
+      MGC.save(); MGC.globalAlpha = on?0.95:0.22;
+      MGC.fillStyle = on ? MGP.phos : MGP.ink;
+      MGC.fillRect(x-13,MH-46,26,7);
+      MGC.restore();
+    }
+    mgText(m.hits+' / 3', cx, MH-64, 13, 'rgba(231,227,218,.5)','center',3);
   },
   done:function(){
     cine(true);
@@ -2534,8 +2587,11 @@ const mgCommune = {
          '그들은 더욱 원했다. 더. 더. 더욱.',
          '심지어는 남자들마저도 원하는 것 같았다.',
          '나는 이제 만족이 되었지만 그들은 만족하지 않았다.'],
-  setup:function(m){ m.r=300; m.hits=0; m.want=0.06; m.pop=0; m.gain=0; m.lock=0; m.face=0; },
+  setup:function(m){ m.r=300; m.hits=0; m.want=0.06; m.pop=0; m.gain=0; m.lock=0; m.face=0;
+                     m.okT=0; m.missT=0; },
   tick:function(dt,m){
+    if(m.okT>0) m.okT-=dt;
+    if(m.missT>0) m.missT-=dt;
     if(m.lock>0){ m.lock-=dt; if(m.lock<=0) MG.close(); return; }
     m.r -= dt*150;
     if(m.r<40){ m.r=300; m.face=(m.face+1)%5; m.want=Math.min(1,m.want+0.02); }
@@ -2549,12 +2605,12 @@ const mgCommune = {
   press:function(m){
     if(m.lock>0) return;
     if(Math.abs(m.r-96)<26){
-      A.kiss(); m.hits++; m.pop=0.6;
+      A.kiss(); m.hits++; m.pop=0.6; m.okT=0.8;
       m.gain = 0.014+0.0075*m.hits;               /* 성공할수록 더 크게 오른다 — 8배까지 */
       m.want = Math.min(1, m.want+m.gain);
       m.r=300; m.face=(m.face+1)%5;
       MG.info(this.lines[Math.min(m.hits-1,this.lines.length-1)]);
-    } else { m.r=300; m.face=(m.face+1)%5; }
+    } else { m.r=300; m.face=(m.face+1)%5; m.missT=0.5; }
   },
   draw:function(t,m){
     const cx=MW/2, cy=MH/2-30;
@@ -2575,6 +2631,29 @@ const mgCommune = {
     mgRing(cx,cy,96,MGP.amber,1.5,0.5);
     mgRing(cx,cy,m.r,MGP.phos,2.5,0.30+0.5*(1-Math.min(1,Math.abs(m.r-96)/150)));
     if(m.pop>0) mgRing(cx,cy,96+(1-m.pop/0.6)*70,MGP.amber,3,m.pop/0.6*0.7);
+    /* 닿았다는 표시.
+       이 게임은 일부러 이길 수 없게 만들어 두었지만(성공할수록 갈망이 더 크게 오른다),
+       '지금 제대로 하고 있다'는 것만은 분명히 보여야 한다.
+       6번째부터는 대사가 같은 것이 되풀이돼 숫자만 오르니 잘하고 있는지 알 수 없었다(실측 지적). */
+    if(m.okT>0){
+      const k=m.okT/0.8;
+      mgRing(cx,cy,96+(1-k)*52,MGP.phos,4,k*0.9);
+      mgText('닿았다', cx, cy-146, 18, MGP.phos, 'center', 4);
+    }
+    if(m.missT>0) mgText('빗나갔다', cx, cy-146, 16, MGP.bad, 'center', 4);
+    /* 만족시킨 얼굴을 눈금으로 — 숫자만으로는 늘고 있는 것이 잘 안 보인다.
+       열두 칸까지 채워지고, 그 뒤로는 칸이 다시 처음부터 밝아진다. */
+    {
+      const N=12, row=Math.floor(Math.max(0,m.hits-1)/N), fill=m.hits-row*N;
+      for(let i=0;i<N;i++){
+        const px=cx-(N-1)*9 + i*18, on=i<fill;
+        MGC.save(); MGC.globalAlpha = on?0.9:0.18;
+        MGC.fillStyle = on ? MGP.phos : MGP.ink;
+        MGC.fillRect(px-6, cy+112, 12, 6);
+        MGC.restore();
+      }
+      if(row>0) mgText('×'+(row+1), cx+(N-1)*9+30, cy+115, 13, MGP.phos, 'left', 2);
+    }
     /* 갈망 — 절대 줄지 않는다 */
     const gx=MW/2-260, gy=MH-46;
     mgText('이 방의 갈망', gx, gy-20, 12, 'rgba(231,227,218,.42)','left',4);
@@ -2683,7 +2762,10 @@ TICK.stand = function(dt){
      문 앞을 벗어나면 셈은 처음으로 돌아간다 — 발을 뺐다는 뜻이니까. */
   if(Math.abs(PL.x-ROOM_A.x)<1.2 && PL.z<HALL.z0+2.4 && ACT.t<25){
     prompt(ENTER_LABEL[d.enter], touchMode?'오른쪽 단추':'E');
-    if(takeInteract()){
+    /* 누름 사이에 최소 간격을 둔다. 연타나 키 자동 반복으로 세 번이 한꺼번에
+       소모되면 '세 번 생각하게 한다'는 뜻이 사라진다. */
+    if(takeInteract() && ACT.t-(d.tPress===undefined?-9:d.tPress) > 0.40){
+      d.tPress=ACT.t;
       d.enter++;
       if(d.enter>=3){ prompt(null); finish('return'); return; }
       const w=ENTER_WARN[d.enter-1];
@@ -2977,6 +3059,7 @@ function pickLights(x,y,z){
 
 /* 프레임이 밀리면 그리는 해상도를 낮춘다. 60fps가 그림보다 중요하다. */
 let renderScale=1, dtAvg=0.0166, lastHeadsDrawn=0;
+let gazeTrack=1;        /* 눈동자가 플레이어를 좇는가. 0 으로 두면 정면 고정(검사용) */
 function draw(){
   const dpr=Math.min(window.devicePixelRatio||1,1.6)*renderScale;
   const w=Math.max(1,Math.round(cv.clientWidth*dpr)), h=Math.max(1,Math.round(cv.clientHeight*dpr));
@@ -3037,6 +3120,7 @@ function draw(){
   gl.uniform1fv(HEADS.u.uLR,lr);
   gl.uniform3f(HEADS.u.uHairCol,COL.hair[0],COL.hair[1],COL.hair[2]);
   gl.uniform3f(HEADS.u.uLipCol,0.52,0.30,0.28);
+  gl.uniform1f(HEADS.u.uTrack,gazeTrack);
   let drawnHeads=0;
   if(faceView){
     gl.bindVertexArray(VIEW_HEAD.vao);
@@ -3045,6 +3129,7 @@ function draw(){
   } else if(ROOM_A._vis || ROOM_B._vis){
     /* 보이는 방의 머리 중 시야 원뿔에 든 것만 추려 한 번에 그린다 */
     const m=fillHeads(eye[0],eye[1],eye[2],fwx,fwy,fwz);
+    headSnap=false;                          /* 검사용 즉시반영은 한 프레임만 */
     if(m){
       for(let k=0;k<3;k++){
         gl.bindBuffer(gl.ARRAY_BUFFER,DYN_B[k]);
@@ -3224,6 +3309,10 @@ if(/[?&]debug=1/.test(location.search)){
     /* 머리 시야 컬링 임계값. -2 면 전부 그린다 — 컬링이 보이는 머리를 지우지 않는지
        같은 화면에서 켜고 끄며 견줘 볼 때 쓴다. */
     cone:function(v){ if(v!==undefined) HEAD_CONE=v; return HEAD_CONE; },
+    /* 고개 돌리기 한계. 0 이면 원래 방향 그대로. 부르면 그 프레임에 즉시 반영된다. */
+    turn:function(v){ if(v!==undefined){ HEAD_TURN=v; headSnap=true; } return HEAD_TURN; },
+    /* 눈동자 추적 on/off. 같은 화면에서 켜고 꺼 픽셀을 맞대 보려고 둔다. */
+    gaze:function(v){ if(v!==undefined) gazeTrack=v; return gazeTrack; },
     blocks:function(){ return BLOCK.length; },
     mgs:function(){ return MG.on ? { on:true, title:E.mgTitle.textContent,
       t:+MG.t.toFixed(2), r:MG.r, p:MG.p, i:MG.i, hits:MG.hits, want:MG.want,

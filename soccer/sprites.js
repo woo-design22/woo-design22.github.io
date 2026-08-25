@@ -507,6 +507,26 @@
   }
 
   /* ── 11. 공개 함수 ──────────────────────────────────────────────────────*/
+  /* ── 사람이 그린 캐릭터 그림 (chars/*.png) ────────────────────────────────
+     있으면 도트 대신 이것을 그린다. 파일이 없거나 아직 안 왔으면 **도트로 그린다**(폴백을 없애지 말 것).
+     그림은 앞을 보고 선 정사각형 256×256 이라 회전시키지 않는다 — 왼쪽을 볼 때만 좌우로 뒤집는다.
+     발밑 판정 원반은 그림이 있든 없든 그대로 그린다. 그 원이 곧 판정이다.
+     골키퍼(charId 6)는 그림이 없어 늘 도트로 그려진다. */
+  var PHOTO_POSE = { idle: '', run: '-run', kick: '-kick', fart: '-fart', stun: '-stun', ult: '-goal' };
+  var PHOTO_SCALE = 3.2;    // 그림 한 변 = 반지름 × 이 값 (사람 키 ≈ 3.0r, 어깨 폭 ≈ 판정 지름)
+  var photoCache = {}, photoOK = (typeof Image !== "undefined");
+  function photoOf(key, pose) {
+    if (!photoOK || !key) return null;
+    var name = key + (PHOTO_POSE[pose] || "");
+    var im = photoCache[name];
+    if (im === undefined) {
+      im = new Image();
+      im.src = "chars/" + name + ".png";
+      photoCache[name] = im;
+      return null;
+    }
+    return (im.complete && im.naturalWidth > 0) ? im : null;
+  }
   function draw(ctx, o) {
     var charId = o.charId | 0;
     if (charId < 0 || charId > 6) charId = 0;
@@ -526,13 +546,23 @@
     if (pose !== 'run' && pose !== 'kick' && pose !== 'fart' &&
         pose !== 'stun' && pose !== 'ult') pose = 'idle';
     var f = frameOf(pose, t + charId * 0.137, phase) % frameCount(pose);   // 캐릭터마다 걸음 위상차
+    // 그림은 팀에 상관없이 똑같이 생겼다 — 발밑 원반을 팀 색으로 칠해야 아군·적군이 구분된다.
+    // 골키퍼 그림은 아직 없어서 덩치형 그림을 빌려 쓴다(chars/keeper.png 를 넣으면 그 줄만 바꾸면 된다).
+    var ph = photoOf(charId === 6 ? 'big' : m.key, pose);
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
 
     // **타격 판정 원반** — 반지름 r 이 곧 충돌 반지름(PLAYER_R)이다. 그림이 아니라 이 원이 판정이다.
     ellipse(ctx, x, y - r * 0.04, r, r * 0.42, 'rgba(0,0,0,0.30)');
-    ring(ctx, x, y - r * 0.04, r, r * 0.42, 'rgba(255,255,255,0.30)', Math.max(1, r * 0.07));
+    if (ph) {
+      ctx.globalAlpha = 0.62;
+      ellipse(ctx, x, y - r * 0.04, r * 0.94, r * 0.40, kit.main);
+      ctx.globalAlpha = 1;
+      ring(ctx, x, y - r * 0.04, r, r * 0.42, 'rgba(255,255,255,0.55)', Math.max(1.5, r * 0.10));
+    } else {
+      ring(ctx, x, y - r * 0.04, r, r * 0.42, 'rgba(255,255,255,0.30)', Math.max(1, r * 0.07));
+    }
 
     if (o.hasBall) {
       ring(ctx, x, y - r * 0.05, r * 1.15, r * 0.42, shade(kit.main, 0.38), Math.max(1.5, r * 0.09));
@@ -553,11 +583,21 @@
       }
     }
 
-    var img = bake(charId, team, view, pose, f);
-    ctx.translate(x, y);
-    if (mirror) ctx.scale(-1, 1);
-    ctx.drawImage(img, -CX * S * WIDEN, -(BASE + 1) * S * FLATTEN, GW * S * WIDEN, GH * S * FLATTEN);   // 납작하고 넓적하게
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (ph) {
+      var F = r * PHOTO_SCALE;
+      ctx.imageSmoothingEnabled = true;
+      ctx.translate(x, y + r * 0.06);          // 발이 판정 원반 위에 놓이게 살짝 내린다
+      if (mirror) ctx.scale(-1, 1);
+      ctx.drawImage(ph, -F / 2, -F, F, F);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+    } else {
+      var img = bake(charId, team, view, pose, f);
+      ctx.translate(x, y);
+      if (mirror) ctx.scale(-1, 1);
+      ctx.drawImage(img, -CX * S * WIDEN, -(BASE + 1) * S * FLATTEN, GW * S * WIDEN, GH * S * FLATTEN);   // 납작하고 넓적하게
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
 
     if (o.charge > 0) {
       var k = o.charge > 1 ? 1 : o.charge;
@@ -591,14 +631,14 @@
   }
 
   global.SoccerSprite = {
-    STYLE: '납작한 종이 도트(정사각형에 가깝게)',
+    STYLE: '손그림 캐릭터(chars/*.png). 파일이 없으면 납작한 종이 도트로 폴백',
     CHARACTERS: [
-      { id: 0, key: 'captain',  name: '체육부장형',   look: '노란 머리띠와 호루라기, 어깨가 벌어진 다부진 체형' },
-      { id: 1, key: 'ace',      name: '에이스형',     look: '긴 갈색 머리에 완장, 흰 축구화와 등번호 10' },
-      { id: 2, key: 'transfer', name: '전학생형',     look: '목이 길고 마른 장신, 안경과 단정한 가르마' },
-      { id: 3, key: 'big',      name: '덩치형',       look: '어깨가 두 배로 넓은 거구, 짧은 스포츠머리' },
-      { id: 4, key: 'runner',   name: '육상부형',     look: '가늘고 긴 다리, 러닝셔츠와 주황 헤드밴드' },
-      { id: 5, key: 'prank',    name: '장난꾸러기형', look: '작고 통통한 몸에 큰 머리, 삐친 머리와 능글맞은 웃음' }
+      { id: 0, key: 'captain',  name: '체육부장형',   look: '뾰족한 남색 머리, 목에 건 호루라기, 야무진 눈매' },
+      { id: 1, key: 'ace',      name: '에이스형',     look: '갈색 포니테일, 주황 머리끈, 단정한 유니폼' },
+      { id: 2, key: 'transfer', name: '전학생형',     look: '동그란 안경과 가방을 멘 전학 첫날 차림' },
+      { id: 3, key: 'big',      name: '덩치형',       look: '떡 벌어진 몸집에 짧은 스포츠머리, 느긋한 표정' },
+      { id: 4, key: 'runner',   name: '육상부형',     look: '노란 머리에 주황 머리띠, 소매 없는 러닝셔츠' },
+      { id: 5, key: 'prank',    name: '장난꾸러기형', look: '머리 위로 묶은 상투와 주황 띠, 장난기 어린 웃음' }
     ],
     draw: draw
   };

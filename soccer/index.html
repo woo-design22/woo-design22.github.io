@@ -88,6 +88,12 @@
   .panel .chars button { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.18);
     background: transparent; color: var(--muted); cursor: pointer; }
   .panel .chars button.sel { border-color: var(--accent); color: var(--text); background: rgba(34,197,94,0.16); }
+  .panel .tabs { display: flex; gap: 6px; justify-content: center; margin: 12px 0 6px; }
+  .panel .btn.sel { border-color: var(--accent); color: var(--text); background: rgba(34,197,94,0.16); }
+  .panel .sides { margin-bottom: 6px; }
+  .panel .sides .row { margin: 6px 0; gap: 5px; }
+  .panel .sides label { font-size: 12.5px; color: var(--muted); }
+  .panel .sideinfo { font-size: 12.5px; color: var(--muted); min-height: 1.4em; margin-bottom: 4px; }
   .panel .ultinfo { font-size: 13px; color: var(--muted); min-height: 20px; margin-bottom: 12px; }
   .panel .ultinfo b { color: var(--ult); }
   .panel .final { font-size: 36px; font-weight: 800; margin: 6px 0 12px; }
@@ -198,6 +204,19 @@
     <div class="final" id="ovFinal" style="display:none"></div>
     <div class="chars" id="ovChars"></div>
     <div class="ultinfo" id="ovUlt"></div>
+    <div class="sides">
+      <div class="tabs">
+        <button class="btn sm" id="tabEven" type="button">대칭</button>
+        <button class="btn sm" id="tabOdd" type="button">비대칭</button>
+      </div>
+      <div class="row" id="sideEven"></div>
+      <div class="row" id="sideOdd" style="display:none">
+        <label for="ovA">우리 편</label><select id="ovA"></select>
+        <label>대</label>
+        <select id="ovB"></select><label for="ovB">상대</label>
+      </div>
+      <div class="sideinfo" id="ovSides"></div>
+    </div>
     <button class="start" id="ovStart">혼자 하기</button>
     <button class="btn" id="ovOnline" type="button" style="margin-top:8px">여러 명이서 하기</button>
     <button class="sndtest" id="ovSndTest" type="button">소리 시험</button>
@@ -278,7 +297,7 @@
     remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   var SETTINGS_KEY = 'soc_settings';
-  var settings = { interpMs: 100, char: 0, minimap: true, sfx: true, bgm: true };
+  var settings = { interpMs: 100, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even' };
   try {
     var saved = JSON.parse(store.get(SETTINGS_KEY) || '{}');
     if (saved && typeof saved === 'object') {
@@ -407,7 +426,7 @@
     if (PREVENT[e.code]) e.preventDefault();
     keys[e.code] = true;
     if (overlayMode) {
-      if (e.code === 'Enter') startPractice({ char: settings.char });
+      if (e.code === 'Enter') startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB });
       else if (e.code.indexOf('Digit') === 0) { var n = +e.code.slice(5); if (n >= 1 && n <= 6) selectChar(n - 1); }
     }
   });
@@ -649,15 +668,32 @@
         var fade = 1 - Math.min(1, animPhase(p, now));
         ctx.save();
         ctx.translate(x, y); ctx.rotate(p.facing);   // 보간을 껐으므로 판정에 쓰인 방향과 같다
-        ctx.globalAlpha = 0.18 + 0.24 * fade;
-        ctx.fillStyle = COLOR.fart; ctx.fillRect(-2 * half, -half, 2 * half, 2 * half);
-        ctx.globalAlpha = 0.55 + 0.4 * fade;
-        ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
-        ctx.strokeRect(-2 * half, -half, 2 * half, 2 * half);
+        var fx = fartImg();
+        if (fx) {
+          // 그림을 판정 사각형에 **정확히 맞춰** 늘린다 — 보이는 것이 곧 맞는 범위여야 한다
+          ctx.globalAlpha = 0.55 + 0.45 * fade;
+          ctx.drawImage(fx, -2 * half, -half, 2 * half, 2 * half);
+          ctx.globalAlpha = 0.30 + 0.35 * fade;
+          ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
+          ctx.strokeRect(-2 * half, -half, 2 * half, 2 * half);
+        } else {
+          ctx.globalAlpha = 0.18 + 0.24 * fade;
+          ctx.fillStyle = COLOR.fart; ctx.fillRect(-2 * half, -half, 2 * half, 2 * half);
+          ctx.globalAlpha = 0.55 + 0.4 * fade;
+          ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
+          ctx.strokeRect(-2 * half, -half, 2 * half, 2 * half);
+        }
         ctx.restore();
       }
       label(isMe ? '나' : String(p.slot + 1), x, y - R * 2.9, isMe ? COLOR.text : COLOR.muted);
     }
+  }
+  /* 방귀 그림(chars/fart-effect.png). 없으면 예전처럼 색 사각형으로 그린다. */
+  var fartIm = null;
+  function fartImg() {
+    if (typeof Image === 'undefined') return null;
+    if (!fartIm) { fartIm = new Image(); fartIm.src = 'chars/fart-effect.png'; return null; }
+    return (fartIm.complete && fartIm.naturalWidth > 0) ? fartIm : null;
   }
   function charOfSlot(slot) {
     // 연습장은 로컬 상태에서, 온라인은 방 정보에서 읽는다(온라인은 서버만 state 를 갖는다)
@@ -780,6 +816,54 @@
   }
   var overlayMode = true;
   function selectChar(i) { settings.char = i; saveSettings(); renderOverlay(); }
+  /* 혼자 하기 인원 고르기 — 대칭(1:1~10:10)과 비대칭(1:10~10:1) 두 갈래.
+     전체 20명이 상한이라 10:10 이 꼭 들어맞는다. 고른 값은 soc_settings 에 남는다. */
+  var SIDE_MAX = 10;
+  function clampSides() {
+    settings.teamA = Math.min(SIDE_MAX, Math.max(1, settings.teamA | 0 || 1));
+    settings.teamB = Math.min(SIDE_MAX, Math.max(1, settings.teamB | 0 || 1));
+  }
+  function buildSides() {
+    var even = $("sideEven"), a = $("ovA"), b = $("ovB"), n;
+    for (n = 1; n <= SIDE_MAX; n++) (function (n) {
+      var t = document.createElement("button");
+      t.className = "btn sm"; t.type = "button"; t.textContent = n + ":" + n;
+      t.addEventListener("click", function () {
+        settings.teamA = n; settings.teamB = n; saveSettings(); renderSides();
+      });
+      even.appendChild(t);
+    })(n);
+    for (n = 1; n <= SIDE_MAX; n++) {
+      a.appendChild(new Option(n + "명", n));
+      b.appendChild(new Option(n + "명", n));
+    }
+    a.addEventListener("change", function () { settings.teamA = +a.value; saveSettings(); renderSides(); });
+    b.addEventListener("change", function () { settings.teamB = +b.value; saveSettings(); renderSides(); });
+    $("tabEven").addEventListener("click", function () {
+      settings.sideTab = "even";
+      if (settings.teamA !== settings.teamB) settings.teamB = settings.teamA;   // 대칭 탭으로 오면 맞춘다
+      saveSettings(); renderSides();
+    });
+    $("tabOdd").addEventListener("click", function () { settings.sideTab = "odd"; saveSettings(); renderSides(); });
+  }
+  function renderSides() {
+    if (!$("sideEven").children.length) buildSides();   // 처음 한 번만 만든다
+    clampSides();
+    var odd = settings.sideTab === "odd";
+    $("tabEven").className = "btn sm" + (odd ? "" : " sel");
+    $("tabOdd").className = "btn sm" + (odd ? " sel" : "");
+    $("sideEven").style.display = odd ? "none" : "";
+    $("sideOdd").style.display = odd ? "" : "none";
+    var kids = $("sideEven").children;
+    for (var i = 0; i < kids.length; i++) {
+      var on = !odd && settings.teamA === i + 1 && settings.teamB === i + 1;
+      kids[i].className = "btn sm" + (on ? " sel" : "");
+    }
+    $("ovA").value = settings.teamA; $("ovB").value = settings.teamB;
+    var mates = settings.teamA - 1;
+    $("ovSides").textContent = settings.teamA + " 대 " + settings.teamB + " — " +
+      (mates > 0 ? "나 + 인공지능 " + mates + "명" : "나 혼자") + " vs 인공지능 " + settings.teamB + "명";
+  }
   function renderOverlay() {
     var chars = $('ovChars'); chars.innerHTML = '';
     core.CHARACTERS.forEach(function (ch, i) {
@@ -789,6 +873,7 @@
       b.addEventListener('click', function () { selectChar(i); });
       chars.appendChild(b);
     });
+    renderSides();
     var sel = core.CHARACTERS[settings.char];
     $('ovUlt').innerHTML = '필살기 <b>' + sel.ult.name + '</b> — ' + ultDesc(sel) +
       ' · 속도 ×' + sel.speed.toFixed(2) + ' · 슛 ×' + sel.shot.toFixed(2);
@@ -821,7 +906,9 @@
     renderOverlay();
   }
   function hideOverlay() { overlayMode = false; $('overlay').classList.remove('show'); }
-  $('ovStart').addEventListener('click', function () { startPractice({ char: settings.char }); });
+  $('ovStart').addEventListener('click', function () {
+    startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB });
+  });
   $('ovOnline').addEventListener('click', function () {
     audio.unlock();
     $('lbNick').value = store.get('soc_nick') || '';
@@ -1296,10 +1383,11 @@
         if (d) { d.x = 820 + (i % 3) * 70; d.y = 320 + Math.floor(i / 3) * 120 + (i % 3) * 60; }
       }
     } else {
-      core.addPlayer(state, 1, 0, (charId + 3) % 6);      // 우리 편 인공지능
-      core.addPlayer(state, 2, 1, (charId + 1) % 6);      // 상대 둘
-      core.addPlayer(state, 3, 1, (charId + 4) % 6);
-      aiSlots = [1, 2, 3];
+      // 우리 편 A 명(나 + 인공지능), 상대 B 명. 슬롯은 0..A-1 이 팀0, A..A+B-1 이 팀1.
+      var A = Math.min(10, Math.max(1, opts.teamA || 2));
+      var B = Math.min(10, Math.max(1, opts.teamB || 2));
+      for (i = 1; i < A; i++) { core.addPlayer(state, i, 0, (charId + 2 + i) % 6); aiSlots.push(i); }
+      for (i = 0; i < B; i++) { core.addPlayer(state, A + i, 1, (charId + 1 + i) % 6); aiSlots.push(A + i); }
       core.AI.reset();
     }
     core.startMatch(state);

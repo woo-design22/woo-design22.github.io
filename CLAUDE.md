@@ -52,6 +52,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   공통 틀의 정본은 `docs/dot-rpg-engine.md`. **게임을 만들거나 고치면 대사집을 반드시 함께 낸다** —
   `python tools/extract_script.py <폴더>` 가 `<폴더>/대사집.txt` 를 만든다(다섯 게임 공용).
   공통 틀의 정본은 `docs/dot-rpg-engine.md` — 새 도트 RPG를 만들기 전에 반드시 먼저 읽는다.
+- `ai-council/index.html` — 「AI 회의실」: **회사가 다른 모델들을 한 방에 앉히고 순번제로 토론시킨 뒤**
+  그 결과를 PPT 개요(.md)로 뽑는다. 그 파일을 클로드 코드에 넘기면 pptx 스킬이 진짜 파일을 만든다.
+  기본 3인이 GPT-5.6 Sol · 클로드 Opus 5 · 제미나이 3.7 Flash 로 서로 다른 회사다.
+  연결은 두 갈래 — **오픈라우터**(모델 344개를 목록 API 로 직접 받아 온다) 또는 앤트로픽 직통(클로드만).
+  **자리마다 모델과 노력도(생각의 깊이)를 따로 정한다.**
+  웹에 올라가 있지만 **대문(랜딩)에는 올리지 않는다** — 주소를 아는 사람만, 그것도 비밀번호를 넣어야 들어간다
+  (couple-rpg·europe-rpg 와 같은 방식). https://woo-design22.github.io/ai-council/
 - `voxel-world/` — 복셀 샌드박스 (진행 중, 다중 파일). 규칙·상수·단계는
   `voxel-world/CLAUDE.md`(설계도) → `ROADMAP.md`(단계) → `HANDOFF.md`(일지) 순으로 읽고,
   충돌 시 그쪽 문서가 이 문서보다 우선한다.
@@ -95,6 +102,7 @@ python -m http.server 8765
 - http://localhost:8765/goth-rpg/ (판매 데모, 비밀번호 0000, `?debug=1` 훅)
 - http://localhost:8765/iso-faces/ (`?debug=1`이면 `window.BD` 훅)
 - http://localhost:8765/lucky-day/ (`?debug=1`이면 `window.LD` 훅)
+- http://localhost:8765/ai-council/ (오픈라우터 키(`sk-or-…`) 또는 앤트로픽 키가 있어야 회의가 돈다. `?debug=1`이면 `window.AC` 훅)
 - http://localhost:8765/event-price/
 - http://localhost:8765/voxel-world/?debug=1
 - http://localhost:8765/soccer/ (혼자 하기 = 인공지능과 2:2. 온라인은 `cd soccer/server && npm start` → http://localhost:8080/)
@@ -126,7 +134,7 @@ python -m http.server 8765
 **새로운 영속 상태도 반드시 `store`를 통해야 한다.**
 
 사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`,
-`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `gt_*`(goth-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
+`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `council_*`(AI 회의실), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `gt_*`(goth-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
 `file://`에서는 모든 앱이 같은 localStorage 네임스페이스를 쓰므로 접두사가 충돌 방지 수단이다.
 
 ## 앱별 구조
@@ -285,6 +293,78 @@ counsel-chat 안에 "worker.js의 MODES와 같이 고칠 것" 주석이 있다 �
   `RED_FLAGS`에 걸리면 앱 쪽에서도 119 카드를 먼저 띄운다. 이 문구들을 완화하지 말 것.
 - `store` 키: `counsel_*`(consent/key/messages/mode/model), `emg_*`(consent/messages).
   `*_consent`는 첫 사용 동의 기록 — 지우면 동의 화면이 다시 뜬다.
+
+### ai-council (AI 회의실)
+
+회사가 다른 모델들을 한 방에 앉혀 순번제로 토론시키고, 서기 한 명이 회의록을 PPT 개요로 정리한다.
+counsel-chat 과 같은 BYOK 구조지만 상담이 아니라 **모델끼리 대화시키는 것**이 목적이다.
+
+- **회의록은 평문 한 덩어리다. 이 앱의 뼈대다.** `[이름]: 발언` 을 이어 붙여 `messages` 에 **user 하나로** 넣는다.
+  남의 발언을 `assistant` 로 옮기지 않는 이유가 있다 — 벤더마다 role 교대 규칙이 달라 400 이 난다.
+  평문이면 어떤 모델에든 똑같이 먹으므로 **회의 로직은 벤더를 모른다.** 실제로 GPT·제미나이를 끼울 때
+  루프는 한 줄도 안 고쳤다. 길어지면 앞부분을 잘라내고 「…(앞부분 생략)…」을 붙인다
+  (요약을 부르면 그것도 호출이라 비용이 또 는다).
+- **모델 표를 손으로 적지 않는다.** `https://openrouter.ai/api/v1/models`(키 불필요, 공개)를 받아
+  `council_cat` 에 하루 캐시한다. 값·출력 상한뿐 아니라 **모델마다 지원하는 노력도 목록**
+  (`reasoning.supported_efforts`)과 **생각을 못 끄는지**(`reasoning.mandatory`)까지 여기서 온다.
+  실측(2026-08-26): 대화용 344개 / 53개 회사 / **67개는 생각을 못 끈다**(제미나이 3.7 Flash·그록 4.6 포함).
+  손으로 적은 `OR_FALLBACK` 은 `file://`·오프라인용 폴백일 뿐 정본이 아니다.
+- **노력도는 자리마다 따로 정한다.** `effortsFor(id)` 가 그 모델이 실제로 받는 값만 골라 준다 —
+  없는 값을 보내면 400 이다. 특수 값 둘: `off` 는 생각 끄기(`reasoning:{enabled:false}`),
+  `default` 는 **아무것도 안 보내기**(단계를 안 알려 주는 모델용). 못 끄는 모델에는 `off` 를 안 보여 준다.
+  모델을 바꾸면 `fixEffort()` 가 저장된 노력도를 가장 가까운 단계로 끌어온다.
+  `max_tokens` 는 `EFFORT_TOKENS` 로 노력도에 비례해 잡고 모델의 출력 상한으로 자른다 —
+  **생각 토큰도 이 예산에서 나가므로 깊을수록 넉넉해야 발언이 안 잘린다.**
+- **벤더 차이는 `PROVIDERS` 두 개에만 갇혀 있다.** `buildRequest()` 와 `handleChunk()` 가 유일한 갈림길이다.
+  - `openrouter` — OpenAI 호환. `chat/completions`, `Authorization: Bearer`, SSE 는 `choices[0].delta.content`.
+    `reasoning:{effort}` 로 회사별 차이를 오픈라우터가 흡수한다. `usage:{include:true}` 를 줘야
+    마지막 조각에 실제 토큰 수가 실린다. **주의 두 가지** — 살아 있다는 표시로 `: OPENROUTER PROCESSING`
+    주석 줄이 섞여 오므로 `data:` 로 시작하는 줄만 먹어야 하고, `delta.reasoning` 은 발언이 아니라 생각이라 버려야 한다.
+    `X-Title` 헤더에 **한글을 넣으면 fetch 가 막는다**(비ASCII 헤더) — 영문으로 둔다.
+  - `anthropic` — 직통. 여기서는 모델마다 받는 파라미터가 달라 한 모양으로 보내면 400 이다:
+    Haiku 4.5 는 `output_config.effort` 를 모르고, **Fable 5 는 `thinking:{type:'disabled'}` 를 거부**하며
+    (그래서 항상 생각하고 `max_tokens` 를 넉넉히 줘야 발언이 안 잘린다 — `tokensFor()`),
+    `fallbacks` 는 Opus 5·Fable 5 에만 얹는다. **`temperature`·`top_p` 는 Opus 5/Sonnet 5/Fable 5 에서 제거됐다(400)** —
+    발언의 다양성은 파라미터가 아니라 역할 프롬프트로 벌린다.
+- 생각을 끈 자리는 지시문의 「내부나 시스템의 XML 태그를 넣지 않는다」가 지킨다
+  (생각을 끄면 태그가 새는 일이 있다). 발언이 비어 오면 대개 **생각만 하다 예산이 끝난 것**이라
+  `stop_reason` 을 보고 "노력도를 낮추라"고 화면에 알려 준다.
+- **폭주 방어선이 여러 겹**인 이유는 모델끼리 대화시키면 토큰이 곱셈으로 늘기 때문이다:
+  자리 5개 · 총 호출 40회 · 회의록 7,000자 · 발언 `max_tokens` 상한 · 중지 버튼(AbortController).
+  비용 표시는 어림이 아니라 **API 의 `usage` 실측**이다 — 이 앱에서 그건 장식이 아니라 안전장치다.
+  실측이 안 오면 글자 수로 어림하고 `≈` 를 붙여 표시한다(0 으로 보이는 것보다 낫다).
+  **최후의 방어선은 코드가 아니라 각 사이트의 지출 상한**이다.
+- **중지하면 개요를 자동으로 만들지 않는다.** 중지는 "돈을 그만 쓰겠다"는 뜻이라 곧바로 또 부르면
+  그 뜻을 배반한다. 버튼을 놓아 두고 누를 때만 부른다. 발언 도중에 끊긴 경우(AbortError)도 같은 처리다.
+- **모델은 344개라 `<select>` 로는 못 고른다.** 검색창 달린 고르기 창(`#picker`)을 쓴다 —
+  회사별로 묶고, 자주 쓰는 회사(`VENDOR_TOP`)를 위로, 「제미나이」 같은 한글 회사명으로도 찾힌다.
+  한 번에 260개까지만 그린다(전부 그리면 느려진다).
+- 오픈라우터는 토큰값에 마진을 안 붙이고 각 회사 정가를 통과시킨다 — 대신 **충전할 때 5.5%**
+  (카드, 최소 $0.80)를 뗀다. 토큰 단가가 아니라 환전 수수료다. **키마다 Credit limit** 을 걸 수 있고
+  그게 이 앱에서 가장 확실한 지출 상한이다.
+- **조사는 `josa()` 로 고른다.** 참가자 이름을 사용자가 바꾸므로 "가/이"를 고정할 수 없다.
+  한글 음절(0xAC00~)에서 28로 나눈 나머지가 받침 유무다.
+- 이름을 타자 치는 중에 `renderSeats()` 를 다시 부르면 **입력칸이 새로 그려져 초점을 잃는다.**
+  그래서 이름 핸들러는 얼굴·서기 목록·빈 방 안내만 손으로 갈아 준다.
+- **자물쇠**: `PASS_HASH`(SHA-256, 소금 `ai-council:`)가 비어 있지 않으면 잠긴다. 비밀번호 원문은 파일에 없다.
+  **SHA-256 을 직접 구현한 이유**는 `crypto.subtle` 이 안전한 문맥에서만 열려서다 —
+  집 규칙이 `file://` 에서도 돌아가야 한다고 정해 놨으므로 거기 의존을 두면 자물쇠가 통째로 죽는다
+  (`crypto.subtle` 과 네 가지 시험값으로 대조해 일치 확인).
+  **다섯 번 안에 맞혀야 하고**, 다 틀리면 `LOCK_MINUTES` 대로 5→10→15→20→30→60분으로 길어지며 한 시간에서 멈춘다.
+  잠긴 시각은 `council_gate` 에 남겨 **새로고침으로 못 풀게** 한다(잠긴 동안엔 정답도 안 통한다).
+  잠금이 풀렸을 때 옛 문구를 지우지 않으면 "아직 잠겼다"고 읽힌다 — `wasLocked` 가 그 자리를 메운다.
+  **비밀번호는 처음 정한 것으로 고정이다.** `?setpass=1` 생성기는 `localhost`·`file://` 에서만 열리므로
+  웹에 올라간 판에는 바꾸는 통로가 아예 없다. 바꾸려면 소스의 `PASS_HASH` 를 고쳐 다시 올려야 한다.
+  분명히 해 둘 것 — 이건 화면을 가리는 문턱이지 서버가 막는 것이 아니다.
+- **누계(`council_total`)는 회의가 끝나도 남는다.** 이 앱에서 "얼마나 썼나"는 이번 판이 아니라
+  지금까지 전부가 궁금한 숫자다. 모델별로도 나눠 둔다("어느 자리가 돈을 먹는지"가 실제 질문이라서).
+  시작일은 **`toISOString()` 을 쓰지 않는다** — UTC 로 바꿔 버려 자정 근처에 하루가 밀린다(실제로 26일에 25일로 찍혔다).
+- `store` 키: `council_prov`, `council_key_<프로바이더>`, `council_seats_<프로바이더>`,
+  `council_topic`, `council_cat`(모델 목록 캐시), `council_total`(누계), `council_unlock`·`council_gate`(자물쇠).
+  키와 자리를 프로바이더별로 나눠 둬야 오가며 써도 안 섞인다.
+  `?debug=1` 이면 `window.AC` — `S`·`ready`(목록 로딩 약속)·`run()`·`transcript()`·`prov(id)`·
+  `M(id)`·`efforts(id)`·`reload()`·`req(모델, 노력도)`. **`req` 는 실제 호출과 같은 경로로 만든다** —
+  여기만 다르게 두면 검증이 거짓말을 한다(한 번 그래서 Fable 의 `max_tokens` 오류를 놓칠 뻔했다).
 
 ### sand-mix (샌드믹스)
 

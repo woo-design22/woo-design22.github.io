@@ -134,17 +134,17 @@
     { id: 0, key: 'captain',  name: '체육부장형',   speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '집합 호루라기', kind: 'stunWave', radius: 200, stunTicks: 24, durTicks: 12 } },
     // 대포알은 시간이 아니라 "다음 슛 한 발"을 강화한다. 5초 안에 쏘지 않으면 사라진다.
-    { id: 1, key: 'ace',      name: '에이스형',     speed: 1.00, shot: 1.25, kickRange: 0.90,
+    { id: 1, key: 'ace',      name: '에이스형',     speed: 1.00, shot: 1.00, kickRange: 0.90,
       ult: { name: '대포알',       kind: 'power',    shotMul: 1.55, durTicks: 100, oneShot: true } },
     { id: 2, key: 'transfer', name: '전학생형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '슬쩍 이동',    kind: 'blink',    dist: 240, durTicks: 12 } },
-    { id: 3, key: 'big',      name: '덩치형',       speed: 1.00, shot: 1.10, kickRange: 1.40,
+    { id: 3, key: 'big',      name: '덩치형',       speed: 1.00, shot: 1.00, kickRange: 1.40,
       ult: { name: '황소 돌진',    kind: 'charge',   speedMul: 1.45, stunTicks: 16, durTicks: 60 } },
     // 질주는 공을 몰고 있을 때는 배율이 낮다(carryMul) — 혼자 필드를 종단해 버리지 못하게
-    { id: 4, key: 'runner',   name: '육상부형',     speed: 1.00, shot: 0.85, kickRange: 0.90,
+    { id: 4, key: 'runner',   name: '육상부형',     speed: 1.00, shot: 1.00, kickRange: 0.90,
       ult: { name: '전력 질주',    kind: 'dash',     speedMul: 1.60, carryMul: 1.25, durTicks: 100 } },
     // 장판은 발동한 자리에 고정된다(시전자를 따라다니지 않는다)
-    { id: 5, key: 'prank',    name: '장난꾸러기형', speed: 1.00, shot: 0.95, kickRange: 1.00,
+    { id: 5, key: 'prank',    name: '장난꾸러기형', speed: 1.00, shot: 1.00, kickRange: 1.00,
       ult: { name: '미끄러운 잔디', kind: 'slow',    radius: 190, speedMul: 0.60, durTicks: 100 } }
   ];
 
@@ -174,6 +174,49 @@
   }
 
   // ── 상태 ─────────────────────────────────────────────────────────────────
+  function newStats() {
+    var a = new Array(C.MAX_PLAYERS);
+    for (var i = 0; i < C.MAX_PLAYERS; i++) a[i] = { g: 0, s: 0, d: 0 };
+    return a;
+  }
+  /* 결정적 수비 — **우리 진영 3분의 1 안에서** 상대의 공을 끊었을 때만 센다.
+     아무 데서나 때려 흘린 것까지 세면 발차기 연타가 곧 수비 기록이 되어 숫자가 의미를 잃는다
+     (실측 3분 3:3 — 제한 없음 11개 → 우리 진영 절반 18개 → 우리 진영 3분의 1 로 좁혔다). */
+  function noteDefence(state, slot) {
+    var p = state.players[slot];
+    if (!p) return;
+    var third = C.FIELD_W / 3;   // 우리 진영 3분의 1 안 — 여기서 끊어야 '결정적'이다
+    var own = sideOf(state, p.team) === 0 ? state.ball.x < third : state.ball.x > C.FIELD_W - third;
+    if (own) note(state, slot, 'd');
+  }
+  function note(state, slot, key) {
+    if (slot == null || slot < 0 || slot >= C.MAX_PLAYERS) return;
+    if (!state.stats) state.stats = newStats();
+    state.stats[slot][key]++;
+  }
+  /* 상황판에 실어 보낼 표. 지금 뛰고 있는 선수 중 기록이 있는 사람만 담는다. */
+  function statTable(state) {
+    var out = [];
+    if (!state.stats) return out;
+    for (var i = 0; i < C.MAX_PLAYERS; i++) {
+      var st = state.stats[i], p = state.players[i];
+      if (!st || (!st.g && !st.s && !st.d)) continue;
+      out.push({ slot: i, team: p ? p.team : -1, g: st.g, s: st.s, d: st.d });
+    }
+    return out;
+  }
+  /* MOM — 골 5점, 유효슈팅 2점, 결정적 수비 2점. 같으면 골 많은 쪽, 그다음 슬롯 순.
+     이긴 팀에 1점을 더 얹는다(같은 기록이면 이긴 팀 선수가 뽑히도록). */
+  function pickMom(state) {
+    var t = statTable(state), best = null, bestV = -1;
+    var win = state.score[0] === state.score[1] ? -1 : (state.score[0] > state.score[1] ? 0 : 1);
+    for (var i = 0; i < t.length; i++) {
+      var r = t[i];
+      var v = r.g * 5 + r.s * 2 + r.d * 2 + (r.team === win ? 1 : 0);
+      if (v > bestV || (v === bestV && best && r.g > best.g)) { bestV = v; best = r; }
+    }
+    return best ? { slot: best.slot, team: best.team, g: best.g, s: best.s, d: best.d, score: bestV } : null;
+  }
   function createState(opts) {
     opts = opts || {};
     var halfSec = opts.halfSec || 180;   // 전·후반 각 3분 (2026-08-25 사용자 지시). 세리머니·킥오프 정지 중에는 clock 이 줄지 않는다
@@ -192,6 +235,9 @@
               owner: -1, lastKicker: -1, kickCd: 0, keeperCd: 0 },
       keepers: [{ side: 0, y: C.FIELD_H / 2, hitT: 0 }, { side: 1, y: C.FIELD_H / 2, hitT: 0 }],
       players: players,
+      // 경기 기록 — 슬롯마다 { g 골, s 유효슈팅, d 결정적 수비 }.
+      // 하프타임·종료 때 이벤트에 실어 보내 상황판을 띄운다(스냅샷에는 넣지 않는다 — 매 틱 보낼 값이 아니다).
+      stats: newStats(),
       events: []
     };
   }
@@ -288,6 +334,7 @@
   function startMatch(state) {
     state.half = 1;
     state.score[0] = 0; state.score[1] = 0;
+    state.stats = newStats();
     state.clock = state.halfTicks;
     state.kickoffTeam = 0;
     resetPositions(state);
@@ -349,6 +396,9 @@
     v.ult = Math.min(TUNING.ult.fullTicks, v.ult + TUNING.ult.hitBonus);
     if (state.ball.owner === v.slot) {
       var b = state.ball;
+      // 기록: 공을 몰던 상대를 때려 떨어뜨렸으면 결정적 수비 하나
+      var by = state.players[bySlot];
+      if (by && by.team !== v.team) noteDefence(state, bySlot);
       b.owner = -1; b.lastKicker = v.slot; b.kickCd = TUNING.ball.kickCdTicks;
       b.vx = Math.cos(dir) * 120; b.vy = Math.sin(dir) * 120; b.range = 60; b.range0 = 60; b.spin = 0; b.spinLeft = 0;
     }
@@ -532,6 +582,7 @@
           b.x = pos[0]; b.y = pos[1]; b.vx = 0; b.vy = 0; b.range = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
           clampCarried(b);
           a.touchCd = 0;
+          noteDefence(state, a.slot);                                 // 기록: 우리 진영에서 끊었을 때만
           ev.push({ kind: 'steal', slot: a.slot, victim: v.slot });
         }
       }
@@ -606,13 +657,17 @@
         ux = inward * 0.75; uy = uy >= 0 ? 0.66 : -0.66;
         var n = Math.hypot(ux, uy); ux /= n; uy /= n;
       }
+      var shooter = b.lastKicker;                                   // 아래에서 지워지므로 먼저 잡아 둔다
       if (carrier) carrier.touchCd = TUNING.player.touchCdTicks;   // 뺏긴 선수는 바로 다시 못 잡는다
       b.x = gx + ux * (hitR + 1); b.y = gy + uy * (hitR + 1);
       b.vx = ux * K.outSpeed; b.vy = uy * K.outSpeed;
       b.range = K.outRange; b.range0 = K.outRange; b.spin = 0; b.spinLeft = 0; b.owner = -1; b.lastKicker = -1;
       b.kickCd = 0; b.keeperCd = K.outCdTicks;
       state.keepers[k].hitT = 6;
-      ev.push({ kind: 'keeperSave', side: k, steal: carrier ? 1 : 0 });
+      // 기록: 골키퍼가 막았다 = 골문으로 갔다는 뜻이므로 **찬 선수에게 유효슈팅** 하나.
+      // (몰고 들어오다 뺏긴 것은 슈팅이 아니므로 세지 않는다.)
+      if (!carrier && shooter >= 0 && state.players[shooter] && sideOf(state, state.players[shooter].team) !== k) note(state, shooter, 's');
+      ev.push({ kind: 'keeperSave', side: k, steal: carrier ? 1 : 0, shooter: carrier ? -1 : shooter });
       return;
     }
   }
@@ -813,6 +868,9 @@
       var g = p.team === team ? TUNING.ult.goalScored : TUNING.ult.goalConceded;
       p.ult = Math.min(TUNING.ult.fullTicks, p.ult + g);
     }
+    // 기록: 넣은 선수에게 골 하나와 유효슈팅 하나. 자책골(내 팀 골대)은 아무에게도 주지 않는다.
+    var sc = state.players[b.lastKicker];
+    if (sc && sc.team === team) { note(state, b.lastKicker, 'g'); note(state, b.lastKicker, 's'); }
     ev.push({ kind: 'goal', team: team, scorer: b.lastKicker, score: [state.score[0], state.score[1]] });
   }
 
@@ -822,8 +880,8 @@
       case PHASE.PLAY:
         if (--state.clock <= 0) {
           state.clock = 0;
-          if (state.half === 1) { state.phase = PHASE.HALF; state.phaseTimer = C.HALF_TICKS; ev.push({ kind: 'half', score: [state.score[0], state.score[1]] }); }
-          else { state.phase = PHASE.END; state.phaseTimer = C.END_TICKS; ev.push({ kind: 'end', score: [state.score[0], state.score[1]] }); }
+          if (state.half === 1) { state.phase = PHASE.HALF; state.phaseTimer = C.HALF_TICKS; ev.push({ kind: 'half', score: [state.score[0], state.score[1]], table: statTable(state) }); }
+          else { state.phase = PHASE.END; state.phaseTimer = C.END_TICKS; ev.push({ kind: 'end', score: [state.score[0], state.score[1]], table: statTable(state), mom: pickMom(state) }); }
         }
         return;
       case PHASE.LOBBY:

@@ -491,11 +491,18 @@ couple-rpg와 같은 챕터형(`CHAPTERS` + `QUESTS.c1~c7`). 공통 엔진은 `d
 - **자막은 전부 원문 그대로다.** 지어낸 문장을 섞지 말 것. `SCRIPT`의 `m` 필드가 "이 구절 → 화면의 무엇"
   대응표이고 화면의 📖 버튼이 그대로 보여 준다.
 
-### android-* (APK 셸 4개)
+### android-* (APK 셸 5개)
 
-웹앱을 WebView로 감싼 안드로이드 앱이 네 개 있고 **구조가 전부 같다**:
+웹앱을 WebView로 감싼 안드로이드 앱이 다섯 개 있고 **구조가 전부 같다**:
 `android-mood-log`(`com.woodesign.moodlog`) · `android-counsel`(`.counsel`) ·
-`android-sandmix`(`.sandmix`) · `android-particle`(`.particle`).
+`android-sandmix`(`.sandmix`) · `android-particle`(`.particle`) · `android-europe`(`.europe`).
+
+**`android-europe`(우리가족 유럽여행)만 다른 점** — 이 앱은 index.html 말고도 음악 2개와
+사진 6장이 필요하다. 사진은 웹판에서 `photos/*.bin`(XOR)이고 `fetch`로 읽는데,
+**WebView가 `file://`로 열리면 fetch가 막혀 사진이 전부 안내 카드로 대체된다.**
+그래서 `prepare_assets.py`가 `.bin`을 원래 `.jpg`로 되돌려 `assets/photos/`에 넣고,
+`build.ps1`이 빌드 전에 그것을 부른다(게임 코드는 한 줄도 고치지 않는다 —
+`showPhoto`가 .bin → .jpg → 안내 카드 순으로 찾기 때문). APK 약 7.7MB.
 새로 만들 때는 가장 가까운 것을 복사해 패키지명·앱 이름·복사해 올 웹앱 경로만 바꾼다.
 
 아래 설명은 `android-mood-log` 기준이고 나머지도 같다.

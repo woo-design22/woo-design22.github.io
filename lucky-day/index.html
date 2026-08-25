@@ -1583,7 +1583,8 @@ const BGM = (function(){
   /* 32걸음 한 도막. null은 쉼. */
   const PHRASE = [5,null,4,null, 3,null,null,2, 3,null,4,null, 2,null,null,null,
                   4,null,3,null, 2,null,1,null, 0,null,null,1, 2,null,null,null];
-  let ac = null, master = null, bed = null, droneG = null;
+  let ac = null, master = null, bed = null, droneG = null, comp = null, ana = null;
+  const anaBuf = new Float32Array(2048);
   let on = store.get(KEY, '1') !== '0';
   let ready = false, nextStep = 0, stepIdx = 0, sceneT = 0;
   const buf = {};
@@ -1614,16 +1615,25 @@ const BGM = (function(){
   }
 
   function build(){
-    master = ac.createGain(); master.gain.value = 0; master.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = 0;
+    /* 마지막에 리미터를 둔다 — 음이 겹칠 때 찌그러지는 걸 막고 체감 크기도 올린다.
+       분석기는 검증용: 소리를 들을 수 없으니 probe()가 실제 출력 레벨을 숫자로 낸다. */
+    comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -12; comp.knee.value = 12; comp.ratio.value = 6;
+    comp.attack.value = 0.004; comp.release.value = 0.25;
+    ana = ac.createAnalyser(); ana.fftSize = 2048;
+    master.connect(comp); comp.connect(ana); ana.connect(ac.destination);
 
-    droneG = ac.createGain(); droneG.gain.value = 0.08;        // 낮게 깔리는 드론
-    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 430;
+    /* 드론. 55Hz 같은 저음은 노트북·휴대폰 스피커가 아예 못 낸다 —
+       들리는 대역(110Hz 위)에 깔아야 한다. */
+    droneG = ac.createGain(); droneG.gain.value = 0.12;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 720;
     droneG.connect(lp); lp.connect(master);
-    [55, 110, 164.81].forEach(function(f, i){
+    [110, 164.81, 220].forEach(function(f, i){
       const o = ac.createOscillator();
       o.type = i === 2 ? 'sine' : 'triangle';
       o.frequency.value = f * (i === 1 ? 1.004 : 1);
-      const g = ac.createGain(); g.gain.value = i === 2 ? 0.12 : 0.30;
+      const g = ac.createGain(); g.gain.value = i === 2 ? 0.14 : 0.30;
       o.connect(g); g.connect(droneG); o.start();
     });
 
@@ -1671,31 +1681,44 @@ const BGM = (function(){
     isReady: function(){ return ready; },
     setOn: function(v){ on = v; store.set(KEY, v ? '1' : '0'); if(v) start(); },
     accent: function(which){                                   // 동전이 떨어질 때 한 음
-      if(ready && on) fire(which === 2 ? buf.hi2 : buf.hi1, ac.currentTime + 0.01, 0.20);
+      if(ready && on) fire(which === 2 ? buf.hi2 : buf.hi1, ac.currentTime + 0.01, 0.75);
     },
-    /* 소리를 들을 수 없는 자동 검증용. 구워 둔 버퍼가 실제로 소리인지(무음이 아닌지),
-       예약이 돌고 있는지를 숫자로 돌려준다. */
+    /* 소리를 들을 수 없을 때 쓰는 검증용.
+       **버퍼가 무음이 아닌지만 보면 안 된다** — 그래 놓고 출력이 -22dBFS라 아무도 못 들은 적이 있다.
+       스피커로 나가는 지점에 분석기를 달아 놓고 실제 레벨을 돌려준다.
+       peakDb가 대략 -14 ~ -6 사이면 정상이다. -20 아래면 너무 작은 것이다. */
     probe: function(){
       if(!ready) return { ready:false };
-      const out = { ready:true, on:on, notes:0, buffers:0, rms:{}, ctx:ac.state, step:stepIdx };
+      ana.getFloatTimeDomainData(anaBuf);
+      let peak = 0, sum = 0;
+      for(let i=0;i<anaBuf.length;i++){ const a = Math.abs(anaBuf[i]); if(a > peak) peak = a; sum += anaBuf[i]*anaBuf[i]; }
+      const rms = Math.sqrt(sum / anaBuf.length);
+      const out = {
+        ready:true, on:on, ctx:ac.state, step:stepIdx,
+        peak:+peak.toFixed(4), rms:+rms.toFixed(4),
+        peakDb:+(20*Math.log10(Math.max(peak,1e-9))).toFixed(1),
+        rmsDb :+(20*Math.log10(Math.max(rms ,1e-9))).toFixed(1),
+        level:+level(sceneT).toFixed(3), buffers:0, ring:{}
+      };
+      /* 뜯는 소리가 실제로 울리는 길이(피크의 2%까지) — 여기가 짧으면 딸깍 소리가 된다 */
       Object.keys(buf).forEach(function(k){
-        const d = buf[k].getChannelData(0);
-        let s = 0, peak = 0;
-        for(let i=0;i<d.length;i+=17){ s += d[i]*d[i]; if(Math.abs(d[i])>peak) peak = Math.abs(d[i]); }
-        out.rms[k] = +Math.sqrt(s / (d.length/17)).toFixed(4);
         out.buffers++;
-        if(peak > 0.01) out.notes++;
+        if(out.buffers > 3 && k !== 'hi1') return;
+        const d = buf[k].getChannelData(0), sr = buf[k].sampleRate;
+        let p = 0; for(let i=0;i<d.length;i+=7){ const a = Math.abs(d[i]); if(a > p) p = a; }
+        let last = 0; const thr = p * 0.02;
+        for(let i=0;i<d.length;i+=7) if(Math.abs(d[i]) > thr) last = i;
+        out.ring[k] = Math.round(last / sr * 1000) + 'ms';
       });
-      out.level = +level(sceneT).toFixed(3);
       return out;
     },
     tick: function(t, playing){
       sceneT = t;
       if(!ready) return;
       const now = ac.currentTime, L = level(t);
-      master.gain.setTargetAtTime(on ? (playing ? 0.55 : 0.18) : 0, now, 0.35);
-      bed.gain.setTargetAtTime(on ? L * 0.05 : 0, now, 0.5);
-      droneG.gain.setTargetAtTime(0.055 + L * 0.085, now, 0.6);
+      master.gain.setTargetAtTime(on ? (playing ? 0.90 : 0.30) : 0, now, 0.35);
+      bed.gain.setTargetAtTime(on ? L * 0.12 : 0, now, 0.5);
+      droneG.gain.setTargetAtTime(0.12 + L * 0.18, now, 0.6);
       if(!on || !playing){ nextStep = Math.max(nextStep, now); return; }
       /* 틱이 한동안 멈췄다면(탭 가림·긴 정지) 밀린 걸음을 몰아서 쏟지 않는다.
          지나간 시각으로 예약하면 그 음들이 한꺼번에 터져 나온다. */
@@ -1704,9 +1727,9 @@ const BGM = (function(){
       while(nextStep < now + 0.3 && guard++ < 4){              // 앞질러 예약해 둔다
         const deg = PHRASE[stepIdx % PHRASE.length];
         if(deg !== null && L > 0.28){
-          fire(buf[SCALE[deg]], nextStep, 0.115 * L);
+          fire(buf[SCALE[deg]], nextStep, 0.55 * L);
           if(L > 0.70 && (stepIdx % 8) === 0)                  // 촘촘할 때만 아래 음을 겹친다
-            fire(buf[SCALE[Math.max(0, deg - 2)]], nextStep, 0.065 * L);
+            fire(buf[SCALE[Math.max(0, deg - 2)]], nextStep, 0.30 * L);
         }
         nextStep += BEAT;
         stepIdx++;

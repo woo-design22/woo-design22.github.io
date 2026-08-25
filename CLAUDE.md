@@ -97,7 +97,7 @@ python -m http.server 8765
 - http://localhost:8765/lucky-day/ (`?debug=1`이면 `window.LD` 훅)
 - http://localhost:8765/event-price/
 - http://localhost:8765/voxel-world/?debug=1
-- http://localhost:8765/soccer/ (혼자 하기 = 인공지능과 2:2. 온라인은 2단계에서 `cd soccer/server && npm start` → http://localhost:8080/)
+- http://localhost:8765/soccer/ (혼자 하기 = 인공지능과 2:2. 온라인은 `cd soccer/server && npm start` → http://localhost:8080/)
 
 테스트 스위트, 린터, 타입 체커가 없다. 변경 검증은 브라우저에서 직접 구동해
 콘솔 에러 확인 + 조작 테스트로 한다. `file://`로 직접 열어도 동작하도록 작성돼

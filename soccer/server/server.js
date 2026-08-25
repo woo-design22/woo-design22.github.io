@@ -21,7 +21,7 @@ const PORT = Number(process.env.PORT || 8080);
 // ── 설정 (§3 지연 게이트·제한) ────────────────────────────────────────────
 const CFG = {
   gate: { pings: 8, everyMs: 100, medianMs: 100, p90Ms: 160, replyMs: 1000 },
-  inMatch: { everyMs: 2000, keep: 10, medianMs: 150, missLimit: 3 },
+  inMatch: { everyMs: 2000, keep: 10, medianMs: 150, missLimit: 3, quietMs: 12000 },
   // perIp: 같은 주소에서의 동시 접속 상한. **로컬(127.0.0.1)은 면제**한다 — 같은 PC 에서 탭 두 개로 붙는 것과
   //          loadtest 가 막히면 안 된다. 공인 IP 에는 그대로 적용된다(환경변수 MAX_PER_IP 로 조절).
   limits: { perIp: Number(process.env.MAX_PER_IP || 4), rooms: 20, nickMin: 2, nickMax: 12, chatLen: 200, chatPerSec: 5, textBytes: 2048, binBytes: 8 },
@@ -283,7 +283,7 @@ function onText(c, m, helloTimer) {
     const t = c.gate.ids.get(m.id);
     if (t !== undefined) { c.gate.ids.delete(m.id); c.gate.rtts.push(Date.now() - t); }
     else if (c.pingId && m.id === c.pingId) {
-      c.rtt = Date.now() - c.pingAt; c.missed = 0;
+      c.rtt = Date.now() - c.pingAt; c.missed = 0; c.lastPongAt = Date.now();
       c.rttHist.push(c.rtt); if (c.rttHist.length > CFG.inMatch.keep) c.rttHist.shift();
     }
     return;
@@ -386,18 +386,26 @@ function finishGate(c) {
   send(c, { t: 'rooms', list: [...rooms.values()].map(roomBrief) });
   startMonitor(c);
 }
-// 접속 뒤에도 계속 지연을 재서 나빠지면 퇴장시킨다
+// 접속 뒤에도 계속 지연을 재서 나빠지면 퇴장시킨다.
+// **경기 중일 때만** 퇴장시킨다 — 로비나 방에서 잠깐 다른 창을 보는 것으로 쫓아내면 안 된다.
+// (2026-08-25: 탭을 옮긴 사이 6초 만에 '응답이 없어 퇴장'이 떴다. 브라우저가 숨은 탭을 얼리면
+//  핑에 답할 수 없는데, 그 사이 3번 놓치는 것만으로 끊겼다.)
 function startMonitor(c) {
+  c.lastPongAt = Date.now();
   c.monTimer = setInterval(() => {
     if (c.ws.readyState !== 1) return;
-    if (c.pingId && c.missed >= 0) {
-      // 이전 핑에 답이 없었다
-      if (Date.now() - c.pingAt > CFG.inMatch.everyMs) c.missed++;
-    }
-    if (c.missed >= CFG.inMatch.missLimit) { kick(c, CLOSE.KICKED, '응답이 없어 퇴장되었습니다'); return; }
-    if (c.rttHist.length >= 4 && median(c.rttHist) > CFG.inMatch.medianMs) {
-      kick(c, CLOSE.KICKED, '지연이 커서 퇴장되었습니다 (중앙값 ' + median(c.rttHist) + 'ms)');
-      return;
+    const r = c.roomId ? rooms.get(c.roomId) : null;
+    const playing = !!(r && r.phase === 'playing');
+    if (playing) {
+      if (Date.now() - c.lastPongAt > CFG.inMatch.quietMs) {
+        kick(c, CLOSE.KICKED, '응답이 없어 퇴장되었습니다'); return;
+      }
+      if (c.rttHist.length >= 4 && median(c.rttHist) > CFG.inMatch.medianMs) {
+        kick(c, CLOSE.KICKED, '지연이 커서 퇴장되었습니다 (중앙값 ' + median(c.rttHist) + 'ms)');
+        return;
+      }
+    } else {
+      c.rttHist.length = 0;   // 경기가 아닐 때 잰 값은 판정에 쓰지 않는다
     }
     c.pingId = (c.pingId % 65535) + 1;
     c.pingAt = Date.now();

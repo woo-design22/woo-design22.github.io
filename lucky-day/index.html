@@ -150,6 +150,7 @@
     <button id="bRe" title="R">⟲ 처음</button>
     <button id="bFree" title="F" aria-pressed="false">👁 자유 시점</button>
     <button id="bMap" title="T" aria-pressed="false">📖 대응표</button>
+    <button id="bSound" title="M" aria-pressed="true">🔊 소리</button>
     <span id="clock">0:00 / 0:00</span>
   </div>
 </div>
@@ -216,16 +217,27 @@ const PAL = {
   rain  :[0.76,0.82,0.88], gold:[0.85,0.70,0.28],  snow:[0.94,0.95,0.97]
 };
 
-/* 사람 팔레트: [옷위, 옷아래, 머리/모자, 신] */
+/* 사람 팔레트.
+   top=저고리/윗옷, bot=바지/치마, head=머리칼(모자가 있으면 모자), shoe=신,
+   skirt=여성 한복(치마+짧은 저고리), western=양복, hat='fedora'|'gat',
+   coat=두루마기, h=키 배수, tie=고름/넥타이 색. */
 const WHO = {
-  kim   : { top:[0.72,0.70,0.62], bot:[0.64,0.61,0.54], head:[0.80,0.78,0.72], shoe:[0.30,0.26,0.21] },
-  lady  : { top:[0.88,0.86,0.82], bot:[0.26,0.30,0.44], head:PAL.hair,          shoe:[0.25,0.22,0.20], skirt:true },
-  teach : { top:[0.14,0.15,0.18], bot:[0.14,0.15,0.18], head:[0.10,0.10,0.12], shoe:[0.09,0.09,0.10], hat:true },
-  pass1 : { top:[0.30,0.28,0.32], bot:[0.22,0.21,0.24], head:PAL.hair, shoe:[0.16,0.15,0.14] },
-  pass2 : { top:[0.78,0.76,0.71], bot:[0.36,0.34,0.40], head:PAL.hair, shoe:[0.20,0.18,0.17], skirt:true },
-  pass3 : { top:[0.20,0.24,0.30], bot:[0.18,0.18,0.20], head:[0.12,0.12,0.14], shoe:[0.12,0.12,0.13], hat:true },
-  pass4 : { top:[0.55,0.50,0.44], bot:[0.40,0.37,0.33], head:PAL.hair, shoe:[0.22,0.20,0.18] },
-  pass5 : { top:[0.84,0.82,0.78], bot:[0.30,0.28,0.26], head:PAL.hair, shoe:[0.19,0.18,0.17], skirt:true }
+  kim   : { top:[0.74,0.72,0.64], bot:[0.66,0.63,0.55], head:[0.16,0.14,0.13],
+            shoe:[0.44,0.36,0.24], h:0.98, tie:[0.60,0.56,0.48] },
+  lady  : { top:[0.90,0.89,0.85], bot:[0.24,0.28,0.42], head:PAL.hair,
+            shoe:[0.26,0.23,0.21], skirt:true, h:0.94, tie:[0.74,0.16,0.20] },
+  teach : { top:[0.15,0.16,0.19], bot:[0.15,0.16,0.19], head:[0.10,0.10,0.12],
+            shoe:[0.09,0.09,0.10], western:true, hat:'fedora', h:1.02, tie:[0.36,0.14,0.16] },
+  pass1 : { top:[0.32,0.30,0.34], bot:[0.24,0.23,0.26], head:PAL.hair,
+            shoe:[0.17,0.16,0.15], coat:[0.28,0.27,0.31], h:1.00 },
+  pass2 : { top:[0.82,0.80,0.75], bot:[0.34,0.32,0.38], head:PAL.hair,
+            shoe:[0.21,0.19,0.18], skirt:true, h:0.95, tie:[0.28,0.40,0.62] },
+  pass3 : { top:[0.20,0.24,0.30], bot:[0.19,0.19,0.21], head:[0.12,0.12,0.14],
+            shoe:[0.12,0.12,0.13], western:true, hat:'fedora', h:1.01, tie:[0.20,0.28,0.40] },
+  pass4 : { top:[0.74,0.72,0.66], bot:[0.44,0.41,0.35], head:[0.15,0.14,0.13],
+            shoe:[0.42,0.35,0.24], hat:'gat', h:0.99, tie:[0.62,0.58,0.50] },
+  pass5 : { top:[0.88,0.86,0.82], bot:[0.32,0.30,0.28], head:PAL.hair,
+            shoe:[0.20,0.19,0.18], skirt:true, h:0.93, tie:[0.66,0.30,0.22] }
 };
 
 /* ══════════════ 4×4 · 3×3 행렬 ══════════════ */
@@ -303,7 +315,11 @@ const MS = (function(){
     rotX(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
              tmp[5]=c; tmp[6]=s; tmp[9]=-s; tmp[10]=c; return api.mulIn(tmp); },
     rotZ(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
-             tmp[0]=c; tmp[1]=s; tmp[4]=-s; tmp[5]=c; return api.mulIn(tmp); }
+             tmp[0]=c; tmp[1]=s; tmp[4]=-s; tmp[5]=c; return api.mulIn(tmp); },
+    /* 균일 크기만 허용한다. 균일하면 법선이 방향은 그대로고 길이만 변해
+       셰이더의 normalize()가 알아서 되돌린다. 축마다 다른 크기는 반드시
+       part()에서 줘야 한다 — 스택에 넣으면 법선 계산이 깨진다. */
+    scaleU(k){ m4.ident(tmp); tmp[0]=tmp[5]=tmp[10]=k; return api.mulIn(tmp); }
   };
   return api;
 })();
@@ -604,6 +620,7 @@ const P = {
   tube : bake(b=>b.cyl(0.5,1,14,[1,1,1],false)),
   cone : bake(b=>b.cone(0.5,0.001,1,14,[1,1,1])),
   skirt: bake(b=>b.cone(0.5,0.22,1,16,[1,1,1])),
+  limb : bake(b=>b.cone(0.40,0.50,1,10,[1,1,1])),   // 아래로 갈수록 가늘어지는 팔·다리
   sph  : bake(b=>b.sph(0.5,12,8,[1,1,1])),
   disc : bake(b=>b.disc(0.5,20))
 };
@@ -833,90 +850,193 @@ for(let x=GATE_X+18; x<SCHOOL_X+8; x+=26) LAMP_POS.push(x);
 
 /* ══════════════ 움직이는 것들 ══════════════ */
 
-/* ── 사람 ── */
+/* ── 사람 ──
+   비례는 머리 하나가 키의 1/6.8쯤. 팔다리는 어깨-팔꿈치, 엉덩이-무릎 두 마디로 꺾이고,
+   옷은 겹쳐 입힌다(저고리 위에 두루마기, 치마 위에 짧은 저고리).
+   한 사람에 마흔 번 가까이 그리므로 **이목구비는 가까울 때만** 그린다.
+   사람은 언제나 제 좌표계의 +Z를 바라본다 — 부르는 쪽에서 dirY로 돌린다. */
+const SKIN_D = [0.66,0.53,0.42];                        // 그늘진 살빛
+/* 삯을 받으려 내민 팔의 [어깨X, 팔꿈치, 어깨Z]. 이 값을 바꾸면 HAND도 다시 재야 한다. */
+const RECV = [-1.15, 0.55, 0.10];
 function drawPerson(who, x, z, dirY, phase, opt){
   opt = opt || {};
   const w = WHO[who] || WHO.pass1;
-  const sw = Math.sin(phase), cw = Math.cos(phase);
-  const moving = opt.moving !== false;
-  const bob = moving ? Math.abs(sw) * 0.035 : 0;
-  const lean = opt.lean || 0;
+  const seated = !!opt.seated;
+  const moving = opt.moving !== false && !seated;
+  const sw = moving ? Math.sin(phase) : 0;
+  const collar = w.collar || [0.94,0.93,0.89];
+  const tie = w.tie || [0.70,0.16,0.20];
+  const coat = opt.coat || w.coat;
+  const dist = opt.dist !== undefined ? opt.dist
+             : Math.hypot(x - camEye[0], 1.4 - camEye[1], z - camEye[2]);
+  const fine = dist < 10;
 
   MS.push();
   MS.move(x, 0, z);
   MS.rotY(dirY);
 
-  /* 발밑 그림자 — 흐린 날이므로 옅고 작게 */
-  gl.depthMask(false);
-  MS.push(); MS.move(0, 0.03, 0);
-    part(P.disc, 1.00, 1, 0.80, [0,0,0], {flat:true, alpha:0.26});
-  MS.pop();
-  gl.depthMask(true);
+  if(!opt.local){                                       /* 발밑 그림자 */
+    gl.depthMask(false);
+    MS.push(); MS.move(0, 0.03, 0);
+      part(P.disc, 0.92, 1, 0.74, [0,0,0], {flat:true, alpha:0.26});
+    MS.pop();
+    gl.depthMask(true);
+  }
 
-  MS.move(0, bob, 0);
-  MS.rotX(lean);
+  MS.scaleU(w.h || 1);
+  if(seated) MS.move(0, -0.88, 0);                      /* 앉으면 엉덩이가 원점 */
+  else { MS.move(0, moving ? Math.abs(sw)*0.026 : 0, 0); MS.rotX(opt.lean || 0); }
 
-  /* 다리 */
-  const legSw = moving ? sw * 0.55 : 0.05;
+  /* ── 다리 ── */
   for(const s of [-1, 1]){
-    const a = s > 0 ? legSw : -legSw;
-    MS.push(); MS.move(s * 0.11, 0.44, 0); MS.rotX(a);
-      MS.push(); MS.move(0, -0.22, 0); part(P.cyl, 0.16, 0.52, 0.16, w.bot); MS.pop();
-      MS.push(); MS.move(0, -0.46, 0.04); part(P.box, 0.17, 0.09, 0.30, w.shoe); MS.pop();
+    const swing = moving ? Math.sin(phase + (s > 0 ? 0 : Math.PI)) : 0;
+    const hipA  = seated ? -1.42 : -swing * 0.52;
+    const kneeA = seated ?  1.36 : Math.max(0, -swing) * 0.78 + 0.04;
+    MS.push(); MS.move(s * 0.10, 0.88, 0); MS.rotX(hipA);
+      MS.push(); MS.move(0, -0.215, 0); part(P.limb, 0.335, 0.44, 0.315, w.bot); MS.pop();
+      MS.move(0, -0.43, 0); MS.rotX(kneeA);
+      MS.push(); MS.move(0, -0.19, 0); part(P.limb, 0.255, 0.40, 0.245, w.bot); MS.pop();
+      if(!w.western){                                   /* 대님 — 바짓부리를 묶은 자리 */
+        MS.push(); MS.move(0, -0.355, 0); part(P.cyl, 0.195, 0.05, 0.185, [0.31,0.28,0.24]); MS.pop();
+      }
+      MS.push(); MS.move(0, -0.405, 0.045); part(P.box, 0.112, 0.055, 0.235, w.shoe); MS.pop();
+      MS.push(); MS.move(0, -0.432, 0.045); part(P.box, 0.122, 0.026, 0.248, [0.29,0.25,0.21]); MS.pop();
     MS.pop();
   }
-  /* 몸통 */
+
+  /* ── 몸통 ── */
+  MS.push(); MS.move(0, 0.93, 0); part(P.box, 0.285, 0.20, 0.185, w.bot); MS.pop();
+  MS.push(); MS.move(0, 1.14, 0); part(P.box, 0.315, 0.30, 0.195, w.top); MS.pop();
+  MS.push(); MS.move(0, 1.305, 0); part(P.box, 0.375, 0.12, 0.205, w.top); MS.pop();
+
+  /* ── 옷 ── */
   if(w.skirt){
-    MS.push(); MS.move(0, 0.60, 0); part(P.skirt, 0.86, 0.66, 0.76, w.bot); MS.pop();
-    MS.push(); MS.move(0, 1.03, 0); part(P.box, 0.40, 0.30, 0.24, w.top); MS.pop();
-    MS.push(); MS.move(0, 1.19, 0); part(P.box, 0.44, 0.06, 0.27, [0.80,0.28,0.30]); MS.pop();  // 고름
+    /* 치마는 가슴 밑부터 발목까지. 걸으면 자락이 흔들린다 */
+    MS.push(); MS.move(0, 0.64, 0); MS.rotZ(sw * 0.035);
+      part(P.skirt, 0.99, 1.05, 0.87, w.bot);
+    MS.pop();
+    MS.push(); MS.move(0, 1.245, 0); part(P.box, 0.375, 0.23, 0.225, w.top); MS.pop();
+  } else if(w.western){
+    MS.push(); MS.move(0, 1.17, 0.099); part(P.box, 0.15, 0.28, 0.02, [0.91,0.90,0.87]); MS.pop();
+    MS.push(); MS.move(0, 1.17, 0.110); part(P.box, 0.05, 0.22, 0.018, tie); MS.pop();
+    MS.push(); MS.move(0, 1.135, 0); part(P.box, 0.345, 0.40, 0.225, w.top); MS.pop();
+    MS.push(); MS.move(0, 0.925, 0); part(P.box, 0.30, 0.075, 0.20, [0.10,0.09,0.10]); MS.pop();
   } else {
-    MS.push(); MS.move(0, 0.92, 0); part(P.box, 0.40, 0.60, 0.25, w.top); MS.pop();
-    if(opt.coat){                                       // 두루마기 자락
-      MS.push(); MS.move(0, 0.66, 0); part(P.skirt, 0.60, 0.46, 0.44, w.top); MS.pop();
-    }
+    MS.push(); MS.move(0, 1.175, 0); part(P.box, 0.355, 0.33, 0.215, w.top); MS.pop();
   }
-  /* 팔 */
-  const armSw = moving ? -sw * 0.5 : 0.08;
+  if(!w.western){                                       /* 깃·동정·고름 */
+    for(const s of [-1, 1]){
+      MS.push(); MS.move(s * 0.052, 1.272, 0.100); MS.rotZ(s * 0.60);
+        part(P.box, 0.058, 0.185, 0.028, collar);
+      MS.pop();
+    }
+    MS.push(); MS.move(0, 1.325, 0.092); part(P.box, 0.185, 0.042, 0.048, collar); MS.pop();
+    MS.push(); MS.move(-0.030, 1.245, 0.110); part(P.box, 0.105, 0.048, 0.018, tie); MS.pop();
+    MS.push(); MS.move(-0.048, 1.145, 0.110); MS.rotZ(0.14);
+      part(P.box, 0.042, 0.235, 0.015, tie); MS.pop();
+  }
+  if(coat){                                             /* 두루마기 */
+    const cc = (coat === true) ? w.top : coat;
+    MS.push(); MS.move(0, 0.88, 0); MS.rotZ(sw * 0.02);
+      part(P.skirt, 0.68, 0.74, 0.56, cc);
+    MS.pop();
+    MS.push(); MS.move(0, 1.17, 0); part(P.box, 0.395, 0.32, 0.245, cc); MS.pop();
+  }
+
+  /* ── 팔 ── */
   for(const s of [-1, 1]){
-    const a = opt.armF !== undefined ? opt.armF : (s > 0 ? armSw : -armSw);
-    MS.push(); MS.move(s * 0.27, 1.16, 0); MS.rotX(a);
-      MS.push(); MS.move(0, -0.24, 0); part(P.cyl, 0.13, 0.52, 0.13, w.top); MS.pop();
-      MS.push(); MS.move(0, -0.52, 0); part(P.sph, 0.14, 0.14, 0.14, PAL.skin); MS.pop();
+    const recv = !!opt.receive && s > 0;          // 삯을 받으려 내민 오른팔
+    let shA, elA, zA;
+    if(recv){ shA = RECV[0]; elA = RECV[1]; zA = RECV[2]; }
+    else if(opt.armF !== undefined){ shA = opt.armF; elA = 0.15; zA = s * 0.28; }
+    else if(seated){ shA = -0.34; elA = 0.92; zA = -s * 0.07; }
+    else { shA = moving ? Math.sin(phase + (s > 0 ? Math.PI : 0)) * 0.40 : 0.06;
+           elA = 0.18 + Math.abs(shA) * 0.35; zA = -s * 0.07; }
+    const sleeve = coat ? ((coat === true) ? w.top : coat) : w.top;
+    MS.push(); MS.move(s * 0.192, 1.295, 0); MS.rotZ(zA); MS.rotX(shA);
+      MS.push(); MS.move(0, -0.155, 0); part(P.limb, 0.235, 0.32, 0.225, sleeve); MS.pop();
+      MS.move(0, -0.315, 0); MS.rotX(elA);
+      MS.push(); MS.move(0, -0.135, 0); part(P.limb, recv ? 0.160 : 0.185, 0.27, recv ? 0.152 : 0.175, sleeve); MS.pop();
+      MS.push(); MS.move(0, recv ? -0.325 : -0.30, 0.008);            /* 손 */
+        if(recv){
+          /* 손바닥을 위로 눕힌다. 동전도 여기 안에서 그려야 팔과 어긋나지 않는다.
+             동전은 손목이 아니라 손가락 쪽에 둔다 — 손목 쪽이면 소매에 가린다. */
+          MS.rotX(-(shA + elA) - 0.16);
+          part(P.box, 0.116, 0.030, 0.118, PAL.skin, {light:1.25});
+          for(const f of [-0.040, -0.013, 0.013, 0.040]){
+            MS.push(); MS.move(f, 0.002, 0.080);
+              part(P.box, 0.022, 0.026, 0.052, PAL.skin, {light:1.25}); MS.pop();
+          }
+          MS.push(); MS.move(-0.058, 0.004, 0.014); MS.rotZ(0.6);
+            part(P.box, 0.026, 0.052, 0.042, PAL.skin, {light:1.25}); MS.pop();   // 엄지
+          if(opt.coins){
+            if(opt.coins[0] > 0){
+              MS.push(); MS.move(-0.004, 0.026 + (1 - opt.coins[0]) * 0.34, 0.032);
+                part(P.cyl, 0.056, 0.010, 0.056, PAL.gold, {light:2.30}); MS.pop();
+            }
+            if(opt.coins[1] > 0){
+              MS.push(); MS.move(0.030, 0.038 + (1 - opt.coins[1]) * 0.34, 0.008);
+                part(P.cyl, 0.064, 0.011, 0.064, [0.92,0.82,0.42], {light:2.30}); MS.pop();
+            }
+          }
+        } else {
+          part(P.box, 0.080, 0.105, 0.055, PAL.skin);
+          if(fine){
+            MS.push(); MS.move(s * 0.044, 0.016, 0.018); MS.rotZ(-s * 0.55);
+              part(P.box, 0.034, 0.058, 0.038, PAL.skin);
+            MS.pop();
+          }
+        }
+      MS.pop();
     MS.pop();
   }
-  /* 목·머리 */
-  MS.push(); MS.move(0, 1.26, 0); part(P.cyl, 0.13, 0.10, 0.13, PAL.skin); MS.pop();
-  MS.push(); MS.move(0, 1.44, 0); MS.rotY(opt.look || 0);
-    part(P.sph, 0.31, 0.35, 0.30, PAL.skin);
-    MS.push(); MS.move(0, 0.10, 0); part(P.sph, 0.32, 0.24, 0.31, w.head); MS.pop();   // 머리칼
-    /* 눈 — 이 대목에서 하나하나 쳐다본다는 그 눈 */
-    for(const s of [-1, 1]){
-      MS.push(); MS.move(s * 0.08, 0.02, 0.145); part(P.box, 0.055, 0.035, 0.02, [0.10,0.09,0.09]); MS.pop();
+
+  /* ── 목·머리 ── */
+  MS.push(); MS.move(0, 1.395, -0.004); part(P.cyl, 0.100, 0.095, 0.095, SKIN_D); MS.pop();
+  MS.push(); MS.move(0, 1.525, 0); MS.rotY(opt.look || 0);
+    part(P.sph, 0.205, 0.245, 0.200, PAL.skin);
+    MS.push(); MS.move(0, -0.052, 0.012); part(P.box, 0.150, 0.098, 0.170, PAL.skin); MS.pop();  // 턱
+    if(fine){
+      MS.push(); MS.move(0, -0.004, 0.096); part(P.box, 0.030, 0.052, 0.032, SKIN_D); MS.pop();  // 코
+      for(const s of [-1, 1]){
+        MS.push(); MS.move(s * 0.050, 0.028, 0.088); part(P.box, 0.038, 0.016, 0.018, [0.11,0.10,0.10]); MS.pop();
+        MS.push(); MS.move(s * 0.051, 0.060, 0.086); part(P.box, 0.048, 0.013, 0.018, w.head); MS.pop();
+      }
+      MS.push(); MS.move(0, -0.060, 0.088); part(P.box, 0.046, 0.011, 0.018, [0.46,0.29,0.27]); MS.pop();
     }
-    if(w.hat){                                          // 중절모 — 챙이 눈을 덮지 않게 높이 올린다
-      MS.push(); MS.move(0, 0.215, 0.01); part(P.cyl, 0.52, 0.045, 0.50, w.head); MS.pop();
-      MS.push(); MS.move(0, 0.30, 0.01);  part(P.cyl, 0.34, 0.19, 0.33, w.head); MS.pop();
-      MS.push(); MS.move(0, 0.245, 0.01); part(P.cyl, 0.355, 0.045, 0.345, [0.06,0.06,0.07]); MS.pop();
+    if(!opt.towel){                                     /* 머리칼 — 얼굴을 덮지 않게 뒤로 물린다 */
+      MS.push(); MS.move(0, 0.052, -0.030); part(P.sph, 0.218, 0.160, 0.208, w.head); MS.pop();
+      MS.push(); MS.move(0, 0.098, 0.020); part(P.box, 0.170, 0.042, 0.115, w.head); MS.pop();
+      if(w.skirt){                                      /* 쪽진 머리 */
+        MS.push(); MS.move(0, 0.012, -0.128); part(P.sph, 0.130, 0.112, 0.115, w.head); MS.pop();
+      }
+    } else {                                            /* 김 첨지의 머릿수건 */
+      MS.push(); MS.move(0, 0.046, -0.032); part(P.sph, 0.226, 0.200, 0.206, [0.84,0.82,0.75]); MS.pop();
+      MS.push(); MS.move(0, 0.074, 0.004);  part(P.box, 0.196, 0.052, 0.190, [0.79,0.77,0.70]); MS.pop();
+      MS.push(); MS.move(0.014, 0.022, -0.118); MS.rotZ(0.5);
+        part(P.box, 0.052, 0.110, 0.068, [0.78,0.76,0.69]); MS.pop();
     }
-    if(opt.towel){                                      // 김 첨지의 머릿수건 — 머리에 두른 모양으로
-      MS.push(); MS.move(0, 0.10, 0);   part(P.sph, 0.345, 0.30, 0.335, [0.82,0.80,0.73]); MS.pop();
-      MS.push(); MS.move(0, 0.145, 0);  part(P.box, 0.30, 0.09, 0.29, [0.77,0.75,0.68]); MS.pop();
-      MS.push(); MS.move(0.02, 0.085, -0.165); MS.rotZ(0.5);
-        part(P.box, 0.09, 0.17, 0.11, [0.76,0.74,0.67]); MS.pop();                          // 뒤로 묶은 매듭
-    }
-    if(w.skirt && !w.hat){                              // 쪽진 머리
-      MS.push(); MS.move(0, 0.03, -0.18); part(P.sph, 0.20, 0.18, 0.18, PAL.hair); MS.pop();
+    if(w.hat === 'fedora'){                             /* 중절모 */
+      MS.push(); MS.move(0, 0.108, 0.004); part(P.cyl, 0.400, 0.026, 0.380, w.head); MS.pop();
+      MS.push(); MS.move(0, 0.172, 0.004); part(P.cyl, 0.238, 0.140, 0.228, w.head); MS.pop();
+      MS.push(); MS.move(0, 0.126, 0.004); part(P.cyl, 0.250, 0.034, 0.240, [0.06,0.06,0.07]); MS.pop();
+    } else if(w.hat === 'gat'){                         /* 갓 — 넓은 챙에 원통 통 */
+      MS.push(); MS.move(0, 0.100, 0); part(P.cyl, 0.300, 0.052, 0.290, [0.13,0.13,0.14]); MS.pop();
+      MS.push(); MS.move(0, 0.122, 0); part(P.cyl, 0.620, 0.014, 0.600, [0.10,0.10,0.11]); MS.pop();
+      MS.push(); MS.move(0, 0.188, 0); part(P.cyl, 0.232, 0.150, 0.224, [0.11,0.11,0.12]); MS.pop();
     }
   MS.pop();
 
-  if(opt.bag){                                          // 가방
-    MS.push(); MS.move(0.34, 0.70, 0.05); part(P.box, 0.16, 0.30, 0.40, [0.24,0.17,0.12]); MS.pop();
+  if(opt.bag){                                          /* 손가방 */
+    MS.push(); MS.move(0.245, 0.775, 0.03); part(P.box, 0.075, 0.215, 0.285, [0.26,0.18,0.13]); MS.pop();
+    MS.push(); MS.move(0.245, 0.890, 0.03); part(P.box, 0.082, 0.030, 0.295, [0.18,0.12,0.09]); MS.pop();
   }
-  if(opt.umbrella){                                     // 우산
-    MS.push(); MS.move(-0.34, 1.55, 0);
-      part(P.cyl, 0.035, 1.1, 0.035, [0.20,0.18,0.16]);
-      MS.push(); MS.move(0, 0.62, 0); part(P.skirt, 1.9, 0.42, 1.9, opt.umbrella); MS.pop();
+  if(opt.umbrella){                                     /* 우산 */
+    MS.push(); MS.move(-0.255, 1.06, 0.02);
+      part(P.cyl, 0.024, 1.40, 0.024, [0.22,0.20,0.17]);
+      /* 우산을 너무 크게 하면 사람이 통째로 가려 검은 고깔만 남는다 */
+      MS.push(); MS.move(0, 0.68, 0); part(P.skirt, 1.16, 0.26, 1.16, opt.umbrella); MS.pop();
+      MS.push(); MS.move(0, 0.83, 0); part(P.cyl, 0.038, 0.09, 0.038, [0.30,0.28,0.24]); MS.pop();
     MS.pop();
   }
   MS.pop();
@@ -925,6 +1045,7 @@ function drawPerson(who, x, z, dirY, phase, opt){
 /* ── 인력거 ──
    원점은 두 바퀴 사이 지면. +X 쪽이 진행 방향. */
 function drawRickshaw(x, z, dirY, roll, rider){
+  const dist = Math.hypot(x - camEye[0], 1.0 - camEye[1], z - camEye[2]);
   MS.push();
   MS.move(x, 0, z);
   MS.rotY(dirY);
@@ -933,10 +1054,13 @@ function drawRickshaw(x, z, dirY, roll, rider){
   MS.push(); MS.move(-0.1, 0.03, 0); part(P.disc, 2.5, 1, 1.5, [0,0,0], {flat:true, alpha:0.24}); MS.pop();
   gl.depthMask(true);
 
-  /* 바퀴 두 짝 */
+  /* 바퀴 두 짝.
+     rotX(90°)로 굴대를 Z축(진행 방향의 옆)에 눕힌다. 그러면 바퀴의 회전축은
+     이 안쪽 좌표계의 **Y축**이므로 구르는 회전은 rotY다.
+     여기서 rotZ를 쓰면 축이 세로가 되어 바퀴가 턴테이블처럼 돌아간다. */
   for(const s of [-1, 1]){
-    MS.push(); MS.move(0, 0.58, s * 0.66); MS.rotX(Math.PI/2); MS.rotY(0); MS.rotZ(0);
-      MS.push(); MS.rotZ(roll);
+    MS.push(); MS.move(0, 0.58, s * 0.66); MS.rotX(Math.PI/2);
+      MS.push(); MS.rotY(roll);
         part(P.tube, 1.16, 0.09, 1.16, [0.14,0.13,0.12]);          // 테
         part(P.tube, 1.02, 0.10, 1.02, [0.20,0.18,0.16]);
         for(let i=0;i<8;i++){                                       // 살
@@ -969,35 +1093,21 @@ function drawRickshaw(x, z, dirY, roll, rider){
   }
   MS.push(); MS.move(-0.62, 1.72, 0); part(P.box, 0.10, 0.86, 1.14, PAL.hood); MS.pop();
 
-  /* 채(끌채) 두 개 — 앞으로 뻗는다 */
+  /* 채(끌채) 두 개 — 앞으로 뻗는다. 끝이 김 첨지의 손에 닿는 길이다(kimAt 참고) */
   for(const s of [-1, 1]){
-    MS.push(); MS.move(1.06, 0.80, s * 0.50); MS.rotZ(0.09);
-      part(P.box, 2.30, 0.09, 0.09, [0.30,0.24,0.18]);
-      MS.push(); MS.move(1.12, 0.06, 0); part(P.box, 0.16, 0.09, 0.10, [0.44,0.38,0.28]); MS.pop();
+    MS.push(); MS.move(1.28, 0.78, s * 0.38); MS.rotZ(0.09);
+      part(P.box, 2.72, 0.085, 0.085, [0.30,0.24,0.18]);
+      MS.push(); MS.move(1.30, 0, 0); part(P.box, 0.20, 0.095, 0.105, [0.44,0.38,0.28]); MS.pop();
     MS.pop();
   }
   /* 등(燈) */
   MS.push(); MS.move(0.66, 1.16, 0.62); part(P.box, 0.16, 0.24, 0.16, [0.22,0.20,0.18]); MS.pop();
 
-  /* 손님 */
+  /* 손님 — 걷는 사람과 같은 몸을 앉은 자세로 쓴다(예전엔 따로 대충 그렸다).
+     사람은 제 좌표계의 +Z를 보므로, 인력거 앞쪽(+X)을 보게 하려면 rotY(+90°)다. */
   if(rider){
-    MS.push(); MS.move(-0.06, 0.95, 0); MS.rotY(-Math.PI/2);
-      const w = WHO[rider];
-      if(w.skirt){
-        MS.push(); MS.move(0, 0.20, 0); part(P.skirt, 0.90, 0.52, 0.80, w.bot); MS.pop();
-        MS.push(); MS.move(0, 0.52, 0); part(P.box, 0.42, 0.32, 0.26, w.top); MS.pop();
-      } else {
-        MS.push(); MS.move(0, 0.28, 0.10); MS.rotX(-0.42); part(P.cyl, 0.19, 0.52, 0.19, w.bot); MS.pop();
-        MS.push(); MS.move(0, 0.44, -0.05); part(P.box, 0.42, 0.52, 0.28, w.top); MS.pop();
-      }
-      MS.push(); MS.move(0, 0.80, -0.02); part(P.sph, 0.30, 0.34, 0.29, PAL.skin);
-        MS.push(); MS.move(0, 0.10, 0); part(P.sph, 0.31, 0.23, 0.30, w.head); MS.pop();
-        if(w.hat){
-          MS.push(); MS.move(0, 0.16, 0); part(P.cyl, 0.60, 0.06, 0.58, w.head); MS.pop();
-          MS.push(); MS.move(0, 0.25, 0); part(P.cyl, 0.35, 0.19, 0.34, w.head); MS.pop();
-        }
-        if(w.skirt){ MS.push(); MS.move(0, 0.02, -0.17); part(P.sph, 0.19, 0.17, 0.17, PAL.hair); MS.pop(); }
-      MS.pop();
+    MS.push(); MS.move(-0.02, 1.02, 0); MS.rotY(Math.PI/2);
+      drawPerson(rider, 0, 0, 0, 0, { seated:true, local:true, dist:dist });
     MS.pop();
   }
   MS.pop();
@@ -1109,14 +1219,32 @@ function headAt(t){
 }
 /* 김 첨지가 선 자리와, 삯을 받는 손의 자리.
    카메라와 그리기가 같은 함수를 봐야 손과 화면이 어긋나지 않는다. */
+/* 채 끝을 잡고 서는 자리. 팔을 뻗은 손끝이 채의 손잡이에 닿도록 맞춘 값이라
+   채 길이(drawRickshaw)나 팔 각도(KIM_ARM)를 바꾸면 여기도 같이 봐야 한다. */
+const KIM_ARM = -0.90;                            // 채를 잡은 어깨 각도
 function kimAt(t){
   const r = rickshawAt(t), h = headAt(t);
-  return { x: r.x + Math.cos(h)*2.55, z: r.z + Math.sin(h)*2.55, h:h, spd:r.spd };
+  return { x: r.x + Math.cos(h)*2.15, z: r.z + Math.sin(h)*2.15, h:h, spd:r.spd };
 }
-const HAND = [0.30, 0.80, 0.42];                 // 김 첨지 기준 손의 자리
+/* 삯을 받는 손의 자리(김 첨지 좌표계, 키 배수 적용 전).
+   숫자를 손으로 적어 두면 팔 각도를 고칠 때마다 어긋난다.
+   그래서 **그리는 코드와 똑같은 변환**을 한 번 돌려 좌표를 직접 읽는다.
+   어깨→팔꿈치→손 사슬의 숫자는 drawPerson의 팔 부분과 반드시 같아야 한다. */
+const HAND = (function(){
+  MS.reset();
+  MS.move(0.192, 1.295, 0); MS.rotZ(RECV[2]); MS.rotX(RECV[0]);
+  MS.move(0, -0.315, 0); MS.rotX(RECV[1]);
+  MS.move(0, -0.325, 0.008);            // drawPerson의 recv 쪽 손 위치와 같아야 한다
+  const m = MS.cur();
+  const p = [m[12], m[13], m[14]];
+  MS.reset();
+  return p;
+})();
 function handAt(t){
   const k = kimAt(t), a = -k.h + Math.PI/2, c = Math.cos(a), s = Math.sin(a);
-  return [ k.x + HAND[0]*c + HAND[2]*s, HAND[1], k.z - HAND[0]*s + HAND[2]*c ];
+  const H = WHO.kim.h || 1;
+  const hx = HAND[0]*H, hy = HAND[1]*H, hz = HAND[2]*H;
+  return [ k.x + hx*c + hz*s, hy, k.z - hx*s + hz*c ];
 }
 
 /* ══════════════ 카메라 ══════════════
@@ -1139,7 +1267,7 @@ const SHOTS = [
   { t:58.0,  follow:true, off:[-4.2, 2.6, -5.6], look:[3.2, 1.3, 0], fov:50 },
   /* 학교 앞. 여기서만 학교와 도착하는 인력거가 한 화면에 든다 */
   { t:62.5,  e:[40, 6.2, 8.0], a:[52.5, 2.2, -3.4], e2:[45, 5.0, 7.4], a2:[52.5, 1.8, -2.6], fov:52 },
-  { t:66.5,  hand:true, fov:34 },
+  { t:66.5,  hand:true, fov:42 },
   { t:71.5,  e:[47.5, 3.2, -7.0], a:[53.5, 1.4, 2.4], e2:[22, 20, -26], a2:[52, 5, -6], fov:50 }
 ];
 
@@ -1151,8 +1279,9 @@ function cameraAt(t){
   const k = smoothstep(clamp((t - s.t) / Math.max(end - s.t, 0.001), 0, 1));
   if(s.hand){
     const p = handAt(t);
-    return { eye:[p[0]+0.24, p[1]+0.60-k*0.05, p[2]+0.56],
-             at :[p[0]-0.01, p[1]+0.10, p[2]-0.04], fov:s.fov };
+    /* 손을 화면 한가운데 둔다. 조준점을 손보다 위에 두면 손이 아래로 밀린다. */
+    return { eye:[p[0]+0.27, p[1]+0.36-k*0.04, p[2]+0.47],
+             at :[p[0],      p[1]+0.03,        p[2]], fov:s.fov };
   }
   if(s.follow){
     const r = rickshawAt(t);
@@ -1200,6 +1329,8 @@ const emptyVAO = gl.createVertexArray();
 
 /* ══════════════ 그리기 ══════════════ */
 const proj = m4.make(), view = m4.make(), vp = m4.make(), invVP = m4.make();
+/* 이번 프레임의 눈 위치. 사람의 이목구비를 그릴지 말지 여기서 잰다. */
+let camEye = [0, 0, 0];
 
 function draw(t){
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -1233,6 +1364,7 @@ function draw(t){
   rootS.setProperty('--film-h', (vh/dpr) + 'px');
 
   const cam = free.on ? freeCamera() : cameraAt(t);
+  camEye = cam.eye;
   const asp = vw/vh;
   const fovy = 2 * Math.atan(Math.tan(cam.fov*Math.PI/360) * Math.max(1, REF/asp));
   m4.persp(proj, fovy, asp, 0.06, 400);
@@ -1359,34 +1491,17 @@ function draw(t){
   /* 47~53초 — 내리는 사람을 하나씩 눈으로 좇는다 */
   let look = 0;
   if(t >= 46.5 && t < 53.5) look = Math.sin((t - 46.5) * 1.15) * 0.85;
+  /* 삯 받는 대목에서는 오른팔을 내밀고, 동전은 그 손 안에서 그린다 */
+  const paying = (t >= 66.0 && t < 72.5);
+  const coins = paying
+    ? [clamp((t - 66.4) / 0.5, 0, 1), clamp((t - 69.0) / 0.5, 0, 1)]
+    : null;
   MS.reset();
   drawPerson('kim', km.x, km.z, -head + Math.PI/2,
              travelledCache(t) * 1.9,
              { moving: rk.spd > 0.15, towel:true, coat:false, look:look,
-               lean: rk.spd > 0.15 ? 0.17 : 0.04, armF: -0.62 });
-
-  /* 삯 — 손바닥 위의 동전 두 닢. 자리는 handAt()이 정한다(카메라와 같은 함수) */
-  if(t >= 66.0 && t < 72.5){
-    const c1 = clamp((t - 66.4) / 0.5, 0, 1), c2 = clamp((t - 69.0) / 0.5, 0, 1);
-    MS.reset(); MS.move(km.x, 0, km.z); MS.rotY(-head + Math.PI/2);
-      MS.push(); MS.move(HAND[0], HAND[1], HAND[2]); MS.rotX(-0.30);
-        part(P.box, 0.23, 0.05, 0.25, PAL.skin, {light:1.30});                     // 손바닥
-        for(const f of [[-0.082,0.108],[-0.027,0.118],[0.029,0.116],[0.083,0.104]]) {
-          MS.push(); MS.move(f[0], 0.006, f[1]);
-            part(P.box, 0.044, 0.034, 0.075, PAL.skin, {light:1.30}); MS.pop();
-        }
-        /* 동전은 어두운 날에도 반짝여야 한다 — 빛을 따로 올린다 */
-        if(c1 > 0){
-          MS.push(); MS.move(-0.045, 0.042 + (1-c1)*0.40, 0.010);
-            part(P.cyl, 0.090, 0.016, 0.090, PAL.gold, {light:2.30}); MS.pop();
-        }
-        if(c2 > 0){
-          MS.push(); MS.move(0.050, 0.060 + (1-c2)*0.40, -0.032);
-            part(P.cyl, 0.104, 0.018, 0.104, [0.92,0.82,0.42], {light:2.30}); MS.pop();
-        }
-      MS.pop();
-    MS.reset();
-  }
+               lean: rk.spd > 0.15 ? 0.17 : 0.04, armF: KIM_ARM,
+               receive: paying, coins: coins });
 
   /* 비와 눈 */
   gl.depthMask(false);
@@ -1449,6 +1564,180 @@ function freeCamera(){
   };
 }
 
+/* ══════════════ store 래퍼 ══════════════
+   file://이나 쿠키 차단 환경에서 localStorage가 예외를 던져도 앱이 멈추지 않게. */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(_){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, v); }catch(_){} }
+};
+
+/* ══════════════ 소리 ══════════════
+   음원 파일을 두지 않고 그 자리에서 만든다(집 규칙: 파일 하나, 외부 의존 0).
+   가야금을 흉내 낸 뜯는 소리 + 낮은 드론 + 아주 옅은 빗소리 결.
+   가락은 5음 음계(계면조 느낌)이고 쉼이 많다 — 비 오는 이른 아침이라.
+   브라우저 자동재생 정책 때문에 첫 조작이 있고 나서야 소리가 난다. */
+const BGM = (function(){
+  const KEY = 'luck_bgm';
+  const BEAT = 60 / 52 / 2;                                   // 8분음표(초), 52 BPM
+  const SCALE = [220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25];  // 라 도 레 미 솔 라 도
+  /* 32걸음 한 도막. null은 쉼. */
+  const PHRASE = [5,null,4,null, 3,null,null,2, 3,null,4,null, 2,null,null,null,
+                  4,null,3,null, 2,null,1,null, 0,null,null,1, 2,null,null,null];
+  let ac = null, master = null, bed = null, droneG = null, comp = null, ana = null;
+  const anaBuf = new Float32Array(2048);
+  let on = store.get(KEY, '1') !== '0';
+  let ready = false, nextStep = 0, stepIdx = 0, sceneT = 0;
+  const buf = {};
+
+  /* 카플러스-스트롱: 잡음 한 조각을 지연선에 넣고 이웃과 평균 내며 되먹이면
+     고음부터 사그라지는 현(絃) 소리가 된다. 뜯는 악기 흉내에 이만한 게 없다. */
+  function pluck(freq, dur, decay){
+    const sr = ac.sampleRate, n = Math.round(sr * dur);
+    const b = ac.createBuffer(1, n, sr), d = b.getChannelData(0);
+    const N = Math.max(2, Math.round(sr / freq)), ring = new Float32Array(N);
+    for(let i=0;i<N;i++) ring[i] = Math.random() * 2 - 1;
+    for(let k=0;k<2;k++) for(let i=0;i<N;i++) ring[i] = (ring[i] + ring[(i+1)%N]) * 0.5;
+    let p = 0;
+    for(let i=0;i<n;i++){
+      d[i] = ring[p];
+      ring[p] = (ring[p] + ring[(p+1)%N]) * 0.5 * decay;
+      p = (p + 1) % N;
+    }
+    const tail = Math.round(sr * 0.15);                        // 끝을 부드럽게 닫는다
+    for(let i=0;i<tail;i++) d[n-1-i] *= i / tail;
+    return b;
+  }
+  function noise(sec){
+    const sr = ac.sampleRate, n = Math.round(sr * sec);
+    const b = ac.createBuffer(1, n, sr), d = b.getChannelData(0);
+    for(let i=0;i<n;i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+
+  function build(){
+    master = ac.createGain(); master.gain.value = 0;
+    /* 마지막에 리미터를 둔다 — 음이 겹칠 때 찌그러지는 걸 막고 체감 크기도 올린다.
+       분석기는 검증용: 소리를 들을 수 없으니 probe()가 실제 출력 레벨을 숫자로 낸다. */
+    comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -12; comp.knee.value = 12; comp.ratio.value = 6;
+    comp.attack.value = 0.004; comp.release.value = 0.25;
+    ana = ac.createAnalyser(); ana.fftSize = 2048;
+    master.connect(comp); comp.connect(ana); ana.connect(ac.destination);
+
+    /* 드론. 55Hz 같은 저음은 노트북·휴대폰 스피커가 아예 못 낸다 —
+       들리는 대역(110Hz 위)에 깔아야 한다. */
+    droneG = ac.createGain(); droneG.gain.value = 0.12;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 720;
+    droneG.connect(lp); lp.connect(master);
+    [110, 164.81, 220].forEach(function(f, i){
+      const o = ac.createOscillator();
+      o.type = i === 2 ? 'sine' : 'triangle';
+      o.frequency.value = f * (i === 1 ? 1.004 : 1);
+      const g = ac.createGain(); g.gain.value = i === 2 ? 0.14 : 0.30;
+      o.connect(g); g.connect(droneG); o.start();
+    });
+
+    const nb = ac.createBufferSource(); nb.buffer = noise(3); nb.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 0.55;
+    bed = ac.createGain(); bed.gain.value = 0;
+    nb.connect(bp); bp.connect(bed); bed.connect(master); nb.start();
+
+    SCALE.forEach(function(f){ buf[f] = pluck(f, 2.4, 0.9965); });
+    buf.hi1 = pluck(659.25, 2.0, 0.9960);                      // 삯 — 첫 번째 손님
+    buf.hi2 = pluck(783.99, 2.2, 0.9960);                      // 삯 — 두 번째 손님
+    ready = true;
+    nextStep = ac.currentTime + 0.25;
+  }
+
+  function fire(b, at, gain){
+    if(!b) return;
+    const s = ac.createBufferSource(); s.buffer = b;
+    const g = ac.createGain(); g.gain.value = gain;
+    s.connect(g); g.connect(master); s.start(at);
+  }
+
+  /* 장면 시각에 따른 밀도·크기. 하늘만 보일 때는 드론뿐이고,
+     달릴 때 가장 촘촘하며, 삯을 받는 대목에서 다시 성기게 비운다. */
+  function level(t){
+    if(t <  8) return 0.16;
+    if(t < 26) return 0.16 + (t - 8) / 18 * 0.44;
+    if(t < 46) return 0.60;
+    if(t < 58) return 0.74;
+    if(t < 66) return 0.86;
+    if(t < 72) return 0.34;
+    return Math.max(0.06, 0.34 - (t - 72) / 7 * 0.28);
+  }
+
+  function start(){
+    if(ac){ if(ac.state === 'suspended') ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    try{ ac = new AC(); build(); }catch(_){ ac = null; }
+  }
+
+  return {
+    start: start,
+    isOn: function(){ return on; },
+    isReady: function(){ return ready; },
+    setOn: function(v){ on = v; store.set(KEY, v ? '1' : '0'); if(v) start(); },
+    accent: function(which){                                   // 동전이 떨어질 때 한 음
+      if(ready && on) fire(which === 2 ? buf.hi2 : buf.hi1, ac.currentTime + 0.01, 0.75);
+    },
+    /* 소리를 들을 수 없을 때 쓰는 검증용.
+       **버퍼가 무음이 아닌지만 보면 안 된다** — 그래 놓고 출력이 -22dBFS라 아무도 못 들은 적이 있다.
+       스피커로 나가는 지점에 분석기를 달아 놓고 실제 레벨을 돌려준다.
+       peakDb가 대략 -14 ~ -6 사이면 정상이다. -20 아래면 너무 작은 것이다. */
+    probe: function(){
+      if(!ready) return { ready:false };
+      ana.getFloatTimeDomainData(anaBuf);
+      let peak = 0, sum = 0;
+      for(let i=0;i<anaBuf.length;i++){ const a = Math.abs(anaBuf[i]); if(a > peak) peak = a; sum += anaBuf[i]*anaBuf[i]; }
+      const rms = Math.sqrt(sum / anaBuf.length);
+      const out = {
+        ready:true, on:on, ctx:ac.state, step:stepIdx,
+        peak:+peak.toFixed(4), rms:+rms.toFixed(4),
+        peakDb:+(20*Math.log10(Math.max(peak,1e-9))).toFixed(1),
+        rmsDb :+(20*Math.log10(Math.max(rms ,1e-9))).toFixed(1),
+        level:+level(sceneT).toFixed(3), buffers:0, ring:{}
+      };
+      /* 뜯는 소리가 실제로 울리는 길이(피크의 2%까지) — 여기가 짧으면 딸깍 소리가 된다 */
+      Object.keys(buf).forEach(function(k){
+        out.buffers++;
+        if(out.buffers > 3 && k !== 'hi1') return;
+        const d = buf[k].getChannelData(0), sr = buf[k].sampleRate;
+        let p = 0; for(let i=0;i<d.length;i+=7){ const a = Math.abs(d[i]); if(a > p) p = a; }
+        let last = 0; const thr = p * 0.02;
+        for(let i=0;i<d.length;i+=7) if(Math.abs(d[i]) > thr) last = i;
+        out.ring[k] = Math.round(last / sr * 1000) + 'ms';
+      });
+      return out;
+    },
+    tick: function(t, playing){
+      sceneT = t;
+      if(!ready) return;
+      const now = ac.currentTime, L = level(t);
+      master.gain.setTargetAtTime(on ? (playing ? 0.90 : 0.30) : 0, now, 0.35);
+      bed.gain.setTargetAtTime(on ? L * 0.12 : 0, now, 0.5);
+      droneG.gain.setTargetAtTime(0.12 + L * 0.18, now, 0.6);
+      if(!on || !playing){ nextStep = Math.max(nextStep, now); return; }
+      /* 틱이 한동안 멈췄다면(탭 가림·긴 정지) 밀린 걸음을 몰아서 쏟지 않는다.
+         지나간 시각으로 예약하면 그 음들이 한꺼번에 터져 나온다. */
+      if(nextStep < now) nextStep = now + 0.02;
+      let guard = 0;
+      while(nextStep < now + 0.3 && guard++ < 4){              // 앞질러 예약해 둔다
+        const deg = PHRASE[stepIdx % PHRASE.length];
+        if(deg !== null && L > 0.28){
+          fire(buf[SCALE[deg]], nextStep, 0.55 * L);
+          if(L > 0.70 && (stepIdx % 8) === 0)                  // 촘촘할 때만 아래 음을 겹친다
+            fire(buf[SCALE[Math.max(0, deg - 2)]], nextStep, 0.30 * L);
+        }
+        nextStep += BEAT;
+        stepIdx++;
+      }
+    }
+  };
+})();
+
 /* ══════════════ 화면 글자 ══════════════ */
 const elSub = document.getElementById('sub');
 const elBottom = document.getElementById('bottom');
@@ -1481,7 +1770,7 @@ const elMap = document.getElementById('map');
   });
 })();
 
-let curLine = -1;
+let curLine = -1, coinStage = 0;
 function cue(t){
   let i = -1;
   for(let k=0;k<SCRIPT.length;k++) if(t >= SCRIPT[k].t) i = k;
@@ -1495,11 +1784,14 @@ function cue(t){
   }
   elTitle.style.opacity = t > 7.5 ? 0 : 1;
 
-  /* 삯 */
+  /* 삯 — 동전이 손바닥에 떨어질 때 소리도 한 음 얹는다 */
   const cb = elCoin.querySelector('b'), ci = elCoin.querySelector('i');
-  if(t >= 66.4 && t < 69.0){ cb.textContent = '삼십 전'; ci.textContent = '첫 번째 손님'; elCoin.classList.add('on'); }
-  else if(t >= 69.0 && t < 71.4){ cb.textContent = '오십 전'; ci.textContent = '두 번째 손님'; elCoin.classList.add('on'); }
+  const stage = (t >= 69.0 && t < 71.4) ? 2 : ((t >= 66.4 && t < 69.0) ? 1 : 0);
+  if(stage === 1){ cb.textContent = '삼십 전'; ci.textContent = '첫 번째 손님'; elCoin.classList.add('on'); }
+  else if(stage === 2){ cb.textContent = '오십 전'; ci.textContent = '두 번째 손님'; elCoin.classList.add('on'); }
   else elCoin.classList.remove('on');
+  if(stage > coinStage) BGM.accent(stage);
+  coinStage = stage;
 
   const mm = function(v){ const m = Math.floor(v/60), s2 = Math.floor(v%60); return m + ':' + (s2<10?'0':'') + s2; };
   elClock.textContent = mm(t) + ' / ' + mm(DUR);
@@ -1531,7 +1823,23 @@ function frame(now){
   }
   cue(state.t);
   draw(state.t);
+  BGM.tick(state.t, state.playing);
 }
+
+/* ── 소리: 브라우저 정책상 첫 조작 뒤에야 울릴 수 있다 ── */
+const bSound = document.getElementById('bSound');
+function paintSound(){
+  bSound.setAttribute('aria-pressed', BGM.isOn() ? 'true' : 'false');
+  bSound.textContent = BGM.isOn() ? '🔊 소리' : '🔇 소리';
+}
+paintSound();
+bSound.addEventListener('click', function(){ BGM.setOn(!BGM.isOn()); paintSound(); });
+const FIRST = ['pointerdown','keydown','touchstart'];
+function firstGesture(){
+  FIRST.forEach(function(e){ window.removeEventListener(e, firstGesture); });
+  if(BGM.isOn()) BGM.start();
+}
+FIRST.forEach(function(e){ window.addEventListener(e, firstGesture, { passive:true }); });
 
 /* ── 버튼 ── */
 document.getElementById('bPlay').addEventListener('click', function(){
@@ -1628,6 +1936,7 @@ window.addEventListener('keydown', function(e){
   else if(e.key === 'r' || e.key === 'R'){ seek(0); setPlaying(true); }
   else if(e.key === 'f' || e.key === 'F') bFree.click();
   else if(e.key === 't' || e.key === 'T') bMap.click();
+  else if(e.key === 'm' || e.key === 'M') bSound.click();
 });
 
 window.addEventListener('resize', function(){ draw(state.t); });
@@ -1642,6 +1951,8 @@ if(/[?&]debug=1/.test(location.search)){
     dur: DUR,
     seek: function(t){ setPlaying(false); seek(t); return this.state(); },
     play: function(){ setPlaying(true); },
+    /* 숨은 탭에서는 rAF가 멈춰 소리 예약이 돌지 않는다. 검증용으로 직접 돌린다. */
+    bgm: function(t, playing){ BGM.tick(t === undefined ? state.t : t, playing !== false); return BGM.probe(); },
     state: function(){
       const c = free.on ? freeCamera() : cameraAt(state.t), r = rickshawAt(state.t);
       return { t:+state.t.toFixed(2), playing:state.playing, free:free.on,
@@ -1649,6 +1960,7 @@ if(/[?&]debug=1/.test(location.search)){
                eye: c.eye.map(v=>+v.toFixed(2)), at: c.at.map(v=>+v.toFixed(2)),
                rick: { x:+r.x.toFixed(2), z:+r.z.toFixed(2), spd:+r.spd.toFixed(2), on:r.on },
                tram: tramAt(state.t), tris: WORLD.n/3|0,
+               bgm: { on: BGM.isOn(), ready: BGM.isReady() },
                size: [cv.width, cv.height] };
     },
     cues: SCRIPT.map(s=>s.t)

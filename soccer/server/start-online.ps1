@@ -1,4 +1,4 @@
-# 반대항축구 온라인 — 서버 + Cloudflare 빠른 터널을 한 번에 띄운다.
+﻿# 반대항축구 온라인 — 서버 + Cloudflare 빠른 터널을 한 번에 띄운다.
 #
 #   powershell -ExecutionPolicy Bypass -File start-online.ps1
 #
@@ -100,7 +100,20 @@ Write-Host "  확인:  node loadtest.js --url $url --players 4" -ForegroundColor
 Write-Host ""
 Write-Host "닫으려면 Ctrl+C 를 누르세요." -ForegroundColor DarkGray
 try {
-  Wait-Process -Id $proc.Id
+  # 게시판이 주소를 잊어도 스스로 되살아나도록 4분마다 같은 주소를 다시 올린다.
+  # (게시판이 메모리 저장으로 도는 동안에는 앱이 잠들 때 주소를 잊는다 — 실제로 겪었다.)
+  $beat = 0
+  while (-not $proc.HasExited) {
+    Start-Sleep -Seconds 10
+    $beat += 10
+    if ($beat -ge 240 -and $regUrl -and $regKey) {
+      $beat = 0
+      try {
+        $body = @{ url = $url; key = $regKey } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Uri "$regUrl/" -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 8 | Out-Null
+      } catch {}
+    }
+  }
 } finally {
   if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
   # 터널이 닫혔으면 게시판도 비운다(옛 주소로 붙는 것을 막는다)

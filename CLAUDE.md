@@ -37,7 +37,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   「나의 이야기로 만들기」 주문 패널(`ORDER_URL` 상수가 비면 "준비 중" 토스트). 저장 접두사 `lv_*`.
   주문 정보 포맷은 `docs/order-schema.md`, 주문 접수 카카오봇은 `counsel-proxy/order-bot.js`(별도 Deno 프로젝트,
   Haiku + 일일 상한, 완성 주문 JSON은 텔레그램으로 전달). 판매 기획 정본은 `docs/custom-game-business.md`(비공개).
-- **네 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`·`love-rpg`)는 같은 엔진을 공유한다.**
+- `retire-rpg/index.html` — 「아버지의 정복」: **판매용 데모 2호** (europe-rpg 재스킨, 경찰관의 정년퇴임 7장).
+  연애물과 구조를 일부러 다르게 잡았다 — **장면 = 장소가 아니라 연도**(1988→2026)이고, 같은 파출소 한 곳이
+  `setEra(연도)`로 벽·바닥·집기까지 다시 칠해져 시대가 바뀐다(무전기→브라운관→LCD, 누런 장판→흰 타일).
+  6장까지는 아버지, **7장에서 딸로 시점이 바뀌고** 보상함이 사진첩이 아니라 **아버지 사물함**이다.
+  체험 비밀번호 0000, 저장 접두사 `rt_*`. 빌드 스크립트 `retire-rpg/build_retire.py`.
+- **다섯 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`·`love-rpg`·`retire-rpg`)는 같은 엔진을 공유한다.**
   공통 틀의 정본은 `docs/dot-rpg-engine.md` — 새 도트 RPG를 만들기 전에 반드시 먼저 읽는다.
 - `voxel-world/` — 복셀 샌드박스 (진행 중, 다중 파일). 규칙·상수·단계는
   `voxel-world/CLAUDE.md`(설계도) → `ROADMAP.md`(단계) → `HANDOFF.md`(일지) 순으로 읽고,
@@ -77,6 +82,7 @@ python -m http.server 8765
 - http://localhost:8765/couple-rpg/ (모바일 모드, `?debug=1` 훅, 비밀번호는 코드의 `PASSWORD`)
 - http://localhost:8765/europe-rpg/ (모바일 모드, `?debug=1` 훅, 비밀번호는 코드의 `PASSWORD`)
 - http://localhost:8765/love-rpg/ (판매 데모, 비밀번호 0000, `?debug=1` 훅)
+- http://localhost:8765/retire-rpg/ (판매 데모, 비밀번호 0000, `?debug=1`이면 `NS.setEra`·`NS.eraYear`)
 - http://localhost:8765/iso-faces/ (`?debug=1`이면 `window.BD` 훅)
 - http://localhost:8765/lucky-day/ (`?debug=1`이면 `window.LD` 훅)
 - http://localhost:8765/event-price/
@@ -110,7 +116,7 @@ python -m http.server 8765
 **새로운 영속 상태도 반드시 `store`를 통해야 한다.**
 
 사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`,
-`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
+`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
 `file://`에서는 모든 앱이 같은 localStorage 네임스페이스를 쓰므로 접두사가 충돌 방지 수단이다.
 
 ## 앱별 구조
@@ -428,6 +434,52 @@ couple-rpg와 같은 챕터형(`CHAPTERS` + `QUESTS.c1~c7`). 공통 엔진은 `d
   남아 있는 `setTimeout`은 소리·CSS 전환용뿐이다.
 - 영속 상태 없음(`store` 미사용). `?debug=1`이면 `window.BD` — `go/state/tp/skill/cursor/interact/frame`,
   화면을 볼 수 없을 때 쓰는 `probe()`(픽셀 통계), `mgs()`/`hud()`/`ended()`/`raw()`.
+
+### lucky-day (운수 좋은 날 — 첫 문단 3D)
+
+소설 **첫 문단 하나**만 입력으로 세운 79초짜리 3D 장면. iso-faces가 "전문 → 게임"이라면 이쪽은
+"한 문단 → 영상"이라 플레이가 없고 재생·되감기·자유 시점만 있다. 파일 하나, 외부 의존 0, `file://`에서도 돈다.
+
+- **three.js를 안 쓴다** — iso-faces와 같은 이유(CDN·ESM 금지). 셰이더 셋: 본체(램버트+반구광+젖은
+  노면+안개), 하늘(전체화면 삼각형에 시선 광선), 비/눈(인스턴싱 줄기).
+- **좌표계**: X = 동소문(-62) → 동광학교(+56), Y = 위, Z = 길 건너. 단위는 미터.
+- **변환 스택 `MS`의 규칙**: 스택에는 이동·회전과 `scaleU`(균일 크기)만 넣는다. **축마다 다른 크기는
+  반드시 `part()`에서** 준다. 그래야 스택의 위쪽 3×3이 회전(×균일배율)뿐이라 법선 행렬을
+  `회전 × (1/크기)`로 정확히 구할 수 있다. 균일 크기는 셰이더의 `normalize()`가 흡수한다.
+- **감김 방향**: 바깥면이 반시계(CCW)여야 뒷면 컬링에 안 잘린다. `cyl`/`cone`/`sph`가 한 번 뒤집혀
+  있었고(법선만 맞고 감김이 반대), **가는 기둥에서는 티가 안 나고 납작한 것(동전)에서만** 드러났다.
+  새 형상을 넣으면 납작한 원판으로 확인할 것.
+- **회전축을 눕힌 뒤의 회전에 주의**: 바퀴는 `rotX(90°)`로 굴대를 Z에 눕히므로, 구르는 회전은 그
+  안쪽 좌표계의 **`rotY`**다. `rotZ`를 쓰면 축이 세로가 되어 턴테이블처럼 돈다(실제로 그랬다).
+- **사람**: 머리 하나가 키의 1/6.8. 팔다리는 두 마디로 꺾이고, 옷은 겹쳐 입힌다(저고리+바지+두루마기,
+  또는 치마+짧은 저고리, 또는 양복). `WHO`의 `skirt`/`western`/`hat`/`coat`/`h`가 차림을 정한다.
+  **이목구비는 카메라에서 10m 안쪽일 때만** 그린다(`fine`) — 한 사람에 마흔 번 가까이 그린다.
+  사람은 언제나 제 좌표계의 **+Z를 바라본다**. 인력거 손님도 같은 함수의 `seated` 자세다.
+- **손처럼 카메라와 그림이 같이 봐야 하는 자리는 상수로 적지 말고 같은 변환으로 구한다.**
+  삯 컷의 `HAND`는 `RECV` 자세의 어깨→팔꿈치→손 사슬을 `MS`로 한 번 돌려 좌표를 읽는다.
+  손으로 계산해 적어 두었더니 팔 각도를 고치는 순간 카메라가 팔뚝만 비췄다.
+- **카메라 금기**: 컷의 `|z|`는 8.5를 넘지 않는다. 한옥 줄 앞면이 z=±9.5라 넘으면 벽 속으로 들어간다.
+- **화면 비율**: 컷은 16:9 기준. 세로 화면에서는 4:3 띠에만 그리고 위아래를 검게 두며, 16:9보다 좁으면
+  세로 화각을 키워 **가로 화각을 기준값으로 유지**한다. 띠는 자막·조작부를 뺀 나머지의 한가운데에 두고
+  `--film-top`/`--film-h`로 DOM 글자에 알려 준다.
+- **시각이 유일한 상태다.** `rickshawAt`·`headAt`·`kimAt`·`handAt`·`cameraAt` 모두 t만 받는다.
+  전역 누적값을 쓰면 되감기에서 어긋난다.
+- **젖음은 가까운 데서만**(26~72m 페이드). 멀리까지 켜면 지면이 스쳐 보이는 각도에서 모아레가 뒤덮는다.
+  안개 거리는 카메라 높이에 비례해 늘린다 — 안 그러면 부감 컷이 통째로 회색이 된다.
+- **소리(`BGM`)**: 음원 파일 없이 그 자리에서 합성한다. 가야금 흉내는 **카플러스-스트롱**(잡음을 지연선에
+  넣고 이웃과 평균 내며 되먹임), 거기에 낮은 드론과 아주 옅은 빗소리 결. 5음 음계에 쉼이 많은 32걸음
+  도막이고, 밀도·크기는 `level(t)`가 장면 시각으로 정한다. 동전이 떨어질 때 `accent()`로 한 음.
+  브라우저 정책상 **첫 조작 뒤에야** `AudioContext`를 만든다. 켜짐은 `store`의 `luck_bgm`.
+  **예약이 밀렸을 때 몰아서 쏟지 말 것** — 지나간 시각으로 예약하면 그 음들이 한꺼번에 터진다.
+  `nextStep`이 현재보다 뒤면 지금으로 당기고, 한 틱에 예약할 걸음 수도 막아 둔다(실측: 안 막으면
+  3초 공백 뒤 16초치가 한꺼번에 나갔다).
+- 영속 상태는 `luck_bgm` 하나. `?debug=1`이면 `window.LD` — `seek(t)`가 프레임을 **동기로 한 장** 그리고,
+  `bgm(t, playing)`은 숨은 탭에서 멈춘 소리 예약을 직접 돌려 `probe()`(버퍼 RMS·걸음 수)를 돌려준다.
+- **성능은 시간이 아니라 드로우 콜로 본다.** 병행 세션이 돌면 이 기계는 유휴 대비 6~8배 느려져
+  프레임 시간이 무의미해진다(순수 CPU 기준선으로 부하를 먼저 재라). 실측 드로우 콜 187~389개,
+  삼각형 30~51k — 이 범위를 크게 넘지 않으면 정상이다.
+- **자막은 전부 원문 그대로다.** 지어낸 문장을 섞지 말 것. `SCRIPT`의 `m` 필드가 "이 구절 → 화면의 무엇"
+  대응표이고 화면의 📖 버튼이 그대로 보여 준다.
 
 ### android-* (APK 셸 4개)
 

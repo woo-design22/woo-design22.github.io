@@ -1076,14 +1076,22 @@
     if (($('lbNick').value || '').trim().length < 2) return;
     netConnect();
   }
+  /* 게시판이 비어 보이면 한 번 더 물어본다.
+     게시판이 KV 없이 메모리로 도는 동안에는 인스턴스가 바뀌면 빈 값이 오는 일이 있다 —
+     실제로 켜져 있는데 '서버가 없습니다'가 뜨는 원인이었다. 2.5초 뒤 한 번만 다시 본다. */
+  var regTried = 0;
   function fetchServerUrl() {
     var reg = (params.get('registry') || REGISTRY || '').replace(/\/+$/, '');
     if (!reg) return;
     $('lbState').textContent = '서버 주소 확인 중…';
     fetch(reg + '/', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.url) { $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; lbNote(OFF_NOTE); return; }
+      if (!d || !d.url) {
+        if (regTried < 2) { regTried++; $('lbState').textContent = '서버 주소 확인 중…'; setTimeout(fetchServerUrl, 2500); return; }
+        $('lbState').textContent = '지금은 열려 있는 서버가 없습니다'; lbNote(OFF_NOTE); return;
+      }
       if (d.stale) { $('lbState').textContent = '서버가 꺼져 있는 것 같습니다 (' + Math.round(d.ageSec / 60) + '분 전 기록)'; lbNote(OFF_NOTE); return; }
       if (!$('lbServer').value.trim()) $('lbServer').value = d.url;
+      regTried = 0;
       lbNote('');
       maybeAutoConnect();
       $('lbState').textContent = '서버 주소를 받았습니다';

@@ -42,7 +42,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `setEra(연도)`로 벽·바닥·집기까지 다시 칠해져 시대가 바뀐다(무전기→브라운관→LCD, 누런 장판→흰 타일).
   6장까지는 아버지, **7장에서 딸로 시점이 바뀌고** 보상함이 사진첩이 아니라 **아버지 사물함**이다.
   체험 비밀번호 0000, 저장 접두사 `rt_*`. 빌드 스크립트 `retire-rpg/build_retire.py`.
-- **다섯 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`·`love-rpg`·`retire-rpg`)는 같은 엔진을 공유한다.**
+- `goth-rpg/index.html` — 「고트전설」: **판매용 데모 3호** (europe-rpg 재스킨, 고전 판타지 7장).
+  왕자의 망명과 귀환이라는 보편 뼈대만 쓰고 **왕국·인물·지명은 전부 새로 지었다**
+  (특정 상용 작품의 설정을 옮기지 않는다 — 공개 데모라 반드시 지킬 것).
+  주인공이 소년→청년→왕으로 자라며 `S.heroSpr`가 바뀌고, 1장과 7장이 같은 왕좌의 방이다.
+  성·폐허·숲·마을·고개·성문 타일을 새로 그렸다. 체험 비밀번호 0000, 저장 접두사 `gt_*`.
+  빌드 스크립트 `goth-rpg/build_goth.py`.
+- **여섯 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`·`love-rpg`·`retire-rpg`·`goth-rpg`)는 같은 엔진을 공유한다.**
   공통 틀의 정본은 `docs/dot-rpg-engine.md`. **게임을 만들거나 고치면 대사집을 반드시 함께 낸다** —
   `python tools/extract_script.py <폴더>` 가 `<폴더>/대사집.txt` 를 만든다(다섯 게임 공용).
   공통 틀의 정본은 `docs/dot-rpg-engine.md` — 새 도트 RPG를 만들기 전에 반드시 먼저 읽는다.
@@ -50,7 +56,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   `voxel-world/CLAUDE.md`(설계도) → `ROADMAP.md`(단계) → `HANDOFF.md`(일지) 순으로 읽고,
   충돌 시 그쪽 문서가 이 문서보다 우선한다.
 - `soccer/` — "반대항축구": 20인 온라인 탑뷰 축구 (진행 중, 다중 파일: `index.html` + 공유 `game-core.js` + 도트 캐릭터 `sprites.js`.
-  **Node.js 서버 `soccer/server/` 는 2단계에서 만든다** — 아직 없다. npm 의존성은 `ws` 하나 예정).
+  **Node.js 서버 `soccer/server/`** — `server.js`(정적 + WebSocket 경기 서버) · `loadtest.js`(사람 없이 흐름 재현) · npm 의존성은 `ws` 하나.
+  혼자 하기는 서버 없이 되고(`file://` 포함), 여러 명이서 하기는 `cd soccer/server && npm start` → http://localhost:8080/).
   같은 감독 문서 체계(`soccer/CLAUDE.md` → `ROADMAP.md` → `HANDOFF.md`)이고 그쪽 문서가 우선한다.
 - `poster-editable/` — 공익 포스터를 미리캔버스에서 요소별로 움직일 수 있게 재구성한 것.
   웹앱이 아니라 **파이썬 빌드 도구**(`src/build_all.py` → `out/*.pdf|pptx`)
@@ -85,6 +92,7 @@ python -m http.server 8765
 - http://localhost:8765/europe-rpg/ (모바일 모드, `?debug=1` 훅, 비밀번호는 코드의 `PASSWORD`)
 - http://localhost:8765/love-rpg/ (판매 데모, 비밀번호 0000, `?debug=1` 훅)
 - http://localhost:8765/retire-rpg/ (판매 데모, 비밀번호 0000, `?debug=1`이면 `NS.setEra`·`NS.eraYear`)
+- http://localhost:8765/goth-rpg/ (판매 데모, 비밀번호 0000, `?debug=1` 훅)
 - http://localhost:8765/iso-faces/ (`?debug=1`이면 `window.BD` 훅)
 - http://localhost:8765/lucky-day/ (`?debug=1`이면 `window.LD` 훅)
 - http://localhost:8765/event-price/
@@ -118,7 +126,7 @@ python -m http.server 8765
 **새로운 영속 상태도 반드시 `store`를 통해야 한다.**
 
 사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`,
-`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
+`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `gt_*`(goth-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
 `file://`에서는 모든 앱이 같은 localStorage 네임스페이스를 쓰므로 접두사가 충돌 방지 수단이다.
 
 ## 앱별 구조
@@ -415,40 +423,13 @@ couple-rpg와 같은 챕터형(`CHAPTERS` + `QUESTS.c1~c7`). 공통 엔진은 `d
   이 곡선을 완만하게 고치면 소설의 논지가 사라진다.
   **3장의 커넥터 접속에는 타이밍 게임을 두지 않는다** — 몸을 얻는 가장 중요한 순간이
   손가락 시험으로 바뀌면 장면이 죽는다. 저절로 꽂히고, 목·척추·신경이 한 줄씩 지나갈 뿐이다.
-- **머리통은 손으로 깎지 않는다 — 실제 사람 메시를 쓴다.** 코드로 깎은 얼굴은 천장이 낮아
-  눈·코·입이 끝내 읽히지 않았다(실패 이력). 지금은 **MakeHuman 베이스 메시 hm08**(CC0 1.0,
-  `makehumancommunity/makehuman`)을 가공해 데이터 블록으로 굽는다:
-  body 그룹만 → 목 위 평면 하나로 절단(반지름 필터를 쓰면 턱 밑에 구멍이 더 생긴다) →
-  높이 1로 정규화 → QEM으로 8,440면→2,099면 → 경계 고리 하나만 뚜껑 → **안구 두 개를 심는다** →
-  uint16 양자화. `HEAD_META.eyeStart` 이후 정점이 안구이고, 디코더가 정점색 r=0으로 표시한다.
-- **눈은 반드시 안구(구)가 있어야 한다.** 평면에 무늬만 칠하면 어떻게 해도 빈 눈구멍으로 보인다.
-  안구 반지름 12mm, 살갗보다 1.4mm 돌출. 셰이더는 평면 좌표가 아니라 **안구 중심에서 본 방향**으로
-  칠한다 — 홍채 30°, 동공 9° 이내. 그래서 동공이 안구 밖으로 나가거나 파묻히는 일이 구조적으로 없다.
-  **셰이더의 안구 중심값은 메시의 `eyeC` 와 항상 같아야 한다.**
-  눈꺼풀은 아몬드 밖을 살갗으로 덮어 만든다. 어두운 방을 위해 눈에만 약한 자체발광을 준다.
-  얼굴의 다른 무늬(눈썹·콧구멍·입술·머리칼)는 `front *= (1-isEye)` 로 안구에 칠하지 않는다.
-  **얼굴 좌표는 메시에서 직접 잰 값이다**(눈 ±0.132/-0.017, 코끝 -0.177, 입선 -0.313, 턱 -0.5).
-  메시를 바꾸면 정규화 기준이 움직이므로 **전부 다시 재야 한다.**
-- **200개를 개별 draw로 그리면 그게 곧 렉이다** — 메시는 하나만 만들고 `HEADS` 프로그램으로 인스턴싱한다
-  (인스턴스마다 회전·크기·살빛·머리칼 양). WebGL2에 baseInstance가 없어서
-  **방마다 VAO를 따로 만들어 오프셋으로 구간을 나눈다**(`HEAD_SETS`),
+- **머리통은 진짜 머리 모양이어야 한다.** 공 하나로는 사람으로 안 보인다.
+  `HEAD_RINGS`(턱→정수리 수평 단면 15줄) + `headBump()`(눈두덩·눈구멍·광대·관자놀이·코·인중·입술·턱·목덜미)로
+  깎고, 귀·눈알·목 그루터기를 붙인다. 정점색이 재질을 나른다(**r=살, g=머리칼, b=입술**).
+  **200개를 개별 draw로 그리면 그게 곧 렉이다** — 메시는 하나만 만들고 `HEADS` 프로그램으로 인스턴싱한다
+  (인스턴스마다 회전·크기·살빛·머리칼 양). 동공만 `EYES` 프로그램으로 따로 굴린다.
+  WebGL2에 baseInstance가 없어서 **방마다 VAO를 따로 만들어 오프셋으로 구간을 나눈다**(`HEAD_SETS`),
   `roomNear()`로 문에서 26m 밖인 방은 통째로 건너뛴다.
-- **기동대는 사람 모양이 아니다.** 거미형 기계다(`drawSpider`) — 작은 몸통(0.80m)에
-  아주 긴 다리(넓적다리 1.05 + 정강이 2.55), 몸통 높이 1.82m, **무릎이 몸통보다 높이 솟는다.**
-  다리는 **2관절 역기구학**으로 푼다. 각도를 고정값으로 흔들면 발이 바닥을 뚫는다.
-  발 관절은 9cm 띄우고 발톱 끝이 바닥에 닿게 한다(그 아래 달린 구슬·발톱이 박히기 때문).
-  머리(코어)만 실제 모델 — **Khronos glTF-Sample-Assets / SciFiHelmet, CC0 1.0**, 23,358면→900면.
-  (후보였던 BrainStem 로봇은 **Poser EULA** 라 쓸 수 없다. 받기 전에 LICENSE.md 를 반드시 본다.)
-- **선반은 통과할 수 없다**(`BLOCK`/`blocked()`). 머리통을 뚫고 걸으면 이야기가 무너진다.
-  양옆에 1m 통로를 남겼고, 두 격리실 모두 문에서 **도달률 100%**(격자 BFS 실측).
-  몸이 생기는 자리가 선반 위라 `bodyReady()`에서 한 걸음 앞으로 내보내고 `unstick()`을 둔다.
-- **구경 모드** `?view=face` / `?view=spider` — 게임을 진행하지 않고 머리통·기동대만 돌려 본다.
-  얼굴 구경은 방·복도를 그리지 않고 머리 하나만 띄운다(`VIEW_HEAD`). 방 안에서 보면
-  모니터 뒤판이 화면을 가린다.
-- **2장은 휴대폰에서 화면을 눌러 커서를 보낸다.** 손가락으로 방향키를 미는 건 고역이라,
-  단말기 화면을 누르면 그 자리로 저절로 가고 속도도 2.4배다.
-- **소리**: 효과음은 공용 잡음 버퍼를 돌려 쓴다(`noise()`). 발소리마다 새로 만들면
-  난수 2만 개를 매번 채우게 된다. 오른쪽 위 🔊 단추로 끄고 켠다.
 - **광량이 감정선이다**: `mood(lightMul, fogMul)`로 장마다 밝기·안개를 민다.
   실측 평균 밝기 격리실 33 → 복도 75 안팎. 이 대비가 "닭장 같은 공간이 아닌 곳"이다.
   **알베도를 낮춰 어둡게 만들지 말 것** — 화면이 죽는다. 어둠은 광량과 안개로만 만든다.

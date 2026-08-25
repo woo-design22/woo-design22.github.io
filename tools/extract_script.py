@@ -18,7 +18,7 @@ playPick 안내와 보기 · playRhythm/playStack 등 미니게임 라벨.
 import io, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-GAMES = ['namsan-rpg', 'couple-rpg', 'europe-rpg', 'love-rpg', 'retire-rpg']
+GAMES = ['namsan-rpg', 'couple-rpg', 'europe-rpg', 'love-rpg', 'retire-rpg', 'goth-rpg']
 
 # 대사 본문: 보통 글자·이스케이프에 더해 "' + 변수 + '" 이음매도 한 덩어리로 본다
 BODY = r"(?:[^'\\]|\\.|'\s*\+\s*[A-Za-z_$][\w.$\[\]']*\s*\+\s*')*"

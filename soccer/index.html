@@ -34,6 +34,7 @@
     --hud-bg: rgba(15, 23, 42, 0.72);
     --accent: #22c55e;
     --danger: #ef4444;
+    --kick-box: #67e8f9;       /* 앞차기 판정 네모 */
     --fart: #a3e635;
     --btn: rgba(255, 255, 255, 0.14);
     --btn-border: rgba(255, 255, 255, 0.38);
@@ -290,7 +291,7 @@
     <h1 id="bdTitle">하프타임</h1>
     <div class="final" id="bdScore"></div>
     <div class="bdwin" id="bdWin"></div>
-    <table class="board"><thead><tr><th>선수</th><th>골</th><th>유효슈팅</th><th>결정적 수비</th></tr></thead>
+    <table class="board"><thead><tr><th>선수</th><th>골</th><th>도움</th><th>유효슈팅</th><th>결정적 수비</th><th>기절시킴</th></tr></thead>
       <tbody id="bdRows"></tbody></table>
     <div class="mom" id="bdMom"></div>
     <div class="hint" id="bdHint"></div>
@@ -351,6 +352,7 @@
     keeper: cssVar('--keeper'), keeperDark: cssVar('--keeper-dark'),
     ball: cssVar('--ball'), ballMark: cssVar('--ball-mark'), shadow: cssVar('--shadow'),
     stun: cssVar('--stun'), charge: cssVar('--charge'), curve: cssVar('--curve'), ult: cssVar('--ult'), fart: cssVar('--fart'),
+    kickBox: cssVar('--kick-box'),
     text: cssVar('--text'), muted: cssVar('--muted'), mapBg: cssVar('--map-bg'),
     outGrass: cssVar('--out-grass'), track: cssVar('--track'), stand: cssVar('--stand'),
     standStep: cssVar('--stand-step'), crowdHead: cssVar('--crowd-head')
@@ -769,27 +771,31 @@
         ctx.strokeStyle = COLOR.text; ctx.lineWidth = Math.max(1, 1.6 * s); ctx.globalAlpha = 0.8;
         ctx.beginPath(); ctx.ellipse(x, y, R * 1.3, R * 0.5, 0, 0, TAU); ctx.stroke(); ctx.globalAlpha = 1;
       }
-      // 방귀 판정은 **바라보는 방향의 뒤쪽 정사각형**이다 — 판정 식과 똑같은 사각형을 그려 준다
-      // (앞모서리가 선수 중심, 뒤로 2×half, 옆으로 ±half). 그림과 판정이 어긋나면 안 된다.
-      if (p.motionName === 'fart') {
-        var half = core.TUNING.kick.fartHalf * (core.CHARACTERS[charOfSlot(p.slot)] || core.CHARACTERS[0]).kickRange * s;
+      // 방귀는 **뒤쪽**, 앞차기는 **앞쪽** 정사각형이다 — 판정 식과 똑같은 사각형을 그려 준다.
+      // (모서리 하나가 선수 중심에 걸리고 2×half 만큼 뻗으며 옆으로 ±half). 그림과 판정이 어긋나면 안 된다.
+      var fartNow = p.motionName === 'fart', kickNow = p.motionName === 'kick' && !p.hasBall;
+      if (fartNow || kickNow) {
+        var K = core.TUNING.kick;
+        var half = (fartNow ? K.fartHalf : K.kickHalf) * (core.CHARACTERS[charOfSlot(p.slot)] || core.CHARACTERS[0]).kickRange * s;
         var fade = 1 - Math.min(1, animPhase(p, now));
         ctx.save();
         ctx.translate(x, y); ctx.rotate(p.facing);   // 보간을 껐으므로 판정에 쓰인 방향과 같다
-        var fx = fartImg();
+        var x0 = fartNow ? -2 * half : 0;          // 방귀는 뒤로, 앞차기는 앞으로 뻗는다
+        var fx = fartNow ? fartImg() : null;
         if (fx) {
           // 그림을 판정 사각형에 **정확히 맞춰** 늘린다 — 보이는 것이 곧 맞는 범위여야 한다
           ctx.globalAlpha = 0.55 + 0.45 * fade;
-          ctx.drawImage(fx, -2 * half, -half, 2 * half, 2 * half);
+          ctx.drawImage(fx, x0, -half, 2 * half, 2 * half);
           ctx.globalAlpha = 0.30 + 0.35 * fade;
           ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
-          ctx.strokeRect(-2 * half, -half, 2 * half, 2 * half);
+          ctx.strokeRect(x0, -half, 2 * half, 2 * half);
         } else {
+          var col = fartNow ? COLOR.fart : COLOR.kickBox;
           ctx.globalAlpha = 0.18 + 0.24 * fade;
-          ctx.fillStyle = COLOR.fart; ctx.fillRect(-2 * half, -half, 2 * half, 2 * half);
+          ctx.fillStyle = col; ctx.fillRect(x0, -half, 2 * half, 2 * half);
           ctx.globalAlpha = 0.55 + 0.4 * fade;
-          ctx.strokeStyle = COLOR.fart; ctx.lineWidth = Math.max(1.5, 2 * s);
-          ctx.strokeRect(-2 * half, -half, 2 * half, 2 * half);
+          ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.5, 2 * s);
+          ctx.strokeRect(x0, -half, 2 * half, 2 * half);
         }
         ctx.restore();
       }
@@ -838,11 +844,13 @@
       win.style.color = w ? "var(--team-b)" : "var(--team-a)";
     }
     // 기록표 — 골 많은 순 → 유효슈팅 → 결정적 수비
-    var t = (e.table || []).slice().sort(function (a, b) { return (b.g - a.g) || (b.s - a.s) || (b.d - a.d); });
+    var t = (e.table || []).slice().sort(function (a, b) {
+      return (b.g - a.g) || (b.a - a.a) || (b.s - a.s) || (b.d - a.d) || (b.k - a.k);
+    });
     var rows = $("bdRows"); rows.innerHTML = "";
     if (!t.length) {
       var tr0 = document.createElement("tr");
-      tr0.innerHTML = '<td class="who" colspan="4" style="color:var(--muted)">아직 기록이 없습니다</td>';
+      tr0.innerHTML = '<td class="who" colspan="6" style="color:var(--muted)">아직 기록이 없습니다</td>';
       rows.appendChild(tr0);
     }
     for (var i = 0; i < t.length; i++) {
@@ -851,13 +859,15 @@
       var col = r.team ? "var(--team-b)" : "var(--team-a)";
       tr.innerHTML = '<td class="who"><span class="dot" style="background:' + col + '"></span>' +
         nickOfSlot(r.slot) + ' <span style="color:var(--muted);font-size:12px">' + charNameOfSlot(r.slot) + '</span></td>' +
-        '<td class="num">' + r.g + '</td><td class="num">' + r.s + '</td><td class="num">' + r.d + '</td>';
+        '<td class="num">' + r.g + '</td><td class="num">' + (r.a || 0) + '</td><td class="num">' + r.s +
+        '</td><td class="num">' + r.d + '</td><td class="num">' + (r.k || 0) + '</td>';
       rows.appendChild(tr);
     }
     var mom = $("bdMom");
     if (end && e.mom) {
       mom.innerHTML = '오늘의 선수 <b>' + nickOfSlot(e.mom.slot) + '</b> — 골 ' + e.mom.g +
-        ' · 유효슈팅 ' + e.mom.s + ' · 결정적 수비 ' + e.mom.d;
+        ' · 도움 ' + (e.mom.a || 0) + ' · 유효슈팅 ' + e.mom.s +
+        ' · 결정적 수비 ' + e.mom.d + ' · 기절시킴 ' + (e.mom.k || 0);
     } else mom.textContent = "";
     $("bdHint").textContent = end ? "잠시 뒤 처음 화면으로 돌아갑니다." : "곧 후반이 시작됩니다.";
     boardT = end ? 9 : 4.4;

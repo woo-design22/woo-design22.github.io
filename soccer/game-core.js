@@ -83,7 +83,11 @@
       // 앞모서리가 선수 중심을 지나고 뒤로 한 변만큼 뻗는다: 뒤 방향 0~2×fartHalf, 옆 방향 ±fartHalf.
       // 맞은 상대가 공을 갖고 있었으면 그 공이 넘어온다(빼앗기).
       // 8차 지시로 **면적을 15% 줄였다**: 한 변에 √0.85 = 0.9220 을 곱해 48 → 44.26 (넓이 96² → 88.5²  = 85%).
-      fartHalf: 44.26     // 정사각형 반변. 캐릭터 kickRange 배율이 곱해진다(덩치형 62)
+      fartHalf: 44.26,    // 정사각형 반변. 캐릭터 kickRange 배율이 곱해진다(덩치형 62)
+      // **앞차기도 정사각형이다**(2026-08-26 지시). 부채꼴은 어디까지 맞는지 눈으로 알 수 없었다.
+      // 뒷모서리가 선수 중심을 지나고 앞으로 2×kickHalf 만큼 뻗으며 옆으로 ±kickHalf.
+      // 옛 부채꼴(반지름 56 · ±60°)의 넓이 3,284 와 비슷하게 맞춘 값이다(4 × 28.7² = 3,294).
+      kickHalf: 28.7
     },
     ball: {
       possessRadius: 28,  // 선수 중심에서 이 거리 안이면 소유 (선수 반지름 18 + 10)
@@ -108,7 +112,7 @@
     // Q/E: 속도는 직선 슛보다 느리고 거리는 슛보다 조금 길다.
     // turnMax 로 총 회전을 끊는다 — 없으면 최대 충전 시 공이 되돌아온다. 2차 지시로 더 휘게(1.9 → 2.7rad = 155°).
     // 거리는 **슛과 같다**(10차 지시). 슛 거리를 바꾸면 이 값도 같이 바꿔야 한다.
-    curve:   { speed: 480, range: 400, chargeTicks: 12, spinMin: 0.010, spinMax: 0.052, turnMax: 2.0 },
+    curve:   { speed: 480, range: 480, chargeTicks: 12, spinMin: 0.010, spinMax: 0.052, turnMax: 2.0 },
     keeper: {
       x: 24, r: 18,       // r = 몸통(선수 반지름과 맞춘다)
       saveR: 30,          // 찬 공을 막는 반지름. 판정 폭 (30+6+2)×2 = 76 → 골대 폭 200의 38%
@@ -176,7 +180,7 @@
   // ── 상태 ─────────────────────────────────────────────────────────────────
   function newStats() {
     var a = new Array(C.MAX_PLAYERS);
-    for (var i = 0; i < C.MAX_PLAYERS; i++) a[i] = { g: 0, s: 0, d: 0 };
+    for (var i = 0; i < C.MAX_PLAYERS; i++) a[i] = { g: 0, a: 0, s: 0, d: 0, k: 0 };
     return a;
   }
   /* 결정적 수비 — **우리 진영 3분의 1 안에서** 상대의 공을 끊었을 때만 센다.
@@ -200,8 +204,8 @@
     if (!state.stats) return out;
     for (var i = 0; i < C.MAX_PLAYERS; i++) {
       var st = state.stats[i], p = state.players[i];
-      if (!st || (!st.g && !st.s && !st.d)) continue;
-      out.push({ slot: i, team: p ? p.team : -1, g: st.g, s: st.s, d: st.d });
+      if (!st || (!st.g && !st.a && !st.s && !st.d && !st.k)) continue;
+      out.push({ slot: i, team: p ? p.team : -1, g: st.g, a: st.a, s: st.s, d: st.d, k: st.k });
     }
     return out;
   }
@@ -212,10 +216,12 @@
     var win = state.score[0] === state.score[1] ? -1 : (state.score[0] > state.score[1] ? 0 : 1);
     for (var i = 0; i < t.length; i++) {
       var r = t[i];
-      var v = r.g * 5 + r.s * 2 + r.d * 2 + (r.team === win ? 1 : 0);
+      // 골이 확실히 앞서도록 무겁게 준다. 기절은 발차기 연타로 수십 개가 쌓여서 0.25 만 센다
+      // (실측: 같은 무게로 두면 골 2개 + 기절 36개가 골 3개를 이겼다).
+      var v = r.g * 10 + r.a * 6 + r.s * 2 + r.d * 2 + r.k * 0.25 + (r.team === win ? 1 : 0);
       if (v > bestV || (v === bestV && best && r.g > best.g)) { bestV = v; best = r; }
     }
-    return best ? { slot: best.slot, team: best.team, g: best.g, s: best.s, d: best.d, score: bestV } : null;
+    return best ? { slot: best.slot, team: best.team, g: best.g, a: best.a, s: best.s, d: best.d, k: best.k, score: bestV } : null;
   }
   function createState(opts) {
     opts = opts || {};
@@ -232,7 +238,7 @@
       score: [0, 0],
       kickoffTeam: 0,
       ball: { x: C.FIELD_W / 2, y: C.FIELD_H / 2, vx: 0, vy: 0, range: 0, spin: 0, spinLeft: 0, pierce: 0,
-              owner: -1, lastKicker: -1, kickCd: 0, keeperCd: 0 },
+              owner: -1, lastKicker: -1, assist: -1, kickCd: 0, keeperCd: 0 },
       keepers: [{ side: 0, y: C.FIELD_H / 2, hitT: 0 }, { side: 1, y: C.FIELD_H / 2, hitT: 0 }],
       players: players,
       // 경기 기록 — 슬롯마다 { g 골, s 유효슈팅, d 결정적 수비 }.
@@ -302,7 +308,7 @@
   function resetBall(state) {
     var b = state.ball;
     b.x = C.FIELD_W / 2; b.y = C.FIELD_H / 2; b.vx = 0; b.vy = 0; b.range = 0; b.range0 = 0; b.spin = 0; b.spinLeft = 0; b.pierce = 0;
-    b.owner = -1; b.lastKicker = -1; b.kickCd = 0; b.keeperCd = 0;
+    b.owner = -1; b.lastKicker = -1; b.assist = -1; b.kickCd = 0; b.keeperCd = 0;
   }
 
   function resetPositions(state) {
@@ -402,6 +408,9 @@
       b.owner = -1; b.lastKicker = v.slot; b.kickCd = TUNING.ball.kickCdTicks;
       b.vx = Math.cos(dir) * 120; b.vy = Math.sin(dir) * 120; b.range = 60; b.range0 = 60; b.spin = 0; b.spinLeft = 0;
     }
+    // 기록: 상대를 기절시킨 횟수. **한 번에 세 명을 눕히면 3개**다(호출이 사람마다 한 번씩 온다).
+    var stunner = state.players[bySlot];
+    if (stunner && stunner.team !== v.team) note(state, bySlot, 'k');
     ev.push({ kind: 'hit', slot: bySlot, victim: v.slot });
   }
 
@@ -459,7 +468,12 @@
 
     if (p.stunT > 0) {
       p.stunT--;
-      if (p.stunT === 0) p.immuneT = T.stunImmuneTicks;   // 깨어나면 잠깐 무적
+      if (p.stunT === 0) {
+        p.immuneT = T.stunImmuneTicks;   // 깨어나면 잠깐 무적
+        // 기절 중 누르고 있던 버튼을 **깨어나는 즉시** 한 번 먹인다(2026-08-26 지시).
+        // 눌린 것을 '새로 눌림'으로 다시 보게 하려고 이전 상태를 지운다.
+        p.prevButtons = 0;
+      }
       if (p.knockT > 0) { p.knockT--; p.vx = Math.cos(p.knockDir) * T.knockback; p.vy = Math.sin(p.knockDir) * T.knockback; }
       p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, C.FIELD_W - C.PLAYER_R);
       p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, C.FIELD_H - C.PLAYER_R);
@@ -551,26 +565,24 @@
       if (a.kickKind === 3) continue;          // 공을 차는 동작(슛·감아차기)은 사람을 때리지 않는다
       var fart = a.kickKind === 2;
       var mul = CHARACTERS[a.char].kickRange;
-      var half = K.fartHalf * mul;                       // 방귀: 선수 중심 정사각형의 반변
-      var range = K.range * mul, cone = K.coneDeg * Math.PI / 180;
+      var half = (fart ? K.fartHalf : K.kickHalf) * mul;   // 정사각형 반변 — 방귀는 뒤, 앞차기는 앞
       for (var j = 0; j < C.MAX_PLAYERS; j++) {
         var v = state.players[j];
         if (!v || v.team === a.team || v.stunT > 0) continue;
         if (ultActive(v, 'charge')) continue;    // 돌진 중엔 기절하지 않는다
         var vdx = v.x - a.x, vdy = v.y - a.y, dir;
+        // **앞차기도 방귀도 정사각형이다.** 바라보는 방향을 축으로 놓고 앞뒤(uu)·좌우(vv)로 잰다.
+        // 클라이언트가 그리는 사각형과 **완전히 같은 식**이다(§5.2). 어긋나면 안 된다.
+        var cf = Math.cos(a.facing), sf = Math.sin(a.facing);
+        var uu = vdx * cf + vdy * sf;            // 앞뒤(+가 앞)
+        var vv = -vdx * sf + vdy * cf;           // 좌우
+        if (Math.abs(vv) > half) continue;
         if (fart) {
-          // **뒤쪽 정사각형**: 바라보는 방향을 축으로 놓고, 뒤로 0~2×half · 옆으로 ±half 안이면 맞는다.
-          // 클라이언트가 그리는 사각형과 완전히 같은 식이다(§5.2).
-          var cf = Math.cos(a.facing), sf = Math.sin(a.facing);
-          var uu = vdx * cf + vdy * sf;          // 앞뒤(+가 앞)
-          var vv = -vdx * sf + vdy * cf;         // 좌우
-          if (uu > 0 || uu < -2 * half || Math.abs(vv) > half) continue;
+          if (uu > 0 || uu < -2 * half) continue;
           dir = normAngle(a.facing + Math.PI);   // 넉백은 뒤로
         } else {
+          if (uu < 0 || uu > 2 * half) continue;
           dir = a.facing;
-          var d = Math.hypot(vdx, vdy);
-          if (d > range) continue;
-          if (d > 0.001 && Math.abs(angleDiff(dir, Math.atan2(vdy, vdx))) > cone) continue;
         }
         var hadBall = state.ball.owner === v.slot;
         stunPlayer(state, v, TUNING.player.stunTicks, dir, ev, a.slot);
@@ -693,6 +705,10 @@
     b.x = pos[0]; b.y = pos[1];
     b.vx = Math.cos(dir) * speed; b.vy = Math.sin(dir) * speed;
     b.range = range; b.range0 = range; b.spin = spin || 0; b.spinLeft = 0; b.pierce = pierce ? 1 : 0;
+    // 어시스트: **직전에 공을 찬 사람이 우리 팀의 다른 선수면** 그 사람을 후보로 남긴다.
+    // 상대가 중간에 찼으면 자연히 -1 이 되어 끊긴다(팀이 다르므로).
+    var prev = b.lastKicker, prevP = prev >= 0 ? state.players[prev] : null;
+    b.assist = (prevP && prev !== p.slot && prevP.team === p.team) ? prev : -1;
     b.owner = -1; b.lastKicker = p.slot; b.kickCd = TUNING.ball.kickCdTicks;
     p.charge = 0; p.chargeKind = 0;
     clampCarried(b);
@@ -870,7 +886,11 @@
     }
     // 기록: 넣은 선수에게 골 하나와 유효슈팅 하나. 자책골(내 팀 골대)은 아무에게도 주지 않는다.
     var sc = state.players[b.lastKicker];
-    if (sc && sc.team === team) { note(state, b.lastKicker, 'g'); note(state, b.lastKicker, 's'); }
+    if (sc && sc.team === team) {
+      note(state, b.lastKicker, 'g'); note(state, b.lastKicker, 's');
+      var as = b.assist >= 0 ? state.players[b.assist] : null;
+      if (as && as.team === team && b.assist !== b.lastKicker) note(state, b.assist, 'a');
+    }
     ev.push({ kind: 'goal', team: team, scorer: b.lastKicker, score: [state.score[0], state.score[1]] });
   }
 
@@ -1108,14 +1128,22 @@
       var att = 1 - sideOf(state, p.team);              // 내가 공격하는 쪽
       var goalX = att === 0 ? 0 : C.FIELD_W, goalY = C.FIELD_H / 2;
       var myGoalX = att === 0 ? C.FIELD_W : 0;           // 내가 지키는 골대
-      var lane = (slot % 2 === 0) ? -90 : 90;           // 두 명이 겹치지 않게 위/아래로 갈라선다
+      /* 성향 3종 — 같은 인공지능이 다 몰려다니지 않게 슬롯마다 역할을 준다(2026-08-26 지시).
+         0 공격형: 앞으로 나가 있고 멀리서도 슛한다. 수비 가담이 적다.
+         1 중원형: 예전 그대로. 공을 쫓고 연결한다.
+         2 수비형: 우리 진영을 지킨다. 공이 우리 쪽으로 넘어와야 달려든다. */
+      var role = slot % 3;
+      var ROLE = [{ up: 0.80, home: 0.62, shootAt: 360, chase: 0.55, lane: 150 },
+                  { up: 0.55, home: 0.45, shootAt: 300, chase: 1.00, lane: 90 },
+                  { up: 0.30, home: 0.20, shootAt: 250, chase: 0.75, lane: 55 }][role];
+      var lane = (slot % 2 === 0 ? -1 : 1) * ROLE.lane;   // 위/아래로 갈라서되 성향마다 폭이 다르다
       var m = memOf(slot), tx, ty, sprint = false;
 
       if (b.owner === slot) {
         // 내가 공을 갖고 있다 — 골대로 몰고 가다가 사거리에 들면 충전 슛
         var dg = Math.hypot(goalX - p.x, goalY - p.y);
         var foe = nearestFoe(state, p);
-        if (dg < 300) {
+        if (dg < ROLE.shootAt) {
           if (m.ch < 9) { m.ch++; out.buttons |= BTN.KICK; } else m.ch = 0;   // 9틱 충전 후 놓기 = 슛
           tx = goalX; ty = goalY;
         } else {
@@ -1128,13 +1156,16 @@
         // 팀원이 갖고 있다 — 앞쪽으로 벌려서 받을 자리를 잡는다
         m.ch = 0;
         var mate = state.players[b.owner];
-        tx = mate.x + (goalX - mate.x) * 0.55; ty = clamp(mate.y + lane, 80, C.FIELD_H - 80);
+        tx = mate.x + (goalX - mate.x) * ROLE.up; ty = clamp(mate.y + lane, 80, C.FIELD_H - 80);
         sprint = p.stam > T.player.staminaMax * 0.6;
       } else if (b.owner >= 0) {
         // 상대가 갖고 있다 — 가장 가까운 한 명만 달려들고 나머지는 골문 앞을 지킨다
         m.ch = 0;
         var car = state.players[b.owner];
-        if (isClosest(state, p)) {
+        // 수비형은 공이 우리 진영 가까이 올 때만 달려든다 — 셋이 한꺼번에 몰리지 않게.
+        var farFromHome = Math.hypot(car.x - myGoalX, car.y - goalY);
+        var willChase = isClosest(state, p) && (role !== 2 || farFromHome < 520);
+        if (willChase) {
           tx = car.x + car.vx * 0.25; ty = car.y + car.vy * 0.25;   // 가는 앞을 자른다
           var d = Math.hypot(car.x - p.x, car.y - p.y);
           if (d < T.kick.range * 0.95) out.buttons |= BTN.KICK;     // 사거리에 들면 발차기로 기절
@@ -1159,8 +1190,11 @@
       } else {
         // 주인 없는 공
         m.ch = 0;
-        if (isClosest(state, p)) { tx = b.x; ty = b.y; sprint = p.stam > T.player.staminaMax * 0.4; }
-        else { tx = myGoalX + (b.x - myGoalX) * 0.45; ty = clamp(b.y + lane * 0.7, 80, C.FIELD_H - 80); }
+        // 공격형은 자기 진영 깊숙한 공은 주우러 가지 않는다(그 자리는 수비형 몫).
+        var mine2 = isClosest(state, p) &&
+          (role !== 0 || Math.hypot(b.x - myGoalX, b.y - goalY) > 300);
+        if (mine2) { tx = b.x; ty = b.y; sprint = p.stam > T.player.staminaMax * 0.4; }
+        else { tx = myGoalX + (b.x - myGoalX) * (0.25 + ROLE.home); ty = clamp(b.y + lane * 0.7, 80, C.FIELD_H - 80); }
       }
 
       var vx = tx - p.x, vy = ty - p.y, len = Math.hypot(vx, vy);

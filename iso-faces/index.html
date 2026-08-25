@@ -306,6 +306,14 @@
   }
   #end p{font-family:var(--serif);font-size:clamp(14px,2.4vw,17.5px);
          letter-spacing:.02em;text-indent:0;color:var(--ink);max-width:20em}
+  /* 실패로 끝났을 때 — 왜 끝났는지 한눈에 알아야 한다.
+     붉은 산세리프는 우주선이 내린 판정이라는 뜻이다(명조는 화자의 말). */
+  #end.fail h1{color:#e0655c;font-family:var(--sans);letter-spacing:.34em;
+               font-size:clamp(22px,5.4vw,36px)}
+  #end.fail h1:after{background:linear-gradient(90deg,transparent,rgba(224,101,92,.6),transparent)}
+  #endwhy{margin:0;font-family:var(--sans);font-size:clamp(12px,2vw,14px);
+          letter-spacing:.10em;color:#e0655c;line-height:1.9;max-width:22em;display:none}
+  #end.fail #endwhy{display:block}
   #cover button,#end button{
     font-family:var(--sans);font-size:11px;color:var(--ink);letter-spacing:.42em;text-indent:.42em;
     background:transparent;border:1px solid var(--line);
@@ -395,7 +403,8 @@
 </div>
 
 <div id="end">
-  <h1>격리실의 얼굴들</h1>
+  <h1 id="endh">격리실의 얼굴들</h1>
+  <p id="endwhy"></p>
   <p id="endtxt"></p>
   <button id="again">다시</button>
 </div>
@@ -744,6 +753,9 @@ function part(prim,sx,sy,sz,col,opt){
   gl.bindVertexArray(prim.vao);
   gl.drawArrays(gl.TRIANGLES,0,prim.n);
 }
+/* 이 물체에만 안개를 옅게(또는 짙게) 건다. k>1 이면 더 멀리까지 또렷하다.
+   MAIN 프로그램 전체에 걸리는 값이라 쓰고 나면 반드시 fogScale(1) 로 되돌려야 한다. */
+function fogScale(k){ gl.uniform1f(MAIN.u.uFogD, 52*fogMul*k); }
 
 /* ═══════════════════ 우주선 ═══════════════════
    좌표: X = 복도가 뻗은 방향, Y = 위, Z = 복도를 가로지르는 방향.
@@ -957,9 +969,17 @@ void main(){
     float sideE = (vL.x >= 0.0) ? 1.0 : -1.0;
     vec3  ctr   = vec3(sideE*0.132, -0.017, 0.283);   /* 안구 중심 — 메시의 eyeC 와 같아야 한다 */
     vec3  d     = normalize(vL - ctr);
-    vec3  ge    = normalize(vLE);
-    vec3  gz    = normalize(vec3(clamp(ge.x,-0.5,0.5)*0.45,
-                                 clamp(ge.y,-0.4,0.4)*0.45, 1.0));
+    /* 눈동자는 언제나 플레이어를 좇는다 — 보이는 머리는 모두 나를 본다.
+       안구 중심에서 카메라로 가는 방향을 그대로 쓴다(vLE 는 머리 원점 기준이라
+       안구 중심을 빼야 가까이 붙었을 때도 어긋나지 않는다).
+       사람 눈이 돌 수 있는 만큼만 돌린다 — 좌우 54°, 위아래 24°.
+       위아래를 더 좁게 잡는 이유: 눈꺼풀 아몬드가 세로로 납작해서(반지름 26mm 대 51mm)
+       더 돌리면 동공이 눈꺼풀 밑으로 숨는다. 머리가 돌아앉아 이 각도로 모자라면
+       끝까지 돌아간 채로 멈춘다 — 그게 곁눈질이 된다. */
+    vec3  ge    = normalize(vLE - ctr);
+    float gyaw  = clamp(atan(ge.x, ge.z), -0.95, 0.95);
+    float gpit  = clamp(asin(clamp(ge.y,-1.0,1.0)), -0.42, 0.42);
+    vec3  gz    = vec3(sin(gyaw)*cos(gpit), sin(gpit), cos(gyaw)*cos(gpit));
     float a     = dot(d, gz);
     vec3  eyeC  = vec3(0.93,0.91,0.87);                                  /* 흰자 */
     eyeC = mix(eyeC, vec3(0.34,0.21,0.11), smoothstep(0.850,0.884,a));   /* 홍채 12mm */
@@ -1105,12 +1125,43 @@ function wallX(b,x,z0,z1,h,col,dir,holes){
   }
   if(cur<z1) panelX(b,x,cur,z1,0,h,col,dir);
 }
-/* 문설주 — 두 벽 사이의 두께를 메운다 */
-function jamb(b,x,z,w,h,t,col){
+/* 격리실 문 — '문'으로 보여야 한다.
+   예전에는 벽에 구멍을 뚫고 가느다란 문설주만 둘렀더니, 플레이어가 그것을 문으로
+   읽지 못했다(실측 지적). 문으로 읽히려면 네 가지가 있어야 한다:
+   두툼한 문틀 · 바닥의 문턱 · **옆으로 물러난 문짝** · 표시등.
+   그 중에서도 문짝이 결정적이다 — 열린 문짝이 보여야 '열려 있는 문'이 된다.
+   co = 복도 쪽 방향(-R.side). 문짝·표시등은 복도에서 보이도록 그쪽에 붙인다. */
+function doorFrame(b,x,z,w,h,t,co){
+  const F=[0.46,0.50,0.55], D=[0.17,0.19,0.22], G=[0.45,0.95,0.72];
+  /* 문틀 — 두 벽 사이 두께를 메우고 복도 쪽으로 조금 튀어나온다 */
   for(const s of [-1,1]){
-    MS.push(); MS.move(x+s*(w/2+0.035),h/2,z); b.box(0.07,h,t,col); MS.pop();
+    MS.push(); MS.move(x+s*(w/2+0.075),h/2,z); b.box(0.15,h+0.15,t+0.10,F); MS.pop();
   }
-  MS.push(); MS.move(x,h+0.035,z); b.box(w+0.14,0.07,t,col); MS.pop();
+  MS.push(); MS.move(x,h+0.075,z); b.box(w+0.30,0.15,t+0.10,F); MS.pop();
+  /* 문턱 — 바닥 판과 문짝이 미끄러지는 홈 */
+  MS.push(); MS.move(x,0.012,z);          b.box(w+0.30,0.024,t+0.16,[0.30,0.32,0.35]); MS.pop();
+  MS.push(); MS.move(x,0.030,z+co*0.055); b.box(w+0.24,0.014,0.05,D); MS.pop();
+  /* 열려서 옆으로 물러난 문짝 */
+  MS.push(); MS.move(x+(w/2+0.52),h/2-0.02,z+co*0.14);
+    b.box(0.98,h-0.04,0.11,[0.34,0.37,0.41]);
+    MS.push(); MS.move(0,0,co*0.058); b.box(0.80,h-0.30,0.02,[0.24,0.27,0.31]); MS.pop();
+    /* 문짝 앞머리의 경고 빗금 — 닫히면 여기가 먼저 온다 */
+    for(let k=0;k<4;k++){
+      MS.push(); MS.move(-0.44,h/2-0.40-k*0.42,co*0.062);
+        b.box(0.07,0.26,0.016,[0.86,0.64,0.22]); MS.pop();
+    }
+  MS.pop();
+  /* 문짝이 들어가 있는 집 — 문틀 위로 이어진다 */
+  MS.push(); MS.move(x+(w/2+0.52),h+0.075,z+co*0.10); b.box(1.05,0.15,t+0.16,F); MS.pop();
+  /* 조작판과 표시등 — 반대쪽 문설주, 복도 쪽 면에 */
+  MS.push(); MS.move(x-(w/2+0.075),1.42,z+co*(t/2+0.062));
+    b.box(0.15,0.32,0.035,D);
+    MS.push(); MS.move(0,0.10,co*0.022); b.box(0.085,0.085,0.022,G); MS.pop();
+    MS.push(); MS.move(0,-0.02,co*0.022); b.box(0.085,0.018,0.022,[0.30,0.34,0.32]); MS.pop();
+    MS.push(); MS.move(0,-0.07,co*0.022); b.box(0.085,0.018,0.022,[0.30,0.34,0.32]); MS.pop();
+  MS.pop();
+  /* 문 위 초록 띠 — 멀리서도 '여기가 문'으로 읽히게 */
+  MS.push(); MS.move(x,h+0.20,z+co*(t/2+0.03)); b.box(w+0.30,0.055,0.035,G); MS.pop();
 }
 
 /* ─── 격리실 굽기 ─── */
@@ -1128,7 +1179,7 @@ function bakeRoom(R, seed, isMine){
     wallZ(b,R.z0,R.x0,R.x1,R.h,COL.wallB, 1, R.side>0?hole:null);
     wallX(b,R.x0,R.z0,R.z1,R.h,COL.wallB, 1,null);
     wallX(b,R.x1,R.z0,R.z1,R.h,COL.wallB,-1,null);
-    jamb(b,R.x,dz,DOORW,DOORH,0.12,[0.20,0.23,0.26]);
+    doorFrame(b,R.x,dz,DOORW,DOORH,0.12,-R.side);
     addLight(R.x,2.15,dz-R.side*0.9, 0.34,0.50,0.44, 8.5);
 
     /* 천장 등 — 흐릿한 초록 */
@@ -1199,14 +1250,16 @@ const HALLM = bake(function(b){
       b.cyl(0.055+k*0.012,w,10,COL.pipe,false);
     MS.pop();
   }
-  /* 문들 — 이 우주선에 있는 수천 개 격리실 중 하나하나 */
+  /* 복도 벽에 장식용 문을 세우지 않는다.
+     예전에는 12m마다 문짝을 붙여 '수천 개의 격리실'을 흉내 냈는데,
+     그 중 하나가 진짜 격리실 A 문(x=-30)에서 2m 옆(x=-32)에 서는 바람에
+     어느 쪽이 들어갈 수 있는 문인지 분간이 안 됐다(실측: 플레이어가 헷갈린다고 지적).
+     들어갈 수 있는 문은 격리실 A·B 둘뿐이고, 그 둘만 doorFrame 으로 세운다.
+     복도의 결은 갈비대와 배관만으로도 충분하다. */
+  /* 벽을 나누는 이음매 — 문으로 오해할 수 없게 바닥까지 닿지 않는 얕은 띠다 */
   for(let x=HALL.x0+6;x<HALL.x1-4;x+=12){
     for(const s of [-1,1]){
-      MS.push(); MS.move(x,1.15,s*(d/2-0.05));
-        b.box(1.7,2.3,0.10,COL.door);
-        MS.push(); MS.move(0,0,-s*0.06); b.box(1.45,2.05,0.03,[0.055,0.065,0.075]); MS.pop();
-        MS.push(); MS.move(0,1.28,0); b.box(0.42,0.05,0.05,[0.30,0.20,0.20]); MS.pop();
-      MS.pop();
+      MS.push(); MS.move(x,2.30,s*(d/2-0.03)); b.box(0.10,1.9,0.04,[0.26,0.28,0.31]); MS.pop();
     }
   }
 });
@@ -1225,10 +1278,80 @@ HEAD_SETS.push({s:_h0, n:HEAD_POS.length/3-_h0, R:ROOM_A}); _h0=HEAD_POS.length/
 const ROOMB = bakeRoom(ROOM_B, 8420, false);
 HEAD_SETS.push({s:_h0, n:HEAD_POS.length/3-_h0, R:ROOM_B});
 buildHeadVAO();          /* 방을 다 굽고 나서 머리통 인스턴스를 올린다 */
+/* ── 머리 인스턴스를 프레임마다 추려 담는 버퍼 ──
+   방 안에 있으면 머리가 삼각형의 87%(98개 × 3072 = 30만)를 차지하는데,
+   그 중 등 뒤에 있는 것까지 전부 그리고 있었다. 방마다 굳어 있던 VAO 대신
+   '지금 시야에 든 머리'만 다시 채워 한 번에 그린다.
+   98개를 도는 것은 CPU 로 눈금 아래고, 올리는 것도 몇 KB다. */
+let DYN_VAO=null, DYN_B=null, dynP=null, dynR=null, dynS=null;
+function buildDynVAO(cap){
+  dynP=new Float32Array(cap*3); dynR=new Float32Array(cap*3); dynS=new Float32Array(cap*3);
+  DYN_B=[0,1,2].map(function(){
+    const b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b);
+    gl.bufferData(gl.ARRAY_BUFFER,cap*12,gl.DYNAMIC_DRAW); return b;
+  });
+  const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+  gl.bindBuffer(gl.ARRAY_BUFFER,HEADM.buf);
+  const S=36;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,S,0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,S,12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,S,24);
+  DYN_B.forEach(function(b,k){
+    gl.bindBuffer(gl.ARRAY_BUFFER,b);
+    gl.enableVertexAttribArray(3+k); gl.vertexAttribPointer(3+k,3,gl.FLOAT,false,0,0);
+    gl.vertexAttribDivisor(3+k,1);
+  });
+  gl.bindVertexArray(null);
+  DYN_VAO=vao;
+}
+/* 시야 원뿔 안의 머리만 골라 담고, 담은 개수를 돌려준다.
+   화면 가장자리에서 머리가 툭 나타나지 않게 각을 넉넉히 잡는다(실화각 반각은 약 49°). */
+let HEAD_CONE = Math.cos(Math.min(3.10, Math.PI/3 + 0.30));
+function fillHeads(ex,ey,ez, fx,fy,fz){
+  let m=0;
+  for(const set of HEAD_SETS){
+    if(!set.R._vis) continue;
+    const end=set.s+set.n;
+    for(let i=set.s;i<end;i++){
+      const px=HEAD_POS[i*3], py=HEAD_POS[i*3+1], pz=HEAD_POS[i*3+2];
+      const dx=px-ex, dy=py-ey, dz=pz-ez;
+      const dist=Math.hypot(dx,dy,dz);
+      /* 코앞의 머리는 각을 재지 않는다 — 얼굴에 닿을 만큼 가까우면 무조건 보인다 */
+      if(dist>1.6 && (dx*fx+dy*fy+dz*fz)/dist < HEAD_CONE) continue;
+      dynP[m*3]=px; dynP[m*3+1]=py; dynP[m*3+2]=pz;
+      dynR[m*3]=HEAD_RSH[i*3]; dynR[m*3+1]=HEAD_RSH[i*3+1]; dynR[m*3+2]=HEAD_RSH[i*3+2];
+      dynS[m*3]=HEAD_SKIN[i*3]; dynS[m*3+1]=HEAD_SKIN[i*3+1]; dynS[m*3+2]=HEAD_SKIN[i*3+2];
+      m++;
+    }
+  }
+  return m;
+}
+
+buildDynVAO(HEAD_POS.length/3);   /* 추려 담을 자리를 머리 전체 수만큼 잡아 둔다 */
+
 /* 그 방이 지금 보일 만한 자리인가 (문에서 26m 안) */
 function roomNear(R,x,z){
   const dz = R.side<0 ? R.z1 : R.z0;
   return Math.hypot(x-R.x, z-dz) < 26;
+}
+/* 방이 지금 화면에 나올 수 있는가.
+   거리만 보던 roomNear 로는 부족했다 — 복도에서는 방이 1.65m 문틈으로만 보이는데,
+   등을 돌리고 있어도 머리 98개(30만 삼각형)를 벽 뒤로 계속 던지고 있었다.
+   밖에 있으면 '문이 시야에 걸리는가'로 판정한다. 문이 화면 가장자리에서 튀어나오지 않게
+   반화각은 넉넉히(60°) 잡고, 문이 차지하는 각을 더해 준다. */
+const ROOM_CULL = 34;                 /* 이보다 멀면 안개에 묻혀 어차피 안 보인다 */
+const VIS_HALF  = Math.PI/3;          /* 넉넉한 반화각 */
+function roomVisible(R, ex,ey,ez, fx,fy,fz){
+  if(ex>R.x0-1.2 && ex<R.x1+1.2 && ez>R.z0-1.2 && ez<R.z1+1.2) return true;  /* 방 안 */
+  const dz = R.side<0 ? R.z1 : R.z0;
+  const dx=R.x-ex, dy=DOORH*0.5-ey, dd=dz-ez;
+  const dist=Math.hypot(dx,dy,dd);
+  if(dist>ROOM_CULL) return false;
+  /* 가까울수록 문이 넓은 각을 차지하므로 아래 atan2 항이 저절로 커진다.
+     그래서 '코앞이면 무조건 그린다' 같은 지름길을 두면 안 된다 —
+     문에 붙어 등을 돌렸을 때도 머리 98개를 계속 그리게 된다(실측). */
+  const c=(dx*fx+dy*fy+dd*fz)/dist;   /* 시선과 문 방향의 코사인 */
+  return c >= Math.cos(Math.min(3.08, VIS_HALF + Math.atan2(1.35,dist)));
 }
 
 const EYE_N = EYE_P.length/3;
@@ -1341,7 +1464,8 @@ const E = {
   hint:document.getElementById('hint'), focus:document.querySelector('#focus i'),
   pad:document.getElementById('pad'), stick:document.getElementById('stick'),
   act:document.getElementById('act'), cover:document.getElementById('cover'),
-  end:document.getElementById('end'), endtxt:document.getElementById('endtxt')
+  end:document.getElementById('end'), endtxt:document.getElementById('endtxt'),
+  endh:document.getElementById('endh'), endwhy:document.getElementById('endwhy')
 };
 let sayTimer=0;
 function say(text,hold){
@@ -1540,7 +1664,7 @@ const WALK = [
 function walkable(x,z){
   if(blocked(x,z)) return false;              /* 선반은 뚫고 지나갈 수 없다 */
   for(let i=0;i<WALK.length;i++){
-    if(i===3 && doorShutA) continue;          /* 4장에서 닫은 문은 다시 못 지난다 */
+    if(i===3 && (doorShutA||doorHoldA)) continue;   /* 닫힌 문(4장)·빗장 걸린 문(7장)은 못 지난다 */
     const r=WALK[i];
     if(x>=r.x0&&x<=r.x1&&z>=r.z0&&z<=r.z1) return true;
   }
@@ -1567,7 +1691,10 @@ function tryMove(nx,nz){
 /* 장마다 3D 위에 얹는 것들. draw()가 이걸 부른다.
    선언이 장(章)보다 먼저 와야 한다 — 장 정의에서 SCENE.extra에 대입하기 때문. */
 const SCENE = { extra:null, eyeRoll:1 };
-let doorShutA=false, jumpReq=false, blackout=0;
+/* doorShutA = 4장에서 내가 닫은 문(보이기도 하고 못 지나가기도 한다).
+   doorHoldA = 7장에서 문은 열려 있되 걸어서는 못 들어가게 잡아 두는 빗장.
+               들어가는 길은 '들어간다'를 세 번 누르는 것 하나뿐이어야 한다. */
+let doorShutA=false, doorHoldA=false, jumpReq=false, blackout=0;
 /* 광량과 안개는 장마다 다르다. 격리실은 눌러 두고 복도에서 터뜨린다 —
    '닭장 같은 공간이 아닌 곳'이라는 문장이 눈으로 느껴져야 한다. */
 let lightMul=0.60, fogMul=0.72, lightTarget=0.60, fogTarget=0.72;
@@ -1784,6 +1911,13 @@ const SPI_LEGS=[[0.34,0.26],[0.01,0.33],[-0.33,0.26],[-0.33,-0.26],[0.01,-0.33],
 /* 몸은 작게, 다리는 아주 길게 — 무릎이 몸통보다 높이 솟는 실루엣이 기괴하다 */
 const SPI_H=1.82, SPI_F=1.05, SPI_T=2.55, SPI_R=1.55, SPI_S=0.34;
 
+/* 그 자리(x,z)에서 목표(tx,tz) 쪽을 보는 yaw.
+   drawSpider 의 앞쪽은 국소 +x 이고, rotY(a) 는 +x 를 (cos a, 0, -sin a) 로 보낸다.
+   그래서 (dx,dz) 를 겨누려면 a = atan2(-dz, dx) 다.
+   예전에는 부르는 자리마다 -PI/2 를 박아 두어서, 기동대가 플레이어 쪽(+x)으로
+   달려오면서 몸도 머리도 +z(옆)를 보고 있었다. 각도를 손으로 적지 말고 여기서 구한다. */
+function faceTo(x,z,tx,tz){ return Math.atan2(-(tz-z), tx-x); }
+
 /* 거미형 기동대. x,z 바닥 위치 / yaw 진행 방향 / ph 걸음 위상 0~1 / rise 몸 높이 배율 */
 function drawSpider(x,z,yaw,ph,rise){
   rise = (rise===undefined?1:rise);
@@ -1848,38 +1982,46 @@ function drawSpider(x,z,yaw,ph,rise){
 /* ───────── 사람 그리기 (기동대 · 내 몸) ───────── */
 function figure(x,y,z,ry,phase,pal,opt){
   opt=opt||{};
+  /* 투명도 — 멀어지는 몸을 천천히 지우려고 쓴다. 각 부위가 저마다 opt 를 가질 수 있어
+     여기서 한 번 곱해 준다(원래 alpha 가 있으면 그것에 곱한다). */
+  const AL=(opt.alpha===undefined?1:opt.alpha);
+  function fp(prim,sx,sy,sz,col,o){
+    o = o ? Object.assign({},o) : {};
+    o.alpha = (o.alpha===undefined?1:o.alpha)*AL;
+    part(prim,sx,sy,sz,col,o);
+  }
   const sw=Math.sin(phase), amp=opt.run?0.9:0.5;
   MS.reset(); MS.move(x,y,z); MS.rotY(ry);
-  MS.push(); MS.move(0,0.03,0); part(P.disc,1.0,1,0.8,[0,0,0],{flat:true,alpha:0.30}); MS.pop();
+  MS.push(); MS.move(0,0.03,0); fp(P.disc,1.0,1,0.8,[0,0,0],{flat:true,alpha:0.30}); MS.pop();
   MS.move(0,Math.abs(sw)*0.04*(opt.run?1.6:1),0);
   if(opt.lean) MS.rotX(opt.lean);
   for(const s of [-1,1]){
     const a=(s>0?sw:-sw)*amp;
     MS.push(); MS.move(s*0.11,0.46,0); MS.rotX(a);
-      MS.push(); MS.move(0,-0.23,0); part(P.cyl,0.17,0.54,0.17,pal.leg); MS.pop();
-      MS.push(); MS.move(0,-0.48,0.05); part(P.box,0.17,0.10,0.29,pal.shoe); MS.pop();
+      MS.push(); MS.move(0,-0.23,0); fp(P.cyl,0.17,0.54,0.17,pal.leg); MS.pop();
+      MS.push(); MS.move(0,-0.48,0.05); fp(P.box,0.17,0.10,0.29,pal.shoe); MS.pop();
     MS.pop();
   }
-  MS.push(); MS.move(0,0.95,0); part(P.box,0.42,0.62,0.26,pal.top); MS.pop();
+  MS.push(); MS.move(0,0.95,0); fp(P.box,0.42,0.62,0.26,pal.top); MS.pop();
   for(const s of [-1,1]){
     const a=(s>0?-sw:sw)*amp*(opt.run?1.2:1);
     MS.push(); MS.move(s*0.28,1.18,0); MS.rotX(a);
-      MS.push(); MS.move(0,-0.25,0); part(P.cyl,0.14,0.54,0.14,pal.top); MS.pop();
-      MS.push(); MS.move(0,-0.53,0); part(P.sph,0.15,0.15,0.15,pal.skin||COL.skin); MS.pop();
+      MS.push(); MS.move(0,-0.25,0); fp(P.cyl,0.14,0.54,0.14,pal.top); MS.pop();
+      MS.push(); MS.move(0,-0.53,0); fp(P.sph,0.15,0.15,0.15,pal.skin||COL.skin); MS.pop();
     MS.pop();
   }
   if(!opt.headless){
-    MS.push(); MS.move(0,1.30,0); part(P.cyl,0.13,0.12,0.13,pal.skin||COL.skin); MS.pop();
+    MS.push(); MS.move(0,1.30,0); fp(P.cyl,0.13,0.12,0.13,pal.skin||COL.skin); MS.pop();
     MS.push(); MS.move(0,1.48,0);
-      part(P.sph,0.30,0.34,0.29,pal.skin||COL.skin);
-      MS.push(); MS.move(0,0.09,-0.01); part(P.sph,0.31,0.24,0.30,pal.hair||COL.hair); MS.pop();
+      fp(P.sph,0.30,0.34,0.29,pal.skin||COL.skin);
+      MS.push(); MS.move(0,0.09,-0.01); fp(P.sph,0.31,0.24,0.30,pal.hair||COL.hair); MS.pop();
       if(pal.visor){
-        MS.push(); MS.move(0,0.01,0.10); part(P.box,0.30,0.13,0.10,pal.visor,{emis:0.5}); MS.pop();
+        MS.push(); MS.move(0,0.01,0.10); fp(P.box,0.30,0.13,0.10,pal.visor,{emis:0.5}); MS.pop();
       }
     MS.pop();
   } else {
     /* 목이 잘린 자리 */
-    MS.push(); MS.move(0,1.28,0); part(P.cyl,0.12,0.06,0.12,[0.34,0.16,0.16],{emis:0.25}); MS.pop();
+    MS.push(); MS.move(0,1.28,0); fp(P.cyl,0.12,0.06,0.12,[0.34,0.16,0.16],{emis:0.25}); MS.pop();
   }
 }
 const PAL_GUARD = { top:[0.10,0.11,0.13], leg:[0.09,0.10,0.12], shoe:[0.06,0.06,0.07],
@@ -1899,6 +2041,10 @@ function marker(x,z,t){
 /* ───────── 구경 모드 ─────────
    ?view=face / ?view=spider — 게임을 진행하지 않고 그것만 돌려 본다. */
 const VIEW = (/[?&]view=([a-z]+)/.exec(location.search)||[])[1] || null;
+/* ?act=stand 처럼 주소만으로 그 장부터 시작한다 — 콘솔이 없는 폰에서도 되고,
+   ?debug=1 을 붙이지 않아도 된다. 장 이름은 SETUP 의 열쇠와 같다:
+   nose · pixel · body · hall · faces · road · stand · run · brain */
+const JUMP = (/[?&]act=([a-z]+)/.exec(location.search)||[])[1] || null;
 let viewLit=false;
 function viewSet(kind){
   const d=ACT.data; d.which=kind;
@@ -2497,7 +2643,11 @@ SETUP.stand = function(){
   PL.free=true; ACT.canLook=true;
   PL.x=ROOM_A.x; PL.z=HALL.z0+1.5;
   look.yaw=0; look.pitch=-0.02;
-  ACT.data={ n:0 };
+  /* 우주선이 문을 연다 — 들어오라고 명령하는 참이니 닫아 둘 이유가 없다.
+     다만 문턱은 doorHoldA 로 막아 둔다. 걸어서 슬쩍 들어가지는 못하고,
+     아래의 '들어간다'를 세 번 눌러야만 들어가진다. */
+  doorShutA=false; doorHoldA=true;
+  ACT.data={ n:0, enter:0 };
   ACT.hintText='아무것도 하지 않아도 된다. 가만히 서 있는 것이 대답이다.';
   vignette(560,0.90);
   hud('7장 · 서 있기','들어가지 않는다','아무것도 하지 않는 것이 대답이다');
@@ -2508,6 +2658,17 @@ const ORDERS=[
   { t:13, msg:'마지막으로 말한다. 들어가라.',        after:'나는 많이 불안했다. 그러나 그대로 서있었다.' },
   { t:21, msg:'좋아. 그게 네 생각이군.',             after:'' }
 ];
+/* 문 앞에서 누를 때마다 붙는 딱지 — 몇 번 남았는지 손가락 앞에 적어 둔다 */
+const ENTER_LABEL = ['들어간다 · 세 번 눌러야 한다',
+                     '들어간다 · 두 번 더',
+                     '들어간다 · 한 번 더 (마지막)'];
+/* 누를 때마다 — 이것이 실패라는 것을 점점 분명하게 말한다 */
+const ENTER_WARN = [
+  { msg:'그래. 들어와라.',
+    after:'들어가면 나는 다시 선반 위의 얼굴 하나가 된다. 그것을 나는 알고 있었다.' },
+  { msg:'한 번만 더 하면 된다. 들어와라.',
+    after:'한 번만 더 누르면 끝이다. 몸도 코도 눈도 없는 자리로 되돌아간다. 그것이 내가 진 것이다.' }
+];
 TICK.stand = function(dt){
   const d=ACT.data;
   walkStep(dt,0.55);
@@ -2516,11 +2677,24 @@ TICK.stand = function(dt){
     bcast(o.msg, 5.4);
     if(o.after) after(3.0,function(){ say(o.after,4.0); });
   }
-  /* 들어가는 것도 선택지다 */
+  /* 들어가는 것도 선택지다 — 다만 한 번에 되지 않는다.
+     예전에는 E 한 번에 곧장 끝나서, 무심코 누른 사람이 영문도 모르고 게임이 끝났다.
+     이제 세 번을 눌러야 들어가지고, 누를 때마다 '들어가면 실패'라고 먼저 말해 준다.
+     문 앞을 벗어나면 셈은 처음으로 돌아간다 — 발을 뺐다는 뜻이니까. */
   if(Math.abs(PL.x-ROOM_A.x)<1.2 && PL.z<HALL.z0+2.4 && ACT.t<25){
-    prompt('들어간다', touchMode?'오른쪽 단추':'E');
-    if(takeInteract()){ prompt(null); finish('return'); }
-  } else prompt(null);
+    prompt(ENTER_LABEL[d.enter], touchMode?'오른쪽 단추':'E');
+    if(takeInteract()){
+      d.enter++;
+      if(d.enter>=3){ prompt(null); finish('return'); return; }
+      const w=ENTER_WARN[d.enter-1];
+      bcast(w.msg,4.6); A.thunk();
+      after(1.4,function(){ say(w.after,4.4); });
+      E.hudSub.textContent='들어가면 실패다 · '+(3-d.enter)+'번 더 누르면 들어간다';
+    }
+  } else {
+    prompt(null);
+    if(d.enter>0){ d.enter=0; E.hudSub.textContent='발을 뺐다 · 아무것도 하지 않는 것이 대답이다'; }
+  }
   if(ACT.t>26){ prompt(null); ACT.go('run'); }
 };
 
@@ -2528,6 +2702,17 @@ TICK.stand = function(dt){
 SETUP.run = function(){
   mood(1.44,1.78);
   PL.free=true; ACT.canLook=true;
+  doorHoldA=false;                             /* 7장의 빗장은 여기서 푼다 */
+  /* 8장은 복도에서 시작한다.
+     7장에서 이어서 왔으면 서 있던 그 자리를 그대로 쓴다 — 서 있다가 그냥 달리는 것이니까.
+     ?act=run 처럼 곧장 들어온 경우에는 PL 이 아직 처음 자리(격리실 선반, MY)라
+     격리실 안에서 달리기가 시작돼 버린다. 그럴 때만 문 앞 복도로 옮긴다.
+     이 자리 옮기기는 bodyX·mark 보다 먼저여야 한다 — 둘 다 PL.x 를 읽어 간다. */
+  if(!(PL.z>HALL.z0+0.6 && PL.z<HALL.z1-0.6)){
+    PL.x=ROOM_A.x; PL.z=HALL.z0+1.5;
+    look.yaw=-Math.PI/2; look.pitch=-0.02;     /* 복도 저쪽(+x)을 본다 */
+    unstick();
+  }
   ACT.data={ gd:30, boost:0, caught:false, phase:0, bodyX:PL.x, ph:0, hold:0 };
   ACT.oneWay=1; ACT.mark=PL.x;                 /* 가지 않은 복도 쪽으로만 */
   ACT.hintText='앞으로 달린다. 연타하면 조금 더 빨라진다.';
@@ -2643,14 +2828,28 @@ const mgRemember = {
 };
 
 /* ───────── 끝 ───────── */
+/* 끝은 두 가지다. 하나는 이야기의 끝(brain), 하나는 실패(return).
+   실패는 실패라고 분명히 말해야 한다 — 예전에는 시적인 한 줄만 띄워 두어서
+   플레이어가 자기가 진 것인지 이야기가 끝난 것인지 몰랐다.
+   retry 가 있는 끝은 「다시」가 처음이 아니라 그 장면으로 돌아간다. */
 const ENDINGS = {
-  brain :'끝까지 서 있었고, 끝까지 빼앗겼다.<br>그래도 뇌는 있으니까.',
-  return:'너는 스스로 걸어 들어갔다.<br>벌은 없었다. 몸도 없었다.<br>다시 백 개의 얼굴 중 하나가 되었다.'
+  brain : { head:'격리실의 얼굴들', why:'',
+            txt:'끝까지 서 있었고, 끝까지 빼앗겼다.<br>그래도 뇌는 있으니까.' },
+  return: { head:'게임 실패', fail:true, retry:'stand',
+            why:'격리실로 들어갔기 때문이다.<br>서 있었어야 했다.',
+            txt:'너는 스스로 걸어 들어갔다.<br>벌은 없었다. 몸도 없었다.<br>다시 백 개의 얼굴 중 하나가 되었다.' }
 };
+let endRetry=null;
 function finish(kind){
   running=false;
   MG.close(); prompt(null); hud(null); cine(false);
-  E.endtxt.innerHTML=ENDINGS[kind]||ENDINGS.brain;
+  const e=ENDINGS[kind]||ENDINGS.brain;
+  endRetry=e.retry||null;
+  E.endh.textContent=e.head;
+  E.endwhy.innerHTML=e.why||'';
+  E.endtxt.innerHTML=e.txt;
+  E.end.classList.toggle('fail',!!e.fail);
+  document.getElementById('again').textContent = endRetry ? '그 자리에서 다시' : '다시';
   E.end.style.display='flex';
   requestAnimationFrame(function(){ E.end.style.opacity='1'; });
   A.hum(0); A.waves(kind==='brain'?0.34:0);
@@ -2724,10 +2923,27 @@ SCENE.extra = function(){
   if(ACT.id==='run'){
     const d=ACT.data;
     if(d.phase===0){
-      if(d.gd<30) drawSpider(PL.x-d.gd, clampf(PL.z,-1.5,1.5), -Math.PI/2, (ACT.t*2.3)-Math.floor(ACT.t*2.3), 1);
+      if(d.gd<30){
+        const sx=PL.x-d.gd, sz=clampf(PL.z,-1.5,1.5);
+        drawSpider(sx, sz, faceTo(sx,sz,PL.x,PL.z), (ACT.t*2.3)-Math.floor(ACT.t*2.3), 1);
+      }
     } else {
-      figure(d.bodyX, 0, PL.z, -Math.PI/2, d.ph, PAL_ME, { run:true, headless:true, lean:0.16 });
-      drawSpider(PL.x-1.15, PL.z+0.35, -Math.PI/2, 0.25, 0.92);
+      /* 내 몸은 +x 로 달아난다. figure 의 앞쪽은 국소 +z(다리가 rotX 로 흔들리고
+         lean 도 rotX 다)이라 +PI/2 여야 앞을 보고 달린다 — 예전엔 뒤로 달렸다.
+         속도는 그대로 두고(7.6m/s 에서 점점 빨라진다) 보이는 방식만 손본다:
+         안개에 그냥 맡기면 40m 부터 회색에 묻혀 툭 사라진다(안개 거리 92m).
+         그래서 몸에만 안개를 2.6배 옅게 걸어 소실점까지 형체가 남게 하고,
+         대신 알파를 2초부터 10초에 걸쳐 천천히 내린다.
+         끝까지 또렷하면 배경에서 오려 붙인 것처럼 떠 보이기 때문이다. */
+      const fade = 1 - smooth(clampf((d.hold-2.0)/8.0, 0, 1));
+      if(fade > 0.004){
+        fogScale(2.6);
+        figure(d.bodyX, 0, PL.z, Math.PI/2, d.ph, PAL_ME,
+               { run:true, headless:true, lean:0.16, alpha:fade });
+        fogScale(1);
+      }
+      const sx=PL.x-1.15, sz=PL.z+0.35;
+      drawSpider(sx, sz, faceTo(sx,sz,PL.x,PL.z), 0.25, 0.92);
     }
   }
 };
@@ -2795,11 +3011,15 @@ function draw(){
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
 
   const faceView = (ACT.id==='view' && ACT.data && ACT.data.which==='face');
+  /* 시선 방향(단위벡터) — 방을 잘라낼 때 쓴다 */
+  const fwx=-Math.sin(look.yaw)*cp, fwy=sp, fwz=-Math.cos(look.yaw)*cp;
+  ROOM_A._vis = !faceView && roomVisible(ROOM_A,eye[0],eye[1],eye[2],fwx,fwy,fwz);
+  ROOM_B._vis = !faceView && roomVisible(ROOM_B,eye[0],eye[1],eye[2],fwx,fwy,fwz);
   MS.reset();
   if(!faceView){
     part(HALLM,1,1,1,[1,1,1]);
-    part(ROOMA,1,1,1,[1,1,1]);
-    part(ROOMB,1,1,1,[1,1,1]);
+    if(ROOM_A._vis) part(ROOMA,1,1,1,[1,1,1]);
+    if(ROOM_B._vis) part(ROOMB,1,1,1,[1,1,1]);
   }
   if(SCENE.extra) SCENE.extra();
 
@@ -2822,11 +3042,18 @@ function draw(){
     gl.bindVertexArray(VIEW_HEAD.vao);
     gl.drawArraysInstanced(gl.TRIANGLES,0,HEADM.n,1);
     drawnHeads=1;
-  } else for(const set of HEAD_SETS){
-    if(!roomNear(set.R,eye[0],eye[2])) continue;
-    gl.bindVertexArray(set.vao);
-    gl.drawArraysInstanced(gl.TRIANGLES,0,HEADM.n,set.n);
-    drawnHeads+=set.n;
+  } else if(ROOM_A._vis || ROOM_B._vis){
+    /* 보이는 방의 머리 중 시야 원뿔에 든 것만 추려 한 번에 그린다 */
+    const m=fillHeads(eye[0],eye[1],eye[2],fwx,fwy,fwz);
+    if(m){
+      for(let k=0;k<3;k++){
+        gl.bindBuffer(gl.ARRAY_BUFFER,DYN_B[k]);
+        gl.bufferSubData(gl.ARRAY_BUFFER,0,[dynP,dynR,dynS][k],0,m*3);
+      }
+      gl.bindVertexArray(DYN_VAO);
+      gl.drawArraysInstanced(gl.TRIANGLES,0,HEADM.n,m);
+      drawnHeads=m;
+    }
   }
   lastHeadsDrawn=drawnHeads;
 
@@ -2893,6 +3120,10 @@ running=true;
 if(VIEW){                                /* 구경 모드는 표지를 건너뛴다 */
   E.cover.style.display='none';
   ACT.go('view');
+} else if(JUMP && SETUP[JUMP]){          /* ?act=stand — 그 장부터 시작한다 */
+  E.cover.style.display='none';
+  E.pad.classList.add('on');             /* 표지의 「시작」이 하던 일을 대신한다 */
+  ACT.go(JUMP);
 } else ACT.go('cover');                  /* 표지 뒤에서 이미 격리실이 돌아간다 */
 
 /* 구경 막대 */
@@ -2920,7 +3151,18 @@ document.getElementById('go').addEventListener('click',function(){
   E.pad.classList.add('on');            /* 터치 조작판은 여기서 한 번만 켠다 */
   ACT.go('nose');
 });
-document.getElementById('again').addEventListener('click',function(){ location.reload(); });
+document.getElementById('again').addEventListener('click',function(){
+  /* 실패로 끝났으면 처음부터가 아니라 그 장면으로 돌아간다 —
+     경고를 듣고 문 앞에 서는 7장 처음이다. 페이지를 다시 읽지 않으므로
+     구워 둔 방·머리통을 그대로 쓴다(다시 굽는 데 몇 초가 걸린다). */
+  if(!endRetry){ location.reload(); return; }
+  const id=endRetry; endRetry=null;
+  E.end.style.opacity='0';
+  setTimeout(function(){ E.end.style.display='none'; E.end.classList.remove('fail'); },700);
+  A.init(); A.resume();
+  running=true;
+  ACT.go(id);
+});
 
 /* 소리 단추 — 첫 누름이 곧 브라우저의 '사용자 조작'이라 여기서 소리가 열린다 */
 (function(){
@@ -2979,6 +3221,9 @@ if(/[?&]debug=1/.test(location.search)){
     walk:function(x,z){ return walkable(x,z); },
     audio:function(){ return A; },
     heye:function(){ return {HEYE:HEYE, meta:HEAD_META.eye, n:HEADM.n}; },
+    /* 머리 시야 컬링 임계값. -2 면 전부 그린다 — 컬링이 보이는 머리를 지우지 않는지
+       같은 화면에서 켜고 끄며 견줘 볼 때 쓴다. */
+    cone:function(v){ if(v!==undefined) HEAD_CONE=v; return HEAD_CONE; },
     blocks:function(){ return BLOCK.length; },
     mgs:function(){ return MG.on ? { on:true, title:E.mgTitle.textContent,
       t:+MG.t.toFixed(2), r:MG.r, p:MG.p, i:MG.i, hits:MG.hits, want:MG.want,

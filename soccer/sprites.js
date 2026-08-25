@@ -513,11 +513,14 @@
      발밑 판정 원반은 그림이 있든 없든 그대로 그린다. 그 원이 곧 판정이다.
      골키퍼(charId 6)는 그림이 없어 늘 도트로 그려진다. */
   var PHOTO_POSE = { idle: '', run: '-run', kick: '-kick', fart: '-fart', stun: '-stun', ult: '-goal' };
+  // 달리기는 두 장을 번갈아 써야 뛰는 느낌이 난다 — `-run` 과 다리만 좌우로 뒤집은 `-run2`.
+  // frameOf('run') 이 0~3 을 주므로 그 홀짝으로 갈라 쓴다. 걸음 속도가 도트판과 같아진다.
+  var PHOTO_RUN2 = '-run2';
   var PHOTO_SCALE = 3.2;    // 그림 한 변 = 반지름 × 이 값 (사람 키 ≈ 3.0r, 어깨 폭 ≈ 판정 지름)
   var photoCache = {}, photoOK = (typeof Image !== "undefined");
-  function photoOf(key, pose) {
+  function photoOf(key, pose, f) {
     if (!photoOK || !key) return null;
-    var name = key + (PHOTO_POSE[pose] || "");
+    var name = key + (pose === "run" && (f & 1) ? PHOTO_RUN2 : (PHOTO_POSE[pose] || ""));
     var im = photoCache[name];
     if (im === undefined) {
       im = new Image();
@@ -548,7 +551,7 @@
     var f = frameOf(pose, t + charId * 0.137, phase) % frameCount(pose);   // 캐릭터마다 걸음 위상차
     // 그림은 팀에 상관없이 똑같이 생겼다 — 발밑 원반을 팀 색으로 칠해야 아군·적군이 구분된다.
     // 골키퍼 그림은 아직 없어서 덩치형 그림을 빌려 쓴다(chars/keeper.png 를 넣으면 그 줄만 바꾸면 된다).
-    var ph = photoOf(charId === 6 ? 'big' : m.key, pose);
+    var ph = photoOf(charId === 6 ? 'big' : m.key, pose, f);
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
@@ -560,6 +563,14 @@
       ellipse(ctx, x, y - r * 0.04, r * 0.94, r * 0.40, kit.main);
       ctx.globalAlpha = 1;
       ring(ctx, x, y - r * 0.04, r, r * 0.42, 'rgba(255,255,255,0.55)', Math.max(1.5, r * 0.10));
+      // 바라보는 방향 쐐기 — 그림은 앞모습 한 장뿐이라 8방향을 이걸로 알린다(위·아래도 정확히 보인다).
+      var fa = o.facing || 0, cf = Math.cos(fa), sf = Math.sin(fa) * 0.42;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.beginPath();
+      ctx.moveTo(x + cf * r * 1.30, y - r * 0.04 + sf * r * 1.30);
+      ctx.lineTo(x + Math.cos(fa + 2.5) * r * 0.62, y - r * 0.04 + Math.sin(fa + 2.5) * 0.42 * r * 0.62);
+      ctx.lineTo(x + Math.cos(fa - 2.5) * r * 0.62, y - r * 0.04 + Math.sin(fa - 2.5) * 0.42 * r * 0.62);
+      ctx.closePath(); ctx.fill();
     } else {
       ring(ctx, x, y - r * 0.04, r, r * 0.42, 'rgba(255,255,255,0.30)', Math.max(1, r * 0.07));
     }
@@ -584,10 +595,16 @@
     }
 
     if (ph) {
-      var F = r * PHOTO_SCALE;
+      // 진행 방향 표현: ①좌우는 뒤집기 ②앞뒤(가로 성분)만큼 몸을 기울이고
+      // ③위로 갈수록 조금 작게, 아래로 올수록 조금 크게 그려 원근을 준다.
+      var fa2 = o.facing || 0;
+      var lean = Math.abs(Math.cos(fa2)) * 0.17;              // 뒤집은 좌표계에선 늘 오른쪽이 진행 방향
+      var depth = 1 + Math.sin(fa2) * 0.07;                   // 아래(+y)로 향하면 살짝 크게
+      var F = r * PHOTO_SCALE * depth;
       ctx.imageSmoothingEnabled = true;
       ctx.translate(x, y + r * 0.06);          // 발이 판정 원반 위에 놓이게 살짝 내린다
       if (mirror) ctx.scale(-1, 1);
+      if (pose === "run" || pose === "kick") ctx.rotate(lean);   // 뛸 때·찰 때만 기운다
       ctx.drawImage(ph, -F / 2, -F, F, F);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.imageSmoothingEnabled = false;

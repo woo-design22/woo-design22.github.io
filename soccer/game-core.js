@@ -17,7 +17,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var PROTOCOL_VERSION = 13;
+  var PROTOCOL_VERSION = 14;   // 14: 드리블·감아차기 충전 분리, 슛 뒤 발차기 래치
 
   // ── 구조 상수 (CLAUDE.md §3) ─────────────────────────────────────────────
   var C = {
@@ -100,7 +100,8 @@
     // W: 누른 시간만큼 멀리 찬다(3차 지시). 톡 치면 아주 짧게(발 앞), 꾹 누르면 길게 치고 달린다.
     // 거리는 충전의 `rangePow` 제곱에 비례한다. 2.0 이면 짧게 누를 때 너무 안 나가서 6차 지시로 1.35 로 낮추고
     // 최소·최대 거리도 함께 올렸다(8 → 24, 300 → 360).
-    dribble: { minSpeed: 260, maxSpeed: 460, minRange: 24, maxRange: 360, chargeTicks: 12, rangePow: 1.35 },
+    dribble: { minSpeed: 260, maxSpeed: 460, minRange: 24, maxRange: 360, chargeTicks: 12, rangePow: 1.35,
+               spinMax: 0.030, turnMax: 0.9 },   // 감아차기와 같이 누르면 짧게 휜다(감아차기의 절반 남짓)
     pass:    { speed: 420, coneDeg: 45, lead: 0.25, rangePad: 40, rangeNoTarget: 400 },
     // D: **충전 없는 한 번 누르기**(5차 지시). 세기도 거리도 항상 같다 — 누르는 순간 나간다.
     shoot:   { speed: 640, range: 400 },   // 6차 지시: 경기장 가로 1200 의 정확히 1/3
@@ -210,7 +211,11 @@
       facing: team === 0 ? 0 : Math.PI,
       prevButtons: 0,
       stam: TUNING.player.staminaMax, stamLock: 0,   // 달리기 체력 / 1이면 바닥나서 잠김
-      charge: 0, chargeKind: 0,   // 0 없음 1 슛 2 감아차기왼쪽 3 감아차기오른쪽
+      charge: 0, chargeKind: 0,   // charge 는 **표시용**(둘 중 큰 쪽). chargeKind: 0 없음 2 감아왼쪽 3 감아오른쪽 4 드리블
+      // 드리블(W)과 감아차기(Q/E)는 **따로** 충전된다 — 동시에 눌러 "휘는 드리블"을 만들 수 있다.
+      // 공이 없어도 미리 모아 둘 수 있다(2026-08-25 지시). 공을 잡는 순간 그대로 쓴다.
+      chargeD: 0, chargeQ: 0, curveSide: 0,
+      kickLatch: 0,               // 슛을 쏜 D 는 손을 뗄 때까지 발차기로 이어지지 않는다
       kickT: 0, kickKind: 0,      // 0 없음 1 앞차기·슛 2 방귀
       kickCd: 0, freezeT: 0,
       stunT: 0, immuneT: 0, touchCd: 0, knockT: 0, knockDir: 0,
@@ -235,7 +240,7 @@
     var spot = formationSpot(side, index, isKickoff);
     p.x = spot[0]; p.y = spot[1]; p.vx = 0; p.vy = 0;
     p.facing = side === 0 ? 0 : Math.PI;
-    p.stunT = 0; p.immuneT = 0; p.charge = 0; p.chargeKind = 0; p.touchCd = 0; p.knockT = 0;
+    p.stunT = 0; p.immuneT = 0; p.charge = 0; p.chargeKind = 0; p.chargeD = 0; p.chargeQ = 0; p.curveSide = 0; p.kickLatch = 0; p.touchCd = 0; p.knockT = 0;
     p.stam = TUNING.player.staminaMax; p.stamLock = 0;   // 킥오프마다 체력은 만충
     p.kickT = 0; p.kickKind = 0; p.freezeT = 0; p.kickCd = 0;
     // 발동 중이던 필살기 효과도 지운다(게이지 p.ult 는 유지) — 안 지우면 감속 장판이 상대 킥오프까지 남는다
@@ -338,7 +343,7 @@
     // 유일한 예외는 덩치형 필살기 「황소 돌진」이다(그 필살기의 존재 이유가 무적이라 남겨 두었다).
     if (T.stunImmuneTicks > 0 && v.immuneT > 0) return;
     if (ultActive(v, 'charge')) return;
-    v.stunT = ticks; v.touchCd = T.touchCdTicks; v.charge = 0; v.chargeKind = 0;
+    v.stunT = ticks; v.touchCd = T.touchCdTicks; v.charge = 0; v.chargeKind = 0; v.chargeD = 0; v.chargeQ = 0;
     v.knockT = T.knockTicks; v.knockDir = dir;
     v.kickT = 0; v.kickKind = 0; v.freezeT = 0;
     v.ult = Math.min(TUNING.ult.fullTicks, v.ult + TUNING.ult.hitBonus);
@@ -422,35 +427,52 @@
       // 필살기 (A)
       if ((pressed & BTN.ULT) && ultReady(p)) activateUlt(state, p, ev);
 
+      // ── 충전은 **공이 없어도** 모인다(2026-08-25 지시). 드리블(W)과 감아차기(Q/E)가 서로 독립이다. ──
+      var holdD = (buttons & BTN.DRIBBLE) !== 0;
+      var holdQ = (buttons & (BTN.CURVE_L | BTN.CURVE_R)) !== 0;
+      // 뗀 그 틱에는 지우지 않는다 — 아래에서 그 값으로 공을 차기 때문이다.
+      if (holdD) { if (p.chargeD < TUNING.dribble.chargeTicks) p.chargeD++; }
+      else if (!(released & BTN.DRIBBLE)) p.chargeD = 0;
+      if (holdQ) {
+        p.curveSide = (buttons & BTN.CURVE_L) ? -1 : 1;
+        if (p.chargeQ < TUNING.curve.chargeTicks) p.chargeQ++;
+      } else if (!(released & (BTN.CURVE_L | BTN.CURVE_R))) p.chargeQ = 0;
+      // 화면에 그릴 게이지는 둘 중 큰 쪽(둘 다 상한이 chargeTicks 로 같다)
+      p.charge = p.chargeD > p.chargeQ ? p.chargeD : p.chargeQ;
+      p.chargeKind = p.chargeD >= p.chargeQ ? (p.chargeD ? 4 : 0) : (p.curveSide < 0 ? 2 : 3);
+
+      // 슛으로 쓴 D 는 손을 뗄 때까지 발차기로 이어지지 않는다.
+      // (예전에는 D 를 누른 채 슛을 쏘면 쿨다운이 끝나는 순간 같은 손가락이 발차기를 내서
+      //  "슛을 쐈는데 앞의 상대가 기절"하는 것처럼 보였다 — 2026-08-25 사용자 신고.)
+      if (!(buttons & BTN.KICK)) p.kickLatch = 0;
+
       // 방귀 (S) — 공을 가진 상태에서도 쓴다. 공은 그대로 두고 주변을 정사각형으로 친다
       if ((pressed & BTN.FART) && p.kickCd === 0) {
         startKick(state, p, 2, ev);
-      // 앞차기 / 슛 (D)
-      } else if ((buttons & BTN.KICK) && !mine && p.kickCd === 0) {
-        startKick(state, p, 1, ev);            // 공이 없으면 누르는 즉시 발차기. 꾹 누르면 쿨다운마다 반복(연타와 같은 성능)
+      // 슛 (D, 공이 있을 때) — 충전 없음, 누르는 순간 일정한 세기
       } else if (mine && (pressed & BTN.KICK)) {
-        kickShoot(state, p, ev);                 // 충전 없음 — 누르는 순간 일정한 세기로 나간다(5차 지시)
-        startKick(state, p, 3, ev);              // 3 = 공만 차는 동작
-      // 감아차기 (Q 왼쪽 / E 오른쪽) — 공이 있을 때만
-      } else if (mine && (buttons & (BTN.CURVE_L | BTN.CURVE_R))) {
-        p.chargeKind = (buttons & BTN.CURVE_L) ? 2 : 3;
-        if (p.charge < TUNING.curve.chargeTicks) p.charge++;
-      } else if (mine && (released & (BTN.CURVE_L | BTN.CURVE_R)) && (p.chargeKind === 2 || p.chargeKind === 3)) {
-        kickCurve(state, p, p.chargeKind === 2 ? -1 : 1, ev);
-        startKick(state, p, 3, ev);
+        kickShoot(state, p, ev);
+        startKick(state, p, 3, ev);              // 3 = 공만 차는 동작(사람을 때리지 않는다)
+        p.kickLatch = 1;
+      // 앞차기 (D, 공이 없을 때) — 꾹 누르면 쿨다운마다 반복(연타와 같은 성능)
+      } else if ((buttons & BTN.KICK) && !mine && !p.kickLatch && p.kickCd === 0) {
+        startKick(state, p, 1, ev);
       // 패스 (Z)
       } else if (mine && (pressed & BTN.PASS)) {
         kickPass(state, p, ev);
-      // 드리블 킥 (W) — 누른 만큼 멀리 찬다. 뗄 때 나간다
-      } else if (mine && (buttons & BTN.DRIBBLE)) {
-        p.chargeKind = 4;
-        if (p.charge < TUNING.dribble.chargeTicks) p.charge++;
-      } else if (mine && (released & BTN.DRIBBLE) && p.chargeKind === 4) {
-        kickDribble(state, p, ev);
+      // 드리블 킥 (W 뗄 때). 감아차기를 같이 모아 뒀으면 **짧게 휘는 드리블**이 된다
+      } else if (mine && (released & BTN.DRIBBLE)) {
+        kickDribble(state, p, p.chargeD, p.chargeQ, p.curveSide, ev);
+        p.chargeQ = 0;                           // 감아차기 충전은 드리블에 쓰였다
+      // 감아차기 (Q/E 뗄 때) — 드리블을 같이 누르고 있지 않을 때만 단독 감아차기
+      } else if (mine && (released & (BTN.CURVE_L | BTN.CURVE_R)) && !holdD && p.chargeQ > 0) {
+        kickCurve(state, p, p.curveSide || 1, ev);
+        startKick(state, p, 3, ev);
       }
-      if (!mine || !(buttons & (BTN.CURVE_L | BTN.CURVE_R | BTN.DRIBBLE))) { p.charge = 0; p.chargeKind = 0; }
+      if (released & (BTN.CURVE_L | BTN.CURVE_R)) p.chargeQ = 0;
+      if (released & BTN.DRIBBLE) p.chargeD = 0;
     } else if (!inp) {
-      p.charge = 0; p.chargeKind = 0;
+      p.charge = 0; p.chargeKind = 0; p.chargeD = 0; p.chargeQ = 0;
     }
 
     p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, C.FIELD_W - C.PLAYER_R);
@@ -654,7 +676,7 @@
   }
   function kickCurve(state, p, sign, ev) {
     var Q = TUNING.curve, ch = CHARACTERS[p.char];
-    var k = p.charge / Q.chargeTicks;
+    var k = clamp((p.chargeQ || 0) / Q.chargeTicks, 0, 1);
     var spin = (Q.spinMin + (Q.spinMax - Q.spinMin) * k) * sign;
     releaseBall(state, p, p.facing, Q.speed * ch.shot, Q.range, spin, 0);
     state.ball.spinLeft = Q.turnMax;   // 총 회전량 상한 — 넘으면 직선으로 편다
@@ -662,13 +684,18 @@
   }
 
   // 누른 시간(0~chargeTicks)에 따라 속도·거리가 늘어난다. 톡 치면 발 앞, 꾹 누르면 앞으로 길게 친다.
-  function kickDribble(state, p, ev) {
-    var D = TUNING.dribble;
-    var k = clamp(p.charge / D.chargeTicks, 0, 1);
+  // 드리블 킥. chargeD 가 거리, chargeQ 가 휘는 정도를 정한다(둘은 서로 다른 버튼의 누른 시간이다).
+  // 감아차기를 같이 모아 두었으면 **짧게 휘는 드리블**이 된다 — 수비 한 명을 감아 넘기는 용도.
+  function kickDribble(state, p, chargeD, chargeQ, side, ev) {
+    var D = TUNING.dribble, Q = TUNING.curve;
+    var k = clamp(chargeD / D.chargeTicks, 0, 1);
     var speed = D.minSpeed + (D.maxSpeed - D.minSpeed) * k;
     var range = D.minRange + (D.maxRange - D.minRange) * Math.pow(k, D.rangePow);
-    releaseBall(state, p, p.facing, speed, range, 0, 0);
-    ev.push({ kind: 'dribble', slot: p.slot, charge: Math.round(k * 100) });
+    var kq = clamp((chargeQ || 0) / Q.chargeTicks, 0, 1);
+    var spin = kq > 0 ? (Q.spinMin + (D.spinMax - Q.spinMin) * kq) * (side || 1) : 0;
+    releaseBall(state, p, p.facing, speed, range, spin, 0);
+    if (spin) state.ball.spinLeft = D.turnMax;   // 감아차기보다 훨씬 짧게만 휜다
+    ev.push({ kind: 'dribble', slot: p.slot, charge: Math.round(k * 100), curve: Math.round(kq * 100) });
   }
 
   function inNet(b) { return b.x < 0 || b.x > C.FIELD_W; }

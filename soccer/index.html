@@ -11,6 +11,11 @@
     --pitch-2: #3a9044;
     --line: rgba(255, 255, 255, 0.85);
     --net: rgba(255, 255, 255, 0.35);
+    --out-grass: #2f7a39;      /* 경기장 밖 잔디(안쪽보다 조금 어둡게) */
+    --track: #9a5433;          /* 트랙 */
+    --stand: #1f2b3a;          /* 관중석 바닥 */
+    --stand-step: #2b3a4d;     /* 관중석 계단 줄 */
+    --crowd-head: #f1d0aa;     /* 관중 얼굴 */
     --team-a: #3b82f6;
     --team-b: #ef4444;
     --team-a-dark: #1d4ed8;
@@ -327,7 +332,9 @@
     keeper: cssVar('--keeper'), keeperDark: cssVar('--keeper-dark'),
     ball: cssVar('--ball'), ballMark: cssVar('--ball-mark'), shadow: cssVar('--shadow'),
     stun: cssVar('--stun'), charge: cssVar('--charge'), curve: cssVar('--curve'), ult: cssVar('--ult'), fart: cssVar('--fart'),
-    text: cssVar('--text'), muted: cssVar('--muted'), mapBg: cssVar('--map-bg')
+    text: cssVar('--text'), muted: cssVar('--muted'), mapBg: cssVar('--map-bg'),
+    outGrass: cssVar('--out-grass'), track: cssVar('--track'), stand: cssVar('--stand'),
+    standStep: cssVar('--stand-step'), crowdHead: cssVar('--crowd-head')
   };
   var TEAM_NAMES = ['1반', '2반'];
 
@@ -344,6 +351,8 @@
   // 2026-08-25 7차 지시: **내 선수가 항상 화면 한가운데**. 그래서 데드존을 없앴다(0).
   // "경기장 가장자리에서는 가운데가 아니어도 된다"는 아래 클램프가 그대로 처리한다 — 경기장 밖을 보여 주지 않으려고 카메라를 붙잡기 때문.
   var CAM = { deadX: 0, deadY: 0, tau: 0.055 };   // 데드존(월드 단위)과 추종 시상수(초)
+  // 경기장 밖으로 이만큼은 화면에 남긴다(관중석 자리). 보이는 **경기장** 넓이는 그대로다.
+  var CAM_OUT = 62;
 
   function resize() {
     var dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -378,9 +387,11 @@
     var k = 1 - Math.exp(-Math.max(0.001, dt) / CAM.tau);   // 프레임률과 무관한 부드러운 추종
     cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
     // 경기장(골망 포함) 밖이 보이지 않게 클램프. 화면이 경기장보다 크면 가운데 고정.
-    var hw = view.worldW / 2, hh = view.worldH / 2, D = C.GOAL_DEPTH;
-    var minX = -D + hw, maxX = C.FIELD_W + D - hw;
-    var minY = hh, maxY = C.FIELD_H - hh;
+    // 경기장 밖으로 CAM_OUT 만큼은 보여 준다 — 그래야 가장자리에서 관중석이 보인다.
+    // (전에는 딱 경기장까지만 보여 줘서 밖이 검게 잘렸다.)
+    var hw = view.worldW / 2, hh = view.worldH / 2, D = C.GOAL_DEPTH, EX = CAM_OUT;
+    var minX = -D - EX + hw, maxX = C.FIELD_W + D + EX - hw;
+    var minY = -EX + hh, maxY = C.FIELD_H + EX - hh;
     cam.x = minX > maxX ? C.FIELD_W / 2 : clamp(cam.x, minX, maxX);
     cam.y = minY > maxY ? C.FIELD_H / 2 : clamp(cam.y, minY, maxY);
   }
@@ -558,6 +569,7 @@
   function drawPitch() {
     var s = view.scale, W = C.FIELD_W, H = C.FIELD_H, D = C.GOAL_DEPTH;
     ctx.fillStyle = COLOR.bg; ctx.fillRect(0, 0, view.w, view.h);
+    drawSurround();                     // 경기장 밖 — 잔디 여백 · 트랙 · 관중석
     // 잔디: 보이는 범위의 줄무늬만 그린다
     ctx.fillStyle = COLOR.pitch; ctx.fillRect(px(0), py(0), W * s, H * s);
     var stripe = W / 10;
@@ -573,10 +585,87 @@
     ctx.strokeRect(px(0), py(H / 2 - 180), 160 * s, 360 * s); ctx.strokeRect(px(W - 160), py(H / 2 - 180), 160 * s, 360 * s);
     ctx.strokeRect(px(0), py(H / 2 - 110), 60 * s, 220 * s); ctx.strokeRect(px(W - 60), py(H / 2 - 110), 60 * s, 220 * s);
     var y0 = C.GOAL_Y0, y1 = C.GOAL_Y1;
+    // 골대 안쪽도 잔디다 — 예전에는 배경색이 그대로 비쳐 **검은 상자**로 보였다(2026-08-25 지시).
+    ctx.fillStyle = COLOR.pitch;
+    ctx.fillRect(px(-D), py(y0), D * s, (y1 - y0) * s);
+    ctx.fillRect(px(W), py(y0), D * s, (y1 - y0) * s);
     ctx.strokeStyle = COLOR.net; ctx.lineWidth = Math.max(1, 1 * s);
     drawNet(px(-D), py(y0), D * s, (y1 - y0) * s); drawNet(px(W), py(y0), D * s, (y1 - y0) * s);
     ctx.strokeStyle = COLOR.line; ctx.lineWidth = Math.max(2, 4 * s);
     ctx.strokeRect(px(-D), py(y0), D * s, (y1 - y0) * s); ctx.strokeRect(px(W), py(y0), D * s, (y1 - y0) * s);
+  }
+  /* ── 경기장 밖: 잔디 여백 · 트랙 · 관중석 ─────────────────────────────────
+     예전에는 경기장 밖이 그냥 배경색(검정)이었다. 잔디를 넓게 깔고 트랙을 두른 뒤
+     그 바깥에 관중석을 그린다. 관중은 그림 파일 없이 **머리+몸통 두 도형**으로 그린다 —
+     스무 명이 뛰는 화면에 256px 그림을 수백 장 얹으면 그대로 렉이 된다.
+     응원 동작은 `sin` 하나로 위아래로 튀게 하고, 골이 들어가면 `cheerT` 가 올라 크게 뛴다. */
+  var OUT = 110;             // 경기장 밖으로 그리는 폭(트랙 + 관중석)
+  var TRACK = 16;            // 트랙(주로) 폭
+  var SEAT = 13;             // 관중 한 명이 차지하는 폭
+  var ROW = 15;              // 관중석 한 줄 간격
+  var cheerT = 0;            // 골 직후 잠깐 크게 응원한다(초)
+  var CROWD_COL = ["#e2e8f0", "#fca5a5", "#93c5fd", "#fcd34d", "#86efac", "#f5d0fe", "#fdba74", "#a5b4fc"];
+  function rnd(i) { var v = Math.sin(i * 12.9898) * 43758.5453; return v - Math.floor(v); }
+  function drawSurround() {
+    var s = view.scale, W = C.FIELD_W, H = C.FIELD_H, D = C.GOAL_DEPTH;
+    var t = performance.now() / 1000;
+    var x0 = -D, x1 = W + D;                    // 골대까지 포함한 경기 영역
+    // 1) 바깥 잔디
+    ctx.fillStyle = COLOR.outGrass;
+    ctx.fillRect(px(x0 - OUT), py(-OUT), (x1 - x0 + 2 * OUT) * s, (H + 2 * OUT) * s);
+    // 2) 트랙 — 경기 영역을 두르는 띠
+    ctx.fillStyle = COLOR.track;
+    ctx.fillRect(px(x0 - TRACK), py(-TRACK), (x1 - x0 + 2 * TRACK) * s, TRACK * s);
+    ctx.fillRect(px(x0 - TRACK), py(H), (x1 - x0 + 2 * TRACK) * s, TRACK * s);
+    ctx.fillRect(px(x0 - TRACK), py(0), TRACK * s, H * s);
+    ctx.fillRect(px(x1), py(0), TRACK * s, H * s);
+    // 3) 관중석 네 방향
+    stand(x0 - OUT, x1 + OUT, -OUT, -TRACK, 0, t);            // 위 (아래를 보고 앉음)
+    stand(x0 - OUT, x1 + OUT, H + TRACK, H + OUT, 1, t);      // 아래
+    stand(x0 - OUT, x0 - TRACK, -TRACK, H + TRACK, 2, t);     // 왼쪽 (오른쪽을 봄)
+    stand(x1 + TRACK, x1 + OUT, -TRACK, H + TRACK, 3, t);     // 오른쪽
+  }
+  /* 관중석 한 덩이. side 0 위 · 1 아래 · 2 왼쪽 · 3 오른쪽.
+     좌석 줄은 경기장에서 멀어지는 쪽으로 쌓이고, 관중은 머리+몸통 두 도형이다.
+     그림 파일을 쓰지 않는 이유: 스무 명이 뛰는 화면에 256px 그림을 수백 장 얹으면 그대로 렉이 된다. */
+  function stand(x0, x1, y0, y1, side, t) {
+    var s = view.scale;
+    if (px(x1) < 0 || px(x0) > view.w || py(y1) < 0 || py(y0) > view.h) return;
+    ctx.fillStyle = COLOR.stand;
+    ctx.fillRect(px(x0), py(y0), (x1 - x0) * s, (y1 - y0) * s);
+    ctx.fillStyle = COLOR.standStep;
+    var vert = side >= 2;
+    var a0 = vert ? x0 : y0, a1 = vert ? x1 : y1;             // 줄이 쌓이는 축
+    for (var a = a0; a < a1; a += ROW) {
+      if (vert) ctx.fillRect(px(a), py(y0), 2 * s, (y1 - y0) * s);
+      else      ctx.fillRect(px(x0), py(a), (x1 - x0) * s, 2 * s);
+    }
+    if (SEAT * s < 2.5) return;                                // 너무 작으면 사람은 생략(성능)
+    var boost = cheerT > 0 ? 1 + cheerT * 1.6 : 1;
+    // 좌석이 늘어서는 축의 화면 범위만 돈다
+    var lo, hi;
+    if (vert) { lo = Math.max(y0, cam.y - view.worldH / 2 - SEAT); hi = Math.min(y1, cam.y + view.worldH / 2 + SEAT); }
+    else      { lo = Math.max(x0, cam.x - view.worldW / 2 - SEAT); hi = Math.min(x1, cam.x + view.worldW / 2 + SEAT); }
+    var c0 = Math.floor(lo / SEAT), c1 = Math.ceil(hi / SEAT);
+    var rows = Math.max(1, Math.floor((a1 - a0) / ROW));
+    var hr = Math.max(1, SEAT * 0.30 * s);
+    for (var r = 0; r < rows; r++) {
+      // 경기장에서 먼 줄일수록 뒤쪽 — 위/왼쪽 관중석은 줄이 앞으로 내려온다
+      var av = (side === 0 || side === 2) ? a0 + r * ROW + ROW * 0.85 : a1 - r * ROW - ROW * 0.15;
+      for (var c = c0; c <= c1; c++) {
+        var id = c * 31 + r * 7 + side * 101;
+        if (rnd(id) < 0.12) continue;                          // 빈자리
+        var bob = Math.abs(Math.sin(t * 3.4 + rnd(id + 1) * 6.28)) * 3.2 * boost;
+        var cv = c * SEAT + SEAT * 0.5;
+        var sx = vert ? px(av) : px(cv);
+        var sy = vert ? py(cv) : py(av - bob);
+        if (vert) sx -= bob * s * (side === 2 ? -1 : 1);        // 옆 관중석은 옆으로 들썩인다
+        ctx.fillStyle = CROWD_COL[((id % CROWD_COL.length) + CROWD_COL.length) % CROWD_COL.length];
+        ctx.fillRect(sx - hr, sy - hr * 1.6, hr * 2, hr * 2.4);
+        ctx.fillStyle = COLOR.crowdHead;
+        ctx.beginPath(); ctx.arc(sx, sy - hr * 2.3, hr * 0.95, 0, TAU); ctx.fill();
+      }
+    }
   }
   function drawNet(x, y, w, h) {
     var step = 8 * view.scale;
@@ -1415,7 +1504,9 @@
       // 소리: 내 화면 밖에서 일어난 일까지 다 울리면 시끄러우므로 위치가 있는 소리는 화면 안일 때만 낸다
       var near = e.slot == null || !game || onScreenSlot(e.slot);
       switch (e.kind) {
-        case 'goal': banner('골! ' + TEAM_NAMES[e.team], 1800); audio.sfx('goal'); break;
+        case 'goal':
+          cheerT = 2.2;   // 관중이 크게 뛴다
+          banner('골! ' + TEAM_NAMES[e.team], 1800); audio.sfx('goal'); break;
         case 'kickoff': banner('킥오프', 900); audio.sfx('whistle'); break;
         case 'play': $('banner').classList.remove('show'); break;
         case 'half': banner('하프타임', 3000); audio.sfx('whistle'); break;
@@ -1467,6 +1558,7 @@
       if (game.acc > 250) game.acc = 250;  // 탭 전환 뒤 따라잡기 상한 5틱
       while (game.acc >= 50) { doTick(now - game.acc + 50); game.acc -= 50; }
     }
+    if (cheerT > 0) cheerT = Math.max(0, cheerT - dt / 1000);   // 골 뒤 환호가 잦아든다
     sample(now - (game ? game.interpMs : settings.interpMs));
     updateCamera(Math.min(0.1, dt / 1000));
     render(now);

@@ -122,6 +122,8 @@ photo photoImg photoCap   mg mgCv mgInfo
 6. `manifest.webmanifest` · `icons/` · `bgm1/2.mp3`를 옮기고 이름만 고친다.
 7. 사진을 쓰면 `photos/encode_photo.py`로 XOR `.bin`을 만든다(공개 저장소에 원본이 그대로 올라가지 않게).
 8. `CLAUDE.md`의 앱 목록과 실행 URL 목록에 새 게임을 **추가한다**.
+9. **대사집을 뽑아 게임과 함께 전달한다** — `python tools/extract_script.py <폴더>`.
+   게임을 고칠 때마다 다시 돌린다. 손님에게 링크만 주고 대사집을 빼먹지 않는다.
 
 ## 5. 검증 방법
 
@@ -132,6 +134,8 @@ python -m http.server 8765
 - `?debug=1` → `window.NS = { S, MAPS, tick, goMap, say, startHero, finishQuest, findEnt, MG, showPhoto }`
 - **숨은 탭에서는 `requestAnimationFrame`이 멈춘다.** 자동화로 볼 때는 `NS.tick(performance.now())`로 프레임을 직접 돌린다.
 - 미니게임은 `NS.MG.forceWin()` / `NS.MG.dbg()`로 통과시켜 뒤쪽 장면까지 확인한다.
+- **맵마다 목표 칸까지 실제로 걸어갈 수 있는지** 너비우선탐색으로 한 번 훑는다.
+  좌표를 직접 바꾸면(`S.px = ...`) `onStep`이 걸리지 않는다. 이동 검증은 방향키를 실제로 눌러서 한다.
 - **`confirm()`은 자동화에서 멈춘다.** 「처음부터」는 저장이 있으면 `confirm`을 띄우므로,
   누르기 전에 `localStorage`의 `SAVE_KEY`를 지운다.
 - 화면을 그림으로 확인할 때는 **캔버스 바이트를 파일로 직접 받는다**(§6 마지막 항목).
@@ -150,6 +154,11 @@ python -m http.server 8765
 | **타일 그림이 이웃과 안 이어짐** | 타일 조각으로 큰 구조물(에펠탑)을 그림 | 큰 구조물은 타일이 아니라 **월드 좌표에 한 덩어리로** 그린다 |
 | 배경이 검게 나옴 | 하늘 자리에 `X`(공간밖, `#0e0d1a`) | 하늘 타일(`~`, 그림 없음) + 배경을 하늘색으로 칠한다 |
 | **옮긴 PNG가 열리지 않음** | 긴 base64를 사람이 옮기다 글자 유실 | 브라우저가 만든 바이트를 **손을 거치지 않고** 파일로 받는다 |
+| **문을 A로 눌러야 나감** | 맵 이동을 `interact`로 붙임 | 이동은 밟으면 되는 것 — `exits` 또는 `onStep` |
+| 가구 뒤 물건에 못 다가감 | 조작 대상 바로 앞칸이 solid(의자 등) | 대상 앞 한 칸은 반드시 비워 둔다 |
+| 길을 헤맴 | 맵 가운데를 벽으로 가름 | 목표까지 막힘 없이 걸어갈 수 있게 (BFS 검사) |
+| 차도를 걸어 다님 | 장식용 도로 타일이 walkable | 배경으로만 쓸 타일은 `solid: true` |
+| 간판이 퀘스트를 가로챔 | `signs` 가 `quest.interact` 보다 먼저 처리된다 | 조작할 칸에는 간판을 두지 않는다 |
 
 마지막 항목 보충 — 캔버스를 파일로 받는 법:
 로컬에 POST를 받아 저장하는 작은 서버를 띄우고, 페이지에서 `canvas.toBlob` → `fetch(POST)`로 보낸다.

@@ -111,7 +111,8 @@ swap("// ----- 설가네 네 식구 -----", "// ----- 캐릭터 픽셀 도안", 
 # 유럽 관광지 타일을 걷어내고 파출소·기차·병원·집 타일로 갈아 끼운다.
 TILES_NEW = '''const TILES = {
   // --- 공용 바닥·구조 ---
-  '.': { name: '잔디' }, ',': { name: '풀꽃' }, '_': { name: '보도' }, '=': { name: '도로' },
+  '.': { name: '잔디' }, ',': { name: '풀꽃' }, '_': { name: '보도' },
+  '=': { name: '도로', solid: true },   // 차도는 걸어 들어가지 않는다
   'f': { name: '마루' }, 'F': { name: '타일바닥' }, 'X': { name: '공간밖', solid: true },
   '|': { name: '실내벽', solid: true }, 'W': { name: '벽', solid: true }, 'w': { name: '창문', solid: true },
   'D': { name: '문', over: true }, 'T': { name: '나무', solid: true, over: true },
@@ -307,8 +308,8 @@ MAPS_NEW = '''const MAPS = {
     '|11111111FFFFFFFF|',
     '|FFFFFFFFFFFFFFFF|',
     '|F22FF22FFFF22FFF|',
-    '|FCCFFCCFFFFCCFFF|',
     '|FFFFFFFFFFFFFFFF|',
+    '|FFFFFFFFFFFFFCCF|',
     '|5555FFFFFFFFFvFF|',
     '|FFFFFFFFFFFFFFFF|',
     '||||||||D|||||||||',
@@ -323,21 +324,22 @@ MAPS_NEW = '''const MAPS = {
   labels: [ { x: 4, y: 3, t: '민원 창구' }, { x: 12, y: 5, t: '근무석' }, { x: 2, y: 8, t: '사물함' }, { x: 9, y: 11, t: '삼거리' } ] },
 
   // ===== 골목 ===== 야간 순찰 구역
+  // 가운데를 막지 않는다 — 이 엔진의 원칙: 길을 헤맬 수 없어야 한다
   alley: { name: '파출소 뒷골목', base: '_', rows: [
     'ZZZZZZZZZZZZZZZZZZZZ',
     '____________________',
     '__Y_______q______Y__',
     '____________________',
-    '____________________',
-    'ZZZZZZZZDZZZZZZZZZZZ',
-    '____________________',
     '______L______L______',
     '____________________',
     '__q______________q__',
     '____________________',
+    '____________________',
+    '______L______L______',
+    '____________________',
     'ZZZZZZZZZZZZZZZZZZZZ'
   ], exits: [], signs: {},
-  labels: [ { x: 10, y: 2, t: '평상' }, { x: 8, y: 5, t: '가게 뒷문' } ] },
+  labels: [ { x: 10, y: 2, t: '평상' }, { x: 10, y: 10, t: '파출소 쪽' } ] },
 
   // ===== 1995 병원 ===== 분만실 앞 복도
   hospital: { name: '시립병원 복도', base: 'F', rows: [
@@ -442,9 +444,7 @@ LINES_NEW = '''const NPC_LINES = {
   female: ['오늘 순찰 구역 바뀐 거 아시죠?', '김 경위님은 늘 제일 늦게 퇴근하시더라.'],
   granny: ['총각, 서울 가나? 조심히 가.', '우리 동네는 저 양반 때문에 발 뻗고 자.'],
   ajussi: ['어이, 김 순경! 오늘도 수고 많아.', '이 골목은 자네가 지켜 주니 마음이 놓여.'],
-  kid: ['아저씨 무서워요…', '엄마 어디 있어요?'],
-  nurse: ['아버님, 조금만 더 기다리세요.', '산모분 잘하고 계세요.'],
-  student: ['저 아저씨 경찰이래.']
+  nurse: ['아버님, 조금만 더 기다리세요.', '산모분 잘하고 계세요.']
 };
 const FRIEND_LINES = {
   ap: ['오늘도 별일 없어야 할 텐데.', '(무전기를 한 번 더 확인한다)'],
@@ -529,8 +529,8 @@ QUESTS.c1 = {
 QUESTS.c2 = {
   start: { map: 'station2', x: 9, y: 9, dir: 'up' },
   init(q) { q.stage = 0; },
-  goal(q) { return q.stage < 1 ? '박 선배에게 신고하기 (노란 !)' : q.stage === 1 ? '뒷골목 순찰 나가기 (아래 문으로)' : '평상 쪽 소리를 확인하기'; },
-  hint(q) { return q.stage < 1 ? '근무석의 박 선배에게 말을 거세요.' : '아래쪽 문으로 나가면 뒷골목입니다.'; },
+  goal(q) { return q.stage < 1 ? '박 선배에게 신고하기 (노란 !)' : q.stage === 1 ? '뒷골목으로 순찰 나가기 (아래 문을 지나가면 됩니다)' : '평상 쪽 소리를 확인하기'; },
+  hint(q) { return q.stage < 1 ? '근무석의 박 선배에게 말을 거세요.' : '아래쪽 문 칸을 밟고 지나가면 바로 뒷골목입니다. 누를 필요 없어요.'; },
   async onEnter(mapId) { S.heroSpr = 'apRookie'; setEra(1990); },
   async intro() {
     await say('', '1990년 겨울. 삼거리 파출소.');
@@ -550,27 +550,26 @@ QUESTS.c2 = {
       await say('박 선배', '이 동네 사람들은 자네 얼굴을 기억할 거야. 십 년, 이십 년.');
       await say('김성호', '…예?');
       await say('박 선배', '그러니까 잘 웃고 다녀. 그게 절반이다.');
-      await say('', '순찰을 나가자. 아래쪽 문으로 나가면 뒷골목이다.');
+      await say('', '순찰을 나가자. 아래쪽 문을 지나가면 뒷골목이다.');
       q.stage = 1; setHud(); save(); QUESTS.c2.marks();
     },
     chief: async e => { await say(e.name, '김 순경, 오늘도 무사히.'); },
     ajussi: async e => { await say(e.name, '어이, 김 순경! 오늘도 수고 많아.'); }
   },
-  interact(mapId, x, y, ch) {
-    if (mapId !== 'station2' || ch !== 'D' || S.q.stage !== 1) return null;
-    return async () => {
+  async onStep(mapId, x, y) {
+    const q = S.q;
+    // 문은 누르는 게 아니라 밟으면 나간다
+    if (mapId === 'station2' && q.stage === 1 && y === 10) {
       S.lock = true;
       await goMap('alley', 9, 8, 'up', true);
-      S.q.stage = 2; setHud(); save();
+      q.stage = 2; setHud(); save();
       await say('', '뒷골목. 가로등 두 개가 전부다.');
       await say('김성호', '(무전기 잡음 말고는 아무 소리도 안 난다.)');
       await say('', '평상 쪽에서 부스럭 소리가 났다. 가 보자.');
       QUESTS.c2.marks();
       S.lock = false;
-    };
-  },
-  async onStep(mapId, x, y) {
-    const q = S.q;
+      return;
+    }
     if (mapId !== 'alley' || q.stage !== 2 || y !== 3 || x < 8 || x > 12) return;
     S.lock = true;
     await say('', '평상 위에 사람이 누워 있다. 술 냄새가 난다.');

@@ -43,6 +43,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   6장까지는 아버지, **7장에서 딸로 시점이 바뀌고** 보상함이 사진첩이 아니라 **아버지 사물함**이다.
   체험 비밀번호 0000, 저장 접두사 `rt_*`. 빌드 스크립트 `retire-rpg/build_retire.py`.
 - **다섯 도트 RPG(`namsan-rpg`·`couple-rpg`·`europe-rpg`·`love-rpg`·`retire-rpg`)는 같은 엔진을 공유한다.**
+  공통 틀의 정본은 `docs/dot-rpg-engine.md`. **게임을 만들거나 고치면 대사집을 반드시 함께 낸다** —
+  `python tools/extract_script.py <폴더>` 가 `<폴더>/대사집.txt` 를 만든다(다섯 게임 공용).
   공통 틀의 정본은 `docs/dot-rpg-engine.md` — 새 도트 RPG를 만들기 전에 반드시 먼저 읽는다.
 - `voxel-world/` — 복셀 샌드박스 (진행 중, 다중 파일). 규칙·상수·단계는
   `voxel-world/CLAUDE.md`(설계도) → `ROADMAP.md`(단계) → `HANDOFF.md`(일지) 순으로 읽고,

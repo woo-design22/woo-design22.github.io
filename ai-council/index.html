@@ -1533,6 +1533,12 @@
     // 프록시 모드의 실패는 원인이 서버 쪽이라 안내가 달라야 한다.
     // "키가 틀렸다"고 하면 넣을 키가 없는 사람이 헤맨다.
     if (S.prov === 'room') {
+      // Deno Deploy 가 프로젝트를 통째로 정지시키면 내 프록시 코드는 실행조차 안 된다.
+      // 그때 "환경변수를 확인하라"고 하면 엉뚱한 데를 뒤지게 된다.
+      if (/USAGE_EXCEEDED|suspended/i.test(raw)) {
+        return '회의실 서버가 사용량 초과로 정지됐다. Deno Deploy 대시보드에서 한도를 확인할 것 ' +
+               '(마음톡·구급대원도 같이 멈춘 상태다).';
+      }
       if (status === 401) return '비밀번호가 서버와 맞지 않는다. Deno Deploy 의 ROOM_TOKEN_SHA 를 확인할 것.';
       if (status === 503) return '회의실 서버가 아직 안 열렸다. Deno Deploy 에 OPENROUTER_KEY 와 ROOM_TOKEN_SHA 를 넣었는지 볼 것.';
       if (status === 403 && /비싸/.test(raw)) return '이 모델은 서버가 막아 둔 값이다. 더 싼 모델로 바꿀 것.';

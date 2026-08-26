@@ -260,6 +260,8 @@
       score: [0, 0],
       kickoffTeam: 0,
       // 경기장 크기는 방마다 다르다(§3). C.FIELD_* 는 기본값일 뿐이고 계산은 전부 state.W/H 로 한다.
+      // 대기 운동장은 **점수가 없다**(2026-08-26 지시). 공은 그대로 두되 골대에 넣어도 아무 일도 없다.
+      friendly: !!opts.friendly,
       field: F.id, W: F.w, H: F.h,
       goalY0: F.h / 2 - F.h * C.GOAL_RATIO, goalY1: F.h / 2 + F.h * C.GOAL_RATIO,
       ball: { x: F.w / 2, y: F.h / 2, vx: 0, vy: 0, range: 0, spin: 0, spinLeft: 0, pierce: 0,
@@ -916,6 +918,7 @@
   }
 
   function goalCheck(state, ev) {
+    if (state.friendly) return;   // 대기 운동장: 골이 없다
     var b = state.ball;
     if (b.x >= 0 && b.x <= state.W) return;
     // 왼쪽 골(x<0)은 왼쪽 진영 팀이 지킨다 → 오른쪽 팀 득점

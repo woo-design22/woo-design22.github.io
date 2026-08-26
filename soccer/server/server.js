@@ -68,13 +68,15 @@ function makeRoom(opts, hostConn) {
     id: String(nextRoomId++),
     name: String(opts.name || '').slice(0, 20) || (hostConn.nick + '의 방'),
     teamSize,
-    halfSec: [90, 180, 300].includes(opts.halfSec) ? opts.halfSec : 180,
+    halfSec: [60, 120, 180].includes(opts.halfSec) ? opts.halfSec : core.C.HALF_SEC,
+    field: core.fieldOf(opts.field).id,          // 방마다 경기장을 고른다(2026-08-26)
     classes: [clampInt(opts.classA, 1, 12, 1), clampInt(opts.classB, 1, 12, 2)],
     pass: typeof opts.pass === 'string' && opts.pass.length ? String(opts.pass).slice(0, 12) : null,
     hostId: hostConn.id,
     members: [],            // conn.id 순서 (입장 순)
     phase: 'lobby',         // lobby | playing
     state: null, inputs: null, timer: null, tick0: 0, tickCount: 0, tickMs: [],
+    wait: null,             // 대기 운동장(경기 전에 방 사람들만 걸어 다니는 곳)
     emptyAt: 0
   };
   rooms.set(room.id, room);
@@ -88,7 +90,7 @@ function roomBrief(r) {
 function roomFull(r) {
   return {
     id: r.id, name: r.name, teamSize: r.teamSize, halfSec: r.halfSec, lock: !!r.pass,
-    classes: r.classes, hostId: r.hostId, phase: r.phase, cap: r.teamSize * 2,
+    classes: r.classes, hostId: r.hostId, phase: r.phase, cap: r.teamSize * 2, field: r.field,
     members: r.members.map(id => {
       const c = conns.get(id);
       return c ? { id: c.id, nick: c.nick, team: c.team, char: c.char, ready: c.ready, slot: c.slot, host: c.id === r.hostId, rtt: c.rtt } : null;
@@ -108,6 +110,78 @@ function canStart(r) {
   return null;
 }
 
+/* ── 대기 운동장 (공용 로비 + 방마다 하나) ────────────────────────────────
+   접속에 성공한 사람은 **모두 프로구장 하나에 모인다**. 방에 들어가면 그 방 사람들만
+   **방이 고른 경기장**에 모인다(2026-08-26 지시). 둘 다 같은 장치를 쓴다.
+   경기가 끝나지 않게 시계를 크게 잡고, 끝나면 곧바로 다시 킥오프한다.
+   방을 고르는 동안에도 걸어 다니고 서로 때릴 수 있어야 하므로
+   방 목록·방 만들기는 화면 오른쪽 좁은 창으로 옮겼다(클라이언트). */
+function makeSession(id, fieldId) {
+  return { id, fieldId, members: [], state: null, inputs: null, timer: null, tickCount: 0 };
+}
+const lobby = makeSession('@lobby', 'pro');
+function fieldStart(sess) {
+  if (sess.timer) return;
+  sess.state = core.createState({ halfSec: 99999, field: sess.fieldId });
+  core.startMatch(sess.state);
+  sess.inputs = new Array(core.C.MAX_PLAYERS).fill(null).map(() => ({ dx: 0, dy: 0, buttons: 0 }));
+  const stepMs = 1000 / CFG.tickHz;
+  let nextAt = Date.now() + stepMs;
+  const snapBuf = new Uint8Array(core.snapshotSize(sess.state) + core.C.MAX_PLAYERS * 13);
+  const tick = () => {
+    for (let s = 0; s < core.C.MAX_PLAYERS; s++) { const i = sess.inputs[s]; i.dx = 0; i.dy = 0; i.buttons = 0; }
+    for (const cid of sess.members) {
+      const c = conns.get(cid);
+      if (!c || c.fieldSlot < 0) continue;
+      const i = sess.inputs[c.fieldSlot];
+      i.dx = c.input.dx; i.dy = c.input.dy; i.buttons = c.input.buttons;
+    }
+    try { core.step(sess.state, sess.inputs); } catch (e) { console.error('[field step]', e); }
+    sess.tickCount++;
+    if (sess.state.phase === 5) core.startMatch(sess.state);   // 끝나지 않는다
+    broadcastBin(sess, core.encodeSnapshot(sess.state, Date.now() >>> 0, snapBuf));
+  };
+  const loop = () => {
+    if (!sess.timer) return;
+    let guard = 0;
+    while (Date.now() >= nextAt && guard++ < 5) { tick(); nextAt += stepMs; }
+    if (Date.now() - nextAt > stepMs * 20) nextAt = Date.now() + stepMs;
+    sess.timer = setTimeout(loop, Math.max(0, Math.round(nextAt - Date.now())));
+  };
+  sess.timer = setTimeout(loop, stepMs);
+}
+function fieldStop(sess) {
+  if (sess.timer) { clearTimeout(sess.timer); sess.timer = null; }
+  sess.state = null; sess.members.length = 0;
+}
+function fieldJoin(sess, c) {
+  fieldLeave(c);
+  if (!sess.state) fieldStart(sess);
+  let slot = -1;
+  for (let s = 0; s < core.C.MAX_PLAYERS; s++) if (!sess.state.players[s]) { slot = s; break; }
+  if (slot < 0) { send(c, { t: 'lobby.field', slot: -1, full: true, field: sess.fieldId }); return; }
+  c.fieldSlot = slot; c.fieldSess = sess;
+  core.addPlayer(sess.state, slot, slot % 2, c.char);
+  if (sess.members.indexOf(c.id) < 0) sess.members.push(c.id);
+  send(c, { t: 'lobby.field', slot, field: sess.fieldId, where: sess.id });
+}
+function fieldLeave(c) {
+  const sess = c.fieldSess;
+  if (!sess) { c.fieldSlot = -1; return; }
+  const i = sess.members.indexOf(c.id);
+  if (i >= 0) sess.members.splice(i, 1);
+  if (c.fieldSlot >= 0 && sess.state) core.removePlayer(sess.state, c.fieldSlot);
+  c.fieldSlot = -1; c.fieldSess = null;
+  if (sess !== lobby && !sess.members.length) fieldStop(sess);   // 빈 방의 운동장은 멈춘다
+}
+/* 방에서 캐릭터를 바꾸면 대기 운동장의 내 몸도 바꿔 준다 */
+function fieldRechar(c) {
+  const sess = c.fieldSess;
+  if (!sess || !sess.state || c.fieldSlot < 0) return;
+  const p = sess.state.players[c.fieldSlot];
+  if (p) p.char = c.char;
+}
+
 // ── 경기 루프 ─────────────────────────────────────────────────────────────
 function startMatch(r) {
   const st = core.createState({ halfSec: r.halfSec });
@@ -118,6 +192,7 @@ function startMatch(r) {
     if (!c) continue;
     c.slot = c.team === 0 ? n0++ : 10 + n1++;
     core.addPlayer(st, c.slot, c.team, c.char);
+    fieldLeave(c);         // 경기 중에는 대기 운동장에서 빠진다
   }
   core.startMatch(st);
   r.state = st;
@@ -169,7 +244,7 @@ function startMatch(r) {
 function stopMatch(r, why) {
   if (r.timer) { clearTimeout(r.timer); r.timer = null; }
   r.phase = 'lobby'; r.state = null;
-  for (const id of r.members) { const c = conns.get(id); if (c) { c.ready = false; c.slot = -1; } }
+  for (const id of r.members) { const c = conns.get(id); if (c) { c.ready = false; c.slot = -1; fieldJoin(rooms.get(c.roomId) ? rooms.get(c.roomId).wait : lobby, c); } }
   broadcast(r, { t: 'match.end', why: why || '' });
   broadcast(r, { t: 'room', state: roomFull(r) });
 }
@@ -204,6 +279,8 @@ function statsSnapshot() {
 function leaveRoom(c, silent) {
   const r = rooms.get(c.roomId);
   c.roomId = null; c.team = 0; c.char = 0; c.ready = false; c.slot = -1;
+  if (c.ws.readyState === 1) fieldJoin(lobby, c);   // 방을 나가면 공용 운동장으로 돌아간다
+  else fieldLeave(c);
   if (!r) return;
   const i = r.members.indexOf(c.id);
   if (i >= 0) r.members.splice(i, 1);
@@ -231,7 +308,7 @@ wss.on('connection', (ws, req) => {
   stats.connections++;
 
   const c = {
-    id: nextConnId++, ws, ip, nick: '', roomId: null, team: 0, char: 0, ready: false, slot: -1,
+    id: nextConnId++, ws, ip, nick: '', roomId: null, team: 0, char: 0, ready: false, slot: -1, fieldSlot: -1, fieldSess: null,
     input: { dx: 0, dy: 0, buttons: 0 }, seq: -1,
     stage: 'hello',                 // hello → gate → ok
     gate: { sent: 0, ids: new Map(), rtts: [], timer: null, timeout: null },
@@ -262,6 +339,7 @@ wss.on('connection', (ws, req) => {
     if (c.gate.timeout) clearTimeout(c.gate.timeout);
     if (c.monTimer) clearInterval(c.monTimer);
     leaveRoom(c);
+    fieldLeave(c);
     conns.delete(c.id);
     ipCount.set(ip, Math.max(0, (ipCount.get(ip) || 1) - 1));
   });
@@ -312,6 +390,19 @@ function onText(c, m, helloTimer) {
       joinRoom(c, r);
       break;
     }
+    // 방장이 사람을 내보낸다(2026-08-26 지시). 경기 중에는 쓰지 않는다.
+    case 'room.kick': {
+      const r = rooms.get(c.roomId);
+      if (!r) break;
+      if (r.hostId !== c.id) { send(c, { t: 'error', msg: '방장만 내보낼 수 있습니다' }); break; }
+      if (r.phase === 'playing') { send(c, { t: 'error', msg: '경기 중에는 내보낼 수 없습니다' }); break; }
+      const target = conns.get(Number(m.id));
+      if (!target || target.roomId !== r.id || target.id === c.id) break;
+      send(target, { t: 'error', msg: '방장이 내보냈습니다' });
+      leaveRoom(target);
+      send(target, { t: 'left' });
+      break;
+    }
     case 'room.leave':
       leaveRoom(c);
       send(c, { t: 'left' });
@@ -325,8 +416,10 @@ function onText(c, m, helloTimer) {
       break;
     }
     case 'char': {
+      // 아래에서 c.char 를 정한 뒤 대기 운동장의 내 몸도 같이 바꾼다(fieldRechar)
       const r = rooms.get(c.roomId); if (!r || r.phase !== 'lobby') break;
-      c.char = clampInt(m.id, 0, 5, 0);
+      c.char = clampInt(m.id, 0, core.CHARACTERS.length - 1, 0);
+      fieldRechar(c);                     // 대기 운동장의 내 몸도 바뀐다
       broadcast(r, { t: 'room', state: roomFull(r) });
       break;
     }
@@ -345,14 +438,17 @@ function onText(c, m, helloTimer) {
       break;
     }
     case 'chat': {
-      const r = rooms.get(c.roomId); if (!r) break;
       const now = Date.now();
       c.chatTimes = c.chatTimes.filter(t => now - t < 1000);
       if (c.chatTimes.length >= CFG.limits.chatPerSec) break;      // 초과는 조용히 버린다
       c.chatTimes.push(now);
       const text = String(m.text || '').slice(0, CFG.limits.chatLen);
       if (!text.trim()) break;
-      broadcast(r, { t: 'chat', from: c.nick, text });
+      // 방 안이면 방 사람들에게, 아니면 공용 운동장 사람들에게.
+      // slot 을 같이 보내야 클라이언트가 **그 사람 머리 위에 말풍선**을 띄울 수 있다.
+      const r = rooms.get(c.roomId);
+      if (r) broadcast(r, { t: 'chat', from: c.nick, text, slot: c.slot });
+      else broadcast(lobby, { t: 'chat', from: c.nick, text, slot: c.fieldSlot });
       break;
     }
   }
@@ -386,6 +482,7 @@ function finishGate(c) {
   c.rtt = med;
   send(c, { t: 'welcome', nick: c.nick, rtt: med, p90, serverTime: Date.now(), protocol: core.PROTOCOL_VERSION });
   send(c, { t: 'rooms', list: [...rooms.values()].map(roomBrief) });
+  fieldJoin(lobby, c);     // 접속에 성공하면 곧바로 공용 운동장으로
   startMonitor(c);
 }
 // 접속 뒤에도 계속 지연을 재서 나빠지면 퇴장시킨다.
@@ -421,6 +518,9 @@ function joinRoom(c, r) {
   c.team = teamCount(r, 0) <= teamCount(r, 1) ? 0 : 1;
   r.members.push(c.id);
   r.emptyAt = 0;
+  // 방에 들어가면 공용 운동장에서 빠져 **그 방의 운동장**으로 옮긴다(방이 고른 경기장).
+  if (!r.wait) r.wait = makeSession('@room' + r.id, r.field);
+  fieldJoin(r.wait, c);
   send(c, { t: 'joined', id: r.id });
   broadcast(r, { t: 'room', state: roomFull(r) });
 }
@@ -438,6 +538,7 @@ function onBinary(c, data) {
   c.input.dx = inp.dx; c.input.dy = inp.dy; c.input.buttons = inp.buttons;
 }
 
+fieldStart(lobby);   // 공용 운동장은 서버가 사는 동안 계속 돈다
 server.listen(PORT, () => {
   console.log('반대항축구 서버 — http://localhost:' + PORT + '/  (프로토콜 v' + core.PROTOCOL_VERSION + ')');
 });

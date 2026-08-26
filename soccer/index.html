@@ -127,6 +127,8 @@
   .panel .hint { color: var(--muted); font-size: 13px; margin-top: 10px; line-height: 1.6; }
   .panel kbd { display: inline-block; padding: 1px 6px; border: 1px solid rgba(255,255,255,0.3); border-radius: 5px; font: 12.5px Consolas, monospace; color: var(--text); }
   .panel button.start { font: inherit; font-size: 18px; font-weight: 700; color: var(--text); background: var(--accent); border: 0; border-radius: 10px; padding: 11px 34px; cursor: pointer; }
+  .panel .startrow { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .panel button.start.alt { background: #3b82f6; }   /* 온라인은 파란색으로 구분 */
   #nogl { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 20px; text-align: center; font-size: 18px; }
 
   /* ── 터치 조작 ── */
@@ -182,6 +184,32 @@
     border-radius: 8px; padding: 5px 12px; font-size: 13px; font-family: inherit; cursor: pointer; }
   .panel .sndtest:hover { color: var(--text); border-color: rgba(255,255,255,0.45); }
   .panel .sndinfo { font-size: 11.5px; color: var(--muted); margin-top: 6px; min-height: 1em; white-space: pre-line; }
+  #dock { position: fixed; top: 56px; right: 8px; width: min(300px, 42vw); max-height: calc(100vh - 150px);
+    background: var(--hud-bg); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+    padding: 8px 10px; font-size: 12.5px; z-index: 4; display: none; overflow: auto; }
+  #dock.show { display: block; }
+  #dock.mini #dockBody { display: none; }
+  #dock .dockhead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  #dock .dockhead b { font-size: 13.5px; }
+  #dock .dockhead span { color: var(--muted); font-size: 11.5px; flex: 1; }
+  #dock table { width: 100%; }
+  #dock .row { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; margin: 5px 0; justify-content: flex-start; }
+  #dock input[type=text], #dock input[type=password], #dock select {
+    font: inherit; font-size: 12px; padding: 4px 6px; border-radius: 7px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.28); color: var(--text); max-width: 100%; }
+  #dock .btn { font: inherit; font-size: 12px; padding: 4px 9px; border-radius: 7px; cursor: pointer;
+    color: var(--text); background: transparent; border: 1px solid rgba(255,255,255,0.24); }
+  #dock .btn.go { background: var(--accent); border-color: var(--accent); color: #06210f; font-weight: 700; }
+  /* 채팅 — **배경 없이 글자만**. 게임을 가리지 않게 최근 5줄까지만 두고 서서히 사라진다. */
+  #chatLog { position: fixed; left: 12px; bottom: 92px; z-index: 3; pointer-events: none;
+    display: flex; flex-direction: column; gap: 2px; max-width: min(52vw, 620px); }
+  #chatLog div { font-size: 14px; font-weight: 600; color: #fff; line-height: 1.35;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7); transition: opacity .8s linear; }
+  #chatLog div b { color: var(--stun); font-weight: 800; }
+  #chatBar { position: fixed; left: 12px; bottom: 62px; z-index: 4; display: none; }
+  #chatBar.show { display: block; }
+  #chatBar input { font: inherit; font-size: 14px; width: min(46vw, 420px); padding: 5px 9px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.3); background: rgba(8,14,10,0.72); color: var(--text); }
   #rotateHint { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--hud-bg);
     padding: 6px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); display: none; pointer-events: none; white-space: nowrap; z-index: 4; }
   @media (orientation: portrait) { body.touch #rotateHint { display: block; } }
@@ -249,14 +277,16 @@
       <div class="row"><label>경기장</label><span id="ovFields" class="pickrow"></span></div>
       <div class="sideinfo" id="ovFieldInfo"></div>
     </div>
-    <button class="start" id="ovStart">혼자 하기</button>
-    <button class="btn" id="ovOnline" type="button" style="margin-top:8px">여러 명이서 하기</button>
+    <div class="startrow">
+      <button class="start" id="ovStart">혼자 하기</button>
+      <button class="start alt" id="ovOnline" type="button">온라인</button>
+    </div>
     <button class="sndtest" id="ovSndTest" type="button">소리 시험</button>
     <div class="sndinfo" id="ovSndInfo"></div>
     <div class="hint" id="ovHint"></div>
   </div>
   <div class="panel wide" id="panelLobby" style="display:none">
-    <h1>여러 명이서 하기</h1>
+    <h1>온라인</h1>
     <div class="sub">아이디(닉네임)를 정하고 방에 들어가세요. 회원가입은 없습니다.</div>
     <div class="row">
       <input type="text" id="lbNick" maxlength="12" placeholder="아이디 2~12자">
@@ -286,21 +316,23 @@
   </div>
 
   <div class="panel wide" id="panelRoom" style="display:none">
-    <h1 id="rmName">방</h1>
-    <div class="sub" id="rmSub"></div>
-    <div class="members" id="rmMembers"></div>
-    <div class="row">
-      <button class="btn" id="rmTeam" type="button">팀 바꾸기</button>
-      <span id="rmChars" class="chars" style="margin:0"></span>
+    <div id="rmBox">
+      <h1 id="rmName">방</h1>
+      <div class="sub" id="rmSub"></div>
+      <div class="members" id="rmMembers"></div>
+      <div class="row">
+        <button class="btn" id="rmTeam" type="button">팀 바꾸기</button>
+      </div>
+      <div class="row"><span id="rmChars" class="chars" style="margin:0"></span></div>
+      <div class="row">
+        <button class="btn go" id="rmReady" type="button">준비</button>
+        <button class="btn go" id="rmStart" type="button">시작</button>
+        <button class="btn" id="rmLeave" type="button">나가기</button>
+      </div>
+      <div class="err" id="rmErr"></div>
+      <div class="chatbox" id="rmChat" style="display:none"></div>
+      <input type="text" id="rmChatIn" style="display:none">
     </div>
-    <div class="row">
-      <button class="btn go" id="rmReady" type="button">준비</button>
-      <button class="btn go" id="rmStart" type="button">시작</button>
-      <button class="btn" id="rmLeave" type="button">나가기</button>
-    </div>
-    <div class="chatbox" id="rmChat"></div>
-    <div class="row"><input type="text" id="rmChatIn" maxlength="200" placeholder="채팅 (Enter)" style="width:70%"></div>
-    <div class="err" id="rmErr"></div>
   </div>
 
   <div class="panel wide board" id="panelBoard" style="display:none">
@@ -325,6 +357,16 @@
     <button class="btn" id="msgHome" type="button" style="margin-left:6px">처음으로</button>
   </div>
 </div>
+<!-- 접속에 성공하면 방 목록·방 만들기는 화면 **오른쪽 좁은 창**으로 간다.
+     그동안 운동장에서는 자기 캐릭터로 걸어 다닐 수 있으므로 화면 한가운데를 막으면 안 된다. -->
+<div id="dock">
+  <div class="dockhead"><b id="dkName">공용 운동장</b><span id="dkInfo"></span>
+    <button class="btn sm" id="dkHide" type="button" title="접기">▸</button></div>
+  <div id="dockBody"></div>
+</div>
+<!-- 채팅: 최근 5줄만, 배경 없이 글자만, 시간이 지나면 서서히 사라진다 -->
+<div id="chatLog"></div>
+<div id="chatBar"><input type="text" id="chatIn" maxlength="80" placeholder="Enter 로 말하기"></div>
 <div id="nogl">이 브라우저는 캔버스를 지원하지 않아 게임을 실행할 수 없습니다. 최신 크롬 또는 엣지를 사용해 주세요.</div>
 
 <script src="game-core.js"></script>
@@ -490,6 +532,7 @@
     audio.unlock();
     if (e.code === 'KeyM' && !overlayMode) { settings.minimap = !settings.minimap; saveSettings(); return; }
     if (e.code === 'Escape') { if (net.screen === 'quit') { hideOverlay(); syncExitBtn(); } else askQuit(); e.preventDefault(); return; }
+    if (e.code === 'Enter' && game && !overlayMode) { chatOpen(true); e.preventDefault(); return; }   // 경기 중 말하기
     if (e.code === 'KeyN') { audio.set('sfx', !settings.sfx); syncAudioBtns(); if (settings.sfx) audio.sfx('pass'); return; }
     if (e.code === 'KeyB') { audio.set('bgm', !settings.bgm); syncAudioBtns(); return; }
     if (PREVENT[e.code]) e.preventDefault();
@@ -837,6 +880,7 @@
         ctx.globalAlpha = 1;
       }
             label(isMe ? '나' : String(p.slot + 1), x, y - R * 2.9, isMe ? COLOR.text : COLOR.muted);
+      drawBubble(p.slot, x, y - R * 3.6, s);
     }
   }
   /* 방귀 그림(chars/fart-effect.png). 없으면 예전처럼 색 사각형으로 그린다. */
@@ -926,6 +970,37 @@
     showPanel("board");
   }
   function hideBoard() { if (boardT > 0) { boardT = 0; hideOverlay(); } }
+  /* 말풍선 — 말한 사람 머리 위에 잠깐 뜬다. 게임을 가리지 않게 아주 옅은 바탕에
+     한 줄만, 길면 잘라서 그린다. 시간이 지나면 같이 옅어진다. */
+  function drawBubble(slot, x, y, s) {
+    var b = bubbles[slot];
+    if (!b) return;
+    var a = b.t > BUBBLE_LIFE - 1.2 ? Math.max(0, (BUBBLE_LIFE - b.t) / 1.2) : 1;
+    var txt = b.text.length > 18 ? b.text.slice(0, 18) + '…' : b.text;
+    var fs = Math.max(11, Math.round(11 * s));
+    ctx.save();
+    ctx.font = '600 ' + fs + "px 'Segoe UI', Pretendard, sans-serif";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    var w = ctx.measureText(txt).width + fs * 0.9, h = fs * 1.7;
+    ctx.globalAlpha = a * 0.42;
+    ctx.fillStyle = '#0b1410';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x - w / 2, y - h, w, h, h * 0.35); ctx.fill(); }
+    else ctx.fillRect(x - w / 2, y - h, w, h);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 4;
+    ctx.fillText(txt, x, y - h / 2);
+    ctx.restore();
+  }
+  /* 경기에 나오는 캐릭터 그림을 미리 받아 둔다. 안 하면 처음 몇 초 동안 도트로 보인다.
+     골키퍼는 덩치형 그림을 빌려 쓰므로 'big' 도 같이 받는다. */
+  function preloadChars() {
+    if (!window.SoccerSprite || !SoccerSprite.preload) return;
+    var keys = ['big'], S = SoccerSprite.CHARACTERS;
+    for (var i = 0; i < S.length; i++) if (keys.indexOf(S[i].key) < 0) keys.push(S[i].key);
+    SoccerSprite.preload(keys);
+    fartImg(); kickImg(); ballImg();
+  }
   function charOfSlot(slot) {
     // 연습장은 로컬 상태에서, 온라인은 방 정보에서 읽는다(온라인은 서버만 state 를 갖는다)
     if (game && game.mode === 'online') {
@@ -1157,6 +1232,7 @@
     });
     renderSides();
     renderPicks();
+    preloadChars();
     var sel = core.CHARACTERS[settings.char];
     $('ovUlt').innerHTML = '필살기 <b>' + sel.ult.name + '</b> — ' + ultDesc(sel) +
       ' · 속도 ×' + sel.speed.toFixed(2) + ' · 슛 ×' + sel.shot.toFixed(2);
@@ -1210,7 +1286,7 @@
   $('lbRefresh').addEventListener('click', function () { netSend({ t: 'room.list' }); });
   $('crMake').addEventListener('click', function () {
     netSend({ t: 'room.create', name: $('crName').value, teamSize: +$('crSize').value,
-      halfSec: +$('crHalf').value, pass: $('crPass').value });
+      halfSec: +$('crHalf').value, pass: $('crPass').value, field: settings.field });
   });
   $('rmTeam').addEventListener('click', function () { var me = myMember(); netSend({ t: 'team', team: me && me.team ? 0 : 1 }); });
   $('rmReady').addEventListener('click', function () { var me = myMember(); netSend({ t: 'ready', on: !(me && me.ready) }); });
@@ -1434,7 +1510,7 @@
      `REGISTRY` 가 비어 있으면 이 기능은 그냥 꺼진 것과 같다(서버가 페이지도 서빙하는 평소 경로에는 필요 없다). */
   var REGISTRY = 'https://gray-macaque-4849.woo-design22.deno.net';   // 주소 게시판 (2026-08-25 배포)
   var OFF_NOTE = [
-    '이 게임은 만든 사람의 컴퓨터에서 서버를 켜 두는 동안만 여러 명이서 할 수 있습니다.',
+    '이 게임은 만든 사람의 컴퓨터에서 서버를 켜 두는 동안만 온라인으로 할 수 있습니다.',
     '켜지면 위 주소 칸이 자동으로 채워집니다. 직접 받은 주소가 있으면 거기에 넣고 「접속」을 누르세요.',
     '혼자라도 「뒤로」 → 「혼자 하기」로 인공지능과 경기할 수 있습니다(1:1 부터 10:10 까지).'
   ].join(String.fromCharCode(10));
@@ -1543,22 +1619,24 @@
         netMsg('퇴장되었습니다', m.msg || '', true);
         break;
       case 'rooms': renderRooms(m.list); break;
-      case 'joined': net.roomId = m.id; break;
+      case 'joined':
+        moveRoomUIToDock(); net.roomId = m.id; break;
       case 'room':
         net.room = m.state;
         if (net.screen !== 'room' && m.state.phase === 'lobby') showPanel('room');
         renderRoom();
         break;
+      case 'lobby.field': onLobbyField(m); break;
       case 'match.start': onMatchStart(); break;
       case 'match.end':
-        stopInputSender();
-        game = null; snaps.length = 0;
-        showPanel('room');
+        game = null; snaps.length = 0;   // 곧 lobby.field 가 다시 와서 공용 운동장으로 돌아간다
+        if (!$('dockBody').children.length) showPanel('room'); else dockShow('room');
         break;
       case 'chat': {
+        chatSay(m.from, m.text, m.slot);
         var box = $('rmChat');
-        box.textContent += (box.textContent ? '\n' : '') + m.from + ': ' + m.text;
-        box.scrollTop = box.scrollHeight;
+        if (box) { box.textContent += (box.textContent ? '\n' : '') + m.from + ': ' + m.text;
+                   box.scrollTop = box.scrollHeight; }
         break;
       }
       case 'error':
@@ -1601,7 +1679,8 @@
     var r = net.room; if (!r) return;
     $('rmName').textContent = r.name + (r.lock ? ' 🔒' : '');
     $('rmSub').textContent = r.teamSize + ':' + r.teamSize + ' · 전후반 각 ' + Math.round(r.halfSec / 60 * 10) / 10 + '분 · '
-      + r.members.length + '/' + r.cap + '명';
+      + r.members.length + '/' + r.cap + '명 · ' + core.fieldOf(r.field).name;
+    if (net.screen !== 'board') $('dkName').textContent = r.name;
     var me = myMember();
     var box = $('rmMembers'); box.innerHTML = '';
     r.members.forEach(function (m) {
@@ -1611,6 +1690,14 @@
         + '<b>' + esc(m.nick) + '</b>' + (m.host ? ' <span style="color:var(--charge)">방장</span>' : '')
         + ' <span style="color:var(--muted)">' + esc((core.CHARACTERS[m.char] || {}).name || '') + '</span>'
         + ' <span style="margin-left:auto" class="' + (m.ready ? 'rd' : 'no') + '">' + (m.ready ? '준비 완료' : '대기') + '</span>';
+      // 방장은 다른 사람을 내보낼 수 있다(2026-08-26 지시)
+      if (me && me.host && m.id !== me.id) {
+        var kb = document.createElement('button');
+        kb.className = 'btn sm'; kb.type = 'button'; kb.textContent = '내보내기';
+        kb.style.marginLeft = '6px';
+        kb.addEventListener('click', function () { netSend({ t: 'room.kick', id: m.id }); });
+        d.appendChild(kb);
+      }
       box.appendChild(d);
     });
     var chars = $('rmChars'); chars.innerHTML = '';
@@ -1636,7 +1723,89 @@
     snaps.length = 0; eventLog.length = 0; animState.length = 0;
     cam.init = false;
     hideOverlay();
+    preloadChars();
     banner('킥오프', 1200);
+    startInputSender();
+  }
+  /* ── 공용 운동장 · 채팅 (2026-08-26 지시) ─────────────────────────────────
+     접속에 성공하면 모두 프로구장 하나에 모여 자기 캐릭터로 걸어 다닌다.
+     방 목록·방 만들기는 화면 오른쪽 좁은 창(#dock)으로 옮긴다 — 가운데를 막으면 걸을 수 없다.
+     말을 하면 **자기 캐릭터 위에 말풍선**이 뜨고 왼쪽 아래 채팅에도 남는다.
+     채팅은 배경 없이 글자만, 최근 5줄, 시간이 지나면 서서히 사라진다. */
+  var CHAT_MAX = 5, CHAT_LIFE = 9, BUBBLE_LIFE = 4.5;
+  var chatLines = [];              // {el, t} 화면 왼쪽 아래 기록
+  var bubbles = {};                // slot → {text, t} 머리 위 말풍선
+  function dockOpen(on) { $('dock').classList.toggle('show', !!on); }
+  /* 방 화면도 같은 오른쪽 창으로 옮긴다 — 방에서도 걸어 다닐 수 있어야 하므로
+     가운데를 막는 큰 패널을 쓰지 않는다(2026-08-26 지시). */
+  function moveRoomUIToDock() {
+    var body = $('dockBody');
+    if ($('rmBox').parentNode === body) { dockShow('room'); return; }
+    body.appendChild($('rmBox'));
+    dockShow('room');
+  }
+  function dockShow(which) {
+    $('lbAfter').style.display = which === 'room' ? 'none' : '';
+    $('rmBox').style.display = which === 'room' ? '' : 'none';
+    $('dkName').textContent = which === 'room' ? (net.room ? net.room.name : '방') : '공용 운동장';
+    dockOpen(true);
+  }
+  function moveLobbyUIToDock() {
+    var body = $('dockBody');
+    if (body.children.length) return;      // 한 번만 옮긴다(핸들러는 그대로 살아 있다)
+    body.appendChild($('lbAfter'));
+    $('lbAfter').style.display = '';
+  }
+  function chatSay(from, text, slot) {
+    var d = document.createElement('div');
+    d.innerHTML = '<b>' + esc(from) + '</b> ' + esc(text);
+    $('chatLog').appendChild(d);
+    chatLines.push({ el: d, t: 0 });
+    while (chatLines.length > CHAT_MAX) { var old = chatLines.shift(); if (old.el.parentNode) old.el.parentNode.removeChild(old.el); }
+    if (slot != null && slot >= 0) bubbles[slot] = { text: text, t: 0 };
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+  function chatTick(dt) {
+    for (var i = chatLines.length - 1; i >= 0; i--) {
+      var L = chatLines[i]; L.t += dt;
+      if (L.t > CHAT_LIFE) { if (L.el.parentNode) L.el.parentNode.removeChild(L.el); chatLines.splice(i, 1); }
+      else if (L.t > CHAT_LIFE - 3) L.el.style.opacity = String(Math.max(0, (CHAT_LIFE - L.t) / 3));
+    }
+    for (var s in bubbles) { bubbles[s].t += dt; if (bubbles[s].t > BUBBLE_LIFE) delete bubbles[s]; }
+  }
+  function chatOpen(on) {
+    $('chatBar').classList.toggle('show', !!on);
+    if (on) $('chatIn').focus(); else { $('chatIn').blur(); $('chatIn').value = ''; }
+  }
+  function chatSend() {
+    var v = $('chatIn').value.trim();
+    chatOpen(false);
+    if (!v) return;
+    if (net.ws && net.ws.readyState === 1) netSend({ t: 'chat', text: v });
+    else chatSay(net.nick || '나', v, game ? game.mySlot : -1);   // 혼자 하기도 똑같이 보인다
+  }
+  $('chatIn').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.code === 'Enter') { chatSend(); e.preventDefault(); }
+    else if (e.code === 'Escape') { chatOpen(false); e.preventDefault(); }
+  });
+  $('dkHide').addEventListener('click', function () {
+    var d = $('dock'); d.classList.toggle('mini');
+    $('dkHide').textContent = d.classList.contains('mini') ? '◂' : '▸';
+  });
+  /* 공용 운동장에 들어왔다 — 방 고르는 화면을 오른쪽으로 옮기고 경기 화면을 켠다. */
+  function onLobbyField(m) {
+    net.mySlot = m.slot;
+    if (m.field) setField(m.field);
+    moveLobbyUIToDock();
+    dockShow(net.roomId ? 'room' : 'lobby');
+    hideOverlay();
+    game = { mode: 'lobby', state: null, inputs: null, mySlot: m.slot, ai: null,
+             acc: 0, last: performance.now(), interpMs: settings.interpMs };
+    snaps.length = 0; eventLog.length = 0; animState.length = 0; cam.init = false;
+    preloadChars();
+    $('dkInfo').textContent = m.slot < 0 ? '자리가 꽉 차 구경만 합니다' : '걸어 다닐 수 있습니다';
+    syncExitBtn();
     startInputSender();
   }
   function startInputSender() {
@@ -1690,6 +1859,7 @@
     cam.init = false;
     hideOverlay();
     syncExitBtn();
+    preloadChars();
     doTick(performance.now());
     banner('킥오프', 1200);
   }
@@ -1755,6 +1925,7 @@
       while (game.acc >= 50) { doTick(now - game.acc + 50); game.acc -= 50; }
     }
     if (cheerT > 0) cheerT = Math.max(0, cheerT - dt / 1000);   // 골 뒤 환호가 잦아든다
+    chatTick(dt / 1000);
     if (boardT > 0) { boardT -= dt / 1000; if (boardT <= 0) { boardT = 0; if (net.screen === "board") hideOverlay(); } }
     sample(now - (game ? game.interpMs : settings.interpMs));
     updateCamera(Math.min(0.1, dt / 1000));

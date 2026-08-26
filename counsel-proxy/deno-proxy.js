@@ -22,6 +22,11 @@
  * 환경변수 (Deno Deploy 프로젝트 Settings 에서 등록):
  *   ANTHROPIC_API_KEY  (필수)
  *   ALLOWED_ORIGINS    (쉼표 구분, 예: https://woo-design22.github.io)
+ *   OPENROUTER_KEY     (/room 용)  sk-or-v1-...
+ *   ROOM_TOKEN_SHA     (/room 용)  회의실 비밀번호에서 나온 표. 비면 /room 이 닫힌다.
+ *
+ * 라우트: (기본) 마음톡 · /triage 구급대원 · /room AI 회의실 ·
+ *         /telegram 텔레그램 봇 · /kakao 카카오 챗봇
  */
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -60,6 +65,197 @@ function rateOk(ip) {
     }
   }
   return true;
+}
+
+/* ==================================================================
+ * /room — 「AI 회의실」(ai-council) 전용 라우트
+ *
+ * 마음톡과 다른 점 하나: 여기서는 **오픈라우터**를 부른다(GPT·클로드·제미나이를
+ * 한 키로 쓰려는 것). 그래서 키도 모델도 상한도 이 구역 안에서 따로 논다.
+ *
+ * 이 라우트를 만든 이유는 단 하나다 — 브라우저에 키를 두지 않으려고.
+ * 정적 페이지는 키를 아무리 숨겨도 F12 네트워크 탭에 그대로 찍힌다.
+ *
+ * 환경변수:
+ *   OPENROUTER_KEY   (필수)  sk-or-v1-...
+ *   ROOM_TOKEN_SHA   (필수)  회의실 비밀번호에서 나온 표를 한 번 더 뭉갠 값.
+ *                            ai-council 의 ?setpass=1 화면이 만들어 준다.
+ *                            비어 있으면 라우트 전체가 닫힌다(열어 두는 쪽이 더 위험하다).
+ * ================================================================== */
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
+
+// 회의 한 판이 7~19회를 몰아 부른다. 상담용 8회/분으로는 회의가 중간에 끊긴다.
+const ROOM_RATE_LIMIT = 40;
+const ROOM_RATE_WINDOW_MS = 60000;
+const roomHits = new Map();
+
+// ---- 비용 상한 (여기 숫자가 곧 청구서다) ----
+// 모델 목록을 손으로 적지 않고 **값으로 자른다**. 새 모델이 나와도 알아서 걸린다.
+// o1-pro 같은 것이 $150/$600 이라 이 문턱이 없으면 한 번에 통장이 빈다.
+const ROOM_MAX_IN_USD = 6;      // 100만 토큰당 입력값 상한
+const ROOM_MAX_OUT_USD = 30;    // 100만 토큰당 출력값 상한
+const ROOM_MAX_TOKENS = 4500;   // 한 번에 만들 수 있는 최대 분량
+const ROOM_MAX_CHARS = 30000;   // 회의록 + 지시문 글자 수 상한
+// 노력도 상한. 'xhigh'·'max' 는 값이 몇 배로 뛰므로 여기서 자른다.
+const ROOM_EFFORTS = ['off', 'default', 'minimal', 'low', 'medium', 'high'];
+
+function roomRateOk(ip) {
+  const now = Date.now();
+  const arr = (roomHits.get(ip) || []).filter((t) => now - t < ROOM_RATE_WINDOW_MS);
+  if (arr.length >= ROOM_RATE_LIMIT) { roomHits.set(ip, arr); return false; }
+  arr.push(now);
+  roomHits.set(ip, arr);
+  if (roomHits.size > 5000) {
+    for (const [k, v] of roomHits) {
+      if (!v.length || now - v[v.length - 1] > ROOM_RATE_WINDOW_MS) roomHits.delete(k);
+    }
+  }
+  return true;
+}
+
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/* 두 값을 비교할 때 길이·내용에 따라 걸리는 시간이 달라지면 그것만으로 힌트가 샌다.
+ * 항상 같은 만큼 돌게 만든다. */
+function sameSecret(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/* 오픈라우터 모델 표. 값이 자주 바뀌므로 받아서 한 시간 들고 있는다.
+ * 못 받으면 통과시키지 않는다 — 값을 모르는 채로 부르는 것이 제일 위험하다. */
+let roomCatalog = null;
+let roomCatalogAt = 0;
+async function roomPrices() {
+  if (roomCatalog && Date.now() - roomCatalogAt < 3600000) return roomCatalog;
+  const res = await fetch(OPENROUTER_MODELS_URL, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error('models ' + res.status);
+  const json = await res.json();
+  const map = new Map();
+  for (const m of (json.data || [])) {
+    const p = m.pricing || {};
+    map.set(m.id, {
+      in: (parseFloat(p.prompt) || 0) * 1e6,
+      out: (parseFloat(p.completion) || 0) * 1e6
+    });
+  }
+  if (!map.size) throw new Error('empty catalog');
+  roomCatalog = map;
+  roomCatalogAt = Date.now();
+  return map;
+}
+
+async function handleRoom(request, echoOrigin) {
+  const orKey = Deno.env.get('OPENROUTER_KEY');
+  const tokenSha = Deno.env.get('ROOM_TOKEN_SHA');
+  if (!orKey) return jsonError(500, '서버에 오픈라우터 키가 설정되지 않았습니다.', echoOrigin);
+  // 표가 없으면 아무나 들어온다. 닫아 두는 쪽이 맞다.
+  if (!tokenSha) return jsonError(503, '회의실이 아직 열리지 않았습니다.', echoOrigin);
+
+  const ip = (request.headers.get('x-forwarded-for') || 'unknown').split(',')[0].trim();
+  if (!roomRateOk(ip)) {
+    return jsonError(429, '너무 빠르게 여러 번 보냈습니다. 잠시 뒤 다시 시도해 주세요.', echoOrigin);
+  }
+
+  let body;
+  try { body = await request.json(); }
+  catch (_e) { return jsonError(400, '요청 형식이 올바르지 않습니다.', echoOrigin); }
+
+  // ---- 표 확인 ----
+  const given = typeof body.token === 'string' ? body.token : '';
+  if (!given || given.length > 200) return jsonError(401, '비밀번호가 필요합니다.', echoOrigin);
+  if (!sameSecret(await sha256Hex('room:' + given), tokenSha)) {
+    return jsonError(401, '비밀번호가 맞지 않습니다.', echoOrigin);
+  }
+
+  // ---- 클라이언트 입력을 신뢰하지 않고 다시 만든다 ----
+  const model = typeof body.model === 'string' ? body.model.slice(0, 120) : '';
+  const system = typeof body.system === 'string' ? body.system : '';
+  const text = typeof body.text === 'string' ? body.text : '';
+  if (!model || !text) return jsonError(400, '보낼 내용이 없습니다.', echoOrigin);
+  if (system.length + text.length > ROOM_MAX_CHARS) {
+    return jsonError(413, '회의록이 너무 깁니다.', echoOrigin);
+  }
+  if (model.indexOf(':batch') >= 0) return jsonError(400, '쓸 수 없는 모델입니다.', echoOrigin);
+
+  let prices;
+  try { prices = await roomPrices(); }
+  catch (_e) { return jsonError(502, '모델 값을 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요.', echoOrigin); }
+
+  const price = prices.get(model);
+  if (!price) return jsonError(400, '없는 모델입니다.', echoOrigin);
+  if (price.in > ROOM_MAX_IN_USD || price.out > ROOM_MAX_OUT_USD) {
+    return jsonError(403, '이 모델은 너무 비싸서 막아 두었습니다. (출력 100만 토큰당 $' +
+      price.out + ') 더 싼 모델을 골라 주세요.', echoOrigin);
+  }
+
+  const maxTokens = Math.min(Math.max(parseInt(body.max_tokens, 10) || 1200, 200), ROOM_MAX_TOKENS);
+  // 상한을 넘겨 부탁하면 상한까지만 깎는다.
+  // 모르는 값이라고 'low' 로 떨어뜨리면 답의 질이 뚝 떨어져 버그처럼 보인다.
+  const effort = ROOM_EFFORTS.includes(body.effort)
+    ? body.effort
+    : (['xhigh', 'max'].includes(body.effort) ? 'high' : 'low');
+
+  const upstreamBody = {
+    model,
+    messages: [
+      { role: 'system', content: system.slice(0, ROOM_MAX_CHARS) },
+      { role: 'user', content: text.slice(0, ROOM_MAX_CHARS) }
+    ],
+    max_tokens: maxTokens,
+    stream: true,
+    usage: { include: true }
+  };
+  if (effort === 'off') upstreamBody.reasoning = { enabled: false };
+  else if (effort !== 'default') upstreamBody.reasoning = { effort };
+
+  let upstream;
+  try {
+    upstream = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + orKey,
+        'HTTP-Referer': 'https://woo-design22.github.io',
+        'X-Title': 'AI Council'   // 한글을 넣으면 비ASCII 헤더라 거부된다
+      },
+      body: JSON.stringify(upstreamBody)
+    });
+  } catch (_e) {
+    return jsonError(502, '회의 서버에 연결하지 못했습니다.', echoOrigin);
+  }
+
+  if (!upstream.ok) {
+    let why = '';
+    try {
+      const j = JSON.parse(await upstream.text());
+      if (j && j.error) why = ' ' + String(j.error.message || '').slice(0, 160);
+    } catch (_e) { /* JSON 이 아니면 상태 코드만 */ }
+    const msg = upstream.status === 402
+      ? '오픈라우터 잔액이 부족하거나 키의 지출 상한에 닿았습니다.'
+      : upstream.status === 429
+        ? '지금 이용자가 많습니다. 잠시 뒤 다시 보내 주세요.'
+        : (upstream.status === 401 || upstream.status === 403)
+          ? '서버 설정에 문제가 있습니다. (인증 ' + upstream.status + ')'
+          : '요청을 처리하지 못했습니다. (' + upstream.status + ')' + why;
+    return jsonError(upstream.status === 429 ? 429 : 502, msg, echoOrigin);
+  }
+
+  // SSE 를 그대로 흘려보낸다. 내용은 읽지 않는다 = 기록도 남지 않는다.
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-store',
+      ...corsHeaders(echoOrigin)
+    }
+  });
 }
 
 const BASE_PROMPT = [
@@ -840,10 +1036,16 @@ Deno.serve(async (request) => {
     return jsonError(405, '지원하지 않는 요청입니다.', echoOrigin);
   }
 
-  // 경로로 앱을 가른다. /triage = 구급대원, 그 외 = 마음톡 상담
-  const isTriage = new URL(request.url).pathname.replace(/\/+$/, '') === '/triage';
+  // 경로로 앱을 가른다. /room = AI 회의실, /triage = 구급대원, 그 외 = 마음톡 상담
+  const path = new URL(request.url).pathname.replace(/\/+$/, '');
+  const isTriage = path === '/triage';
   if (!originOk) {
     return jsonError(403, '허용되지 않은 접근입니다.', echoOrigin);
+  }
+
+  // 회의실은 오픈라우터를 부르고 자기 키·자기 상한을 쓴다. 아래 상담 경로와 섞이면 안 된다.
+  if (path === '/room') {
+    return await handleRoom(request, echoOrigin);
   }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');

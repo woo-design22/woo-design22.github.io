@@ -314,6 +314,11 @@
   .fchip .fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fchip .fn small { display: block; color: var(--ink-3); font-size: 11.5px; white-space: normal; }
   .fchip .del { flex: none; }
+  .fchip .th {
+    flex: none; width: 38px; height: 38px;
+    object-fit: cover; border-radius: 7px;
+    border: 1px solid var(--line);
+  }
   .fchip.bad { border-color: var(--warn); }
   .fchip.bad .fn small { color: var(--warn); }
   .fchip.cut .fn small { color: var(--gold); }
@@ -753,20 +758,20 @@
   const CAT_TTL = 24 * 3600 * 1000;   // 하루 지나면 다시 받는다
 
   const OR_FALLBACK = [
-    { id:'anthropic/claude-opus-5',       label:'Claude Opus 5',    i:5,    o:25, mx:128000, md:0, ef:['max','xhigh','high','medium','low'] },
-    { id:'anthropic/claude-sonnet-5',     label:'Claude Sonnet 5',  i:2,    o:10, mx:128000, md:0, ef:['max','xhigh','high','medium','low'] },
-    { id:'anthropic/claude-haiku-4.5',    label:'Claude Haiku 4.5', i:1,    o:5,  mx:64000,  md:0, ef:[] },
-    { id:'anthropic/claude-fable-5',      label:'Claude Fable 5',   i:10,   o:50, mx:128000, md:1, ef:['max','xhigh','high','medium','low'] },
-    { id:'openai/gpt-5.6-sol',            label:'GPT-5.6 Sol',      i:2,    o:10, mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
-    { id:'openai/gpt-5.6-sol-pro',        label:'GPT-5.6 Sol Pro',  i:2,    o:10, mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
-    { id:'openai/gpt-5.6-terra',          label:'GPT-5.6 Terra',    i:2,    o:12, mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
-    { id:'openai/gpt-5.6-luna',           label:'GPT-5.6 Luna',     i:0.2,  o:1.2,mx:128000, md:0, ef:['max','xhigh','high','medium','low','none'] },
-    { id:'openai/gpt-5.4',                label:'GPT-5.4',          i:2.5,  o:15, mx:128000, md:0, ef:['xhigh','high','medium','low','none'] },
-    { id:'openai/gpt-5-mini',             label:'GPT-5 Mini',       i:0.25, o:2,  mx:128000, md:1, ef:['high','medium','low','minimal'] },
-    { id:'google/gemini-3.1-pro-preview', label:'Gemini 3.1 Pro',   i:2,    o:12, mx:65536,  md:1, ef:['high','medium','low'] },
-    { id:'google/gemini-3.7-flash',       label:'Gemini 3.7 Flash', i:0.375,o:1.875,mx:65536,md:1, ef:['high','medium','low'] },
-    { id:'x-ai/grok-4.6',                 label:'Grok 4.6',         i:2,    o:6,  mx:450000, md:1, ef:['xhigh','high','medium','low'] },
-    { id:'deepseek/deepseek-chat-v3.1',   label:'DeepSeek V3.1',    i:0.55, o:1.65,mx:144900,md:0, ef:[] }
+    { id:'anthropic/claude-opus-5',       label:'Claude Opus 5',    i:5,    o:25, mx:128000, img:1, md:0, ef:['max','xhigh','high','medium','low'] },
+    { id:'anthropic/claude-sonnet-5',     label:'Claude Sonnet 5',  i:2,    o:10, mx:128000, img:1, md:0, ef:['max','xhigh','high','medium','low'] },
+    { id:'anthropic/claude-haiku-4.5',    label:'Claude Haiku 4.5', i:1,    o:5,  mx:64000,  img:1, md:0, ef:[] },
+    { id:'anthropic/claude-fable-5',      label:'Claude Fable 5',   i:10,   o:50, mx:128000, img:1, md:1, ef:['max','xhigh','high','medium','low'] },
+    { id:'openai/gpt-5.6-sol',            label:'GPT-5.6 Sol',      i:2,    o:10, mx:128000, img:1, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.6-sol-pro',        label:'GPT-5.6 Sol Pro',  i:2,    o:10, mx:128000, img:1, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.6-terra',          label:'GPT-5.6 Terra',    i:2,    o:12, mx:128000, img:1, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.6-luna',           label:'GPT-5.6 Luna',     i:0.2,  o:1.2,mx:128000, img:1, md:0, ef:['max','xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5.4',                label:'GPT-5.4',          i:2.5,  o:15, mx:128000, img:1, md:0, ef:['xhigh','high','medium','low','none'] },
+    { id:'openai/gpt-5-mini',             label:'GPT-5 Mini',       i:0.25, o:2,  mx:128000, img:1, md:1, ef:['high','medium','low','minimal'] },
+    { id:'google/gemini-3.1-pro-preview', label:'Gemini 3.1 Pro',   i:2,    o:12, mx:65536,  img:1, md:1, ef:['high','medium','low'] },
+    { id:'google/gemini-3.7-flash',       label:'Gemini 3.7 Flash', i:0.375,o:1.875,mx:65536,img:1, md:1, ef:['high','medium','low'] },
+    { id:'x-ai/grok-4.6',                 label:'Grok 4.6',         i:2,    o:6,  mx:450000, img:1, md:1, ef:['xhigh','high','medium','low'] },
+    { id:'deepseek/deepseek-chat-v3.1',   label:'DeepSeek V3.1',    i:0.55, o:1.65,mx:144900,img:0, md:0, ef:[] }
   ];
 
   /* 앤트로픽 직통 — 이미 앤트로픽 키가 있는 사람용. 여기는 목록 API 가 없어 손으로 적는다.
@@ -777,10 +782,10 @@
    * 발언의 다양성은 파라미터가 아니라 역할 프롬프트로 벌린다.
    */
   const ANT_LIST = [
-    { id:'claude-opus-5',    label:'Opus 5',    i:5,  o:25, mx:64000, md:0, ef:['max','xhigh','high','medium','low'], fb:1 },
-    { id:'claude-sonnet-5',  label:'Sonnet 5',  i:3,  o:15, mx:64000, md:0, ef:['max','xhigh','high','medium','low'], fb:0 },
-    { id:'claude-haiku-4-5', label:'Haiku 4.5', i:1,  o:5,  mx:64000, md:0, ef:[],                                    fb:0 },
-    { id:'claude-fable-5',   label:'Fable 5',   i:10, o:50, mx:64000, md:1, ef:['max','xhigh','high','medium','low'], fb:1 }
+    { id:'claude-opus-5',    label:'Opus 5',    i:5,  o:25, mx:64000, img:1, md:0, ef:['max','xhigh','high','medium','low'], fb:1 },
+    { id:'claude-sonnet-5',  label:'Sonnet 5',  i:3,  o:15, mx:64000, img:1, md:0, ef:['max','xhigh','high','medium','low'], fb:0 },
+    { id:'claude-haiku-4-5', label:'Haiku 4.5', i:1,  o:5,  mx:64000, img:1, md:0, ef:[],                                    fb:0 },
+    { id:'claude-fable-5',   label:'Fable 5',   i:10, o:50, mx:64000, img:1, md:1, ef:['max','xhigh','high','medium','low'], fb:1 }
   ];
 
   /* 프록시(counsel-proxy 의 /room). 키는 저 서버에만 있고 브라우저로 내려오지 않는다.
@@ -1455,7 +1460,7 @@
     S.cat.forEach((m) => { catIndex[m.id] = m; });
   }
   function M(id) {
-    return catIndex[id] || { id: id, label: id, i: 0, o: 0, mx: 8192, md: 0, ef: [], unknown: true };
+    return catIndex[id] || { id: id, label: id, i: 0, o: 0, mx: 8192, md: 0, ef: [], img: 0, unknown: true };
   }
   const vendorOf = (id) => (id.indexOf('/') > 0 ? id.split('/')[0] : 'anthropic');
   const vendorKo = (v) => VENDOR_KO[v] || v;
@@ -1505,6 +1510,7 @@
       const mods = a.output_modalities || [];
       // 글을 못 내놓는 모델(그림·소리 전용), 묶음 처리용, 별명은 뺀다
       if (mods.indexOf('text') < 0) return;
+      const ins = a.input_modalities || [];
       if (m.id.indexOf(':batch') >= 0) return;
       if (m.alias_target) return;
       const p = m.pricing || {};
@@ -1518,6 +1524,7 @@
         mx: tp.max_completion_tokens || m.context_length || 8192,
         md: r && r.mandatory ? 1 : 0,
         ef: (r && r.supported_efforts) || [],
+        img: ins.indexOf('image') >= 0 ? 1 : 0,   // 그림을 눈으로 볼 수 있는가
         ctx: m.context_length || 0
       });
     });
@@ -1791,17 +1798,51 @@
    * ================================================================== */
   const FILE_BUDGET = 12000;              // 모델에 보내는 글자 수 총량
   const FILE_MAX_BYTES = 8 * 1024 * 1024; // 한 파일 크기 상한
+  const IMG_BUDGET = 4;                   // 모델에 보내는 그림 장수 (한 장이 수천 토큰이다)
 
   async function inflate(bytes, fmt) {
     const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(fmt));
     return new Uint8Array(await new Response(s).arrayBuffer());
   }
 
-  /* .docx 는 실은 zip 이다. 중앙 디렉터리를 훑어 word/document.xml 만 꺼내 푼다.
-   * 라이브러리를 쓰지 않는 이유는 집 규칙(CDN 금지)이고, 브라우저가 압축해제를
-   * 기본으로 갖고 있어서 그것만으로 된다. */
-  async function readDocx(file) {
-    const buf = new Uint8Array(await file.arrayBuffer());
+  /* 꼬리에 쓰레기가 붙어 있어도 푼 데까지는 살리는 해제.
+   *
+   * 이게 왜 필요한가: 한글(.hwp) 의 Section 스트림은 뒤가 0 으로 채워져 있고,
+   * PDF 의 stream 도 끝에 줄바꿈이 붙는다. 파이썬 zlib 은 그걸 그냥 무시하는데
+   * 브라우저의 DecompressionStream 은 규격대로 **오류를 낸다**.
+   * 그래서 한 번에 받지 않고 조각을 직접 퍼내면서, 마지막에 나는 오류만 삼킨다.
+   * (실측: 견본 hwp 의 Section0 5,080바이트 → 14,712바이트. 엄격 해제로는 통째로 실패했다.) */
+  async function inflateLoose(bytes, fmt) {
+    const ds = new DecompressionStream(fmt);
+    const writer = ds.writable.getWriter();
+    const reader = ds.readable.getReader();
+    const chunks = [];
+    const pump = (async () => {
+      try {
+        for (;;) {
+          const r = await reader.read();
+          if (r.done) break;
+          chunks.push(r.value);
+        }
+      } catch (e) { /* 꼬리에서 난 오류. 여기까지 푼 것은 그대로 쓴다. */ }
+    })();
+    try { await writer.write(bytes); await writer.close(); }
+    catch (e) { /* 위와 같은 이유 */ }
+    await pump;
+    let len = 0;
+    chunks.forEach((c) => { len += c.length; });
+    const out = new Uint8Array(len);
+    let off = 0;
+    chunks.forEach((c) => { out.set(c, off); off += c.length; });
+    if (!out.length) throw new Error('압축을 풀지 못했다');
+    return out;
+  }
+
+  /* ---------- zip 읽기 (공용) ----------
+   * .docx 도 .hwpx 도 실은 zip 이다. 라이브러리를 쓰지 않는 이유는 집 규칙(CDN 금지)이고,
+   * 브라우저가 압축해제를 기본으로 갖고 있어서 그것만으로 된다.
+   */
+  function zipEntries(buf) {
     const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
     let eocd = -1;
     for (let i = buf.length - 22; i >= 0 && i > buf.length - 66000; i--) {
@@ -1810,40 +1851,259 @@
     if (eocd < 0) throw new Error('zip 구조가 아니다');
     const count = dv.getUint16(eocd + 10, true);
     let off = dv.getUint32(eocd + 16, true);
-    let hit = null;
     const dec = new TextDecoder();
+    const out = [];
     for (let i = 0; i < count; i++) {
-      if (dv.getUint32(off, true) !== 0x02014b50) break;
+      if (off + 46 > buf.length || dv.getUint32(off, true) !== 0x02014b50) break;
       const nLen = dv.getUint16(off + 28, true);
       const eLen = dv.getUint16(off + 30, true);
       const cLen = dv.getUint16(off + 32, true);
-      const name = dec.decode(buf.subarray(off + 46, off + 46 + nLen));
-      if (name === 'word/document.xml') {
-        hit = { method: dv.getUint16(off + 10, true), size: dv.getUint32(off + 20, true),
-                lho: dv.getUint32(off + 42, true) };
-        break;
-      }
+      out.push({
+        name: dec.decode(buf.subarray(off + 46, off + 46 + nLen)),
+        method: dv.getUint16(off + 10, true),
+        size: dv.getUint32(off + 20, true),
+        lho: dv.getUint32(off + 42, true)
+      });
       off += 46 + nLen + eLen + cLen;
     }
-    if (!hit) throw new Error('본문(word/document.xml)이 없다');
-    const lo = hit.lho;
-    if (dv.getUint32(lo, true) !== 0x04034b50) throw new Error('머리말이 깨졌다');
-    const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true);
-    const raw = buf.subarray(start, start + hit.size);
-    const xmlBytes = hit.method === 0 ? raw
-      : hit.method === 8 ? await inflate(raw, 'deflate-raw')
-      : null;
-    if (!xmlBytes) throw new Error('모르는 압축 방식이다');
-    const xml = new TextDecoder('utf-8').decode(xmlBytes);
+    return out;
+  }
+
+  async function zipRead(buf, e) {
+    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    if (dv.getUint32(e.lho, true) !== 0x04034b50) throw new Error('머리말이 깨졌다');
+    const start = e.lho + 30 + dv.getUint16(e.lho + 26, true) + dv.getUint16(e.lho + 28, true);
+    const raw = buf.subarray(start, start + e.size);
+    if (e.method === 0) return raw;
+    if (e.method === 8) return await inflate(raw, 'deflate-raw');
+    throw new Error('모르는 압축 방식이다');
+  }
+
+  // XML 에서 글자만 남긴다. 문단 끝으로 삼을 태그를 정규식으로 넘긴다.
+  function stripXml(xml, brRe) {
     return xml
-      .replace(/<w:tab[^>]*\/>/g, '\t')
-      .replace(/<w:br[^>]*\/>/g, '\n')
-      .replace(/<\/w:p>/g, '\n')
+      .replace(/<[^>]*tab[^>]*\/>/g, '\t')
+      .replace(brRe, '\n')
       .replace(/<[^>]+>/g, '')
       .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+      .replace(/[ \t]+\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
+  }
+
+  async function readDocx(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const hit = zipEntries(buf).filter((e) => e.name === 'word/document.xml')[0];
+    if (!hit) throw new Error('본문(word/document.xml)이 없다');
+    const xml = new TextDecoder('utf-8').decode(await zipRead(buf, hit));
+    return stripXml(xml, /<\/w:p>|<w:br[^>]*\/>/g);
+  }
+
+  /* .hwpx 는 한글의 새 형식이고 이것도 zip(OWPML)이다.
+   * 본문이 Contents/section0.xml, section1.xml … 로 나뉘어 있어 순서대로 이어 붙인다. */
+  async function readHwpx(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const secs = zipEntries(buf)
+      .filter((e) => /^Contents\/section\d+\.xml$/i.test(e.name))
+      .sort((a, b) => (parseInt(a.name.replace(/\D+/g, ''), 10) - parseInt(b.name.replace(/\D+/g, ''), 10)));
+    if (!secs.length) throw new Error('본문(Contents/section*.xml)이 없다');
+    let out = '';
+    for (const s of secs) {
+      const xml = new TextDecoder('utf-8').decode(await zipRead(buf, s));
+      out += stripXml(xml, /<\/hp:p>|<hp:lineBreak[^>]*\/>/g) + '\n\n';
+    }
+    return out.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  /* ---------- .hwp (한글 5.0) ----------
+   * 이건 zip 이 아니라 **OLE 복합문서**(CFB)다. 옛 .doc/.xls 와 같은 그릇이라
+   * 섹터 표를 직접 따라가야 한다. 본문은 BodyText/SectionN 에 있고,
+   * FileHeader 의 플래그 첫 비트가 켜져 있으면 통째로 deflate 로 눌려 있다.
+   */
+  function cfbOpen(buf) {
+    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+    if (dv.getUint32(0, true) !== 0xE011CFD0 || dv.getUint32(4, true) !== 0xE11AB1A1) {
+      throw new Error('한글 5.0 파일이 아니다');
+    }
+    const secSize = 1 << dv.getUint16(0x1E, true);
+    const miniSize = 1 << dv.getUint16(0x20, true);
+    const numFat = dv.getUint32(0x2C, true);
+    const dirStart = dv.getUint32(0x30, true);
+    const miniCutoff = dv.getUint32(0x38, true);
+    const miniFatStart = dv.getUint32(0x3C, true);
+    const difatStart = dv.getUint32(0x44, true);
+    const secAt = (s) => (s + 1) * secSize;
+
+    // DIFAT → FAT 섹터 번호들
+    const fatSecs = [];
+    for (let i = 0; i < 109 && fatSecs.length < numFat; i++) {
+      const v = dv.getUint32(0x4C + i * 4, true);
+      if (v === 0xFFFFFFFF) break;
+      fatSecs.push(v);
+    }
+    let ds = difatStart, guard = 0;
+    while (ds !== 0xFFFFFFFE && ds !== 0xFFFFFFFF && fatSecs.length < numFat && guard++ < 10000) {
+      const base = secAt(ds), n = (secSize / 4) - 1;
+      for (let i = 0; i < n; i++) {
+        const v = dv.getUint32(base + i * 4, true);
+        if (v !== 0xFFFFFFFF) fatSecs.push(v);
+      }
+      ds = dv.getUint32(base + n * 4, true);
+    }
+
+    const per = secSize / 4;
+    const fat = new Uint32Array(fatSecs.length * per);
+    fatSecs.forEach((s, k) => {
+      const base = secAt(s);
+      for (let i = 0; i < per; i++) fat[k * per + i] = dv.getUint32(base + i * 4, true);
+    });
+
+    const walk = (start, table) => {
+      const out = [];
+      let s = start, g = 0;
+      while (s < table.length && s !== 0xFFFFFFFE && s !== 0xFFFFFFFF && g++ < 200000) {
+        out.push(s); s = table[s];
+      }
+      return out;
+    };
+    const readSecs = (start, size) => {
+      const secs = walk(start, fat);
+      const out = new Uint8Array(secs.length * secSize);
+      secs.forEach((s, i) => {
+        const from = secAt(s);
+        out.set(buf.subarray(from, Math.min(from + secSize, buf.length)), i * secSize);
+      });
+      return size ? out.subarray(0, size) : out;
+    };
+
+    // 디렉터리 항목들
+    const dirBytes = readSecs(dirStart, 0);
+    const entries = [];
+    for (let off = 0; off + 128 <= dirBytes.length; off += 128) {
+      const nameLen = dirBytes[off + 0x40] | (dirBytes[off + 0x41] << 8);
+      if (nameLen < 2) { entries.push(null); continue; }
+      let name = '';
+      for (let i = 0; i < nameLen - 2; i += 2) {
+        name += String.fromCharCode(dirBytes[off + i] | (dirBytes[off + i + 1] << 8));
+      }
+      const d = new DataView(dirBytes.buffer, dirBytes.byteOffset + off, 128);
+      entries.push({ name: name, type: dirBytes[off + 0x42], start: d.getUint32(0x74, true), size: d.getUint32(0x78, true) });
+    }
+
+    // 작은 스트림은 미니 FAT 을 따로 탄다
+    const root = entries.filter((e) => e && e.type === 5)[0];
+    let miniFat = null, miniData = null;
+    if (root && root.size) {
+      const mfBytes = readSecs(miniFatStart, 0);
+      miniFat = new Uint32Array(mfBytes.buffer, mfBytes.byteOffset, Math.floor(mfBytes.length / 4));
+      miniData = readSecs(root.start, root.size);
+    }
+
+    const read = (name) => {
+      const e = entries.filter((x) => x && x.type === 2 && x.name === name)[0];
+      if (!e) return null;
+      if (e.size >= miniCutoff || !miniData) return readSecs(e.start, e.size);
+      const secs = walk(e.start, miniFat);
+      const out = new Uint8Array(secs.length * miniSize);
+      secs.forEach((s, i) => out.set(miniData.subarray(s * miniSize, (s + 1) * miniSize), i * miniSize));
+      return out.subarray(0, e.size);
+    };
+    const names = entries.filter((e) => e && e.type === 2).map((e) => e.name);
+    return { read: read, names: names };
+  }
+
+  /* 본문 레코드에서 글자만 줍는다.
+   * 레코드 머리말 uint32 = 태그(10비트) | 수준(10) | 크기(12). 크기가 0xFFF 면 뒤에 4바이트가 더 온다.
+   * 태그 67 이 문단 글자다. 그 안의 제어문자 중 일부는 뒤에 7글자를 더 달고 다니므로
+   * 그걸 건너뛰지 않으면 쓰레기 글자가 섞인다. */
+  const HWP_INLINE = [4, 5, 6, 7, 8, 9, 19, 20];
+  const HWP_EXTEND = [1, 2, 3, 11, 12, 14, 15, 16, 17, 18, 21, 22, 23];
+  function hwpRecords(b) {
+    let out = '';
+    let p = 0;
+    while (p + 4 <= b.length) {
+      const h = (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16) | (b[p + 3] << 24)) >>> 0;
+      const tag = h & 0x3FF;
+      let size = (h >>> 20) & 0xFFF;
+      p += 4;
+      if (size === 0xFFF) {
+        if (p + 4 > b.length) break;
+        size = (b[p] | (b[p + 1] << 8) | (b[p + 2] << 16) | (b[p + 3] << 24)) >>> 0;
+        p += 4;
+      }
+      if (p + size > b.length) break;
+      if (tag === 67) {
+        let i = 0;
+        while (i + 1 < size) {
+          const c = b[p + i] | (b[p + i + 1] << 8);
+          if (c === 13 || c === 10) { out += '\n'; i += 2; }
+          else if (HWP_INLINE.indexOf(c) >= 0 || HWP_EXTEND.indexOf(c) >= 0) { i += 16; }
+          else if (c === 24 || c === 30 || c === 31) { out += '-'; i += 2; }
+          else if (c < 32) { i += 2; }
+          else { out += String.fromCharCode(c); i += 2; }
+        }
+        out += '\n';
+      }
+      p += size;
+    }
+    return out;
+  }
+
+  async function readHwp(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const cfb = cfbOpen(buf);
+    const fh = cfb.read('FileHeader');
+    if (!fh || fh.length < 40) throw new Error('머리말이 없다');
+    const compressed = (fh[36] & 1) === 1;
+    const secNames = cfb.names
+      .filter((n) => /^Section\d+$/i.test(n))
+      .sort((a, b) => parseInt(a.replace(/\D+/g, ''), 10) - parseInt(b.replace(/\D+/g, ''), 10));
+    if (!secNames.length) throw new Error('본문(Section)이 없다');
+    let out = '';
+    for (const n of secNames) {
+      let bytes = cfb.read(n);
+      if (!bytes) continue;
+      if (compressed) {
+        // 뒤가 0 으로 채워져 있어 엄격 해제로는 통째로 실패한다
+        try { bytes = await inflateLoose(bytes, 'deflate-raw'); }
+        catch (e) {
+          try { bytes = await inflateLoose(bytes, 'deflate'); }
+          catch (e2) { continue; }
+        }
+      }
+      out += hwpRecords(bytes) + '\n';
+    }
+    out = out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    if (out.length < 10) throw new Error('글자를 찾지 못했다. 한글에서 「다른 이름으로 저장」으로 hwpx 나 docx 로 바꿔 올려라');
+    return out;
+  }
+
+  /* ---------- 그림 ----------
+   * 모델이 눈으로 본다. 원본 그대로 보내면 토큰이 폭발하므로 긴 변을 줄여 다시 굽는다.
+   * 화면 캡처의 글자가 읽혀야 해서 너무 작게 줄이면 안 된다 — 1400 이 그 절충점이다. */
+  const IMG_MAX_SIDE = 1400;
+  async function readImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => rej(new Error('열 수 없는 그림이다'));
+        im.src = url;
+      });
+      const w = img.naturalWidth, h = img.naturalHeight;
+      if (!w || !h) throw new Error('크기를 알 수 없는 그림이다');
+      const k = Math.min(1, IMG_MAX_SIDE / Math.max(w, h));
+      const cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+      const cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      const ctx = cv.getContext('2d');
+      ctx.fillStyle = '#fff';           // 투명 배경이 검게 나오지 않게
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.drawImage(img, 0, 0, cw, ch);
+      return { kind: 'image', dataUrl: cv.toDataURL('image/jpeg', 0.9), w: cw, h: ch, srcW: w, srcH: h };
+    } finally { URL.revokeObjectURL(url); }
   }
 
   // PDF 안의 글자 그리기 명령에서 문자열만 주워 담는다
@@ -1885,7 +2145,7 @@
       const raw = buf.subarray(start, end);
       let txt = null;
       for (const fmt of ['deflate', 'deflate-raw']) {
-        try { txt = new TextDecoder('utf-8').decode(await inflate(raw, fmt)); break; }
+        try { txt = new TextDecoder('utf-8').decode(await inflateLoose(raw, fmt)); break; }
         catch (e) { /* 다음 방식으로 */ }
       }
       if (!txt || (txt.indexOf('Tj') < 0 && txt.indexOf('TJ') < 0)) continue;
@@ -1910,25 +2170,34 @@
     return bad / head.length > 0.02;
   }
 
+  const IMG_EXT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'];
+
+  // 결과는 { kind:'text', text } 또는 { kind:'image', dataUrl, w, h } 다.
   async function readAny(file) {
     if (file.size > FILE_MAX_BYTES) throw new Error('8MB 가 넘는다');
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    if (ext === 'docx') return await readDocx(file);
-    if (ext === 'pdf') return await readPdf(file);
-    if (ext === 'hwp' || ext === 'hwpx') throw new Error('한글(hwp) 은 못 읽는다. 「다른 이름으로 저장」에서 docx 나 txt 로 바꿔 올려라');
+    if (IMG_EXT.indexOf(ext) >= 0 || /^image\//.test(file.type || '')) return await readImage(file);
+    if (ext === 'docx') return { kind: 'text', text: await readDocx(file) };
+    if (ext === 'hwpx') return { kind: 'text', text: await readHwpx(file) };
+    if (ext === 'hwp') return { kind: 'text', text: await readHwp(file) };
+    if (ext === 'pdf') return { kind: 'text', text: await readPdf(file) };
     if (ext === 'xlsx' || ext === 'doc' || ext === 'ppt' || ext === 'pptx') {
-      throw new Error('이 형식은 아직 못 읽는다. txt·csv·docx·pdf 나 코드 파일로 올려라');
+      throw new Error('이 형식은 아직 못 읽는다. txt·csv·docx·hwp·hwpx·pdf·그림 이나 코드 파일로 올려라');
     }
     const t = await file.text();
-    if (looksBinary(t)) throw new Error('글자로 읽을 수 없는 파일이다 (그림·압축·실행파일 등)');
-    return t;
+    if (looksBinary(t)) throw new Error('글자로 읽을 수 없는 파일이다 (압축·실행파일 등)');
+    return { kind: 'text', text: t };
   }
 
-  /* 예산 나누기 — 작은 파일부터 제 몫을 채우고 남은 것을 큰 파일들이 나눠 갖는다 */
+  /* 예산 나누기
+   * 글: 작은 파일부터 제 몫을 채우고 남은 것을 큰 파일들이 나눠 갖는다.
+   * 그림: 글보다 훨씬 비싸다(한 장이 수천 토큰이고 발언마다 다시 실린다).
+   *       그래서 개수로 자른다 — 앞에서부터 IMG_BUDGET 장까지만 보낸다. */
   function budgetFiles() {
-    S.files.forEach((f) => { f.send = 0; });
-    const ok = S.files.filter((f) => !f.err && f.text);
-    const order = ok.slice().sort((a, b) => a.text.length - b.text.length);
+    S.files.forEach((f) => { f.send = 0; f.use = false; });
+
+    const texts = S.files.filter((f) => !f.err && f.kind === 'text' && f.text);
+    const order = texts.slice().sort((a, b) => a.text.length - b.text.length);
     let left = FILE_BUDGET, n = order.length;
     order.forEach((f) => {
       const share = Math.floor(left / n);
@@ -1936,37 +2205,81 @@
       left -= f.send;
       n--;
     });
+
+    let imgLeft = IMG_BUDGET;
+    S.files.forEach((f) => {
+      if (f.err || f.kind !== 'image') return;
+      if (imgLeft > 0) { f.use = true; imgLeft--; }
+    });
   }
+
+  // 자리 중 몇이 그림을 볼 수 있나. 못 보는 자리가 있으면 미리 알려 준다.
+  // 자리가 아직 없을 수도 있다(잠금이 안 풀렸거나 목록을 받기 전) — 그때는 0 이다.
+  function eyesCount() {
+    return S.seats ? S.seats.filter((s) => M(s.model).img).length : 0;
+  }
+  const seatCount = () => (S.seats ? S.seats.length : 0);
 
   function renderFiles() {
     budgetFiles();
     const box = $('fileList');
     box.innerHTML = '';
     S.files.forEach((f, i) => {
-      const cut = !f.err && f.send < f.text.length;
+      const isImg = f.kind === 'image';
+      const cut = !f.err && !isImg && f.send < f.text.length;
+      const over = !f.err && isImg && !f.use;
       const d = document.createElement('div');
-      d.className = 'fchip' + (f.err ? ' bad' : cut ? ' cut' : '');
-      d.innerHTML = '<span class="fn"></span><button class="mini ghost del" title="빼기">✕</button>';
-      const fn = d.querySelector('.fn');
+      d.className = 'fchip' + (f.err ? ' bad' : (cut || over) ? ' cut' : '');
+      if (isImg && !f.err) {
+        const th = document.createElement('img');
+        th.className = 'th';
+        th.src = f.dataUrl;
+        th.alt = '';
+        d.appendChild(th);
+      }
+      const fn = document.createElement('span');
+      fn.className = 'fn';
       fn.textContent = f.name;
       const sub = document.createElement('small');
       sub.textContent = f.err ? f.err
+        : isImg ? (f.srcW + '×' + f.srcH + ' → ' + f.w + '×' + f.h + (over ? ' · 그림은 ' + IMG_BUDGET + '장까지만 보낸다 (이건 빠짐)' : ' 로 줄여 보낸다'))
         : cut ? (f.text.length.toLocaleString('ko-KR') + '자 중 앞 ' + f.send.toLocaleString('ko-KR') + '자만 보낸다')
         : (f.text.length.toLocaleString('ko-KR') + '자 · 전부 보낸다');
       fn.appendChild(sub);
-      d.querySelector('.del').addEventListener('click', () => {
-        S.files.splice(i, 1); renderFiles(); updateEstimate();
-      });
+      d.appendChild(fn);
+      const del = document.createElement('button');
+      del.className = 'mini ghost del';
+      del.title = '빼기';
+      del.textContent = '✕';
+      del.addEventListener('click', () => { S.files.splice(i, 1); renderFiles(); updateEstimate(); });
+      d.appendChild(del);
       box.appendChild(d);
     });
 
     const ok = S.files.filter((f) => !f.err);
-    const sent = ok.reduce((a, f) => a + f.send, 0);
-    const total = ok.reduce((a, f) => a + f.text.length, 0);
-    $('fileNote').textContent = !S.files.length
-      ? '문서(txt·md·csv·docx·pdf)와 코드 파일을 읽는다. 올린 파일은 이 브라우저 안에만 있고 새로고침하면 사라진다.'
-      : ok.length + '개 · ' + total.toLocaleString('ko-KR') + '자 중 ' + sent.toLocaleString('ko-KR') + '자를 회의에 넣는다. ' +
-        '자료는 발언할 때마다 다시 실리므로 길수록 값이 오른다.';
+    const texts = ok.filter((f) => f.kind === 'text');
+    const imgs = ok.filter((f) => f.kind === 'image');
+    const sent = texts.reduce((a, f) => a + f.send, 0);
+    const total = texts.reduce((a, f) => a + f.text.length, 0);
+
+    if (!S.files.length) {
+      $('fileNote').textContent =
+        '문서(txt·md·csv·docx·hwp·hwpx·pdf)·코드 파일·그림을 읽는다. ' +
+        '올린 파일은 이 브라우저 안에만 있고 새로고침하면 사라진다.';
+      return;
+    }
+    const bits = [];
+    if (texts.length) {
+      bits.push('글 ' + texts.length + '개 · ' + total.toLocaleString('ko-KR') + '자 중 ' + sent.toLocaleString('ko-KR') + '자');
+    }
+    if (imgs.length) {
+      const shown = imgs.filter((f) => f.use).length;
+      const eyes = eyesCount();
+      bits.push('그림 ' + imgs.length + '장 중 ' + shown + '장' +
+        (eyes < seatCount() ? ' (참가자 ' + seatCount() + '명 중 ' + eyes + '명만 볼 수 있다)' : ''));
+    }
+    $('fileNote').textContent = bits.join(' · ') + ' 를 회의에 넣는다. ' +
+      '자료는 발언할 때마다 다시 실리므로 길수록·많을수록 값이 오른다.';
   }
 
   async function addFiles(list) {
@@ -1974,10 +2287,18 @@
     if (!arr.length) return;
     flash(arr.length + '개 읽는 중…');
     for (const file of arr) {
-      const rec = { name: file.name, text: '', err: null, send: 0 };
-      try { rec.text = (await readAny(file)).trim(); }
-      catch (e) { rec.err = e.message || String(e); }
-      if (!rec.err && !rec.text) rec.err = '내용이 비어 있다';
+      const rec = { name: file.name, kind: 'text', text: '', dataUrl: '', err: null, send: 0, use: false };
+      try {
+        const got = await readAny(file);
+        if (got.kind === 'image') {
+          rec.kind = 'image';
+          rec.dataUrl = got.dataUrl;
+          rec.w = got.w; rec.h = got.h; rec.srcW = got.srcW; rec.srcH = got.srcH;
+        } else {
+          rec.text = (got.text || '').trim();
+        }
+      } catch (e) { rec.err = e.message || String(e); }
+      if (!rec.err && rec.kind === 'text' && !rec.text) rec.err = '내용이 비어 있다';
       S.files.push(rec);
     }
     renderFiles();
@@ -1990,8 +2311,9 @@
    * 파일은 남이 만든 글이라 그 안에 지시가 섞여 있을 수 있다.
    * 「읽을 대상이지 지시가 아니다」를 못 박아 두지 않으면 참가자가 그걸 따라간다. */
   function filesBlock() {
-    const ok = S.files.filter((f) => !f.err && f.send > 0);
-    if (!ok.length) return '';
+    const ok = S.files.filter((f) => !f.err && f.kind === 'text' && f.send > 0);
+    const imgs = S.files.filter((f) => !f.err && f.kind === 'image' && f.use);
+    if (!ok.length && !imgs.length) return '';
     const parts = [
       '',
       '# 함께 볼 자료',
@@ -2006,8 +2328,15 @@
       parts.push('----- 파일 끝 -----');
       parts.push('');
     });
+    if (imgs.length) {
+      parts.push('그림도 ' + imgs.length + '장 함께 붙어 있다: ' + imgs.map((f) => f.name).join(', '));
+      parts.push('');
+    }
     return parts.join('\n');
   }
+
+  // 모델에 실제로 보낼 그림들
+  const imagesToSend = () => S.files.filter((f) => !f.err && f.kind === 'image' && f.use);
   const fileChars = () => S.files.reduce((a, f) => a + (f.err ? 0 : f.send), 0);
 
   $('btnFile').addEventListener('click', () => $('fileInput').click());
@@ -2327,26 +2656,32 @@
     /* 프록시 — 키를 안 싣는다. 비밀번호에서 나온 표만 보내고 서버가 키를 붙여 준다.
      * 모델·노력도·분량 상한은 서버가 다시 판정하므로 여기 값은 「부탁」일 뿐이다. */
     if (S.prov === 'room') {
-      return {
-        url: P().url,
-        headers: { 'Content-Type': 'application/json' },
-        body: {
-          token: S.roomToken,
-          model: model,
-          effort: effort,
-          system: system,
-          text: userText,
-          max_tokens: maxTok
-        }
+      const body = {
+        token: S.roomToken,
+        model: model,
+        effort: effort,
+        system: system,
+        text: userText,
+        max_tokens: maxTok
       };
+      // 그림은 그 모델이 눈이 있을 때만 싣는다. 없는 모델에 보내면 400 이다.
+      const pics = m.img ? imagesToSend() : [];
+      if (pics.length) body.images = pics.map((f) => f.dataUrl);
+      return { url: P().url, headers: { 'Content-Type': 'application/json' }, body: body };
     }
 
     if (P().orCatalog) {
+      // 그림이 있으면 user 쪽이 글 하나 + 그림 여럿의 배열이 된다 (OpenAI 호환 형식)
+      const pics = m.img ? imagesToSend() : [];
+      const userContent = pics.length
+        ? [{ type: 'text', text: userText }].concat(
+            pics.map((f) => ({ type: 'image_url', image_url: { url: f.dataUrl } })))
+        : userText;
       const body = {
         model: model,
         messages: [
           { role: 'system', content: system },
-          { role: 'user', content: userText }
+          { role: 'user', content: userContent }
         ],
         max_tokens: maxTok,
         stream: true,
@@ -2370,12 +2705,27 @@
     }
 
     // 앤트로픽 직통
+    // 앤트로픽은 그림 형식이 또 다르다 — data URL 이 아니라 media_type + 알맹이로 쪼개 보낸다
+    const antPics = m.img ? imagesToSend() : [];
+    const antContent = antPics.length
+      ? [{ type: 'text', text: userText }].concat(antPics.map((f) => {
+          const cut = f.dataUrl.indexOf(',');
+          return {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: f.dataUrl.slice(5, f.dataUrl.indexOf(';')),
+              data: f.dataUrl.slice(cut + 1)
+            }
+          };
+        }))
+      : userText;
     const body = {
       model: model,
       max_tokens: maxTok,
       stream: true,
       system: system,
-      messages: [{ role: 'user', content: userText }]
+      messages: [{ role: 'user', content: antContent }]
     };
     if (effort === 'off') {
       // Opus 5 는 effort 가 high 이하일 때만 생각을 끌 수 있다 — low 로 낮춰 함께 보낸다
@@ -3083,6 +3433,7 @@
       unlock: (pw) => { el.lockInput.value = pw; tryUnlock(); return el.lockBad.textContent; },
       gate: gate, gateLeft: lockLeft, clearGate: () => store.del(GATE_KEY),
       totals: renderTotals, addFiles: addFiles, filesBlock: filesBlock,
+      cfb: cfbOpen, hwpRecords: hwpRecords, inflate: inflate,
       // 실제 호출과 같은 경로로 만든다 — 여기만 다르면 검증이 거짓말을 한다
       req: (model, effort) => buildRequest(model, effort, 'sys', 'user', tokensFor(model, effort), true)
     };

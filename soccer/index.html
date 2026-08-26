@@ -446,6 +446,28 @@
   /* 경기장 크기는 방마다 다르다(동네·학교·프로·월드컵). 스냅샷이 경기장 번호를 실어 주므로
      그때마다 FLD 를 갱신하고, 그리기·카메라·미니맵은 전부 이 값을 쓴다. C.FIELD_* 는 기본값일 뿐이다. */
   var FLD = { W: C.FIELD_W, H: C.FIELD_H, goalY0: C.GOAL_Y0, goalY1: C.GOAL_Y1, id: 'school', crowd: 0.75 };
+  /* ── 구장별 화풍 (2026-08-26 지시) ────────────────────────────────────────
+     같은 경기장을 색만 바꾸는 게 아니라 **바닥·선·둘레·관중까지 맥락에 맞게** 다르게 그린다.
+     town   동네 — 흙바닥에 잡초가 듬성듬성. 선은 지워져 흐리고 트랙이 없다. 철망 너머 구경꾼 몇 명.
+     school 학교 — 잔디인데 골문 앞·중앙이 닳아 흙이 드러난다. 얇은 트랙, 나무 벤치, 학생 조금.
+     pro    프로 — 고른 줄무늬 잔디, 붉은 우레탄 트랙, 좌석 관중석.
+     world  월드컵 — 촘촘한 줄무늬, 푸른 트랙, 여러 단 관중석에 사람이 꽉 찼다.
+     바닥 얼룩은 rnd() 로 자리를 고정해 **매 프레임 같은 자리**에 있게 한다(반짝이면 안 된다). */
+  var FIELD_ART = {
+    town:   { grass: '#a87a45', grass2: '#9d7040', out: '#8d6238', line: 'rgba(255,255,255,0.42)',
+              stripes: 0, patch: 'weed', patchN: 90, patchC: '#6f8f4a',
+              track: null, stand: 'fence', standC: '#5a6270', stepC: '#6b7482', rows: 1, seat: 17 },
+    school: { grass: '#4f9a45', grass2: '#489040', out: '#3f7f3a', line: 'rgba(255,255,255,0.72)',
+              stripes: 0, patch: 'bare', patchN: 55, patchC: '#9d7a4c',
+              track: '#9a5433', stand: 'bench', standC: '#3a3326', stepC: '#4d422f', rows: 2, seat: 15 },
+    pro:    { grass: '#3f9a4a', grass2: '#3a9044', out: '#2f7a39', line: 'rgba(255,255,255,0.88)',
+              stripes: 10, patch: null, patchN: 0, patchC: null,
+              track: '#9a5433', stand: 'seats', standC: '#1f2b3a', stepC: '#2b3a4d', rows: 4, seat: 13 },
+    world:  { grass: '#35924a', grass2: '#2f8944', out: '#276f38', line: 'rgba(255,255,255,0.95)',
+              stripes: 18, patch: null, patchN: 0, patchC: null,
+              track: '#2f5fa8', stand: 'tiers', standC: '#141b28', stepC: '#232f45', rows: 6, seat: 11 }
+  };
+  function art() { return FIELD_ART[FLD.id] || FIELD_ART.school; }
   function setField(id) {
     var f = core.fieldOf(id);
     FLD.id = f.id; FLD.W = f.w; FLD.H = f.h; FLD.crowd = f.crowd;
@@ -713,101 +735,147 @@
 
   // ── 렌더 ──
   function drawPitch() {
-    var s = view.scale, W = FLD.W, H = FLD.H, D = C.GOAL_DEPTH;
+    var s = view.scale, W = FLD.W, H = FLD.H, D = C.GOAL_DEPTH, A = art();
     ctx.fillStyle = COLOR.bg; ctx.fillRect(0, 0, view.w, view.h);
-    drawSurround();                     // 경기장 밖 — 잔디 여백 · 트랙 · 관중석
-    // 잔디: 보이는 범위의 줄무늬만 그린다
-    ctx.fillStyle = COLOR.pitch; ctx.fillRect(px(0), py(0), W * s, H * s);
-    var stripe = W / 10;
-    var i0 = Math.max(0, Math.floor((cam.x - view.worldW / 2) / stripe));
-    var i1 = Math.min(9, Math.ceil((cam.x + view.worldW / 2) / stripe));
-    ctx.fillStyle = COLOR.pitch2;
-    for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s, H * s);
-    ctx.strokeStyle = COLOR.line; ctx.lineWidth = Math.max(1, 2 * s);
+    drawSurround();                     // 경기장 밖 — 바닥 · 트랙 · 관중석
+    // 바닥
+    ctx.fillStyle = A.grass; ctx.fillRect(px(0), py(0), W * s, H * s);
+    // 줄무늬 잔디(프로·월드컵만). 동네·학교는 줄무늬를 깎지 않는다.
+    if (A.stripes) {
+      var stripe = W / A.stripes;
+      var i0 = Math.max(0, Math.floor((cam.x - view.worldW / 2) / stripe));
+      var i1 = Math.min(A.stripes - 1, Math.ceil((cam.x + view.worldW / 2) / stripe));
+      ctx.fillStyle = A.grass2;
+      for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s, H * s);
+    }
+    drawPatches(A, W, H, s);            // 잡초(동네) · 닳은 흙(학교)
+    // 선
+    ctx.strokeStyle = A.line; ctx.lineWidth = Math.max(1, 2 * s);
     ctx.strokeRect(px(0), py(0), W * s, H * s);
     ctx.beginPath(); ctx.moveTo(px(W / 2), py(0)); ctx.lineTo(px(W / 2), py(H)); ctx.stroke();
-    ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), 80 * s, 0, TAU); ctx.stroke();
-    ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), 3 * s, 0, TAU); ctx.fillStyle = COLOR.line; ctx.fill();
-    ctx.strokeRect(px(0), py(H / 2 - 180), 160 * s, 360 * s); ctx.strokeRect(px(W - 160), py(H / 2 - 180), 160 * s, 360 * s);
-    ctx.strokeRect(px(0), py(H / 2 - 110), 60 * s, 220 * s); ctx.strokeRect(px(W - 60), py(H / 2 - 110), 60 * s, 220 * s);
+    var R = H * 0.1;                    // 센터 서클도 경기장 크기를 따라간다
+    ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), R * s, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(px(W / 2), py(H / 2), 3 * s, 0, TAU); ctx.fillStyle = A.line; ctx.fill();
+    ctx.strokeStyle = A.line;
+    var bw = W * 0.133, bh = H * 0.45, gw = W * 0.05, gh = H * 0.275;
+    ctx.strokeRect(px(0), py(H / 2 - bh / 2), bw * s, bh * s);
+    ctx.strokeRect(px(W - bw), py(H / 2 - bh / 2), bw * s, bh * s);
+    ctx.strokeRect(px(0), py(H / 2 - gh / 2), gw * s, gh * s);
+    ctx.strokeRect(px(W - gw), py(H / 2 - gh / 2), gw * s, gh * s);
+    // 골대
     var y0 = FLD.goalY0, y1 = FLD.goalY1;
-    // 골대 안쪽도 잔디다 — 예전에는 배경색이 그대로 비쳐 **검은 상자**로 보였다(2026-08-25 지시).
-    ctx.fillStyle = COLOR.pitch;
+    ctx.fillStyle = A.grass;            // 골대 안쪽도 바닥이다(배경색이 비치면 검은 상자가 된다)
     ctx.fillRect(px(-D), py(y0), D * s, (y1 - y0) * s);
     ctx.fillRect(px(W), py(y0), D * s, (y1 - y0) * s);
     ctx.strokeStyle = COLOR.net; ctx.lineWidth = Math.max(1, 1 * s);
     drawNet(px(-D), py(y0), D * s, (y1 - y0) * s); drawNet(px(W), py(y0), D * s, (y1 - y0) * s);
-    ctx.strokeStyle = COLOR.line; ctx.lineWidth = Math.max(2, 4 * s);
+    ctx.strokeStyle = A.line; ctx.lineWidth = Math.max(2, 4 * s);
     ctx.strokeRect(px(-D), py(y0), D * s, (y1 - y0) * s); ctx.strokeRect(px(W), py(y0), D * s, (y1 - y0) * s);
   }
-  /* ── 경기장 밖: 잔디 여백 · 트랙 · 관중석 ─────────────────────────────────
-     예전에는 경기장 밖이 그냥 배경색(검정)이었다. 잔디를 넓게 깔고 트랙을 두른 뒤
-     그 바깥에 관중석을 그린다. 관중은 그림 파일 없이 **머리+몸통 두 도형**으로 그린다 —
-     스무 명이 뛰는 화면에 256px 그림을 수백 장 얹으면 그대로 렉이 된다.
-     응원 동작은 `sin` 하나로 위아래로 튀게 하고, 골이 들어가면 `cheerT` 가 올라 크게 뛴다. */
+  /* 바닥 얼룩 — 자리와 크기를 rnd() 로 고정해 매 프레임 같은 자리에 있게 한다.
+     동네는 흙바닥에 **잡초**가 나 있고, 학교는 잔디가 **골문 앞·중앙에서 닳아** 흙이 드러난다. */
+  function drawPatches(A, W, H, s) {
+    if (!A.patch) return;
+    var vx0 = cam.x - view.worldW / 2 - 60, vx1 = cam.x + view.worldW / 2 + 60;
+    ctx.fillStyle = A.patchC;
+    ctx.globalAlpha = A.patch === 'weed' ? 0.55 : 0.42;
+    for (var i = 0; i < A.patchN; i++) {
+      var rx = rnd(i * 3 + 1), ry = rnd(i * 3 + 2), rr = rnd(i * 3 + 3);
+      var x, y;
+      if (A.patch === 'bare') {
+        // 닳는 자리는 정해져 있다: 양쪽 골문 앞과 가운데
+        var zone = i % 3;
+        var cxz = zone === 0 ? W * 0.09 : zone === 1 ? W * 0.91 : W * 0.5;
+        x = cxz + (rx - 0.5) * W * 0.16;
+        y = H / 2 + (ry - 0.5) * H * 0.5;
+      } else {
+        x = rx * W; y = ry * H;
+      }
+      if (x < vx0 || x > vx1) continue;
+      var r = (A.patch === 'weed' ? 6 + rr * 14 : 10 + rr * 26) * s;
+      ctx.beginPath();
+      ctx.ellipse(px(x), py(y), r, r * 0.62, rr * 3, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  /* ── 경기장 밖: 바닥 · 트랙 · 관중석 ─────────────────────────────────────
+     구장마다 다르다 — 동네는 트랙 없이 낮은 철망만, 학교는 얇은 트랙에 나무 벤치,
+     프로는 우레탄 트랙에 좌석, 월드컵은 푸른 트랙에 여러 단 관중석이 꽉 찬다.
+     관중은 **그림 파일을 쓰지 않는다** — 머리(원) + 몸통(사각형) 두 도형이다.
+     스무 명이 뛰는 화면에 256px 그림을 수백 장 얹으면 그대로 렉이 되기 때문이다. */
   var OUT_BASE = 110;        // 경기장 밖으로 그리는 폭(트랙 + 관중석). 큰 경기장은 더 넓다
   var TRACK = 16;            // 트랙(주로) 폭
-  var SEAT = 13;             // 관중 한 명이 차지하는 폭
-  var ROW = 15;              // 관중석 한 줄 간격
   var cheerT = 0;            // 골 직후 잠깐 크게 응원한다(초)
   var CROWD_COL = ["#e2e8f0", "#fca5a5", "#93c5fd", "#fcd34d", "#86efac", "#f5d0fe", "#fdba74", "#a5b4fc"];
   function rnd(i) { var v = Math.sin(i * 12.9898) * 43758.5453; return v - Math.floor(v); }
   function drawSurround() {
-    var s = view.scale, W = FLD.W, H = FLD.H, D = C.GOAL_DEPTH;
+    var s = view.scale, W = FLD.W, H = FLD.H, D = C.GOAL_DEPTH, A = art();
     var t = performance.now() / 1000;
-    var OUT = OUT_BASE * (0.8 + 0.4 * FLD.crowd);   // 관중석 폭도 규모에 따라
+    var OUT = OUT_BASE * (0.8 + 0.4 * FLD.crowd);
     var x0 = -D, x1 = W + D;                    // 골대까지 포함한 경기 영역
-    // 1) 바깥 잔디
-    ctx.fillStyle = COLOR.outGrass;
+    ctx.fillStyle = A.out;
     ctx.fillRect(px(x0 - OUT), py(-OUT), (x1 - x0 + 2 * OUT) * s, (H + 2 * OUT) * s);
-    // 2) 트랙 — 경기 영역을 두르는 띠
-    ctx.fillStyle = COLOR.track;
-    ctx.fillRect(px(x0 - TRACK), py(-TRACK), (x1 - x0 + 2 * TRACK) * s, TRACK * s);
-    ctx.fillRect(px(x0 - TRACK), py(H), (x1 - x0 + 2 * TRACK) * s, TRACK * s);
-    ctx.fillRect(px(x0 - TRACK), py(0), TRACK * s, H * s);
-    ctx.fillRect(px(x1), py(0), TRACK * s, H * s);
-    // 3) 관중석 네 방향
-    stand(x0 - OUT, x1 + OUT, -OUT, -TRACK, 0, t);            // 위 (아래를 보고 앉음)
-    stand(x0 - OUT, x1 + OUT, H + TRACK, H + OUT, 1, t);      // 아래
-    stand(x0 - OUT, x0 - TRACK, -TRACK, H + TRACK, 2, t);     // 왼쪽 (오른쪽을 봄)
-    stand(x1 + TRACK, x1 + OUT, -TRACK, H + TRACK, 3, t);     // 오른쪽
+    if (A.track) {
+      ctx.fillStyle = A.track;
+      ctx.fillRect(px(x0 - TRACK), py(-TRACK), (x1 - x0 + 2 * TRACK) * s, TRACK * s);
+      ctx.fillRect(px(x0 - TRACK), py(H), (x1 - x0 + 2 * TRACK) * s, TRACK * s);
+      ctx.fillRect(px(x0 - TRACK), py(0), TRACK * s, H * s);
+      ctx.fillRect(px(x1), py(0), TRACK * s, H * s);
+    }
+    var pad = A.track ? TRACK : 6;
+    stand(A, x0 - OUT, x1 + OUT, -OUT, -pad, 0, t);
+    stand(A, x0 - OUT, x1 + OUT, H + pad, H + OUT, 1, t);
+    stand(A, x0 - OUT, x0 - pad, -pad, H + pad, 2, t);
+    stand(A, x1 + pad, x1 + OUT, -pad, H + pad, 3, t);
   }
-  /* 관중석 한 덩이. side 0 위 · 1 아래 · 2 왼쪽 · 3 오른쪽.
-     좌석 줄은 경기장에서 멀어지는 쪽으로 쌓이고, 관중은 머리+몸통 두 도형이다.
-     그림 파일을 쓰지 않는 이유: 스무 명이 뛰는 화면에 256px 그림을 수백 장 얹으면 그대로 렉이 된다. */
-  function stand(x0, x1, y0, y1, side, t) {
+  function stand(A, x0, x1, y0, y1, side, t) {
     var s = view.scale;
     if (px(x1) < 0 || px(x0) > view.w || py(y1) < 0 || py(y0) > view.h) return;
-    ctx.fillStyle = COLOR.stand;
-    ctx.fillRect(px(x0), py(y0), (x1 - x0) * s, (y1 - y0) * s);
-    ctx.fillStyle = COLOR.standStep;
     var vert = side >= 2;
-    var a0 = vert ? x0 : y0, a1 = vert ? x1 : y1;             // 줄이 쌓이는 축
-    for (var a = a0; a < a1; a += ROW) {
-      if (vert) ctx.fillRect(px(a), py(y0), 2 * s, (y1 - y0) * s);
-      else      ctx.fillRect(px(x0), py(a), (x1 - x0) * s, 2 * s);
+    if (A.stand === 'fence') {
+      // 동네: 관중석이 없다. 낮은 철망만 두르고 그 너머는 흙이다.
+      ctx.strokeStyle = 'rgba(210,220,230,0.30)'; ctx.lineWidth = Math.max(1, 1.5 * s);
+      var fx = vert ? (side === 2 ? x1 : x0) : x0, fy = side === 0 ? y1 : y0;
+      ctx.beginPath();
+      if (vert) { ctx.moveTo(px(fx), py(y0)); ctx.lineTo(px(fx), py(y1)); }
+      else { ctx.moveTo(px(x0), py(fy)); ctx.lineTo(px(x1), py(fy)); }
+      ctx.stroke();
+      if (14 * s > 3) {
+        ctx.globalAlpha = 0.45; ctx.beginPath();
+        if (vert) { for (var yy = y0; yy < y1; yy += 14) { ctx.moveTo(px(fx) - 5 * s, py(yy)); ctx.lineTo(px(fx) + 5 * s, py(yy)); } }
+        else { for (var xx = x0; xx < x1; xx += 14) { ctx.moveTo(px(xx), py(fy) - 5 * s); ctx.lineTo(px(xx), py(fy) + 5 * s); } }
+        ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    } else {
+      ctx.fillStyle = A.standC;
+      ctx.fillRect(px(x0), py(y0), (x1 - x0) * s, (y1 - y0) * s);
+      ctx.fillStyle = A.stepC;
+      var b0 = vert ? x0 : y0, b1 = vert ? x1 : y1, gap = (b1 - b0) / A.rows;
+      for (var a = b0; a < b1; a += gap) {
+        if (vert) ctx.fillRect(px(a), py(y0), 2 * s, (y1 - y0) * s);
+        else ctx.fillRect(px(x0), py(a), (x1 - x0) * s, 2 * s);
+      }
     }
-    if (SEAT * s < 2.5) return;                                // 너무 작으면 사람은 생략(성능)
+    if (A.seat * s < 2.5) return;
     var boost = cheerT > 0 ? 1 + cheerT * 1.6 : 1;
-    // 좌석이 늘어서는 축의 화면 범위만 돈다
     var lo, hi;
-    if (vert) { lo = Math.max(y0, cam.y - view.worldH / 2 - SEAT); hi = Math.min(y1, cam.y + view.worldH / 2 + SEAT); }
-    else      { lo = Math.max(x0, cam.x - view.worldW / 2 - SEAT); hi = Math.min(x1, cam.x + view.worldW / 2 + SEAT); }
-    var c0 = Math.floor(lo / SEAT), c1 = Math.ceil(hi / SEAT);
-    var rows = Math.max(1, Math.floor((a1 - a0) / ROW));
-    var hr = Math.max(1, SEAT * 0.30 * s);
+    if (vert) { lo = Math.max(y0, cam.y - view.worldH / 2 - A.seat); hi = Math.min(y1, cam.y + view.worldH / 2 + A.seat); }
+    else      { lo = Math.max(x0, cam.x - view.worldW / 2 - A.seat); hi = Math.min(x1, cam.x + view.worldW / 2 + A.seat); }
+    var c0 = Math.floor(lo / A.seat), c1 = Math.ceil(hi / A.seat);
+    var a0 = vert ? x0 : y0, a1 = vert ? x1 : y1;
+    var rows = Math.max(1, A.rows), gap2 = (a1 - a0) / rows;
+    var hr = Math.max(1, A.seat * 0.30 * s);
     for (var r = 0; r < rows; r++) {
-      // 경기장에서 먼 줄일수록 뒤쪽 — 위/왼쪽 관중석은 줄이 앞으로 내려온다
-      var av = (side === 0 || side === 2) ? a0 + r * ROW + ROW * 0.85 : a1 - r * ROW - ROW * 0.15;
+      var av = (side === 0 || side === 2) ? a0 + r * gap2 + gap2 * 0.75 : a1 - r * gap2 - gap2 * 0.25;
       for (var c = c0; c <= c1; c++) {
         var id = c * 31 + r * 7 + side * 101;
-        // 경기장이 작을수록 관중이 드문드문하다(동네 55% ~ 월드컵 100%).
-        if (rnd(id) > FLD.crowd) continue;                       // 빈자리
+        if (rnd(id) > FLD.crowd) continue;                       // 작은 구장일수록 드문드문
         var bob = Math.abs(Math.sin(t * 3.4 + rnd(id + 1) * 6.28)) * 3.2 * boost;
-        var cv = c * SEAT + SEAT * 0.5;
+        var cv = c * A.seat + A.seat * 0.5;
         var sx = vert ? px(av) : px(cv);
         var sy = vert ? py(cv) : py(av - bob);
-        if (vert) sx -= bob * s * (side === 2 ? -1 : 1);        // 옆 관중석은 옆으로 들썩인다
+        if (vert) sx -= bob * s * (side === 2 ? -1 : 1);
         ctx.fillStyle = CROWD_COL[((id % CROWD_COL.length) + CROWD_COL.length) % CROWD_COL.length];
         ctx.fillRect(sx - hr, sy - hr * 1.6, hr * 2, hr * 2.4);
         ctx.fillStyle = COLOR.crowdHead;

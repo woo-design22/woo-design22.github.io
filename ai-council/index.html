@@ -435,8 +435,14 @@
 
   <!-- ===== 회의 설정 ===== -->
   <section class="card" id="setupCard">
+    <h2>목적</h2>
+    <button class="mbtn" id="purposeBtn" style="width:100%">
+      <span class="mname" id="purposeName">자유 주제</span>
+      <span class="mprice" id="purposeDesc"></span>
+    </button>
+
     <h2>안건</h2>
-    <textarea id="topic" rows="3" placeholder="예) 신입사원 정보보안 교육 PPT 12장. 딱딱하지 않게, 사례 위주로."></textarea>
+    <textarea id="topic" rows="3"></textarea>
 
     <h2>참가자</h2>
     <div id="seats"></div>
@@ -484,7 +490,7 @@
 
   <!-- ===== 결과 ===== -->
   <section class="card hidden" id="outCard">
-    <h2>PPT 개요</h2>
+    <h2 id="outTitle">회의 결과</h2>
     <div id="outline"></div>
     <div class="row" style="margin-top:12px">
       <button class="fixed" id="btnCopy">복사</button>
@@ -541,6 +547,19 @@
         <span class="spacer"></span>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ===== 회의 목적 고르기 =====
+     스물세 개나 되어 늘어놓으면 화면이 잡아먹힌다. 눌러야 열린다. -->
+<div class="modal hidden" id="ppick">
+  <div class="sheet" style="max-width:480px">
+    <div class="top">
+      <b style="flex:1">회의 목적</b>
+      <button class="mini" id="ppClose">닫기</button>
+    </div>
+    <div class="list" id="ppList"></div>
+    <div class="bot">고르면 참가자 역할이 그에 맞게 바뀐다. 모델과 노력도는 그대로 둔다.</div>
   </div>
 </div>
 
@@ -742,6 +761,531 @@
     { who:'청중대변', model:'google/gemini-3.7-flash', effort:'low',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
   ];
 
+  /* ==================================================================
+   * 회의의 목적
+   *
+   * 기능 하나는 결국 세 가지만 다르다 — 누가 앉나 · 몇 바퀴 도나 ·
+   * 서기가 무슨 형식으로 내놓나. 엔진은 하나도 안 바뀐다.
+   *
+   * 모델은 여기 안 적는다. 자리를 갈아 끼울 때 지금 쓰던 모델·노력도를
+   * 그대로 물려받게 해야 "목적만 바꿨는데 비싼 모델로 바뀌는" 일이 없다.
+   *
+   * out 이 null 이면 서기가 형식을 강요하지 않는다(자유 주제용).
+   * 배열 순서가 곧 화면 순서다.
+   * ================================================================== */
+  const PRESETS = [
+    {
+      id: 'free', name: '자유 주제', desc: '아무 주제나. 목적을 직접 적는다',
+      hint: '무엇이든 적어라. 목적까지 같이 적으면 더 잘 맞춘다.\n예) 전기차 지금 사도 될까. 3년 탈 생각이다.',
+      rounds: 3, out: null,
+      roles: [
+        { who:'하나', persona:'넓게 본다. 큰 틀과 빠진 축을 먼저 말한다.' },
+        { who:'둘',   persona:'따진다. 어긋난 곳과 근거가 약한 곳을 찾는다. 쉽게 동의하지 않는다.' },
+        { who:'셋',   persona:'듣는 사람 입장에서 본다. 어려운 말과 뜬구름을 싫어한다.' }
+      ]
+    },
+    {
+      id: 'decide', name: '결정 내리기', desc: 'A냐 B냐 정해야 할 때',
+      hint: '무엇과 무엇 사이에서 정해야 하는지 적어라.\n예) 지금 집을 살까, 2년 더 전세로 있을까. 가진 돈과 사정도 적어 주면 좋다.',
+      rounds: 3,
+      roles: [
+        { who:'찬성', persona:'첫 번째 안을 지지한다. 좋은 점과 그것이 성립하는 조건을 든다.' },
+        { who:'반대', persona:'반대편을 지지한다. 숨은 비용과 나중에 터질 위험을 든다.' },
+        { who:'제3안', persona:'둘 다 아닌 길을 찾는다. 애초에 이 선택지가 맞는지부터 의심한다.' }
+      ],
+      out: [
+        '# 결정',
+        '> (하나만 고른다. 못 고르겠으면 "정보가 더 필요하다"고 쓰고 무엇이 필요한지 적는다)',
+        '',
+        '## 그렇게 본 이유',
+        '- (회의에서 실제로 나온 근거만)',
+        '',
+        '## 이러면 뒤집힌다',
+        '- (이 조건이 달라지면 반대가 맞다)',
+        '',
+        '## 남은 위험',
+        '- (합의 못 본 것. 없으면 "없음")'
+      ]
+    },
+    {
+      id: 'explain', name: '쉽게 이해하기', desc: '같은 개념을 셋이 다른 비유로',
+      hint: '이해하고 싶은 것을 적어라. 어디까지 아는지도 적으면 좋다.\n예) 금리가 오르면 왜 집값이 내리나. 경제는 잘 모른다.',
+      rounds: 2,
+      roles: [
+        { who:'비유쟁이', persona:'일상의 물건과 상황에 빗대 설명한다. 전문용어를 안 쓴다.' },
+        { who:'차근차근', persona:'원인에서 결과로 순서대로 짚는다. 건너뛰지 않는다.' },
+        { who:'딴지', persona:'그 설명이 틀리거나 지나치게 단순해지는 지점을 짚는다. 예외를 든다.' }
+      ],
+      out: [
+        '# (한 줄 정의)',
+        '',
+        '## 제일 쉬운 설명',
+        '- (비유 하나로)',
+        '',
+        '## 실제로는 이렇게 돌아간다',
+        '- (순서대로 3~5단계)',
+        '',
+        '## 이건 조심',
+        '- (비유가 안 맞는 지점, 흔한 오해)'
+      ]
+    },
+    {
+      id: 'plan', name: '일정 짜기', desc: '여행·행사 시간표',
+      hint: '언제, 어디를, 누구와, 얼마로 가는지 적어라.\n예) 4월에 부모님 모시고 제주 3박4일. 어머니가 오래 못 걷는다.',
+      rounds: 3,
+      roles: [
+        { who:'예산', persona:'돈을 지킨다. 비싼 항목을 깎고 대안을 낸다.' },
+        { who:'체력', persona:'무리한 일정을 막는다. 이동 시간과 쉬는 시간을 챙긴다.' },
+        { who:'즐길거리', persona:'기억에 남을 것을 넣자고 밀어붙인다. 뻔한 코스를 싫어한다.' }
+      ],
+      out: [
+        '# (제목)',
+        '> (이 일정의 성격 한 줄)',
+        '',
+        '## 1일차',
+        '- 오전: ',
+        '- 오후: ',
+        '- 저녁: ',
+        '- 메모: (이동 시간·예약 필요·주의)',
+        '',
+        '## 2일차',
+        '...',
+        '',
+        '## 남은 쟁점',
+        '- (합의 못 본 것. 없으면 "없음")'
+      ]
+    },
+    {
+      id: 'price', name: '값 정하기', desc: '얼마를 받을까',
+      hint: '무엇을 누구에게 파는지 적어라. 원가와 들인 시간도 적으면 좋다.\n예) 커플 도트 RPG 맞춤 제작. 한 편에 2주쯤 걸린다.',
+      rounds: 3,
+      roles: [
+        { who:'파는쪽', persona:'들인 품과 가치를 근거로 값을 올리려 한다.' },
+        { who:'사는쪽', persona:'지갑을 여는 사람이다. 비싸다고 느끼는 지점을 솔직히 말한다.' },
+        { who:'경쟁자', persona:'비슷한 것을 파는 사람이다. 시세와 대체재를 든다.' }
+      ],
+      out: [
+        '# 권하는 값',
+        '> (숫자 하나 또는 범위)',
+        '',
+        '## 그 값인 이유',
+        '- ',
+        '',
+        '## 값을 올릴 수 있는 조건',
+        '- ',
+        '',
+        '## 이 값에서 놓치는 손님',
+        '- '
+      ]
+    },
+    {
+      id: 'review', name: '설계 뜯어보기', desc: '코드·구조를 세 관점으로',
+      hint: '무엇을 어떻게 만들었는지 적어라. 코드나 구조를 붙여 넣어도 된다.\n예) 브라우저에 API 키를 두고 프록시 없이 호출하는 구조인데 괜찮나.',
+      rounds: 3,
+      roles: [
+        { who:'보안', persona:'새는 곳과 악용될 길을 찾는다. 최악을 가정한다.' },
+        { who:'성능', persona:'느려지거나 터지는 지점을 찾는다. 규모가 커질 때를 본다.' },
+        { who:'뒷사람', persona:'반년 뒤 이걸 고칠 사람이다. 헷갈리고 위험한 구조를 짚는다.' }
+      ],
+      out: [
+        '# 한 줄 평',
+        '',
+        '## 당장 고칠 것',
+        '- (심각한 순서대로. 왜 문제인지 한 줄씩)',
+        '',
+        '## 나중에 고칠 것',
+        '- ',
+        '',
+        '## 잘 된 것',
+        '- (있으면. 없으면 "없음")'
+      ]
+    },
+    {
+      id: 'critique', name: '글 합평', desc: '내가 쓴 글을 셋이 읽는다',
+      hint: '글을 통째로 붙여 넣어라. 누구에게 보일 글인지도 적으면 좋다.',
+      rounds: 2,
+      roles: [
+        { who:'독자', persona:'그냥 읽는 사람이다. 지루하거나 안 읽히는 곳을 말한다.' },
+        { who:'편집자', persona:'구조와 문장을 본다. 뺄 것과 순서 바꿀 곳을 짚는다.' },
+        { who:'심술', persona:'꼬투리를 잡는다. 과장·비약·근거 없는 단정을 찾는다.' }
+      ],
+      out: [
+        '# 한 줄 평',
+        '',
+        '## 고칠 곳 (중요한 순서)',
+        '- (어디를 → 어떻게)',
+        '',
+        '## 뺄 곳',
+        '- ',
+        '',
+        '## 살릴 곳',
+        '- '
+      ]
+    },
+    {
+      id: 'budget', name: '예산 안에서 짜기', desc: '정해진 돈으로 최대치',
+      hint: '총액과 무엇에 쓸지 적어라.\n예) 300만원으로 신혼집 가전 전부. 세탁기는 좋은 걸로.',
+      rounds: 3,
+      roles: [
+        { who:'꼭필요', persona:'없으면 안 되는 것을 지킨다. 여기서 깎으면 안 된다고 버틴다.' },
+        { who:'아끼기', persona:'과한 지출을 잘라낸다. 더 싼 대안을 계속 낸다.' },
+        { who:'나중생각', persona:'지금 아끼면 나중에 더 드는 항목을 짚는다.' }
+      ],
+      out: [
+        '# 배분안',
+        '',
+        '| 항목 | 금액 | 이유 |',
+        '|---|---|---|',
+        '| | | |',
+        '',
+        '## 합계',
+        '',
+        '## 돈이 더 생기면 여기부터',
+        '- ',
+        '',
+        '## 줄여야 하면 여기부터',
+        '- '
+      ]
+    },
+    {
+      id: 'ppt', name: 'PPT 개요', desc: '장표 구성을 짠다',
+      hint: '무엇을 누구에게 발표하는지 적어라.\n예) 신입사원 정보보안 교육 12장. 딱딱하지 않게, 사례 위주로.',
+      rounds: 3,
+      roles: [
+        { who:'기획자', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
+        { who:'반론자', persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
+        { who:'청중대변', persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
+      ],
+      out: [
+        '# (발표 제목)',
+        '> (한 줄 요약 — 듣는 사람에게 남길 단 하나의 메시지)',
+        '',
+        '## 1. (장표 제목)',
+        '- 핵심: (이 장이 말하는 것 한 줄)',
+        '- 내용: (불릿 2~4개)',
+        '- 노트: (발표자가 말로 덧붙일 것)',
+        '',
+        '## 2. (장표 제목)',
+        '...',
+        '',
+        '## 남은 쟁점',
+        '- (합의 못 본 것. 없으면 "없음")'
+      ]
+    },
+    {
+      id: 'talk', name: '어려운 대화 연습', desc: '상대역이 진짜로 반발한다',
+      hint: '누구에게 무슨 말을 해야 하는지, 상대가 어떤 사람인지 적어라.\n예) 아버지께 회사 그만두고 창업한다고 말해야 한다. 아버지는 공무원이셨다.',
+      rounds: 3,
+      roles: [
+        { who:'나', persona:'말을 꺼내는 사람이다. 실제로 할 문장을 만들어 본다.' },
+        { who:'상대', persona:'말을 듣는 쪽이다. 순순히 받아들이지 않는다. 그 사람이 실제로 할 법한 반박과 감정을 낸다.' },
+        { who:'옆사람', persona:'둘 다 아는 사람이다. 어디서 감정이 상하는지, 무슨 말이 역효과인지 짚는다.' }
+      ],
+      out: [
+        '# 이렇게 시작하라',
+        '> (첫 문장 그대로)',
+        '',
+        '## 상대가 낼 반응과 그때 할 말',
+        '- 상대: "…" → 나: "…"',
+        '',
+        '## 하지 말아야 할 말',
+        '- (이 말은 불을 붙인다)',
+        '',
+        '## 이번에 안 되면',
+        '- (한 번에 안 될 때 남겨 둘 것)'
+      ]
+    },
+    {
+      id: 'dig', name: '뭘 원하는지 캐내기', desc: '막연할 때 질문으로 윤곽 잡기',
+      hint: '막연한 채로 적어도 된다.\n예) 뭔가 앱을 하나 만들고 싶은데 뭘 만들지 모르겠다.',
+      rounds: 3,
+      roles: [
+        { who:'용도', persona:'"그래서 누가 언제 쓰나"를 캐묻는다. 쓰이는 장면을 구체적으로 만든다.' },
+        { who:'조건', persona:'돈·시간·실력의 한계를 캐묻는다. 못 하는 것을 먼저 지운다.' },
+        { who:'속마음', persona:'진짜 이유를 캐묻는다. 말한 것 말고 원하는 것이 따로 있는지 본다.' }
+      ],
+      out: [
+        '# 정리하면 원하는 건 이것이다',
+        '> (한 줄로)',
+        '',
+        '## 확실해진 조건',
+        '- ',
+        '',
+        '## 아직 못 정한 것',
+        '- (본인이 답해야 넘어가는 질문)',
+        '',
+        '## 여기서 갈라지는 길',
+        '- (이 답에 따라 방향이 달라진다)'
+      ]
+    },
+    {
+      id: 'estimate', name: '얼마나 걸릴까 / 들까', desc: '낙관·비관·현실로 잡는 범위',
+      hint: '무엇을 하려는지, 지금 가진 조건을 적어라.\n예) 혼자 안드로이드 앱 하나 만들어 스토어에 올리기. 자바는 조금 안다.',
+      rounds: 2,
+      roles: [
+        { who:'낙관', persona:'다 잘 풀렸을 때를 잡는다. 최소치를 말한다.' },
+        { who:'비관', persona:'막히는 것이 다 막혔을 때를 잡는다. 흔히 빠뜨리는 항목을 든다.' },
+        { who:'현실', persona:'비슷한 일이 실제로 어떻게 흘러갔는지를 근거로 가운데를 잡는다.' }
+      ],
+      out: [
+        '# 예상',
+        '- 잘 풀리면: ',
+        '- 보통이면: ',
+        '- 막히면: ',
+        '',
+        '## 시간(돈)을 좌우하는 것',
+        '- (여기가 흔들리면 전체가 흔들린다)',
+        '',
+        '## 흔히 빠뜨리는 항목',
+        '- '
+      ]
+    },
+    {
+      id: 'reply', name: '답장 초안', desc: '세 톤으로 써 보고 고른다',
+      hint: '받은 메시지를 붙여 넣고, 어떤 관계인지와 원하는 결과를 적어라.',
+      rounds: 2,
+      roles: [
+        { who:'단호', persona:'할 말은 한다. 선을 분명히 긋는 버전을 쓴다.' },
+        { who:'부드럽게', persona:'관계를 지킨다. 상대가 덜 상하는 버전을 쓴다.' },
+        { who:'중립', persona:'사실만 적는다. 감정을 빼는 버전을 쓴다. 앞 둘의 위험도 짚는다.' }
+      ],
+      out: [
+        '# 보낼 문안',
+        '',
+        '(그대로 복사해 쓸 수 있게 완성된 글로 쓴다)',
+        '',
+        '## 왜 이 톤인가',
+        '- ',
+        '',
+        '## 상대가 이렇게 나오면',
+        '- (예상 반응 → 그때 할 말)'
+      ]
+    },
+    {
+      id: 'redteam', name: '내 주장 공격받기', desc: '셋이 무너뜨리려 든다',
+      hint: '내가 믿는 것, 주장하려는 것을 적어라.\n예) 소규모 앱은 광고보다 유료 판매가 낫다고 생각한다.',
+      rounds: 3,
+      roles: [
+        { who:'근거', persona:'근거가 부족하거나 사례가 편향된 지점을 친다.' },
+        { who:'반례', persona:'반대되는 경우를 든다. 예외가 규칙보다 큰지 따진다.' },
+        { who:'전제', persona:'말하지 않은 전제를 끄집어낸다. 그게 무너지면 전체가 무너진다고 본다.' }
+      ],
+      out: [
+        '# 이 주장은 어디까지 버티나',
+        '> (한 줄 판정)',
+        '',
+        '## 가장 아픈 공격',
+        '- (센 순서대로)',
+        '',
+        '## 이렇게 고치면 살아남는다',
+        '- (주장을 좁히거나 조건을 붙이는 방법)',
+        '',
+        '## 무너지지 않은 부분',
+        '- '
+      ]
+    },
+    {
+      id: 'mediate', name: '다툼 정리하기', desc: '양쪽을 대변시키고 쟁점을 뽑는다',
+      hint: '누구와 무슨 일로 부딪혔는지 양쪽 입장을 다 적어라.',
+      rounds: 3,
+      roles: [
+        { who:'이쪽', persona:'한쪽을 대변한다. 그쪽이 억울한 지점을 최대한 살려 말한다.' },
+        { who:'저쪽', persona:'다른 쪽을 대변한다. 마찬가지로 그쪽 입장에서 말한다.' },
+        { who:'사회자', persona:'편들지 않는다. 진짜 쟁점과 오해를 갈라낸다.' }
+      ],
+      out: [
+        '# 진짜 쟁점',
+        '- (감정이 아니라 사실 다툼이 있는 지점)',
+        '',
+        '## 오해에서 온 것',
+        '- (설명하면 풀리는 것)',
+        '',
+        '## 타협할 수 있는 것',
+        '- ',
+        '',
+        '## 타협 못 하는 것',
+        '- (여기는 누가 양보해야 끝난다)'
+      ]
+    },
+    {
+      id: 'premortem', name: '망할 이유 찾기', desc: '"6개월 뒤 망했다, 왜?"',
+      hint: '시작하려는 일을 적어라.\n예) 내년 3월에 동네에 작은 카페를 연다.',
+      rounds: 2,
+      roles: [
+        { who:'돈', persona:'자금이 마르는 경로를 짚는다. 예상 못 한 지출을 든다.' },
+        { who:'사람', persona:'사람 때문에 무너지는 경로를 짚는다. 나 자신이 지치는 경우도 포함한다.' },
+        { who:'시장', persona:'손님이 안 오는 경로를 짚는다. 경쟁과 시기를 본다.' }
+      ],
+      out: [
+        '# 망하는 길 (가능성 높은 순)',
+        '1. (무엇이 → 어떻게 → 결과)',
+        '',
+        '## 지금 막을 수 있는 것',
+        '- (오늘 할 수 있는 조치)',
+        '',
+        '## 미리 정해 둘 신호',
+        '- (이게 보이면 멈추거나 방향을 튼다)'
+      ]
+    },
+    {
+      id: 'idea', name: '아이디어 두들기기', desc: '고객·경쟁사·투자자가 친다',
+      hint: '아이디어를 적어라. 누구의 어떤 문제를 푸는지까지 적으면 좋다.',
+      rounds: 3,
+      roles: [
+        { who:'고객', persona:'돈 낼 사람이다. 굳이 이걸 왜 쓰는지, 지금은 어떻게 해결하는지 따진다.' },
+        { who:'경쟁사', persona:'이미 비슷한 걸 하는 쪽이다. 따라 하기 쉬운 부분을 짚는다.' },
+        { who:'투자자', persona:'돈을 넣을지 본다. 커질 수 있는지, 뭘 증명해야 하는지 묻는다.' }
+      ],
+      out: [
+        '# 판정',
+        '> (해볼 만하다 / 조건부 / 접는 게 낫다 중 하나 + 한 줄 이유)',
+        '',
+        '## 치명적 약점 (센 순서)',
+        '- ',
+        '',
+        '## 이것만 답하면 해볼 만하다',
+        '- (검증해야 할 질문 3개 이내)',
+        '',
+        '## 살아 있는 강점',
+        '- '
+      ]
+    },
+    {
+      id: 'name', name: '이름 짓기', desc: '후보를 놓고 서로 깐다',
+      hint: '무엇의 이름인지, 어떤 느낌을 원하는지 적어라. 후보가 있으면 같이 적어라.',
+      rounds: 3,
+      roles: [
+        { who:'작명', persona:'후보를 낸다. 뜻과 어감을 설명한다.' },
+        { who:'트집', persona:'발음·오해·검색·상표 문제를 짚는다. 비슷한 이름이 이미 있는지 의심한다.' },
+        { who:'손님', persona:'처음 듣는 사람이다. 무슨 뜻인지 짐작되는지, 기억에 남는지 말한다.' }
+      ],
+      out: [
+        '# 최종 후보 3개',
+        '1. (이름) — (왜 좋은가) / (약점)',
+        '2. ',
+        '3. ',
+        '',
+        '## 떨어진 것과 이유',
+        '- ',
+        '',
+        '## 쓰기 전에 확인할 것',
+        '- (상표·도메인·이미 쓰는 곳 등)'
+      ]
+    },
+    {
+      id: 'rehearse', name: '압박 리허설', desc: '깐깐한 질문자들이 파고든다',
+      hint: '무엇을 누구 앞에서 말하는지, 내 주장 요지를 적어라.',
+      rounds: 3,
+      roles: [
+        { who:'꼬치꼬치', persona:'숫자와 근거를 캐묻는다. 얼버무리면 다시 묻는다.' },
+        { who:'반대편', persona:'처음부터 회의적이다. 왜 이게 나쁜 생각인지 묻는다.' },
+        { who:'딴소리', persona:'예상 못 한 각도에서 묻는다. 준비 안 된 곳을 찌른다.' }
+      ],
+      out: [
+        '# 나올 질문 (가능성 높은 순)',
+        '1. Q: ',
+        '   A: (준비할 답 한두 문장)',
+        '',
+        '## 내 답이 약한 곳',
+        '- (여기는 더 준비해야 한다)',
+        '',
+        '## 모르면 이렇게 말하라',
+        '- '
+      ]
+    },
+    {
+      id: 'compare', name: '셋 비교하기', desc: '각자 하나씩 변호한다',
+      hint: '비교할 것 두셋과 무엇에 쓸지 적어라.\n예) 아이폰 / 갤럭시 / 중저가 안드로이드. 부모님 쓰실 것.',
+      rounds: 3,
+      roles: [
+        { who:'A변호', persona:'첫 번째를 변호한다. 왜 이게 최선인지 든다.' },
+        { who:'B변호', persona:'두 번째를 변호한다. 앞의 주장을 직접 반박한다.' },
+        { who:'C변호', persona:'세 번째(또는 아무것도 안 하기)를 변호한다.' }
+      ],
+      out: [
+        '# 비교',
+        '',
+        '| | 좋은 점 | 나쁜 점 | 이럴 때 |',
+        '|---|---|---|---|',
+        '| | | | |',
+        '',
+        '## 상황별 추천',
+        '- (조건 → 이것)',
+        '',
+        '## 무엇을 고르든 같은 것',
+        '- '
+      ]
+    },
+    {
+      id: 'audience', name: '이 사람들은 어떻게 볼까', desc: '집단별 반응 예측',
+      hint: '보여 줄 것과 누구에게 보일지 적어라.',
+      rounds: 2,
+      roles: [
+        { who:'윗세대', persona:'부모님 또래다. 익숙하지 않은 것에 조심스럽다.' },
+        { who:'또래', persona:'나와 비슷한 세대다. 비슷한 걸 많이 봤다.' },
+        { who:'문외한', persona:'이 분야를 전혀 모른다. 용어부터 막힌다.' }
+      ],
+      out: [
+        '# 집단별 반응',
+        '- 윗세대: (첫인상 / 걸리는 곳)',
+        '- 또래: ',
+        '- 문외한: ',
+        '',
+        '## 모두가 걸린 곳',
+        '- (여기는 반드시 고쳐야 한다)',
+        '',
+        '## 누구를 버릴지 정해야 한다면',
+        '- '
+      ]
+    },
+    {
+      id: 'retro', name: '지난 일 되짚기', desc: '끝난 일에서 배울 것',
+      hint: '끝난 일을 적어라. 어떻게 흘러갔는지 사실 위주로.',
+      rounds: 2,
+      roles: [
+        { who:'잘된것', persona:'성과와 운 좋았던 것을 갈라낸다. 다시 재현할 수 있는지 본다.' },
+        { who:'못된것', persona:'실수와 낭비를 짚는다. 변명 없이 본다.' },
+        { who:'다음엔', persona:'다음에 바꿀 것을 구체적으로 만든다. 추상적인 다짐을 싫어한다.' }
+      ],
+      out: [
+        '# 한 줄 요약',
+        '',
+        '## 다시 할 것',
+        '- ',
+        '',
+        '## 안 할 것',
+        '- ',
+        '',
+        '## 다음에 바꿀 것 (구체적으로)',
+        '- (무엇을 → 어떻게)'
+      ]
+    },
+    {
+      id: 'debate', name: '토론 구경', desc: '주제 하나로 싸우게 두기',
+      hint: '토론 주제를 적어라.\n예) 초등학생에게 스마트폰을 사 줘야 하나.',
+      rounds: 3,
+      roles: [
+        { who:'찬성측', persona:'찬성 입장을 끝까지 지킨다. 근거와 사례를 든다.' },
+        { who:'반대측', persona:'반대 입장을 끝까지 지킨다. 상대 근거를 직접 반박한다.' },
+        { who:'사회자', persona:'편들지 않는다. 논점이 흐려지면 되돌리고, 양쪽이 피한 질문을 던진다.' }
+      ],
+      out: [
+        '# 쟁점',
+        '- ',
+        '',
+        '## 찬성측 핵심 논거',
+        '- ',
+        '',
+        '## 반대측 핵심 논거',
+        '- ',
+        '',
+        '## 판단은 결국 여기서 갈린다',
+        '- (무엇을 더 중요하게 보느냐)'
+      ]
+    }
+  ];
+  const presetById = (id) => PRESETS.filter((p) => p.id === id)[0] || PRESETS[0];
+
   const PROVIDERS = {
     room: {
       label: '우리 회의실',
@@ -790,6 +1334,7 @@
   /* ---------- 상태 ---------- */
   const S = {
     prov: store.get('council_prov', 'room'),
+    preset: store.get('council_preset', 'free'),
     seats: null,
     cat: null,          // 지금 프로바이더의 모델 목록 (배열)
     catAt: 0,           // 언제 받았는가
@@ -912,10 +1457,25 @@
   }
 
   /* ---------- 자리 ---------- */
+  /* 목적이 바뀌면 역할(이름·성격)만 갈아 끼우고 모델·노력도는 쓰던 것을 물려받는다.
+   * 그래야 "목적만 바꿨는데 비싼 모델로 바뀌어 있는" 일이 없다. */
+  function seatsFromPreset(pre) {
+    const dflt = P().seats;
+    return pre.roles.map((r, i) => {
+      const cur = S.seats && S.seats[i];
+      const base = dflt[i % dflt.length];
+      const model = (cur && cur.model) || base.model;
+      return {
+        who: r.who, persona: r.persona, model: model,
+        effort: fixEffort(model, (cur && cur.effort) || base.effort)
+      };
+    });
+  }
+
   function loadSeats() {
     const saved = store.get('council_seats_' + S.prov, null);
     const ok = Array.isArray(saved) && saved.length >= 2 && saved.every((s) => s && s.model && s.who !== undefined);
-    S.seats = ok ? saved : P().seats.map((s) => Object.assign({}, s));
+    S.seats = ok ? saved : seatsFromPreset(presetById(S.preset));
     // 모델이 바뀌어 없어진 노력도를 가진 자리가 있을 수 있다
     S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort || 'low'); });
   }
@@ -933,7 +1493,8 @@
     lock: $('lock'), lockInput: $('lockInput'), lockBad: $('lockBad'),
     setpass: $('setpass'), spPw: $('spPw'), spOut: $('spOut'),
     btnRun: $('btnRun'), btnStop: $('btnStop'),
-    picker: $('picker'), pickSearch: $('pickSearch'), pickList: $('pickList'), pickCount: $('pickCount')
+    picker: $('picker'), pickSearch: $('pickSearch'), pickList: $('pickList'), pickCount: $('pickCount'),
+    ppick: $('ppick'), ppList: $('ppList'), purposeBtn: $('purposeBtn')
   };
 
   const initial = (name) => (name || '?').trim().charAt(0) || '?';
@@ -1065,6 +1626,60 @@
       ' (어림값 · 한화 약 ' + Math.round(cost * 1400).toLocaleString('ko-KR') + '원). ' +
       '노력도를 올리면 값이 빠르게 뛴다. 키에 지출 상한을 걸어 둘 것.';
   }
+
+  /* ==================================================================
+   * 회의 목적
+   * ================================================================== */
+
+  function renderPurpose() {
+    const pre = presetById(S.preset);
+    $('purposeName').textContent = pre.name;
+    $('purposeDesc').textContent = pre.desc;
+    el.topic.placeholder = pre.hint;
+  }
+
+  function applyPreset(id) {
+    const pre = presetById(id);
+    S.preset = pre.id;
+    store.set('council_preset', pre.id);
+    S.seats = seatsFromPreset(pre);
+    el.rounds.value = String(pre.rounds);
+    saveSeats();
+    renderPurpose(); renderSeats(); renderScribe();
+  }
+
+  function renderPPList() {
+    el.ppList.innerHTML = '';
+    PRESETS.forEach((pre) => {
+      const row = document.createElement('div');
+      row.className = 'mrow' + (pre.id === S.preset ? ' on' : '');
+      const nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.textContent = pre.name;
+      const sub = document.createElement('small');
+      sub.className = 'id';
+      sub.textContent = pre.desc;
+      nm.appendChild(sub);
+      row.appendChild(nm);
+      const cnt = document.createElement('span');
+      cnt.className = 'badge';
+      cnt.textContent = pre.roles.length + '명 · ' + pre.rounds + '바퀴';
+      row.appendChild(cnt);
+      row.addEventListener('click', () => {
+        el.ppick.classList.add('hidden');
+        applyPreset(pre.id);
+        flash('목적을 「' + pre.name + '」 로 바꿨다.');
+      });
+      el.ppList.appendChild(row);
+    });
+  }
+
+  el.purposeBtn.addEventListener('click', () => {
+    renderPPList();
+    el.ppick.classList.remove('hidden');
+  });
+  $('ppClose').addEventListener('click', () => el.ppick.classList.add('hidden'));
+  el.ppick.addEventListener('click', (e) => { if (e.target === el.ppick) el.ppick.classList.add('hidden'); });
 
   /* ==================================================================
    * 모델 고르기 창
@@ -1590,7 +2205,8 @@
 
   function seatSystem(seat, topic, roundNow, roundTotal) {
     return [
-      '당신은 「AI 회의실」에 앉은 참가자다. 역할 이름은 「' + seat.who + '」다.',
+      // 이름을 사용자가 바꾸므로 조사도 받침을 보고 골라야 한다 (「찬성」다 → 「찬성」이다)
+      '당신은 「AI 회의실」에 앉은 참가자다. 역할 이름은 「' + seat.who + '」' + josa(seat.who, '이다', '다') + '.',
       '당신의 성격: ' + (seat.persona || '특별한 성향 없이 상식적으로 판단한다.'),
       '',
       '# 이 회의의 안건',
@@ -1613,8 +2229,12 @@
   }
 
   function scribeSystem(topic) {
-    return [
-      '당신은 방금 끝난 회의의 서기다. 회의록을 읽고 PPT 개요를 만든다.',
+    const pre = presetById(S.preset);
+    const head = [
+      '당신은 방금 끝난 회의의 서기다. 회의록을 읽고 정리한다.',
+      '',
+      '# 회의의 목적',
+      pre.name + ' — ' + pre.desc,
       '',
       '# 안건',
       topic,
@@ -1622,24 +2242,20 @@
       '# 규칙',
       '- 한국어로 쓴다.',
       '- 회의에서 실제로 나온 이야기만 쓴다. 나오지 않은 내용을 지어내지 않는다.',
-      '- 반대 의견이 끝까지 좁혀지지 않았으면 맨 아래 「남은 쟁점」에 그대로 적는다. 억지로 합의시키지 않는다.',
+      '- 끝까지 좁혀지지 않은 것은 억지로 합의시키지 않고 그대로 적는다.'
+    ];
+    // 자유 주제는 형식을 강요하지 않는다. 주제가 뭘지 모르는데 틀을 씌우면 억지가 된다.
+    if (!pre.out) {
+      return head.concat([
+        '- 정해진 형식은 없다. 무슨 얘기가 오갔고 무엇으로 모였는지 읽기 좋게 정리한다.',
+        '- 제목 한 줄로 시작하고 결론을 앞에 둔다. 합의 못 본 것은 맨 아래에 따로 적는다.'
+      ]).join('\n');
+    }
+    return head.concat([
       '- 아래 형식을 그대로 지킨다. 형식 밖의 말(인사·설명)을 앞뒤에 붙이지 않는다.',
       '',
-      '# 형식',
-      '# (발표 제목)',
-      '> (한 줄 요약 — 이 발표가 듣는 사람에게 남길 단 하나의 메시지)',
-      '',
-      '## 1. (장표 제목)',
-      '- 핵심: (이 장이 말하는 것 한 줄)',
-      '- 내용: (불릿 2~4개)',
-      '- 노트: (발표자가 말로 덧붙일 것)',
-      '',
-      '## 2. (장표 제목)',
-      '...',
-      '',
-      '## 남은 쟁점',
-      '- (합의 못 본 것. 없으면 "없음")'
-    ].join('\n');
+      '# 형식'
+    ]).concat(pre.out).join('\n');
   }
 
   /* ==================================================================
@@ -1758,6 +2374,7 @@
     flash(seat.who + josa(seat.who, '이', '가') + ' 개요를 쓰는 중…');
 
     el.outCard.classList.remove('hidden');
+    $('outTitle').textContent = presetById(S.preset).name;
     el.outline.textContent = '';
 
     // 개요는 발언보다 길다. 생각 토큰까지 여기서 나가므로 넉넉히 준다.
@@ -1855,10 +2472,9 @@
   });
 
   $('btnReset').addEventListener('click', () => {
-    S.seats = P().seats.map((s) => Object.assign({}, s));
-    S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort); });
+    S.seats = seatsFromPreset(presetById(S.preset));
     saveSeats(); renderSeats(); renderScribe();
-    flash('기본 참가자로 되돌렸다.');
+    flash('「' + presetById(S.preset).name + '」 의 기본 참가자로 되돌렸다.');
   });
 
   $('btnClear').addEventListener('click', () => {
@@ -2040,7 +2656,7 @@
     const blob = new Blob([el.outline.textContent], { type: 'text/markdown;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'ppt-개요.md';
+    a.download = presetById(S.preset).name + '.md';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
@@ -2062,6 +2678,7 @@
     reindex();
     loadSeats();
     el.topic.value = store.get('council_topic', '');
+    renderPurpose();
     renderSeats();
     renderScribe();
     syncKeyCard();

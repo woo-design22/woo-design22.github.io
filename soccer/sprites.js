@@ -537,17 +537,29 @@
   var PHOTO_RUN = ['-run-1', '-run-2', '-run-3'];   // 원본 팩이 준 달리기 3장
   var PHOTO_SCALE = 3.2;    // 그림 한 변 = 반지름 × 이 값 (사람 키 ≈ 3.0r, 어깨 폭 ≈ 판정 지름)
   var photoCache = {}, photoOK = (typeof Image !== "undefined");
-  function photoOf(key, pose, f) {
-    if (!photoOK || !key) return null;
-    var name = key + (pose === "run" ? PHOTO_RUN[f % PHOTO_RUN.length] : (PHOTO_POSE[pose] || ""));
+  function photoAt(name) {
     var im = photoCache[name];
     if (im === undefined) {
       im = new Image();
-      im.src = "chars/" + name + ".png";
+      im.src = 'chars/' + name + '.png';
       photoCache[name] = im;
       return null;
     }
     return (im.complete && im.naturalWidth > 0) ? im : null;
+  }
+  /* 필요한 그림을 미리 받아 둔다. 안 하면 **경기 시작 직후 잠깐 도트로 보인다** —
+     그림은 처음 쓰일 때 비로소 받기 시작하기 때문이다(2026-08-26 사용자 지적). */
+  function preload(keys) {
+    if (!photoOK) return;
+    var poses = ['', '-kick', '-fart', '-stun', '-goal'].concat(PHOTO_RUN);
+    for (var i = 0; i < keys.length; i++)
+      for (var j = 0; j < poses.length; j++) photoAt(keys[i] + poses[j]);
+  }
+  function photoOf(key, pose, f) {
+    if (!photoOK || !key) return null;
+    var name = key + (pose === "run" ? PHOTO_RUN[f % PHOTO_RUN.length] : (PHOTO_POSE[pose] || ""));
+    // 그 동작 그림이 아직 안 왔으면 **서 있는 그림으로 대신**한다 — 도트로 튀는 것보다 훨씬 덜 어색하다.
+    return photoAt(name) || photoAt(key);
   }
   function draw(ctx, o) {
     var charId = o.charId | 0;
@@ -679,6 +691,7 @@
       { id: 7, key: 'rocker',   name: '밴드부형',     look: '분홍 뾰족머리에 목에 건 헤드폰' },
       { id: 8, key: 'swimmer',  name: '수영부형',     look: '하늘색 단발에 머리 위로 올린 물안경' }
     ],
+    preload: preload,
     draw: draw
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -122,7 +122,8 @@ function makeSession(id, fieldId) {
 const lobby = makeSession('@lobby', 'pro');
 function fieldStart(sess) {
   if (sess.timer) return;
-  sess.state = core.createState({ halfSec: 99999, field: sess.fieldId });
+  // 대기 운동장은 점수가 없다 — 공은 굴러다니되 골대에 넣어도 아무 일도 일어나지 않는다.
+  sess.state = core.createState({ halfSec: 99999, field: sess.fieldId, friendly: true });
   core.startMatch(sess.state);
   sess.inputs = new Array(core.C.MAX_PLAYERS).fill(null).map(() => ({ dx: 0, dy: 0, buttons: 0 }));
   const stepMs = 1000 / CFG.tickHz;

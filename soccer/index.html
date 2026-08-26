@@ -685,6 +685,13 @@
     pred.x += (o.x - pred.x) * k; pred.y += (o.y - pred.y) * k;
     if (Math.hypot(o.x - pred.x, o.y - pred.y) > 60) { pred.x = o.x; pred.y = o.y; }
     o.x = pred.x; o.y = pred.y; o.facing = pred.facing;
+    // **내가 몰고 있는 공은 내 예측 위치를 따라온다.** 안 그러면 나만 앞서 가고 공이 뒤따라와
+    // 드리블이 가장 늦게 느껴진다. 공 주인이 나일 때만이고, 놓는 순간부터는 서버 값 그대로다.
+    if ((o.flags & 1) && rs.ball) {
+      var off = core.TUNING.ball.carryOffset;
+      rs.ball.x = pred.x + Math.cos(pred.facing) * off;
+      rs.ball.y = pred.y + Math.sin(pred.facing) * off;
+    }
   }
   function myRenderPlayer() {
     if (!rs.has || !game) return null;
@@ -1139,8 +1146,17 @@
     ctx.beginPath(); ctx.arc(x0 + rs.ball.x * sx, y0 + rs.ball.y * sy, 2.6, 0, TAU); ctx.fill();
     ctx.restore();
   }
-  var hudCache = { score: '', clock: '', ult: -1, ultCls: '', stam: -1, stamLow: null };
+  var hudCache = { score: '', clock: '', ult: -1, ultCls: '', stam: -1, stamLow: null, waiting: null };
+  /* 대기 운동장(방 전·방 안)은 **점수가 없다** — 점수판을 아예 감춘다(2026-08-26 지시).
+     매 프레임 확인하지 않고 모드가 바뀔 때 한 번만 켜고 끈다. */
+  function syncScoreboard() {
+    var waiting = !!(game && game.mode === 'lobby');
+    if (hudCache.waiting === waiting) return;
+    hudCache.waiting = waiting;
+    $('score').style.display = waiting ? 'none' : '';
+  }
   function drawHUD() {
+    if (game && game.mode === 'lobby') return;
     var sc = rs.has ? rs.score[0] + ' : ' + rs.score[1] : '0 : 0';
     if (sc !== hudCache.score) { hudCache.score = sc; $('score').textContent = sc; }
     var secs = rs.has ? Math.ceil(rs.clock / C.TICK_HZ) : 0;
@@ -1761,6 +1777,7 @@
     hideOverlay();
     dockOpen(false);
     chatPlace(true);
+    syncScoreboard();
     preloadChars();
     banner('킥오프', 1200);
     startInputSender();
@@ -1861,6 +1878,7 @@
     preloadChars();
     $('dkInfo').textContent = m.slot < 0 ? '자리가 꽉 차 구경만 합니다' : '걸어 다닐 수 있습니다';
     syncExitBtn();
+    syncScoreboard();       // 대기 운동장에는 점수판이 없다
     startInputSender();
   }
   /* 입력은 틱마다(20Hz) 보내되, **바뀐 순간 곧바로 한 번 더** 보낸다.
@@ -1929,6 +1947,7 @@
     hideOverlay();
     syncExitBtn();
     chatPlace(true);
+    syncScoreboard();
     preloadChars();
     doTick(performance.now());
     banner('킥오프', 1200);

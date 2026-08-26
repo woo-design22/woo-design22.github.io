@@ -97,6 +97,10 @@ const ROOM_MAX_IN_USD = 6;      // 100만 토큰당 입력값 상한
 const ROOM_MAX_OUT_USD = 30;    // 100만 토큰당 출력값 상한
 const ROOM_MAX_TOKENS = 4500;   // 한 번에 만들 수 있는 최대 분량
 const ROOM_MAX_CHARS = 30000;   // 회의록 + 지시문 글자 수 상한
+// 그림은 한 장이 수천 토큰이고 발언마다 다시 실린다. 장수와 총량을 둘 다 막는다.
+const ROOM_MAX_IMAGES = 4;
+const ROOM_MAX_IMAGE_CHARS = 8 * 1024 * 1024;
+const DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 // 노력도 상한. 'xhigh'·'max' 는 값이 몇 배로 뛰므로 여기서 자른다.
 const ROOM_EFFORTS = ['off', 'default', 'minimal', 'low', 'medium', 'high'];
 
@@ -202,11 +206,29 @@ async function handleRoom(request, echoOrigin) {
     ? body.effort
     : (['xhigh', 'max'].includes(body.effort) ? 'high' : 'low');
 
+  // ---- 그림 ----
+  // 클라이언트가 보낸 것을 그대로 믿지 않는다. data URL 모양이 아니면 조용히 버린다.
+  const wanted = Array.isArray(body.images) ? body.images.slice(0, ROOM_MAX_IMAGES) : [];
+  const pics = [];
+  let picChars = 0;
+  for (const u of wanted) {
+    if (typeof u !== 'string' || !DATA_URL_RE.test(u)) continue;
+    picChars += u.length;
+    if (picChars > ROOM_MAX_IMAGE_CHARS) break;
+    pics.push(u);
+  }
+
+  const userText = text.slice(0, ROOM_MAX_CHARS);
+  const userContent = pics.length
+    ? [{ type: 'text', text: userText }]
+        .concat(pics.map((u) => ({ type: 'image_url', image_url: { url: u } })))
+    : userText;
+
   const upstreamBody = {
     model,
     messages: [
       { role: 'system', content: system.slice(0, ROOM_MAX_CHARS) },
-      { role: 'user', content: text.slice(0, ROOM_MAX_CHARS) }
+      { role: 'user', content: userContent }
     ],
     max_tokens: maxTokens,
     stream: true,

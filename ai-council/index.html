@@ -1550,14 +1550,24 @@
     });
   }
 
+  /* 자리는 **목적에 딸린 것**이라 목적과 함께 저장한다.
+   * 이렇게 안 해 두면 앱을 고쳤을 때 옛 자리가 그대로 남아 새 기본값이 영영 안 온다
+   * (실제로 PPT 시절 「기획자·반론자·청중대변」이 브라우저에 남아 있던 일이 있다).
+   * 목적이 같으면 사용자가 손본 자리를 그대로 살리고, 다르면 새로 세운다. */
+  const SEATS_V = 2;
   function loadSeats() {
-    const saved = store.get('council_seats_' + S.prov, null);
-    const ok = Array.isArray(saved) && saved.length >= 2 && saved.every((s) => s && s.model && s.who !== undefined);
-    S.seats = ok ? saved : seatsFromPreset(presetById(S.preset));
+    const raw = store.get('council_seats_' + S.prov, null);
+    const ok = raw && raw.v === SEATS_V && raw.preset === S.preset &&
+               Array.isArray(raw.seats) && raw.seats.length >= 2 &&
+               raw.seats.every((s) => s && s.model && s.who !== undefined);
+    S.seats = ok ? raw.seats : seatsFromPreset(presetById(S.preset));
     // 모델이 바뀌어 없어진 노력도를 가진 자리가 있을 수 있다
     S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort || 'low'); });
   }
-  function saveSeats() { store.set('council_seats_' + S.prov, S.seats); updateEstimate(); renderFaces(); }
+  function saveSeats() {
+    store.set('council_seats_' + S.prov, { v: SEATS_V, preset: S.preset, seats: S.seats });
+    updateEstimate(); renderFaces();
+  }
 
   /* ---------- DOM ---------- */
   const $ = (id) => document.getElementById(id);
@@ -3401,10 +3411,20 @@
    */
   let booted = false;
   let ready = null;
+  let migrated = false;   // 옛 저장값에서 연결을 돌려세웠나
   function boot() {
     if (booted) return ready;
     booted = true;
     apiKey = store.get('council_key_' + S.prov, '');
+    /* 옛 판에서 저장된 연결이 남아 있을 수 있다. 「우리 회의실」이 생기기 전에는
+     * 기본이 오픈라우터 직통이었는데, 거기엔 넣을 키가 없어서 「키가 올바르지 않다」만 뜬다.
+     * 넣을 키도 없는 직통이면 회의실 쪽으로 돌려 준다. */
+    if (P().needsKey && !apiKey && PROXY_URL) {
+      S.prov = 'room';
+      store.set('council_prov', 'room');
+      apiKey = '';
+      migrated = true;
+    }
     S.roomToken = store.get('council_rt', '');
     S.cat = P().orCatalog ? OR_FALLBACK.slice() : ANT_LIST.slice();
     reindex();
@@ -3423,9 +3443,11 @@
       S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort); });
       renderSeats(); renderScribe();
       if (P().orCatalog) {
-        flash(S.catLive
-          ? '모델 ' + S.cat.length + '개를 불러왔다.'
-          : '모델 목록을 못 받아 기본 표(' + S.cat.length + '개)로 시작한다.');
+        flash(migrated
+          ? '연결을 「우리 회의실」로 되돌렸다 (예전 설정에 키가 없었다). 모델 ' + S.cat.length + '개.'
+          : S.catLive
+            ? '모델 ' + S.cat.length + '개를 불러왔다.'
+            : '모델 목록을 못 받아 기본 표(' + S.cat.length + '개)로 시작한다.');
       }
       return ok;
     });

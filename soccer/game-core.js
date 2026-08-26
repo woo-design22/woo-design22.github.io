@@ -30,7 +30,7 @@
     for (var i = 0; i < FIELDS.length; i++) if (FIELDS[i].id === id) return FIELDS[i];
     return FIELDS[1];   // 기본은 학교 축구장(예전 크기)
   }
-  var PROTOCOL_VERSION = 19;   // 19: 방귀·발차기 판정 축소   // 18: 킥오프 3초·전후반 90초   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
+  var PROTOCOL_VERSION = 20;   // 20: 선수가 골대 안까지   // 19: 방귀·발차기 판정 축소   // 18: 킥오프 3초·전후반 90초   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
 
   // ── 구조 상수 (CLAUDE.md §3) ─────────────────────────────────────────────
   var C = {
@@ -293,6 +293,25 @@
       events: []
     };
   }
+  /* 선수를 경기장 안에 가둔다 — **골문 안쪽까지는 들어갈 수 있다**(2026-08-27 지시).
+     골대는 골라인 바깥(x<0 · x>W)으로 깊이 D 만큼 파인 상자이고 세로로는 골문 폭뿐이라,
+     **가로로 어디까지 갈 수 있는지가 세로 위치에 따라 달라진다.** 몰고 가는 공(`clampCarried`)과 같은 규칙이다.
+
+     순서가 중요하다 — **골대 안에 있던 선수는 세로를 먼저 골문 폭에 가둔다.**
+     안 그러면 골문 폭을 벗어나는 순간 아래 가로 제한이 걸려 선수가 골대 밖으로 **순간이동**한다
+     (골대 깊이만큼 옆으로 튄다). 골대 안에서는 뒷그물이 벽이고 골문이 유일한 출입구다.
+     경계를 `>=`·`<=` 로 두는 것도 같은 이유다 — 골포스트에 딱 붙었을 때 튕겨 나가면 안 된다. */
+  function confinePlayer(state, p, nx, ny) {
+    var R = C.PLAYER_R, D = C.GOAL_DEPTH, W = state.W, H = state.H;
+    var lo = state.goalY0 + R, hi = state.goalY1 - R;
+    // **옮기기 전** 자리가 정말 골대 상자 안이었나 — 가로만 보면 안 된다.
+    // 가로만 보면 경기장 밖 아무 데나 찍힌 좌표(순간이동·검증용 -5000 같은)가 골대 안으로 읽혀
+    // 선수가 골문에 나타난다. 실제로 대조표의 "정식 경기 골"이 그렇게 깨졌다(골 대신 선수가 공을 주웠다).
+    var inGoal = (p.x < R || p.x > W - R) && p.y >= lo && p.y <= hi;
+    p.y = inGoal ? clamp(ny, lo, hi) : clamp(ny, R, H - R);
+    var mouth = p.y >= lo && p.y <= hi;             // 골문 폭 안이면 골라인을 넘어갈 수 있다
+    p.x = clamp(nx, mouth ? -D + R : R, mouth ? W + D - R : W - R);
+  }
   function keeperX(W, side) { return side === 0 ? TUNING.keeper.x : W - TUNING.keeper.x; }
   // 골키퍼 y 는 tick 만의 함수 — 공·선수와 무관하게 주기적으로 왕복한다(사용자 지시).
   function keeperY(H, tick, side) {
@@ -433,9 +452,7 @@
         stunPlayer(state, q, u.stunTicks, Math.atan2(q.y - p.y, q.x - p.x), ev, p.slot);
       }
     } else if (u.kind === 'blink') {
-      var nx = clamp(p.x + Math.cos(p.facing) * u.dist, C.PLAYER_R, state.W - C.PLAYER_R);
-      var ny = clamp(p.y + Math.sin(p.facing) * u.dist, C.PLAYER_R, state.H - C.PLAYER_R);
-      p.x = nx; p.y = ny;
+      confinePlayer(state, p, p.x + Math.cos(p.facing) * u.dist, p.y + Math.sin(p.facing) * u.dist);
       if (state.ball.owner === p.slot) { var pos = carryPos(p); state.ball.x = pos[0]; state.ball.y = pos[1]; clampCarried(state, state.ball); }
     }
   }
@@ -525,8 +542,7 @@
         p.prevButtons = 0;
       }
       if (p.knockT > 0) { p.knockT--; p.vx = Math.cos(p.knockDir) * T.knockback; p.vy = Math.sin(p.knockDir) * T.knockback; }
-      p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, state.W - C.PLAYER_R);
-      p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, state.H - C.PLAYER_R);
+      confinePlayer(state, p, p.x + p.vx * DT, p.y + p.vy * DT);
       return;
     }
 
@@ -591,8 +607,7 @@
       p.charge = 0; p.chargeKind = 0; p.chargeD = 0; p.chargeQ = 0;
     }
 
-    p.x = clamp(p.x + p.vx * DT, C.PLAYER_R, state.W - C.PLAYER_R);
-    p.y = clamp(p.y + p.vy * DT, C.PLAYER_R, state.H - C.PLAYER_R);
+    confinePlayer(state, p, p.x + p.vx * DT, p.y + p.vy * DT);
   }
 
   // 동작 시작: 시전자 정지 + 판정용 타이머.
@@ -672,11 +687,11 @@
 
   // 선수끼리·선수-골키퍼가 겹치지 않게 밀어낸다 (슬롯 순서 고정 → 결정적). 골키퍼는 밀리지 않는다.
   // **선수는 사람·골키퍼·공에 닿아도 밀리지 않는다**(2026-08-25 3차 지시). 서로 겹쳐 지나갈 수 있고,
-  // 밀려나는 것은 오직 발차기·방귀에 맞았을 때의 넉백뿐이다(`stunPlayer`). 여기서는 경기장 밖으로만 못 나가게 한다.
+  // 밀려나는 것은 오직 발차기·방귀에 맞았을 때의 넉백뿐이다(`stunPlayer`). 여기서는 경기장 밖으로만 못 나가게 한다(골대 안은 된다).
   function separatePlayers(state) {
     for (var i = 0; i < C.MAX_PLAYERS; i++) {
       var a = state.players[i]; if (!a) continue;
-      a.x = clamp(a.x, C.PLAYER_R, state.W - C.PLAYER_R); a.y = clamp(a.y, C.PLAYER_R, state.H - C.PLAYER_R);
+      confinePlayer(state, a, a.x, a.y);
     }
   }
 

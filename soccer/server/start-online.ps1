@@ -66,7 +66,24 @@ if (-not $url) {
   exit 1
 }
 
-# ── 4) 주소 게시판에 알리기 (선택) ────────────────────────────────────────
+# ── 주소 게시판 (GitHub Gist) ─────────────────────────────────────────────
+# Deno 판은 잠들면 주소를 잊고 무료 한도도 금세 닳아 실제로 정지됐다(2026-08-26).
+# Gist 는 잠들지 않고 한도가 넉넉하다. 쓰기는 gh CLI 가 이미 로그인돼 있어 토큰을 따로 두지 않는다.
+$GistId = "5d0b2f4daf7e089553c5a541b53cd29c"
+$GistFile = "soccer-server.json"
+function Publish-Url([string]$u) {
+  if (-not $GistId) { return }
+  $ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $tmp = Join-Path $env:TEMP $GistFile
+  $json = if ($u) { "{""url"":""$u"",""at"":$ms}" } else { "{""url"":"""",""at"":0}" }
+  Set-Content -Path $tmp -Value $json -Encoding utf8 -NoNewline
+  try { & gh gist edit $GistId -f $GistFile $tmp 2>$null | Out-Null
+        if ($u) { Write-Host "게시판(Gist)에 주소를 올렸습니다." -ForegroundColor DarkGray } }
+  catch { Write-Host "게시판에 못 올렸습니다(gh 로그인 확인): $($_.Exception.Message)" -ForegroundColor Yellow }
+}
+Publish-Url $url
+
+# ── 4) 예비 게시판(Deno)에도 알리기 (선택) ────────────────────────────────
 # 대문(GitHub Pages)에 올린 사본이 "지금 주소"를 스스로 찾게 하려면, 켤 때마다 여기에 적어 준다.
 # 두 값은 이 스크립트 옆의 registry.txt 에서 읽는다 (1줄: 게시판 주소 / 2줄: WRITE_KEY).
 # 파일이 없으면 그냥 건너뛴다 — 집에서만 할 때는 필요 없다.
@@ -108,16 +125,20 @@ try {
   while (-not $proc.HasExited) {
     Start-Sleep -Seconds 10
     $beat += 10
-    if ($beat -ge 600 -and $regUrl -and $regKey) {
+    if ($beat -ge 600) {
       $beat = 0
-      try {
-        $body = @{ url = $url; key = $regKey } | ConvertTo-Json -Compress
-        Invoke-RestMethod -Uri "$regUrl/" -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 8 | Out-Null
-      } catch {}
+      Publish-Url $url                      # Gist 는 registry.txt 가 없어도 갱신한다
+      if ($regUrl -and $regKey) {
+        try {
+          $body = @{ url = $url; key = $regKey } | ConvertTo-Json -Compress
+          Invoke-RestMethod -Uri "$regUrl/" -Method Post -Body $body -ContentType 'application/json' -TimeoutSec 8 | Out-Null
+        } catch {}
+      }
     }
   }
 } finally {
   if (-not $proc.HasExited) { Stop-Process -Id $proc.Id -Force }
+  Publish-Url ''            # 터널이 닫혔으면 Gist 도 비운다
   # 터널이 닫혔으면 게시판도 비운다(옛 주소로 붙는 것을 막는다)
   if ($regUrl -and $regKey) {
     try {

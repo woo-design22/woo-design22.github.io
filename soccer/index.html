@@ -157,6 +157,10 @@
   .panel input[type=text], .panel input[type=password], .panel select {
     font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; color: var(--text);
     border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.06); }
+  /* **목록을 펼쳤을 때 글자가 안 보이던 것**(2026-08-27 "명수 글자가 하얘서 안보인다").
+     닫혀 있는 칸은 어두운 패널 위라 흰 글자가 보이지만, 펼친 목록은 운영체제가 **흰 바탕**에 그려
+     흰 글자가 그대로 사라졌다. 목록 항목의 바탕·글자를 직접 정해 준다. */
+  select option { background: #16202c; color: var(--text); }
   .panel input::placeholder { color: rgba(255,255,255,0.35); }
   .panel .btn { font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 9px; cursor: pointer;
     border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.06); color: var(--text); }
@@ -1806,7 +1810,15 @@
         moveRoomUIToDock(); net.roomId = m.id; break;
       case 'room':
         net.room = m.state;
-        if (net.screen !== 'room' && m.state.phase === 'lobby') showPanel('room');
+        /* **가운데 패널을 다시 띄우면 안 되는 경우가 있다.** 방에 들어가면 `joined` 가 먼저 와서
+           방 화면(`#rmBox`)을 오른쪽 창으로 옮겨 놓는데, 그 뒤에 이 `room` 이 와서 `showPanel('room')` 을
+           부르면 **속이 빈 패널**이 어두운 막과 함께 뜬다 — 누를 버튼이 하나도 없어 그대로 멈춘다
+           (2026-08-27 "방만들기 하니까 버튼 안 눌러지고 화면이 어두워짐"의 정체).
+           옮겨 간 뒤에는 오른쪽 창만 갱신한다. `match.end` 가 이미 쓰던 판별을 그대로 쓴다. */
+        if (m.state.phase === 'lobby') {
+          if ($('rmBox').parentNode === $('dockBody')) dockShow('room');
+          else if (net.screen !== 'room') showPanel('room');
+        }
         renderRoom();
         break;
       case 'lobby.field': onLobbyField(m); break;

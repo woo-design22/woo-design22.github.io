@@ -389,14 +389,14 @@
     remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   var SETTINGS_KEY = 'soc_settings';
-  var settings = { interpMs: 30, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
+  var settings = { interpMs: 20, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
                    ball: 'classic', field: 'school' };
   try {
     var saved = JSON.parse(store.get(SETTINGS_KEY) || '{}');
     if (saved && typeof saved === 'object') {
-      // 옛 기본값(100·60)이 저장돼 있으면 무시하고 새 기본값(30)을 쓴다.
-      // 40Hz 로 올려 스냅샷이 25ms 마다 오므로 30ms 버퍼면 20Hz 의 60ms 와 같은 여유다.
-      if (saved.interpMs >= 20 && saved.interpMs < 60) settings.interpMs = saved.interpMs;
+      // 옛 기본값(100·60·30)이 저장돼 있으면 무시하고 새 기본값(20)을 쓴다.
+      // 60Hz 라 스냅샷이 16.7ms 마다 온다 — 20ms 버퍼면 20Hz 의 60ms 와 같은 여유(1.2틱)다.
+      if (saved.interpMs >= 15 && saved.interpMs < 30) settings.interpMs = saved.interpMs;
       if (saved.char >= 0 && saved.char < core.CHARACTERS.length) settings.char = saved.char | 0;
       if (typeof saved.minimap === 'boolean') settings.minimap = saved.minimap;
       if (typeof saved.sfx === 'boolean') settings.sfx = saved.sfx;
@@ -1942,7 +1942,7 @@
     core.startMatch(state);
     var inputs = [];
     for (i = 0; i < C.MAX_PLAYERS; i++) inputs[i] = { dx: 0, dy: 0, buttons: 0 };
-    game = { mode: 'practice', state: state, inputs: inputs, mySlot: 0, ai: aiSlots, acc: 0, last: performance.now(), interpMs: 25 };
+    game = { mode: 'practice', state: state, inputs: inputs, mySlot: 0, ai: aiSlots, acc: 0, last: performance.now(), interpMs: 17 };
     snaps.length = 0; injected.length = 0; eventLog.length = 0; animState.length = 0;
     cam.init = false;
     hideOverlay();

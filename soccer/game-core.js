@@ -29,28 +29,28 @@
     for (var i = 0; i < FIELDS.length; i++) if (FIELDS[i].id === id) return FIELDS[i];
     return FIELDS[1];   // 기본은 학교 축구장(예전 크기)
   }
-  var PROTOCOL_VERSION = 16;   // 16: 틱 30Hz   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
+  var PROTOCOL_VERSION = 17;   // 17: 틱 60Hz   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
 
   // ── 구조 상수 (CLAUDE.md §3) ─────────────────────────────────────────────
   var C = {
-    // 2026-08-26: 20 → **40Hz**. 틱 단위 수치를 전부 **정확히 2배**로 올려 실제 시간은 그대로 뒀다.
-    // 30Hz 도 검토했지만 0.05초(1.5틱)·0.25초(7.5틱)가 정수가 안 돼 네 값이 17ms 씩 어긋났다.
-    // 40 은 20 의 정수배라 **반올림이 하나도 없다**(대조표 28개 항목 전부 일치).
-    // 서버가 더 자주 계산하니 입력 대기(평균 25 → 12.5ms)와 보간 버퍼(60 → 30ms)가 함께 줄어든다.
-    // **새 수치를 넣을 때는 초 단위로 생각하고 ×40** 할 것.
-    TICK_HZ: 40, DT: 1 / 40,
+    // 2026-08-26: 20 → 40 → **60Hz**. 틱 단위 수치를 원래(20Hz) 값의 **정확히 3배**로 올려
+    // 실제 시간(초)은 그대로 뒀다. 60 은 20 의 정수배라 반올림이 하나도 없다.
+    // (30Hz 는 0.05초=1.5틱·0.25초=7.5틱이 정수가 안 돼 버렸다.)
+    // 얻는 것: 입력 대기 평균 25 → 8.3ms, 스냅샷 간격 50 → 16.7ms, 보간 버퍼 60 → 20ms.
+    // **새 수치를 넣을 때는 초 단위로 생각하고 ×60** 할 것.
+    TICK_HZ: 60, DT: 1 / 60,
     FIELD_W: 1200, FIELD_H: 800,
     GOAL_Y0: 300, GOAL_Y1: 500, GOAL_DEPTH: 40,   // 기본(학교) 값. 실제 경기는 state.goalY0/Y1 을 쓴다
     GOAL_RATIO: 0.125,   // 골대 반폭 = 경기장 세로 × 이 값. 경기장이 커져도 골대 비율은 같다
     PLAYER_R: 18, BALL_R: 6,     // 2026-08-25 4차 지시로 14 → 18. 서로 때리기 쉬워지고 그림도 같이 커진다
     MAX_PLAYERS: 20,
-    KICKOFF_TICKS: 80,    // 경기 시작·후반 시작 킥오프 정지 2초
-    GOAL_TICKS: 48,       // 득점 후 세리머니 1.2초 (공은 골망 안에서 계속 구른다)
-    REKICKOFF_TICKS: 32,  // 득점 후 킥오프 정지 0.8초 (세리머니와 합쳐 2초)
+    KICKOFF_TICKS: 120,    // 경기 시작·후반 시작 킥오프 정지 2초
+    GOAL_TICKS: 72,       // 득점 후 세리머니 1.2초 (공은 골망 안에서 계속 구른다)
+    REKICKOFF_TICKS: 48,  // 득점 후 킥오프 정지 0.8초 (세리머니와 합쳐 2초)
     HALF_SEC: 120,        // 전·후반 각 2분 (2026-08-26 — 3분은 골이 너무 많아 늘어졌다)
     EXTRA_SEC: 30,        // 연장 전·후반 각 30초. 그래도 동점이면 무승부로 끝낸다
-    HALF_TICKS: 200,      // 하프타임 5초
-    END_TICKS: 400        // 종료 화면 10초
+    HALF_TICKS: 300,      // 하프타임 5초
+    END_TICKS: 600        // 종료 화면 10초
   };
   var PHASE = { LOBBY: 0, KICKOFF: 1, PLAY: 2, GOAL: 3, HALF: 4, END: 5 };
   var PHASE_NAME = ['lobby', 'kickoff', 'play', 'goal', 'half', 'end'];
@@ -69,33 +69,33 @@
   var TUNING = {
     player: {
       maxSpeed: 168,      // 단위/초. 입력 즉시 이 속도, 떼면 즉시 0 (캐릭터 speed 배율). 220 → 185 → 160 → 168 (6차 지시로 5% 상향)
-      stunTicks: 80,      // 발차기에 맞으면 2초 기절 (2026-08-25 사용자 지시)
+      stunTicks: 120,      // 발차기에 맞으면 2초 기절 (2026-08-25 사용자 지시)
       stunImmuneTicks: 0, // **폐지**(2026-08-25 4차 지시: "타격범위에 있으면 무조건 기절"). 아래 경고를 반드시 읽을 것
       // 8차 지시: **맞아도 밀리지 않는다.** 두 값을 0 으로 두어 넉백을 껐다(코드 경로와 해시 항목은 그대로 남긴다).
       knockback: 0,       // 맞은 선수가 밀려나는 속도
       knockTicks: 0,      // 밀려나는 시간
-      touchCdTicks: 10,   // 공을 뺏긴 직후 다시 잡을 수 없는 시간 0.25초
+      touchCdTicks: 15,   // 공을 뺏긴 직후 다시 잡을 수 없는 시간 0.25초
       // 달리기(왼쪽 시프트, 2026-08-25 사용자 지시). 눈금을 200 으로 잡아 정수만으로 세밀하게 조절한다.
       sprintMul: 1.5,     // 달릴 때 속도 배율 (220 → 330)
       sprintCarryMul: 1.25, // 공을 몰고 달릴 때는 덜 빠르다 (220 → 275) — 몰고 들어가 넣는 게 너무 쉬워지지 않게
-      staminaMax: 400,    // 체력 상한(눈금). 40Hz 로 올리면서 2배 — 닳는 시간은 그대로 2초
+      staminaMax: 600,    // 체력 상한(눈금). 40Hz 로 올리면서 2배 — 닳는 시간은 그대로 2초
       staminaDrain: 5,    // 달리는 동안 틱마다 −5 → 2초면 바닥 (더 빨리 닳게, 2차 지시)
       staminaRegen: 1,    // 달리지 않으면 틱마다 +1 → 10초면 만충 (더 천천히 회복, 2차 지시)
-      staminaResume: 120,  // 바닥난 뒤에는 30%까지 차야 다시 달릴 수 있다(1씩 남은 체력으로 깜빡이는 것 방지)
+      staminaResume: 180,  // 바닥난 뒤에는 30%까지 차야 다시 달릴 수 있다(1씩 남은 체력으로 깜빡이는 것 방지)
       tiredMul: 0.72      // **바닥난 뒤 회복 전까지는 걷기보다도 느리다**(220 → 158). 회복하면 원래대로
     },
     // ⚠ 기절 2초 > 쿨다운 0.6초 인데 **기절 면역까지 없앴다**(4차 지시). 즉 한 명이 상대를 계속 눕혀 둘 수 있다.
     // 되돌리려면 stunImmuneTicks 를 올리면 된다. 사용자 확인 없이 되살리지 말 것.
     kick: {
-      freezeTicks: 2,     // 발차기 시전자 정지 0.05초 (4차 지시로 2 → 1)
+      freezeTicks: 3,     // 발차기 시전자 정지 0.05초 (4차 지시로 2 → 1)
       // **슛과 방귀는 정지가 더 길다** — 3차 지시 "딜레이 1.3배". 2 × 1.3 = 2.6 이지만 틱은 정수라 3틱(0.15초)으로 올림했다.
       // 이 정지가 "쏘는 순간 역공당하는" 타이밍 싸움을 만든다.
-      shootFreezeTicks: 4,   // 슛 0.10초 (4차 지시로 3 → 2)
-      fartFreezeTicks: 4,    // 방귀 0.10초 (4차 지시로 3 → 2)
-      animTicks: 10,      // 동작 0.25초
-      hitTick: 10,         // 누른 그 틱에 바로 판정한다(animTicks 와 같아야 한다)(kickT === animTicks)
-      cdTicks: 24,        // 앞차기 쿨다운 0.6초 — 헛치면 손해
-      fartCdTicks: 16,    // 방귀 쿨다운 0.4초 (10차 지시로 16 → 8. 앞차기 0.6초보다 짧다)
+      shootFreezeTicks: 6,   // 슛 0.10초 (4차 지시로 3 → 2)
+      fartFreezeTicks: 6,    // 방귀 0.10초 (4차 지시로 3 → 2)
+      animTicks: 15,      // 동작 0.25초
+      hitTick: 15,         // 누른 그 틱에 바로 판정한다(animTicks 와 같아야 한다)(kickT === animTicks)
+      cdTicks: 36,        // 앞차기 쿨다운 0.6초 — 헛치면 손해
+      fartCdTicks: 24,    // 방귀 쿨다운 0.4초 (10차 지시로 16 → 8. 앞차기 0.6초보다 짧다)
       range: 56,          // 앞차기 판정 반지름 (48 → 68 로 넓혔다가 7차 지시로 56 으로 되돌림)
       coneDeg: 60,        // 앞차기 판정 반각 (55 → 70 → 60)
       // 방귀(S)는 **공을 차지 않는 순수 타격기**이고 판정이 **바라보는 방향의 뒤쪽 정사각형**이다.
@@ -116,7 +116,7 @@
     ball: {
       possessRadius: 28,  // 선수 중심에서 이 거리 안이면 소유 (선수 반지름 18 + 10)
       carryOffset: 22,    // 드리블 중 공이 붙는 거리(바라보는 방향 앞)
-      kickCdTicks: 10,    // 찬 사람이 곧바로 다시 잡지 못하는 시간 0.25초
+      kickCdTicks: 15,    // 찬 사람이 곧바로 다시 잡지 못하는 시간 0.25초
       bounceRangeKeep: 0.6, // 벽에 맞으면 남은 거리가 이 비율로 준다
       // **공은 굴러가며 느려진다**(2026-08-25 7차 지시로 완전 등속을 버렸다).
       // 9차 지시로 곡선을 바꿨다: 남은 거리 비율의 **제곱근**에 비례한다 = 실제 공처럼 **일정한 감속도**.
@@ -128,19 +128,24 @@
     // W: 누른 시간만큼 멀리 찬다(3차 지시). 톡 치면 아주 짧게(발 앞), 꾹 누르면 길게 치고 달린다.
     // 거리는 충전의 `rangePow` 제곱에 비례한다. 2.0 이면 짧게 누를 때 너무 안 나가서 6차 지시로 1.35 로 낮추고
     // 최소·최대 거리도 함께 올렸다(8 → 24, 300 → 360).
-    dribble: { minSpeed: 260, maxSpeed: 460, minRange: 24, maxRange: 360, chargeTicks: 24, rangePow: 1.35,
-               spinMax: 0.015, turnMax: 0.9 },   // 감아차기와 같이 누르면 짧게 휜다(감아차기의 절반 남짓)
+    dribble: { minSpeed: 260, maxSpeed: 460, minRange: 24, maxRange: 345, chargeTicks: 36, rangePow: 1.35,
+               spinMax: 0.011859, turnMax: 0.9 },   // 감아차기와 같이 누르면 짧게 휜다(감아차기의 절반 남짓)
                                                  // spinMax 도 틱마다 도는 각이라 40Hz 로 올리며 절반으로 내렸다
     pass:    { speed: 420, coneDeg: 45, lead: 0.25, rangePad: 40, rangeNoTarget: 400 },
     // D: **충전 없는 한 번 누르기**(5차 지시). 세기도 거리도 항상 같다 — 누르는 순간 나간다.
-    shoot:   { speed: 640, range: 400 },   // 6차 지시: 경기장 가로 1200 의 정확히 1/3
+    // range 는 «설정한 총 이동 거리»이고 실제로 가는 거리는 감속을 적분한 결과라 조금 짧다.
+    // 20Hz 에서 400 → 실제 368 이었는데 60Hz 는 더 잘게 적분해 400 → 389 로 늘어났다.
+    // **게임 감각을 그대로 두려고** 실제 거리가 368 이 되도록 380 으로 되맞췄다(2026-08-26).
+    shoot:   { speed: 640, range: 380 },   // 6차 지시: 경기장 가로 1200 의 정확히 1/3
     // Q/E: 속도는 직선 슛보다 느리고 거리는 슛보다 조금 길다.
     // turnMax 로 총 회전을 끊는다 — 없으면 최대 충전 시 공이 되돌아온다. 2차 지시로 더 휘게(1.9 → 2.7rad = 155°).
     // 거리는 **슛과 같다**(10차 지시). 슛 거리를 바꾸면 이 값도 같이 바꿔야 한다.
     // **spin 은 «틱마다 도는 각(라디안)»이다** — 틱 주파수를 바꾸면 반드시 같이 나눠야 한다.
     // 20 → 40Hz 로 올리면서 이걸 안 고쳐 감아차기가 두 배로 휘었다(2026-08-26 사용자 신고).
     // turnMax 는 «총 회전량»이라 주파수와 무관하므로 그대로 둔다.
-    curve:   { speed: 480, range: 480, chargeTicks: 24, spinMin: 0.005, spinMax: 0.026, turnMax: 2.0 },
+    curve:   { speed: 480, range: 456, chargeTicks: 36, spinMin: 0.003954, spinMax: 0.020556, turnMax: 2.0 },
+    // spin 은 «틱마다 도는 각»이라 주파수에 반비례해야 하고, range 를 480 → 456 으로 줄이면서
+    // 나는 시간이 짧아진 만큼 회전율을 조금 올렸다. 실측 옆으로 벗어난 거리 271(20Hz 와 같다).
     keeper: {
       x: 24, r: 18,       // r = 몸통(선수 반지름과 맞춘다)
       saveR: 30,          // 찬 공을 막는 반지름. 판정 폭 (30+6+2)×2 = 76 → 골대 폭 200의 38%
@@ -149,13 +154,13 @@
       periodSec: 3.0,     // 주기 왕복(최고 180u/s). 좌우 골키퍼는 위상 π 차이(서로 반대편)
       amp: 86,            // y 314~486 — 몸통이 골대 기둥에 정확히 닿는 최대 진폭(반폭 100 − 반지름 14)
       hitPad: 2,          // 접촉 판정 여유
-      outSpeed: 560, outRange: 760, outCdTicks: 8   // 튕겨낸 공
+      outSpeed: 560, outRange: 760, outCdTicks: 12   // 튕겨낸 공
     },
     ult: {
-      fullTicks: 1800,    // 45초에 만충 (게이지 = 틱)
-      goalScored: 80,     // 득점한 팀 +2초
-      goalConceded: 320,  // 실점한 팀 +8초 — 이긴 팀이 더 강해지는 눈덩이를 막는다
-      hitBonus: 120       // 발차기에 맞으면 맞은 쪽 +3초 (역전 여지)
+      fullTicks: 2700,    // 45초에 만충 (게이지 = 틱)
+      goalScored: 120,     // 득점한 팀 +2초
+      goalConceded: 480,  // 실점한 팀 +8초 — 이긴 팀이 더 강해지는 눈덩이를 막는다
+      hitBonus: 180       // 발차기에 맞으면 맞은 쪽 +3초 (역전 여지)
     }
   };
 
@@ -164,23 +169,23 @@
   // ultKind: 'stunWave' 광역 기절 · 'power' 강슛+골키퍼 관통 · 'blink' 순간이동 · 'charge' 무적 돌진 · 'dash' 질주 · 'slow' 감속 장판
   var CHARACTERS = [
     { id: 0, key: 'captain',  name: '체육부장형',   speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '집합 호루라기', kind: 'stunWave', radius: 200, stunTicks: 48, durTicks: 24 } },
+      ult: { name: '집합 호루라기', kind: 'stunWave', radius: 200, stunTicks: 72, durTicks: 36 } },
     { id: 1, key: 'ace',      name: '에이스형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '대포알',       kind: 'power',    shotMul: 1.55, durTicks: 200, oneShot: true } },
+      ult: { name: '대포알',       kind: 'power',    shotMul: 1.55, durTicks: 300, oneShot: true } },
     { id: 2, key: 'transfer', name: '전학생형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '슬쩍 이동',    kind: 'blink',    dist: 240, durTicks: 24 } },
+      ult: { name: '슬쩍 이동',    kind: 'blink',    dist: 240, durTicks: 36 } },
     { id: 3, key: 'big',      name: '덩치형',       speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '황소 돌진',    kind: 'charge',   speedMul: 1.45, stunTicks: 32, durTicks: 120 } },
+      ult: { name: '황소 돌진',    kind: 'charge',   speedMul: 1.45, stunTicks: 48, durTicks: 180 } },
     { id: 4, key: 'runner',   name: '육상부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '전력 질주',    kind: 'dash',     speedMul: 1.60, carryMul: 1.25, durTicks: 200 } },
+      ult: { name: '전력 질주',    kind: 'dash',     speedMul: 1.60, carryMul: 1.25, durTicks: 300 } },
     { id: 5, key: 'prank',    name: '장난꾸러기형', speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '미끄러운 잔디', kind: 'slow',    radius: 190, speedMul: 0.60, durTicks: 200 } },
+      ult: { name: '미끄러운 잔디', kind: 'slow',    radius: 190, speedMul: 0.60, durTicks: 300 } },
     { id: 6, key: 'basket',   name: '농구부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '덩크 슛',      kind: 'power',    shotMul: 1.40, durTicks: 240, oneShot: true } },
+      ult: { name: '덩크 슛',      kind: 'power',    shotMul: 1.40, durTicks: 360, oneShot: true } },
     { id: 7, key: 'rocker',   name: '밴드부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '고음 지르기',  kind: 'stunWave', radius: 160, stunTicks: 40, durTicks: 24 } },
+      ult: { name: '고음 지르기',  kind: 'stunWave', radius: 160, stunTicks: 60, durTicks: 36 } },
     { id: 8, key: 'swimmer',  name: '수영부형',     speed: 1.00, shot: 1.00, kickRange: 1.00,
-      ult: { name: '물살 가르기',  kind: 'blink',    dist: 200, durTicks: 24 } }
+      ult: { name: '물살 가르기',  kind: 'blink',    dist: 200, durTicks: 36 } }
   ];
 
   // 포메이션: 왼쪽 진영 기준 좌표. 팀 안에서 슬롯 순서대로 배정. 0번이 중앙 공격수.

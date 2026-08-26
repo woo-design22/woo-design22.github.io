@@ -201,8 +201,11 @@
     color: var(--text); background: transparent; border: 1px solid rgba(255,255,255,0.24); }
   #dock .btn.go { background: var(--accent); border-color: var(--accent); color: #06210f; font-weight: 700; }
   /* 채팅 — **배경 없이 글자만**. 게임을 가리지 않게 최근 5줄까지만 두고 서서히 사라진다. */
+  /* 경기 전에는 오른쪽 창 안(#dock)에, 경기 중에는 왼쪽 아래에 띄운다(2026-08-26 지시). */
   #chatLog { position: fixed; left: 12px; bottom: 92px; z-index: 3; pointer-events: none;
     display: flex; flex-direction: column; gap: 2px; max-width: min(52vw, 620px); }
+  #chatLog.docked { position: static; max-width: 100%; margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.10); padding-top: 6px; }
+  #chatLog.docked div { font-size: 12.5px; }
   #chatLog div { font-size: 14px; font-weight: 600; color: #fff; line-height: 1.35;
     text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.7); transition: opacity .8s linear; }
   #chatLog div b { color: var(--stun); font-weight: 800; }
@@ -386,12 +389,13 @@
     remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   var SETTINGS_KEY = 'soc_settings';
-  var settings = { interpMs: 100, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
+  var settings = { interpMs: 60, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
                    ball: 'classic', field: 'school' };
   try {
     var saved = JSON.parse(store.get(SETTINGS_KEY) || '{}');
     if (saved && typeof saved === 'object') {
-      if (saved.interpMs >= 50 && saved.interpMs <= 150) settings.interpMs = saved.interpMs;
+      // 옛 기본값 100 이 저장돼 있으면 무시하고 새 기본값(60)을 쓴다 — 체감 지연을 줄이려는 것.
+      if (saved.interpMs >= 30 && saved.interpMs < 100) settings.interpMs = saved.interpMs;
       if (saved.char >= 0 && saved.char < core.CHARACTERS.length) settings.char = saved.char | 0;
       if (typeof saved.minimap === 'boolean') settings.minimap = saved.minimap;
       if (typeof saved.sfx === 'boolean') settings.sfx = saved.sfx;
@@ -537,12 +541,13 @@
     if (e.code === 'KeyB') { audio.set('bgm', !settings.bgm); syncAudioBtns(); return; }
     if (PREVENT[e.code]) e.preventDefault();
     keys[e.code] = true;
+    flushInput();      // 누른 순간 바로 보낸다(지연 감소)
     if (overlayMode) {
       if (e.code === 'Enter') startPractice({ char: settings.char, teamA: settings.teamA, teamB: settings.teamB, field: settings.field });
       else if (e.code.indexOf('Digit') === 0) { var n = +e.code.slice(5); if (n >= 1 && n <= 6) selectChar(n - 1); }
     }
   });
-  window.addEventListener('keyup', function (e) { keys[e.code] = false; });
+  window.addEventListener('keyup', function (e) { keys[e.code] = false; flushInput(); });
   window.addEventListener('blur', function () { keys = Object.create(null); stickVec.active = false; });
   window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
@@ -649,6 +654,37 @@
     rs.phase = sb.phase; rs.half = sb.half; rs.score[0] = sb.score[0]; rs.score[1] = sb.score[1]; rs.clock = sb.clock; rs.tick = sb.tick;
     if (sb.field && sb.field !== FLD.id) setField(sb.field);   // 방마다 경기장이 다르다(스냅샷이 알려 준다)
     rs.has = true;
+  }
+  /* ── 내 선수 로컬 예측 (2026-08-26) ────────────────────────────────────────
+     온라인은 원래 '내 입력 → 서버 → 스냅샷 → 보간'을 거치므로 왕복 지연 + 보간 버퍼만큼
+     늦게 움직인다(실측 체감 130~150ms). 서버 권위는 그대로 두고 **내 선수의 위치만**
+     화면에서 미리 그려 준다. 서버 값과 어긋나면 매 프레임 조금씩 끌어당겨 맞추고(0.12초 상수),
+     60 이상 벌어지면 그냥 서버 값으로 튕긴다. 기절·동작 중에는 예측하지 않는다
+     (그때는 서버에서 완전히 고정돼 있고, 판정 사각형과 그림이 어긋나면 안 된다). */
+  var pred = { on: false, x: 0, y: 0, facing: 0 }, predIn = { dx: 0, dy: 0, buttons: 0 };
+  function predictMe(dt) {
+    if (!game || (game.mode !== 'online' && game.mode !== 'lobby') || game.mySlot < 0) { pred.on = false; return; }
+    var o = null;
+    for (var i = 0; i < rs.n; i++) if (rs.players[i].slot === game.mySlot) { o = rs.players[i]; break; }
+    if (!o) { pred.on = false; return; }
+    if (!pred.on) { pred.x = o.x; pred.y = o.y; pred.facing = o.facing; pred.on = true; return; }
+    var stunned = (o.flags & 4) !== 0, acting = o.motionName === 'fart' || o.motionName === 'kick';
+    if (stunned || acting) { pred.x = o.x; pred.y = o.y; pred.facing = o.facing; return; }
+    readInput(predIn);
+    var len = Math.hypot(predIn.dx, predIn.dy);
+    if (len > 0.01) {
+      var T = core.TUNING.player;
+      var sp = T.maxSpeed;
+      if ((predIn.buttons & BTN.SPRINT) && o.stam > 0.02) sp *= (o.flags & 1) ? T.sprintCarryMul : T.sprintMul;
+      else if (o.stam <= 0.02) sp *= T.tiredMul;
+      pred.x += predIn.dx / len * sp * dt;
+      pred.y += predIn.dy / len * sp * dt;
+      pred.facing = Math.atan2(predIn.dy, predIn.dx);
+    }
+    var k = 1 - Math.exp(-dt / 0.12);          // 서버 값으로 서서히 수렴
+    pred.x += (o.x - pred.x) * k; pred.y += (o.y - pred.y) * k;
+    if (Math.hypot(o.x - pred.x, o.y - pred.y) > 60) { pred.x = o.x; pred.y = o.y; }
+    o.x = pred.x; o.y = pred.y; o.facing = pred.facing;
   }
   function myRenderPlayer() {
     if (!rs.has || !game) return null;
@@ -1723,6 +1759,8 @@
     snaps.length = 0; eventLog.length = 0; animState.length = 0;
     cam.init = false;
     hideOverlay();
+    dockOpen(false);
+    chatPlace(true);
     preloadChars();
     banner('킥오프', 1200);
     startInputSender();
@@ -1743,6 +1781,21 @@
     if ($('rmBox').parentNode === body) { dockShow('room'); return; }
     body.appendChild($('rmBox'));
     dockShow('room');
+  }
+  /* 채팅 자리 옮기기 — 경기 중이면 왼쪽 아래(고정), 아니면 오른쪽 창 맨 아래. */
+  function chatPlace(inMatch) {
+    var log = $('chatLog'), bar = $('chatBar');
+    if (inMatch) {
+      if (log.parentNode !== document.body) document.body.appendChild(log);
+      log.classList.remove('docked');
+      bar.style.position = 'fixed'; bar.style.left = '12px'; bar.style.bottom = '62px';
+    } else {
+      var body = $('dockBody');
+      if (log.parentNode !== body) body.appendChild(log);
+      log.classList.add('docked');
+      if (bar.parentNode !== body) body.appendChild(bar);
+      bar.style.position = 'static';
+    }
   }
   function dockShow(which) {
     $('lbAfter').style.display = which === 'room' ? 'none' : '';
@@ -1779,7 +1832,8 @@
   }
   function chatSend() {
     var v = $('chatIn').value.trim();
-    chatOpen(false);
+    $('chatIn').value = '';
+    chatOpen(false);          // 보내면 입력창은 곧바로 닫힌다(2026-08-26 지시)
     if (!v) return;
     if (net.ws && net.ws.readyState === 1) netSend({ t: 'chat', text: v });
     else chatSay(net.nick || '나', v, game ? game.mySlot : -1);   // 혼자 하기도 똑같이 보인다
@@ -1799,6 +1853,7 @@
     if (m.field) setField(m.field);
     moveLobbyUIToDock();
     dockShow(net.roomId ? 'room' : 'lobby');
+    chatPlace(false);
     hideOverlay();
     game = { mode: 'lobby', state: null, inputs: null, mySlot: m.slot, ai: null,
              acc: 0, last: performance.now(), interpMs: settings.interpMs };
@@ -1808,15 +1863,29 @@
     syncExitBtn();
     startInputSender();
   }
+  /* 입력은 틱마다(20Hz) 보내되, **바뀐 순간 곧바로 한 번 더** 보낸다.
+     20Hz 만으로는 키를 누른 뒤 최대 50ms 를 그냥 기다리게 된다(2026-08-26 지연 개선).
+     서버 상한이 초당 30개라 25ms 안에는 다시 보내지 않는다. */
+  var lastSent = { dx: 0, dy: 0, buttons: 0, at: 0 };
+  function sendInput(out, force) {
+    if (!net.ws || net.ws.readyState !== 1) return;
+    var now = performance.now();
+    var same = out.dx === lastSent.dx && out.dy === lastSent.dy && out.buttons === lastSent.buttons;
+    if (!force && (same || now - lastSent.at < 25)) return;
+    lastSent.dx = out.dx; lastSent.dy = out.dy; lastSent.buttons = out.buttons; lastSent.at = now;
+    net.seq = (net.seq + 1) & 0xffff;
+    core.encodeInput(net.seq, out.buttons, out.dx, out.dy, net.buf);
+    net.ws.send(net.buf);
+  }
+  var inputNow = { dx: 0, dy: 0, buttons: 0 };
+  function flushInput() { if (net.ws && net.ws.readyState === 1) sendInput(readInput(inputNow), false); }
   function startInputSender() {
     stopInputSender();
     var out = { dx: 0, dy: 0, buttons: 0 };
     net.inputTimer = setInterval(function () {
       if (!net.ws || net.ws.readyState !== 1) return;
       readInput(out);
-      net.seq = (net.seq + 1) & 0xffff;
-      core.encodeInput(net.seq, out.buttons, out.dx, out.dy, net.buf);
-      net.ws.send(net.buf);
+      sendInput(out, true);      // 틱마다 한 번은 무조건(서버가 끊기지 않게)
     }, 1000 / C.TICK_HZ);
   }
   function stopInputSender() { if (net.inputTimer) { clearInterval(net.inputTimer); net.inputTimer = null; } }
@@ -1859,6 +1928,7 @@
     cam.init = false;
     hideOverlay();
     syncExitBtn();
+    chatPlace(true);
     preloadChars();
     doTick(performance.now());
     banner('킥오프', 1200);
@@ -1928,6 +1998,7 @@
     chatTick(dt / 1000);
     if (boardT > 0) { boardT -= dt / 1000; if (boardT <= 0) { boardT = 0; if (net.screen === "board") hideOverlay(); } }
     sample(now - (game ? game.interpMs : settings.interpMs));
+    predictMe(Math.min(0.1, dt / 1000));      // 내 선수만 미리 그려 체감 지연을 줄인다
     updateCamera(Math.min(0.1, dt / 1000));
     render(now);
     if (debugOn) renderDebug();

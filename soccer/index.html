@@ -389,13 +389,14 @@
     remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
   };
   var SETTINGS_KEY = 'soc_settings';
-  var settings = { interpMs: 60, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
+  var settings = { interpMs: 30, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
                    ball: 'classic', field: 'school' };
   try {
     var saved = JSON.parse(store.get(SETTINGS_KEY) || '{}');
     if (saved && typeof saved === 'object') {
-      // 옛 기본값 100 이 저장돼 있으면 무시하고 새 기본값(60)을 쓴다 — 체감 지연을 줄이려는 것.
-      if (saved.interpMs >= 30 && saved.interpMs < 100) settings.interpMs = saved.interpMs;
+      // 옛 기본값(100·60)이 저장돼 있으면 무시하고 새 기본값(30)을 쓴다.
+      // 40Hz 로 올려 스냅샷이 25ms 마다 오므로 30ms 버퍼면 20Hz 의 60ms 와 같은 여유다.
+      if (saved.interpMs >= 20 && saved.interpMs < 60) settings.interpMs = saved.interpMs;
       if (saved.char >= 0 && saved.char < core.CHARACTERS.length) settings.char = saved.char | 0;
       if (typeof saved.minimap === 'boolean') settings.minimap = saved.minimap;
       if (typeof saved.sfx === 'boolean') settings.sfx = saved.sfx;
@@ -1941,7 +1942,7 @@
     core.startMatch(state);
     var inputs = [];
     for (i = 0; i < C.MAX_PLAYERS; i++) inputs[i] = { dx: 0, dy: 0, buttons: 0 };
-    game = { mode: 'practice', state: state, inputs: inputs, mySlot: 0, ai: aiSlots, acc: 0, last: performance.now(), interpMs: 50 };
+    game = { mode: 'practice', state: state, inputs: inputs, mySlot: 0, ai: aiSlots, acc: 0, last: performance.now(), interpMs: 25 };
     snaps.length = 0; injected.length = 0; eventLog.length = 0; animState.length = 0;
     cam.init = false;
     hideOverlay();
@@ -2010,8 +2011,9 @@
     frameMs = sum / frameTimes.length; fps = frameMs > 0 ? 1000 / frameMs : 0;
     if (game && game.mode === 'practice') {
       game.acc += now - game.last; game.last = now;
-      if (game.acc > 250) game.acc = 250;  // 탭 전환 뒤 따라잡기 상한 5틱
-      while (game.acc >= 50) { doTick(now - game.acc + 50); game.acc -= 50; }
+      var stepMs = 1000 / C.TICK_HZ;
+      if (game.acc > stepMs * 5) game.acc = stepMs * 5;  // 탭 전환 뒤 따라잡기 상한 5틱
+      while (game.acc >= stepMs) { doTick(now - game.acc + stepMs); game.acc -= stepMs; }
     }
     if (cheerT > 0) cheerT = Math.max(0, cheerT - dt / 1000);   // 골 뒤 환호가 잦아든다
     chatTick(dt / 1000);
@@ -2075,7 +2077,7 @@
       if (!game) throw new Error('경기가 없다');
       // 동기 실행: 마지막 틱이 "지금"이 되도록 과거 시각으로 찍는다 (렌더러가 최신 스냅샷을 고르게)
       var from = eventLog.length, now = performance.now();
-      for (var i = 0; i < ticks; i++) doTick(now - (ticks - 1 - i) * 50);
+      for (var i = 0; i < ticks; i++) doTick(now - (ticks - 1 - i) * (1000 / C.TICK_HZ));
       game.acc = 0; game.last = performance.now();
       sample(performance.now());
       return eventLog.slice(from);

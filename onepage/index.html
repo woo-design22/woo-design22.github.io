@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>한 쪽으로 줄이기</title>
+<style>
+  :root {
+    --bg: #f4f4f2;
+    --surface: #ffffff;
+    --line: #e0dfda;
+    --ink: #1c1e22;
+    --ink-2: #565a61;
+    --ink-3: #8b9098;
+    --accent: #2f6f5e;
+    --warn: #a8621b;
+    --font: 'Segoe UI', Pretendard, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181b; --surface: #1e2126; --line: #2c3036;
+      --ink: #e9eaec; --ink-2: #b0b5bb; --ink-3: #7c828a;
+      --accent: #6bbba2; --warn: #d9a05b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font);
+         line-height: 1.7; padding: 32px 18px 72px; }
+  .wrap { max-width: 660px; margin: 0 auto; }
+  a.back { color: var(--ink-3); text-decoration: none; font-size: .88rem; }
+  a.back:hover { color: var(--accent); }
+  h1 { font-size: 1.6rem; margin: 14px 0 6px; }
+  .lead { color: var(--ink-2); margin: 0 0 26px; }
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+         padding: 20px; margin-bottom: 18px; }
+  label { display: block; font-size: .85rem; color: var(--ink-2); margin-bottom: 6px; }
+  input { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 9px;
+          background: var(--bg); color: var(--ink); font: inherit; font-size: .95rem; }
+  .row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button, .go { font: inherit; font-weight: 600; border: 0; border-radius: 9px;
+                padding: 12px 22px; cursor: pointer; text-decoration: none;
+                display: inline-block; }
+  .go { background: var(--accent); color: #fff; }
+  .go[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+  button.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line); }
+  .state { font-size: .88rem; margin-top: 12px; color: var(--ink-3); }
+  .state b.on { color: var(--accent); }
+  .state b.off { color: var(--warn); }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  code, pre { font-family: ui-monospace, Consolas, monospace; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 9px;
+        padding: 12px 14px; overflow-x: auto; font-size: .85rem; margin: 8px 0 0; }
+  ul { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); font-size: .92rem; }
+  li { margin-bottom: 4px; }
+  .fine { color: var(--ink-3); font-size: .84rem; margin-top: 26px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="../">← 목록으로</a>
+  <h1>한 쪽으로 줄이기</h1>
+  <p class="lead">
+    여러 쪽짜리 보고서를 올리면 1쪽 회의자료(한글 파일)로 줄여 줍니다.
+    한글·워드·엑셀·파워포인트·PDF·그림을 섞어 올려도 됩니다.
+  </p>
+
+  <div class="box">
+    <h2>이 도구는 다른 앱과 다릅니다</h2>
+    <p style="margin:0;color:var(--ink-2);font-size:.94rem">
+      한글 파일을 만들려면 서버가 필요해서, 이 페이지는 <b>들어가는 문</b>일 뿐입니다.
+      실제 작업은 여러분이 띄운 서버에서 돌아갑니다.
+      그래서 <b>올린 문서가 이 웹사이트를 거치지 않습니다.</b>
+    </p>
+  </div>
+
+  <div class="box">
+    <label for="addr">서버 주소</label>
+    <input id="addr" type="url" inputmode="url" spellcheck="false"
+           placeholder="https://....trycloudflare.com 또는 http://localhost:8770">
+    <div class="row">
+      <a class="go" id="open" href="#" target="_blank" rel="noopener">열기</a>
+      <button class="ghost" id="check" type="button">연결 확인</button>
+    </div>
+    <div class="state" id="state">주소를 넣으면 이 브라우저에 기억해 둡니다.</div>
+  </div>
+
+  <div class="box">
+    <h2>서버 켜는 법</h2>
+    <p style="margin:0 0 4px;color:var(--ink-2);font-size:.92rem">
+      한 번만 준비하면 됩니다.
+    </p>
+    <pre>pip install -r requirements.txt</pre>
+    <p style="margin:12px 0 0;color:var(--ink-2);font-size:.92rem">
+      그다음 켤 때마다 — 공개 주소가 필요하면:
+    </p>
+    <pre>python server.py --tunnel --pass 원하는비밀번호</pre>
+    <p style="margin:12px 0 0;color:var(--ink-2);font-size:.92rem">
+      내 PC에서만 쓸 거라면:
+    </p>
+    <pre>python server.py</pre>
+    <ul>
+      <li>터널을 쓰면 <code>★ 공개 주소:</code> 뒤에 나오는 주소를 위 칸에 넣으세요.</li>
+      <li>그 주소는 서버를 껐다 켜면 바뀝니다.</li>
+      <li>밖에 열 때는 비밀번호가 없으면 서버가 뜨지 않습니다.</li>
+    </ul>
+  </div>
+
+  <p class="fine">
+    개인이 만든 실험적인 도구이며 예고 없이 바뀌거나 멈출 수 있습니다.
+    요약은 AI가 만든 초안이니 <b>보고 전에 사람이 반드시 확인</b>하세요.
+    개인정보가 담긴 문서를 올릴지는 소속 기관의 규정을 먼저 확인하시기 바랍니다.
+  </p>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  // 집 규칙: localStorage 는 반드시 try/catch. file:// 나 쿠키 차단에서 접근만으로
+  // 예외가 나고, 그러면 페이지 전체가 멈춘다.
+  var store = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  var KEY = 'onepage_addr';
+  var addr = document.getElementById('addr');
+  var open = document.getElementById('open');
+  var state = document.getElementById('state');
+
+  function clean(value) {
+    value = (value || '').trim().replace(/\/+$/, '');
+    if (value && !/^https?:\/\//i.test(value)) value = 'https://' + value;
+    return value;
+  }
+
+  function sync() {
+    var value = clean(addr.value);
+    open.href = value || '#';
+    open.setAttribute('aria-disabled', value ? 'false' : 'true');
+    store.set(KEY, addr.value.trim());
+  }
+
+  addr.value = store.get(KEY) || '';
+  sync();
+
+  addr.addEventListener('input', sync);
+  addr.addEventListener('change', sync);
+  addr.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && clean(addr.value)) { e.preventDefault(); open.click(); }
+  });
+
+  document.getElementById('check').addEventListener('click', function () {
+    var value = clean(addr.value);
+    if (!value) { state.textContent = '주소를 먼저 넣으세요.'; return; }
+    state.textContent = '확인하는 중…';
+    // 서버가 /api/hello 에만 CORS 를 열어 둔다(비밀 없는 정보라 안전하다).
+    var stop = new AbortController();
+    var timer = setTimeout(function () { stop.abort(); }, 6000);
+    fetch(value + '/api/hello', { signal: stop.signal })
+      .then(function (r) { return r.json(); })
+      .then(function (info) {
+        clearTimeout(timer);
+        state.innerHTML = '<b class="on">서버가 켜져 있습니다.</b> 자물쇠 ' +
+          (info.locked ? '켜짐' : '꺼짐') + ' · 결과 보관 ' + info.retention + '분';
+      })
+      .catch(function () {
+        clearTimeout(timer);
+        state.innerHTML = '<b class="off">닿지 않습니다.</b> 서버가 꺼져 있거나 주소가 다릅니다. ' +
+          '브라우저가 막았을 수도 있으니(https 페이지에서 http 주소), ' +
+          '그냥 <b>열기</b>를 눌러 보세요.';
+      });
+  });
+})();
+</script>
+</body>
+</html>

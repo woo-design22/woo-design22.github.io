@@ -68,7 +68,7 @@ function makeRoom(opts, hostConn) {
     id: String(nextRoomId++),
     name: String(opts.name || '').slice(0, 20) || (hostConn.nick + '의 방'),
     teamSize,
-    halfSec: [60, 120, 180].includes(opts.halfSec) ? opts.halfSec : core.C.HALF_SEC,
+    halfSec: [60, 90, 120, 180].includes(opts.halfSec) ? opts.halfSec : core.C.HALF_SEC,
     field: core.fieldOf(opts.field).id,          // 방마다 경기장을 고른다(2026-08-26)
     classes: [clampInt(opts.classA, 1, 12, 1), clampInt(opts.classB, 1, 12, 2)],
     pass: typeof opts.pass === 'string' && opts.pass.length ? String(opts.pass).slice(0, 12) : null,

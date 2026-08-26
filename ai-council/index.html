@@ -538,8 +538,8 @@
       <span class="spacer"></span>
     </div>
     <p class="hint">
-      이 파일을 클로드 코드에 넘기고 “이걸로 PPT 만들어”라고 하면 pptx 스킬이 진짜 파일을 만든다.
-      회사 서식이 있으면 그 파일도 같이 준다.
+      회의가 다다른 결론이다. 복사해 두거나 .md 로 내려받아 두면 나중에 다시 볼 수 있다.
+      납득이 안 되면 참가자나 노력도를 바꿔 다시 열어 보라.
     </p>
   </section>
 </main>
@@ -796,9 +796,9 @@
   const PROXY_MAX_EFFORT = 'high';
 
   const ROOM_SEATS = [
-    { who:'기획자',   model:'openai/gpt-5.6-sol',      effort:'medium', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
-    { who:'반론자',   model:'anthropic/claude-opus-5', effort:'low',    persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
-    { who:'청중대변', model:'google/gemini-3.7-flash', effort:'low',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
+    { who:'하나',   model:'openai/gpt-5.6-sol',      effort:'medium', persona:'넓게 본다. 큰 틀과 빠진 축을 먼저 말한다.' },
+    { who:'둘',   model:'anthropic/claude-opus-5', effort:'low',    persona:'따진다. 어긋난 곳과 근거가 약한 곳을 찾는다. 쉽게 동의하지 않는다.' },
+    { who:'셋', model:'google/gemini-3.7-flash', effort:'low',    persona:'듣는 사람 입장에서 본다. 어려운 말과 뜬구름을 싫어한다.' }
   ];
 
   /* ==================================================================
@@ -1045,31 +1045,6 @@
         '',
         '## 줄여야 하면 여기부터',
         '- '
-      ]
-    },
-    {
-      id: 'ppt', name: 'PPT 개요', desc: '장표 구성을 짠다',
-      hint: '무엇을 누구에게 발표하는지 적어라.\n예) 신입사원 정보보안 교육 12장. 딱딱하지 않게, 사례 위주로.',
-      rounds: 3,
-      roles: [
-        { who:'기획자', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
-        { who:'반론자', persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
-        { who:'청중대변', persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
-      ],
-      out: [
-        '# (발표 제목)',
-        '> (한 줄 요약 — 듣는 사람에게 남길 단 하나의 메시지)',
-        '',
-        '## 1. (장표 제목)',
-        '- 핵심: (이 장이 말하는 것 한 줄)',
-        '- 내용: (불릿 2~4개)',
-        '- 노트: (발표자가 말로 덧붙일 것)',
-        '',
-        '## 2. (장표 제목)',
-        '...',
-        '',
-        '## 남은 쟁점',
-        '- (합의 못 본 것. 없으면 "없음")'
       ]
     },
     {
@@ -1411,9 +1386,9 @@
       keyPlaceholder: 'sk-ant-...',
       url: 'https://api.anthropic.com/v1/messages',
       seats: [
-        { who:'기획자',   model:'claude-opus-5',    effort:'medium', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
-        { who:'반론자',   model:'claude-sonnet-5',  effort:'low',    persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
-        { who:'청중대변', model:'claude-haiku-4-5', effort:'off',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
+        { who:'하나',   model:'claude-opus-5',    effort:'medium', persona:'넓게 본다. 큰 틀과 빠진 축을 먼저 말한다.' },
+        { who:'둘',   model:'claude-sonnet-5',  effort:'low',    persona:'따진다. 어긋난 곳과 근거가 약한 곳을 찾는다. 쉽게 동의하지 않는다.' },
+        { who:'셋', model:'claude-haiku-4-5', effort:'off',    persona:'듣는 사람 입장에서 본다. 어려운 말과 뜬구름을 싫어한다.' }
       ]
     }
   };
@@ -3085,7 +3060,7 @@
     const st = await callApi(
       seat.model, seat.effort,
       scribeSystem(topic),
-      '# 회의록\n\n' + transcriptText() + '\n\n---\n\n위 회의를 PPT 개요로 정리하라.',
+      '# 회의록\n\n' + transcriptText() + '\n\n---\n\n위 회의를 정리하라.',
       maxTok,
       (partial) => { el.outline.textContent = partial; scrollDown(); }
     );

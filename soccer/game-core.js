@@ -1043,7 +1043,12 @@
   // 입력 6바이트: [0x01, seq u16 LE, buttons u8, dx i8, dy i8]  (dx,dy: -127~127 → -1~1)
   var INPUT_BYTES = 6;
   function i8(v) { return Math.round(clamp(v, -1, 1) * 127) & 255; }
-  function encodeInput(seq, dx, dy, buttons, out) {
+  /* 입력 6B: [0x01, seq u16 LE, buttons u8, dx i8, dy i8]
+     **인자 차례가 바이트 차례와 같아야 한다**(seq, buttons, dx, dy).
+     2026-08-26 까지 선언이 (seq, dx, dy, buttons) 였는데 부르는 쪽은 둘 다
+     (seq, buttons, dx, dy) 로 넘기고 있었다 → 온라인에서 **좌우 입력이 세로로 가고
+     버튼이 가로 이동이 되는** 버그가 났다. 연습장은 이 함수를 안 거쳐서 멀쩡했다. */
+  function encodeInput(seq, buttons, dx, dy, out) {
     var u8 = out || new Uint8Array(INPUT_BYTES);
     u8[0] = 0x01;
     u8[1] = seq & 255; u8[2] = (seq >> 8) & 255;

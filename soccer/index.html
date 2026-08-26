@@ -450,8 +450,8 @@
      같은 경기장을 색만 바꾸는 게 아니라 **바닥·선·둘레·관중까지 맥락에 맞게** 다르게 그린다.
      town   동네 — 흙바닥에 잡초가 듬성듬성. 선은 지워져 흐리고 트랙이 없다. 철망 너머 구경꾼 몇 명.
      school 학교 — 잔디인데 골문 앞·중앙이 닳아 흙이 드러난다. 얇은 트랙, 나무 벤치, 학생 조금.
-     pro    프로 — 고른 줄무늬 잔디, 붉은 우레탄 트랙, 좌석 관중석.
-     world  월드컵 — 촘촘한 줄무늬, 푸른 트랙, 여러 단 관중석에 사람이 꽉 찼다.
+     pro    프로 — **관리가 좀 덜 된 잔디**. 노란빛이 도는 연한 줄무늬에 마른 자국이 옅게 깔린다. 붉은 우레탄 트랙, 좌석 관중석.
+     world  월드컵 — 프로와 **같은 세로 줄무늬**인데 더 촘촘하고 색이 짙고 고르다. 푸른 트랙, 여러 단 관중석에 사람이 꽉 찼다.
      바닥 얼룩은 rnd() 로 자리를 고정해 **매 프레임 같은 자리**에 있게 한다(반짝이면 안 된다). */
   var FIELD_ART = {
     town:   { grass: '#a87a45', grass2: '#9d7040', out: '#8d6238', line: 'rgba(255,255,255,0.42)',
@@ -460,13 +460,16 @@
     school: { grass: '#4f9a45', grass2: '#489040', out: '#3f7f3a', line: 'rgba(255,255,255,0.72)',
               stripes: 0, patch: 'bare', patchN: 55, patchC: '#9d7a4c',
               track: '#9a5433', stand: 'bench', standC: '#3a3326', stepC: '#4d422f', rows: 2, seat: 15 },
-    // 프로: 밝은 잔디에 **세로 줄무늬 10줄**. 흔히 보는 리그 구장.
-    pro:    { grass: '#46a552', grass2: '#3c9446', out: '#2f7a39', line: 'rgba(255,255,255,0.88)',
-              stripes: 10, cross: 0, patch: null, patchN: 0, patchC: null,
+    /* 프로: **관리가 좀 덜 된 잔디**(2026-08-27 지시). 잔디는 잔디인데 물이 모자란 듯 노란빛이 돌고,
+       줄무늬도 색 차이가 옅어 갓 깎은 티가 안 난다. 거기에 마른 자국(patch 'dry')을 크고 흐릿하게 깔았다.
+       월드컵과 나란히 놓았을 때 "덜 좋은 구장"으로 읽히게 하려는 것이다. */
+    pro:    { grass: '#8aa84f', grass2: '#7f9d48', out: '#6d8a3f', line: 'rgba(255,255,255,0.82)',
+              stripes: 10, patch: 'dry', patchN: 46, patchC: '#c6c069',
               track: '#9a5433', stand: 'seats', standC: '#1f2b3a', stepC: '#2b3a4d', rows: 4, seat: 13 },
-    // 월드컵: **바둑판 무늬**(세로 16 × 가로 10)에 훨씬 짙은 잔디. 프로와 한눈에 구분되게 색부터 벌렸다.
-    world:  { grass: '#1f7a3c', grass2: '#186a34', out: '#14562b', line: 'rgba(255,255,255,0.97)',
-              stripes: 16, cross: 10, patch: null, patchN: 0, patchC: null,
+    /* 월드컵: 프로와 **같은 세로 줄무늬**다(2026-08-27 지시로 바둑판을 걷어냈다).
+       줄이 더 촘촘하고(14줄) 색이 짙고 고르며 얼룩이 하나도 없다 — 잘 관리된 잔디. */
+    world:  { grass: '#3f9e51', grass2: '#348c45', out: '#2a7439', line: 'rgba(255,255,255,0.97)',
+              stripes: 14, patch: null, patchN: 0, patchC: null,
               track: '#2f5fa8', stand: 'tiers', standC: '#141b28', stepC: '#232f45', rows: 6, seat: 11 }
   };
   function art() { return FIELD_ART[FLD.id] || FIELD_ART.school; }
@@ -743,22 +746,13 @@
     // 바닥
     ctx.fillStyle = A.grass; ctx.fillRect(px(0), py(0), W * s, H * s);
     // 줄무늬 잔디(프로·월드컵만). 동네·학교는 줄무늬를 깎지 않는다.
+    // 2026-08-27 지시로 **월드컵의 바둑판 무늬를 걷어냈다** — 둘 다 세로 줄무늬이고 줄 수와 색만 다르다.
     if (A.stripes) {
       var stripe = W / A.stripes;
       var i0 = Math.max(0, Math.floor((cam.x - view.worldW / 2) / stripe));
       var i1 = Math.min(A.stripes - 1, Math.ceil((cam.x + view.worldW / 2) / stripe));
       ctx.fillStyle = A.grass2;
-      if (!A.cross) {
-        for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s, H * s);
-      } else {
-        // 바둑판(월드컵) — 세로·가로가 엇갈리는 칸만 칠한다. 가로줄은 화면 안 범위만.
-        var band = H / A.cross;
-        var j0 = Math.max(0, Math.floor((cam.y - view.worldH / 2) / band));
-        var j1 = Math.min(A.cross - 1, Math.ceil((cam.y + view.worldH / 2) / band));
-        for (var i = i0; i <= i1; i++)
-          for (var j = j0; j <= j1; j++)
-            if (((i + j) & 1) === 0) ctx.fillRect(px(i * stripe), py(j * band), stripe * s + 1, band * s + 1);
-      }
+      for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s + 1, H * s);
     }
     drawPatches(A, W, H, s);            // 잡초(동네) · 닳은 흙(학교)
     // 선
@@ -785,12 +779,13 @@
     ctx.strokeRect(px(-D), py(y0), D * s, (y1 - y0) * s); ctx.strokeRect(px(W), py(y0), D * s, (y1 - y0) * s);
   }
   /* 바닥 얼룩 — 자리와 크기를 rnd() 로 고정해 매 프레임 같은 자리에 있게 한다.
-     동네는 흙바닥에 **잡초**가 나 있고, 학교는 잔디가 **골문 앞·중앙에서 닳아** 흙이 드러난다. */
+     동네는 흙바닥에 **잡초**가 나 있고, 학교는 잔디가 **골문 앞·중앙에서 닳아** 흙이 드러난다.
+     프로는 **마른 자국**('dry') — 흙이 드러난 게 아니라 잔디가 누렇게 뜬 것이라 크고 아주 흐리다. */
   function drawPatches(A, W, H, s) {
     if (!A.patch) return;
     var vx0 = cam.x - view.worldW / 2 - 60, vx1 = cam.x + view.worldW / 2 + 60;
     ctx.fillStyle = A.patchC;
-    ctx.globalAlpha = A.patch === 'weed' ? 0.55 : 0.42;
+    ctx.globalAlpha = A.patch === 'weed' ? 0.55 : A.patch === 'dry' ? 0.20 : 0.42;
     for (var i = 0; i < A.patchN; i++) {
       var rx = rnd(i * 3 + 1), ry = rnd(i * 3 + 2), rr = rnd(i * 3 + 3);
       var x, y;
@@ -804,7 +799,9 @@
         x = rx * W; y = ry * H;
       }
       if (x < vx0 || x > vx1) continue;
-      var r = (A.patch === 'weed' ? 6 + rr * 14 : 10 + rr * 26) * s;
+      var r = (A.patch === 'weed' ? 6 + rr * 14
+             : A.patch === 'dry'  ? 24 + rr * 46      // 넓게 번지는 마름. 작으면 얼룩이 아니라 점으로 보인다
+             : 10 + rr * 26) * s;
       ctx.beginPath();
       ctx.ellipse(px(x), py(y), r, r * 0.62, rr * 3, 0, TAU);
       ctx.fill();

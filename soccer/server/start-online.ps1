@@ -76,7 +76,9 @@ function Publish-Url([string]$u) {
   $ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $tmp = Join-Path $env:TEMP $GistFile
   $json = if ($u) { "{""url"":""$u"",""at"":$ms}" } else { "{""url"":"""",""at"":0}" }
-  Set-Content -Path $tmp -Value $json -Encoding utf8 -NoNewline
+  # **BOM 을 넣으면 안 된다.** Windows PowerShell 의 `Set-Content -Encoding utf8` 은 BOM 을 붙이는데,
+  # 그러면 브라우저에서 JSON.parse 가 첫 글자에서 그대로 터진다(2026-08-26 실제로 겪음).
+  [IO.File]::WriteAllText($tmp, $json, (New-Object Text.UTF8Encoding $false))
   try { & gh gist edit $GistId -f $GistFile $tmp 2>$null | Out-Null
         if ($u) { Write-Host "게시판(Gist)에 주소를 올렸습니다." -ForegroundColor DarkGray } }
   catch { Write-Host "게시판에 못 올렸습니다(gh 로그인 확인): $($_.Exception.Message)" -ForegroundColor Yellow }

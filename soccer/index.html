@@ -1701,7 +1701,10 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var f = d && d.files && d.files[GIST_FILE];
-        var j = f && f.content ? JSON.parse(f.content) : null;
+        // **앞에 붙은 BOM·공백을 반드시 걷어낸다.** BOM 이 하나만 붙어도 JSON.parse 가 그대로 터지고,
+        // 그러면 조용히 예비 게시판으로 넘어가 "서버가 없습니다" 가 뜬다(2026-08-26 실제로 겪음).
+        var txt = (f && f.content || '').replace(/^[\uFEFF\s]+/, '');
+        var j = txt ? JSON.parse(txt) : null;
         var ageMin = j && j.at ? (Date.now() - j.at) / 60000 : 1e9;
         if (!j || !j.url) throw new Error('비어 있음');
         if (ageMin > 40) throw new Error('오래됨');

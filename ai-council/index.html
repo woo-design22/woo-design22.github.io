@@ -413,13 +413,16 @@
   <section class="card hidden" id="keyCard">
     <h2>연결</h2>
     <div class="row">
-      <div class="fixed" style="width:230px">
+      <div class="grow">
         <label for="provider">어디를 통해 부를까</label>
         <select id="provider">
-          <option value="openrouter">오픈라우터 — 모든 모델</option>
+          <option value="room">우리 회의실 — 키 없이 (권장)</option>
+          <option value="openrouter">오픈라우터 직통 — 내 키로</option>
           <option value="anthropic">앤트로픽 직통 — 클로드만</option>
         </select>
       </div>
+    </div>
+    <div class="row hidden" id="keyRow" style="margin-top:10px">
       <div class="grow">
         <label for="keyInput" id="keyLabel">API 키</label>
         <input id="keyInput" type="password" autocomplete="off" spellcheck="false">
@@ -726,20 +729,40 @@
     { id:'claude-fable-5',   label:'Fable 5',   i:10, o:50, mx:64000, md:1, ef:['max','xhigh','high','medium','low'], fb:1 }
   ];
 
+  /* 프록시(counsel-proxy 의 /room). 키는 저 서버에만 있고 브라우저로 내려오지 않는다.
+   * 정적 페이지에 키를 두면 아무리 숨겨도 F12 네트워크 탭에 그대로 찍힌다 —
+   * 「여럿이 쓰되 키는 아무도 못 본다」는 서버 없이는 성립하지 않는다. */
+  const PROXY_URL = 'https://stormy-cuttlefish-2376.woo-design22.deno.net/room';
+  // 프록시가 잘라 내는 노력도 상한. 여기서 미리 감춰야 "골랐는데 거부당하는" 일이 없다.
+  const PROXY_MAX_EFFORT = 'high';
+
+  const ROOM_SEATS = [
+    { who:'기획자',   model:'openai/gpt-5.6-sol',      effort:'medium', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
+    { who:'반론자',   model:'anthropic/claude-opus-5', effort:'low',    persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
+    { who:'청중대변', model:'google/gemini-3.7-flash', effort:'low',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
+  ];
+
   const PROVIDERS = {
+    room: {
+      label: '우리 회의실',
+      needsKey: false,        // 비밀번호에서 나온 표로 프록시를 부른다
+      orCatalog: true,
+      url: PROXY_URL,
+      seats: ROOM_SEATS.map((s) => Object.assign({}, s))
+    },
     openrouter: {
-      label: '오픈라우터',
+      label: '오픈라우터 직통',
+      needsKey: true,
+      orCatalog: true,
       keyPrefix: 'sk-or-',
       keyPlaceholder: 'sk-or-v1-...',
       url: 'https://openrouter.ai/api/v1/chat/completions',
-      seats: [
-        { who:'기획자',   model:'openai/gpt-5.6-sol',      effort:'medium', persona:'이야기 구조를 짠다. 장표 순서와 각 장의 핵심 메시지를 제안한다.' },
-        { who:'반론자',   model:'anthropic/claude-opus-5', effort:'low',    persona:'약한 근거와 뻔한 구성을 찌른다. 동의보다 반대를 먼저 찾는다.' },
-        { who:'청중대변', model:'google/gemini-3.7-flash', effort:'low',    persona:'듣는 사람 입장에서 안 와닿거나 어려운 곳을 짚는다. 전문용어를 싫어한다.' }
-      ]
+      seats: ROOM_SEATS.map((s) => Object.assign({}, s))
     },
     anthropic: {
       label: '앤트로픽 직통',
+      needsKey: true,
+      orCatalog: false,
       keyPrefix: 'sk-ant-',
       keyPlaceholder: 'sk-ant-...',
       url: 'https://api.anthropic.com/v1/messages',
@@ -766,7 +789,7 @@
 
   /* ---------- 상태 ---------- */
   const S = {
-    prov: store.get('council_prov', 'openrouter'),
+    prov: store.get('council_prov', 'room'),
     seats: null,
     cat: null,          // 지금 프로바이더의 모델 목록 (배열)
     catAt: 0,           // 언제 받았는가
@@ -776,7 +799,8 @@
     calls: 0, inTok: 0, outTok: 0, cost: 0,
     estimated: false,
     abort: null,
-    pickSeat: -1
+    pickSeat: -1,
+    roomToken: ''   // 비밀번호에서 뽑아낸 표. 프록시가 이것만 보고 문을 연다
   };
   if (!PROVIDERS[S.prov]) S.prov = 'openrouter';
   let apiKey = '';
@@ -807,7 +831,14 @@
       return list;
     }
     m.ef.forEach((e) => { if (e !== 'none' && list.indexOf(e) < 0) list.push(e); });
-    return list.sort((a, b) => EFFORT_ORDER.indexOf(a) - EFFORT_ORDER.indexOf(b));
+    let out = list.sort((a, b) => EFFORT_ORDER.indexOf(a) - EFFORT_ORDER.indexOf(b));
+    // 프록시는 'xhigh'·'max' 를 잘라 낸다. 고를 수 있는데 거부당하면 그게 더 나쁘다.
+    if (S.prov === 'room') {
+      const cap = EFFORT_ORDER.indexOf(PROXY_MAX_EFFORT);
+      out = out.filter((e) => EFFORT_ORDER.indexOf(e) <= cap);
+      if (!out.length) out = ['default'];
+    }
+    return out;
   }
   // 저장된 노력도가 그 모델에 없으면 가장 가까운 것으로 끌어온다
   function fixEffort(id, want) {
@@ -853,7 +884,7 @@
   }
 
   async function loadCatalog(force) {
-    if (S.prov === 'anthropic') {
+    if (!P().orCatalog) {
       S.cat = ANT_LIST.slice(); S.catLive = false; reindex(); return;
     }
     const cached = store.get('council_cat', null);
@@ -893,7 +924,7 @@
   /* ---------- DOM ---------- */
   const $ = (id) => document.getElementById(id);
   const el = {
-    keyCard: $('keyCard'), keyInput: $('keyInput'), keyLabel: $('keyLabel'), keyHint: $('keyHint'),
+    keyCard: $('keyCard'), keyRow: $('keyRow'), keyInput: $('keyInput'), keyLabel: $('keyLabel'), keyHint: $('keyHint'),
     provider: $('provider'), hdrSub: $('hdrSub'), faces: $('faces'),
     topic: $('topic'), seats: $('seats'), rounds: $('rounds'), scribe: $('scribe'), estimate: $('estimate'),
     log: $('log'), outCard: $('outCard'), outline: $('outline'),
@@ -933,7 +964,7 @@
       d.title = s.who + ' · ' + M(s.model).label;
       el.faces.appendChild(d);
     });
-    el.hdrSub.textContent = P().label + (S.prov === 'openrouter' && !S.catLive ? ' (목록 못 받음)' : '');
+    el.hdrSub.textContent = P().label + (P().orCatalog && !S.catLive ? ' (목록 못 받음)' : '');
   }
 
   function renderSeats() {
@@ -1327,7 +1358,24 @@
   function buildRequest(model, effort, system, userText, maxTok, useFallback) {
     const m = M(model);
 
-    if (S.prov === 'openrouter') {
+    /* 프록시 — 키를 안 싣는다. 비밀번호에서 나온 표만 보내고 서버가 키를 붙여 준다.
+     * 모델·노력도·분량 상한은 서버가 다시 판정하므로 여기 값은 「부탁」일 뿐이다. */
+    if (S.prov === 'room') {
+      return {
+        url: P().url,
+        headers: { 'Content-Type': 'application/json' },
+        body: {
+          token: S.roomToken,
+          model: model,
+          effort: effort,
+          system: system,
+          text: userText,
+          max_tokens: maxTok
+        }
+      };
+    }
+
+    if (P().orCatalog) {
       const body = {
         model: model,
         messages: [
@@ -1480,7 +1528,23 @@
   }
 
   function friendlyError(status, raw, model) {
-    const or = S.prov === 'openrouter';
+    const or = P().orCatalog;
+
+    // 프록시 모드의 실패는 원인이 서버 쪽이라 안내가 달라야 한다.
+    // "키가 틀렸다"고 하면 넣을 키가 없는 사람이 헤맨다.
+    if (S.prov === 'room') {
+      if (status === 401) return '비밀번호가 서버와 맞지 않는다. Deno Deploy 의 ROOM_TOKEN_SHA 를 확인할 것.';
+      if (status === 503) return '회의실 서버가 아직 안 열렸다. Deno Deploy 에 OPENROUTER_KEY 와 ROOM_TOKEN_SHA 를 넣었는지 볼 것.';
+      if (status === 403 && /비싸/.test(raw)) return '이 모델은 서버가 막아 둔 값이다. 더 싼 모델로 바꿀 것.';
+      if (status === 403) return '이 주소에서는 회의실을 쓸 수 없다.';
+      if (status === 400 && /보낼 내용|messages/.test(raw)) {
+        return '회의실 라우트(/room)가 아직 배포되지 않은 것 같다. counsel-proxy 를 다시 배포할 것.';
+      }
+      if (status === 429) return '너무 빠르게 여러 번 불렀다. 잠시 뒤 다시.';
+      if (status >= 500) return '회의실 서버가 응답하지 않는다. 잠시 뒤 다시.';
+      return '회의실 서버가 거절했다. (' + status + ') ' + raw.slice(0, 120);
+    }
+
     if (status === 401) return '키가 올바르지 않다. 「키」에서 확인할 것.';
     if (status === 402) return '오픈라우터 잔액이 부족하거나 이 키의 Credit limit 에 닿았다.';
     if (status === 403) return '이 키로는 접근할 수 없다.';
@@ -1606,7 +1670,8 @@
   async function runMeeting() {
     const topic = el.topic.value.trim();
     if (!topic) { flash('안건을 먼저 적을 것.'); el.topic.focus(); return; }
-    if (!apiKey) { flash('API 키가 없다.'); openKey(); return; }
+    if (P().needsKey && !apiKey) { flash('API 키가 없다.'); openKey(); return; }
+    if (!P().needsKey && !S.roomToken) { flash('비밀번호를 다시 넣어야 한다.'); return; }
     if (S.seats.some((s) => !s.who.trim())) { flash('이름이 빈 자리가 있다.'); return; }
 
     const roundTotal = +el.rounds.value;
@@ -1708,6 +1773,11 @@
    * ================================================================== */
 
   const KEY_HINTS = {
+    room:
+      '키를 넣을 필요가 없다. 회의실 서버가 대신 오픈라우터를 부른다 — ' +
+      '키는 그 서버에만 있고 이 화면으로 절대 내려오지 않는다(F12 로도 안 보인다). ' +
+      '비밀번호를 아는 사람이면 누구나 이대로 쓸 수 있다. ' +
+      '대신 값이 아주 비싼 모델과 「아주 많이」·「최대」 노력도는 서버가 막아 둔다.',
     openrouter:
       '오픈라우터에 한 번 충전해 두면 GPT·클로드·제미나이·그록이 키 하나로 다 열린다. ' +
       '키는 openrouter.ai/keys 에서 만들고 충전은 openrouter.ai/credits 에서 한다. ' +
@@ -1720,12 +1790,21 @@
 
   function syncKeyCard() {
     el.provider.value = S.prov;
-    el.keyInput.placeholder = P().keyPlaceholder;
-    el.keyLabel.textContent = P().label + ' API 키';
     el.keyHint.textContent = KEY_HINTS[S.prov];
-    el.keyInput.value = apiKey;
+    // 프록시 모드에는 넣을 키가 없다. 빈 칸을 남겨 두면 뭘 넣으라는 건지 헷갈린다.
+    const need = P().needsKey;
+    el.keyRow.classList.toggle('hidden', !need);
+    if (need) {
+      el.keyInput.placeholder = P().keyPlaceholder;
+      el.keyLabel.textContent = P().label + ' API 키';
+      el.keyInput.value = apiKey;
+    }
   }
-  function openKey() { el.keyCard.classList.remove('hidden'); syncKeyCard(); el.keyInput.focus(); }
+  function openKey() {
+    el.keyCard.classList.remove('hidden');
+    syncKeyCard();
+    if (P().needsKey) el.keyInput.focus();
+  }
 
   async function switchProvider(next) {
     S.prov = next;
@@ -1746,7 +1825,7 @@
   });
   $('btnKeySave').addEventListener('click', () => {
     const v = el.keyInput.value.trim();
-    if (v && v.indexOf(P().keyPrefix) !== 0) {
+    if (v && P().keyPrefix && v.indexOf(P().keyPrefix) !== 0) {
       flash('이 키는 ' + P().keyPlaceholder + ' 모양이어야 한다. 연결 대상을 확인할 것.');
       return;
     }
@@ -1887,6 +1966,9 @@
     if (hashPass(v) === PASS_HASH) {
       store.del(GATE_KEY);                       // 들어왔으면 틀린 기록도 지운다
       store.set('council_unlock', PASS_HASH);
+      // 프록시에 낼 표를 여기서 만든다. 비밀번호 원문은 어디에도 남기지 않는다.
+      S.roomToken = sha256('ai-council-auth:' + v);
+      store.set('council_rt', S.roomToken);
       el.lock.classList.add('hidden');
       el.lockInput.value = '';
       el.lockBad.textContent = '';
@@ -1920,7 +2002,17 @@
       el.spOut.dataset.line = '';
       return;
     }
-    const line = "  const PASS_HASH = '" + hashPass(pw) + "';";
+    /* 두 값이 나온다. 쓰이는 데가 다르다.
+     *  PASS_HASH      → index.html. 이 화면을 열지 말지 정한다.
+     *  ROOM_TOKEN_SHA → Deno Deploy 환경변수. 프록시가 남의 요청을 거를 때 쓴다.
+     * 둘 다 한 비밀번호에서 나오지만 서로를 되돌릴 수는 없다. */
+    const roomToken = sha256('ai-council-auth:' + pw);
+    const line =
+      "① index.html 의 이 줄을 갈아 끼운다\n" +
+      "  const PASS_HASH = '" + hashPass(pw) + "';\n" +
+      "\n" +
+      "② Deno Deploy 환경변수에 넣는다\n" +
+      "  ROOM_TOKEN_SHA = " + sha256('room:' + roomToken);
     el.spOut.textContent = line;
     el.spOut.dataset.line = line;
   }
@@ -1959,7 +2051,8 @@
     if (booted) return ready;
     booted = true;
     apiKey = store.get('council_key_' + S.prov, '');
-    S.cat = S.prov === 'anthropic' ? ANT_LIST.slice() : OR_FALLBACK.slice();
+    S.roomToken = store.get('council_rt', '');
+    S.cat = P().orCatalog ? OR_FALLBACK.slice() : ANT_LIST.slice();
     reindex();
     loadSeats();
     el.topic.value = store.get('council_topic', '');
@@ -1968,12 +2061,12 @@
     syncKeyCard();
     updateEstimate();
     updateStats();
-    if (!apiKey) openKey();
+    if (P().needsKey && !apiKey) openKey();
 
     ready = loadCatalog(false).then((ok) => {
       S.seats.forEach((s) => { s.effort = fixEffort(s.model, s.effort); });
       renderSeats(); renderScribe();
-      if (S.prov === 'openrouter') {
+      if (P().orCatalog) {
         flash(S.catLive
           ? '모델 ' + S.cat.length + '개를 불러왔다.'
           : '모델 목록을 못 받아 기본 표(' + S.cat.length + '개)로 시작한다.');

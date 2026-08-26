@@ -20,16 +20,17 @@
   /* 경기장 4종 — 넓어질수록 사람이 적어 보이므로 관중 수도 넓이에 비례해 늘린다(클라이언트 §7.2).
      세로:가로 비율은 대체로 유지하고, 골대는 세로의 25%(GOAL_RATIO×2)로 함께 커진다. */
   var FIELDS = [
-    { id: 'town',  name: '동네 축구장',   w: 1000, h: 660,  crowd: 0.55 },
-    { id: 'school', name: '학교 축구장',  w: 1200, h: 800,  crowd: 0.75 },
-    { id: 'pro',   name: '프로리그 축구장', w: 1500, h: 1000, crowd: 0.90 },
+    // crowd = 관중석 자리가 찰 확률(2026-08-26 지시로 값을 벌렸다 — 규모 차이가 한눈에 보이게).
+    { id: 'town',  name: '동네 축구장',   w: 1000, h: 660,  crowd: 0.05 },
+    { id: 'school', name: '학교 축구장',  w: 1200, h: 800,  crowd: 0.15 },
+    { id: 'pro',   name: '프로리그 축구장', w: 1500, h: 1000, crowd: 0.40 },
     { id: 'world', name: '월드컵 축구장', w: 1800, h: 1200, crowd: 1.00 }
   ];
   function fieldOf(id) {
     for (var i = 0; i < FIELDS.length; i++) if (FIELDS[i].id === id) return FIELDS[i];
     return FIELDS[1];   // 기본은 학교 축구장(예전 크기)
   }
-  var PROTOCOL_VERSION = 17;   // 17: 틱 60Hz   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
+  var PROTOCOL_VERSION = 18;   // 18: 킥오프 3초·전후반 90초   // 15: 경기장 4종·연장·논스톱 슛·캐릭터 9종
 
   // ── 구조 상수 (CLAUDE.md §3) ─────────────────────────────────────────────
   var C = {
@@ -44,10 +45,10 @@
     GOAL_RATIO: 0.125,   // 골대 반폭 = 경기장 세로 × 이 값. 경기장이 커져도 골대 비율은 같다
     PLAYER_R: 18, BALL_R: 6,     // 2026-08-25 4차 지시로 14 → 18. 서로 때리기 쉬워지고 그림도 같이 커진다
     MAX_PLAYERS: 20,
-    KICKOFF_TICKS: 120,    // 경기 시작·후반 시작 킥오프 정지 2초
+    KICKOFF_TICKS: 180,   // 경기·하프 시작 킥오프 정지 **3초** — 3·2·1 카운트다운이 들어간다(2026-08-26)
     GOAL_TICKS: 72,       // 득점 후 세리머니 1.2초 (공은 골망 안에서 계속 구른다)
     REKICKOFF_TICKS: 48,  // 득점 후 킥오프 정지 0.8초 (세리머니와 합쳐 2초)
-    HALF_SEC: 120,        // 전·후반 각 2분 (2026-08-26 — 3분은 골이 너무 많아 늘어졌다)
+    HALF_SEC: 90,         // 전·후반 각 1분 30초 (2026-08-26: 3분 → 2분 → 1분 30초)
     EXTRA_SEC: 30,        // 연장 전·후반 각 30초. 그래도 동점이면 무승부로 끝낸다
     HALF_TICKS: 300,      // 하프타임 5초
     END_TICKS: 600        // 종료 화면 10초
@@ -260,7 +261,7 @@
   }
   function createState(opts) {
     opts = opts || {};
-    var halfSec = opts.halfSec || C.HALF_SEC;   // 전·후반 각 2분(2026-08-26). 세리머니·킥오프 정지 중에는 clock 이 줄지 않는다
+    var halfSec = opts.halfSec || C.HALF_SEC;   // 전·후반 각 1분 30초. 세리머니·킥오프 정지 중에는 clock 이 줄지 않는다
     var F = fieldOf(opts.field);
     var players = new Array(C.MAX_PLAYERS);
     for (var i = 0; i < C.MAX_PLAYERS; i++) players[i] = null;

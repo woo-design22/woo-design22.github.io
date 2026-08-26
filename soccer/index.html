@@ -309,7 +309,7 @@
       <div class="row" style="border-top:1px solid rgba(255,255,255,0.1); padding-top:10px">
         <input type="text" id="crName" maxlength="20" placeholder="방 이름" style="width:150px">
         <select id="crSize"><option value="1">1:1</option><option value="2" selected>2:2</option><option value="3">3:3</option><option value="4">4:4</option><option value="5">5:5</option><option value="10">10:10</option></select>
-        <select id="crHalf"><option value="90">전후반 1분30초</option><option value="180" selected>전후반 3분</option><option value="300">전후반 5분</option></select>
+        <select id="crHalf"><option value="90" selected>전후반 1분30초</option><option value="120">전후반 2분</option><option value="180">전후반 3분</option></select>
         <input type="password" id="crPass" maxlength="12" placeholder="비밀번호(없으면 공개)" style="width:150px">
         <button class="btn go" id="crMake" type="button">방 만들기</button>
       </div>
@@ -460,11 +460,13 @@
     school: { grass: '#4f9a45', grass2: '#489040', out: '#3f7f3a', line: 'rgba(255,255,255,0.72)',
               stripes: 0, patch: 'bare', patchN: 55, patchC: '#9d7a4c',
               track: '#9a5433', stand: 'bench', standC: '#3a3326', stepC: '#4d422f', rows: 2, seat: 15 },
-    pro:    { grass: '#3f9a4a', grass2: '#3a9044', out: '#2f7a39', line: 'rgba(255,255,255,0.88)',
-              stripes: 10, patch: null, patchN: 0, patchC: null,
+    // 프로: 밝은 잔디에 **세로 줄무늬 10줄**. 흔히 보는 리그 구장.
+    pro:    { grass: '#46a552', grass2: '#3c9446', out: '#2f7a39', line: 'rgba(255,255,255,0.88)',
+              stripes: 10, cross: 0, patch: null, patchN: 0, patchC: null,
               track: '#9a5433', stand: 'seats', standC: '#1f2b3a', stepC: '#2b3a4d', rows: 4, seat: 13 },
-    world:  { grass: '#35924a', grass2: '#2f8944', out: '#276f38', line: 'rgba(255,255,255,0.95)',
-              stripes: 18, patch: null, patchN: 0, patchC: null,
+    // 월드컵: **바둑판 무늬**(세로 16 × 가로 10)에 훨씬 짙은 잔디. 프로와 한눈에 구분되게 색부터 벌렸다.
+    world:  { grass: '#1f7a3c', grass2: '#186a34', out: '#14562b', line: 'rgba(255,255,255,0.97)',
+              stripes: 16, cross: 10, patch: null, patchN: 0, patchC: null,
               track: '#2f5fa8', stand: 'tiers', standC: '#141b28', stepC: '#232f45', rows: 6, seat: 11 }
   };
   function art() { return FIELD_ART[FLD.id] || FIELD_ART.school; }
@@ -746,7 +748,17 @@
       var i0 = Math.max(0, Math.floor((cam.x - view.worldW / 2) / stripe));
       var i1 = Math.min(A.stripes - 1, Math.ceil((cam.x + view.worldW / 2) / stripe));
       ctx.fillStyle = A.grass2;
-      for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s, H * s);
+      if (!A.cross) {
+        for (var i = i0; i <= i1; i++) if (i % 2 === 0) ctx.fillRect(px(i * stripe), py(0), stripe * s, H * s);
+      } else {
+        // 바둑판(월드컵) — 세로·가로가 엇갈리는 칸만 칠한다. 가로줄은 화면 안 범위만.
+        var band = H / A.cross;
+        var j0 = Math.max(0, Math.floor((cam.y - view.worldH / 2) / band));
+        var j1 = Math.min(A.cross - 1, Math.ceil((cam.y + view.worldH / 2) / band));
+        for (var i = i0; i <= i1; i++)
+          for (var j = j0; j <= j1; j++)
+            if (((i + j) & 1) === 0) ctx.fillRect(px(i * stripe), py(j * band), stripe * s + 1, band * s + 1);
+      }
     }
     drawPatches(A, W, H, s);            // 잡초(동네) · 닳은 흙(학교)
     // 선
@@ -1263,6 +1275,18 @@
 
   // ── 배너·오버레이 ──
   var bannerTimer = 0;
+  /* 킥오프 3·2·1 카운트다운 (2026-08-26 지시).
+     킥오프 정지가 3초(`KICKOFF_TICKS` 180 @60Hz)라 1초마다 한 번씩 세면 딱 맞는다.
+     숫자마다 골 소리의 종소리를 올려 가며 내고, **공이 살아나는 순간에 휘슬**을 분다. */
+  var cdTimers = [];
+  function stopCountdown() { for (var i = 0; i < cdTimers.length; i++) clearTimeout(cdTimers[i]); cdTimers.length = 0; }
+  function startCountdown() {
+    stopCountdown();
+    var steps = [['3', 'count3', 0], ['2', 'count2', 1000], ['1', 'count1', 2000]];
+    steps.forEach(function (s) {
+      cdTimers.push(setTimeout(function () { banner(s[0], 900); audio.sfx(s[1]); }, s[2]));
+    });
+  }
   function banner(text, ms) {
     var el = $('banner'); el.textContent = text; el.classList.add('show');
     clearTimeout(bannerTimer);
@@ -1513,6 +1537,11 @@
         case 'keeperSave':hiss(t, 0.11, 0.28, 900, 260, 0.6); tone('sine', 260, 150, t, 0.10, 0.20); break;
         case 'ult':       tone('sawtooth', 180, 900, t, 0.30, 0.22); hiss(t, 0.30, 0.10, 400, 3000, 2); break;
         case 'whistle':   whistle(t); break;
+        // 3·2·1 카운트다운 — 골 소리의 종소리(square 벨)만 떼어 쓴다.
+        // 골 소리를 통째로 쓰면 휘슬이 1초마다 겹쳐 지저분하다.
+        case 'count3':    tone('square', hz(60), 0, t, 0.26, 0.20); break;
+        case 'count2':    tone('square', hz(64), 0, t, 0.26, 0.20); break;
+        case 'count1':    tone('square', hz(67), 0, t, 0.26, 0.22); break;
         case 'goal':
           whistle(t);
           for (var i = 0; i < 4; i++) tone('square', hz([60, 64, 67, 72][i]), 0, t + 0.16 + i * 0.09, 0.22, 0.16);
@@ -1881,7 +1910,7 @@
     chatPlace(true);
     syncScoreboard();
     preloadChars();
-    banner('킥오프', 1200);
+    startCountdown();      // 경기 시작에도 3·2·1 — 첫 킥오프는 이벤트가 따로 오지 않는다
     startInputSender();
   }
   /* ── 공용 운동장 · 채팅 (2026-08-26 지시) ─────────────────────────────────
@@ -2052,7 +2081,7 @@
     syncScoreboard();
     preloadChars();
     doTick(performance.now());
-    banner('킥오프', 1200);
+    startCountdown();
   }
   function handleEvents(ev, tick) {
     for (var i = 0; i < ev.length; i++) {
@@ -2064,8 +2093,10 @@
         case 'goal':
           cheerT = 2.2;   // 관중이 크게 뛴다
           banner('골! ' + TEAM_NAMES[e.team], 1800); audio.sfx('goal'); break;
-        case 'kickoff': hideBoard(); banner('킥오프', 900); audio.sfx('whistle'); break;
-        case 'play': $('banner').classList.remove('show'); break;
+        // 경기·하프 시작이면 **3 · 2 · 1** 을 세고, 공이 살아나는 순간(play)에 휘슬을 분다.
+        // 득점 뒤 킥오프(0.8초)는 짧아서 세지 않는다.
+        case 'kickoff': hideBoard(); if (e.half) startCountdown(); else banner('킥오프', 600); break;
+        case 'play': stopCountdown(); banner('시작!', 700); audio.sfx('whistle'); break;
         case 'half': audio.sfx('whistle'); showBoard('half', e); break;
         case 'end': audio.sfx('whistle'); showBoard('end', e); break;
         case 'lobby': showOverlay([game.state.score[0], game.state.score[1]]); break;

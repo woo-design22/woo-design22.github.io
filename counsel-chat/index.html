@@ -1803,7 +1803,7 @@
   }
 
   async function roomLoad() {
-    if (!ROOM_URL) return [];
+    if (!ROOM_URL) return { digest: null, msgs: [] };
     try {
       const res = await fetch(ROOM_URL, {
         method: 'POST',
@@ -1811,11 +1811,11 @@
         body: JSON.stringify({ op: 'load', room: R.id })
       });
       const j = await res.json();
-      if (!j.blob) return [];
+      if (!j.blob) return { digest: null, msgs: [] };
       const got = JSON.parse(await unseal(R.key, j.blob));
       if (Array.isArray(got)) return { digest: null, msgs: got };          // 옛 형식
       return { digest: got.digest || null, msgs: got.msgs || [] };
-    } catch (_e) { return []; }
+    } catch (_e) { return { digest: null, msgs: [] }; }
   }
 
   /* ---------- 내보내기 · 들여오기 ---------- */
@@ -2000,12 +2000,18 @@
     R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0, digest: null };
     fxLoad();
 
-    const past = await roomLoad();
-    R.digest = past.digest;
-    if (past.msgs.length || past.digest) {
-      R.msgs = past.msgs;
-      if (past.digest) roomSys(digestLine(past.digest));
-      if (past.msgs.length) roomSys('지난 기록 ' + past.msgs.length + '개를 불러왔습니다');
+    try {
+      const past = (await roomLoad()) || {};
+      const pm = past.msgs || [];
+      R.digest = past.digest || null;
+      if (pm.length || R.digest) {
+        R.msgs = pm;
+        if (R.digest) roomSys(digestLine(R.digest));
+        if (pm.length) roomSys('지난 기록 ' + pm.length + '개를 불러왔습니다');
+      }
+    } catch (_e) {
+      // 지난 기록을 못 불러와도 방은 열려야 한다
+      roomSys('지난 기록을 불러오지 못했습니다. 이번 대화는 그대로 진행됩니다.');
     }
 
     $('roomSheet').classList.add('hidden');

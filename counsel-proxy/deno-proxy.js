@@ -1118,17 +1118,17 @@ const TOGETHER_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 보관 기록 만료 (쓸 �
 const TOGETHER_BLOB_MAX = 256 * 1024;             // 잠긴 덩어리 상한
 const TOGETHER_NAME_MAX = 20;
 const TOGETHER_SAY_MAX = 8000;        // 잠근 뒤라 평문보다 길다
-// 사용자 결정: 함께상담에는 비용 상한을 두지 않는다.
-// 기본 상담의 24,000자 / 24개 상한 대신 사실상 열어 둔다.
-// 남은 것은 폭주 방지용 레이트리밋과 모델의 문맥 창(100만 토큰)뿐이고,
-// 진짜 마지막 방어선은 코드가 아니라 Anthropic 콘솔의 지출 상한이다.
-const TOGETHER_MAX_CHARS = 400000;    // 약 30만 토큰. 100만 문맥 안에 넉넉히 든다
-const TOGETHER_MAX_HISTORY = 400;
-const TOGETHER_TRIM_AT = 200000;       // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
-const TOGETHER_KEEP = 60000;           // 접고 나서 원문 그대로 남길 최근 분량
+// 상담사가 한 번에 읽는 범위. 회당 비용을 정하는 값이기도 하지만,
+// 화면에서는 「상담사가 기억하는 범위」로 쓰인다 — 이 선을 넘으면
+// 오래된 대화는 원문 그대로가 아니라 요약으로만 남는다.
+// 호출 횟수에는 상한을 두지 않는다(사용자 결정). 폭주 방지 레이트리밋만 남는다.
+const TOGETHER_MAX_CHARS = 24000;
+const TOGETHER_MAX_HISTORY = 400;     // 글자 수로 자르므로 개수는 넉넉히 둔다
+const TOGETHER_TRIM_AT = 20000;       // 이 글자 수를 넘으면 앞부분을 요약으로 접는다       // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
+const TOGETHER_KEEP = 8000;           // 접고 나서 원문 그대로 남길 최근 분량
 const TOGETHER_DIGEST_EFFORT = 'medium';  // 요약은 압축이지 상담이 아니다. 깊게 갈 이유가 없다
 const TOGETHER_DIGEST_TOKENS = 3000;
-const TOGETHER_ASK_LIMIT = 20;        // 방 하나가 10분에 부를 수 있는 상담사 호출
+const TOGETHER_ASK_LIMIT = 60;      // 폭주 방지용. 비용 상한이 아니다        // 방 하나가 10분에 부를 수 있는 상담사 호출
 const TOGETHER_ASK_WINDOW_MS = 10 * 60 * 1000;
 
 // roomId -> { socks:Set<WebSocket>, names:Map<WebSocket,string>, asks:number[], sweep:number }
@@ -1275,6 +1275,21 @@ function handleTogetherSocket(request, originOk) {
       const c = togetherClean(m.c, TOGETHER_SAY_MAX);
       if (!c) return;
       togetherSend(roomId, { t: 'ai', c, at: Date.now() });
+      return;
+    }
+
+    // 요금은 방 전체의 것이다. 누가 불렀든 합계는 하나여야 한다.
+    // 숫자만 오가므로 대화 내용은 실리지 않는다.
+    if (m.t === 'cost') {
+      togetherSend(roomId, {
+        t: 'cost', name: myName,
+        usd: Number(m.usd) || 0,
+        inTok: Number(m.inTok) || 0,
+        outTok: Number(m.outTok) || 0,
+        effort: typeof m.effort === 'string' ? m.effort.slice(0, 12) : '',
+        kind: m.kind === 'digest' ? 'digest' : 'ask',
+        at: Date.now()
+      });
       return;
     }
 

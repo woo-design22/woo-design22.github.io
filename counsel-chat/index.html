@@ -425,6 +425,10 @@
   #roomTools button, #roomTools .fake { font: inherit; font-size: 12.5px; padding: 7px 12px; border-radius: 999px;
     border: 1px solid var(--line); background: var(--card); color: var(--ink-2); cursor: pointer; }
   #roomTools input[type="file"] { display: none; }
+  #roomTools button.ask { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #roomTools button.end { margin-left: auto; }
+  #roomChars { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #roomChars.warn { color: var(--crisis); font-weight: 600; }
   #roomComposer { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
   #roomComposer textarea { flex: 1; resize: none; font: inherit; font-size: 15px; padding: 10px 12px;
     border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); max-height: 140px; }
@@ -528,15 +532,19 @@
 <div id="roomView" class="hidden">
   <div id="roomTop">
     <div class="rname">함께상담<small id="roomMembers">연결 중…</small></div>
+    <span id="roomChars"></span>
     <button class="tbtn" id="roomOut">나가기</button>
   </div>
   <div id="roomLog"></div>
   <div id="roomTools">
-    <button id="roomAsk">상담사에게 묻기</button>
-    <button id="roomPdf">PDF로 저장</button>
-    <button id="roomTxt">기록 파일 내려받기</button>
-    <label class="fake" for="roomUp">기록 올리기</label>
+    <button id="roomAsk" class="ask">상담사에게 묻기</button>
+    <button id="roomTxt">txt 전문</button>
+    <button id="roomTxtSum">txt 요약</button>
+    <label class="fake" for="roomUp">txt 올리기</label>
     <input type="file" id="roomUp" accept=".txt,text/plain">
+    <button id="roomPdf">PDF 전문</button>
+    <button id="roomPdfSum">PDF 요약</button>
+    <button id="roomEnd" class="end">상담 종료</button>
   </div>
   <div id="roomComposer">
     <textarea id="roomInput" rows="1" placeholder="여기에 적으면 방에 있는 사람에게 보입니다"></textarea>
@@ -1622,6 +1630,13 @@
     const tot = R.spent > 0
       ? '  ·  이번 상담 ≈ ' + R.spent.toFixed(3) + ' 달러 / 약 ' + won(R.spent) + '원'
       : '';
+    // 24,000자를 넘으면 오래된 대화가 상담사에게 안 실린다. 미리 보이게 둔다.
+    const used = roomChars(R.msgs.filter(function (m) { return !m.sys; })) +
+      (R.digest ? R.digest.text.length : 0);
+    const ce = $('roomChars');
+    ce.textContent = used.toLocaleString() + ' / 24,000자';
+    if (used > ROOM_TRIM_AT) ce.classList.add('warn'); else ce.classList.remove('warn');
+
     $('roomMembers').textContent = (R.members.length
       ? R.members.join(' · ') + ' (' + R.members.length + '명)'
       : '연결 중…') + tot;
@@ -1750,7 +1765,12 @@
         const c = costOf(j.usage);
         if (c) {
           R.spent += c.usd;
-          roomSys(money(c, j.effort));
+          R.asks += 1;
+          // 회당 얼마인지는 한 번만 보여 준다. 매번 뜨면 값을 세는 대화가 된다.
+          if (!R.costShown) {
+            R.costShown = true;
+            roomSys(money(c, j.effort) + '   — 이후 회차는 가리고, 총액은 상담을 마칠 때 알려 드립니다.');
+          }
         }
       }
     } catch (_e) {
@@ -2001,6 +2021,61 @@
     window.print();
   }
 
+  /* ---------- 요약본 · 종료 ---------- */
+
+  // 요약으로 내보내려는데 아직 접힌 적이 없으면 그 자리에서 만든다.
+  // 호출이 한 번 더 나가므로 만들었다는 것과 든 비용을 반드시 알린다.
+  async function ensureDigest() {
+    if (!R) return null;
+    const real = R.msgs.filter(function (m) { return !m.sys; });
+    if (!real.length) return R.digest;
+    if (R.digest && R.digest.srcChars >= roomChars(real)) return R.digest;
+
+    const asText = real.map(function (m) {
+      return (m.ai ? '상담사' : m.who) + ': ' + m.text;
+    }).join('\n');
+    roomSys('요약을 만드는 중…');
+    try {
+      const res = await fetch(ROOM_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'digest', room: R.id, text: asText })
+      });
+      const j = await res.json();
+      if (!res.ok || !j.text) { roomSys('요약을 만들지 못했습니다.'); return null; }
+      R.digest = { text: j.text, srcChars: asText.length };
+      const c = costOf(j.usage);
+      if (c) R.spent += c.usd;
+      roomSys(digestLine(R.digest) + (c ? '  (요약 비용 약 ' + won(c.usd) + '원)' : ''));
+      return R.digest;
+    } catch (_e) {
+      roomSys('요약을 만들지 못했습니다.');
+      return null;
+    }
+  }
+
+  // 요약본은 대화 형식이 아니라 문서 한 장이다.
+  function digestAsList(d) {
+    return [{ who: ROOM_AI_NAME, text: d.text, ai: true, at: null }];
+  }
+
+  function stamp() { return roomStamp(Date.now()).replace(/[ :]/g, ''); }
+
+  async function roomEnd() {
+    if (!R || R.ended) return;
+    R.ended = true;
+    $('roomEnd').disabled = true;
+    $('roomAsk').disabled = true;
+    await roomSave();
+    const used = roomChars(R.msgs.filter(function (m) { return !m.sys; })) +
+      (R.digest ? R.digest.text.length : 0);
+    roomSys('상담을 마쳤습니다.');
+    roomSys(R.spent > 0
+      ? '총 요금 ≈ ' + R.spent.toFixed(3) + ' 달러 · 약 ' + won(R.spent) + '원' +
+        '   (상담사 호출 ' + R.asks + '회 · 주고받은 글자 ' + used.toLocaleString() + '자)'
+      : '이번 상담에서는 상담사를 부르지 않아 요금이 없습니다.');
+    roomSys('기록을 가져가시려면 아래 버튼을 쓰세요. 나가면 이 화면은 닫힙니다.');
+  }
+
   /* ---------- 들어가기 · 나가기 ---------- */
 
   async function roomEnter() {
@@ -2026,7 +2101,8 @@
       key = await roomKey(name, pw);
     } catch (_e) { err.textContent = '방을 열지 못했습니다.'; return; }
 
-    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0, digest: null, thinking: null, thinkTimer: 0 };
+    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0, digest: null, thinking: null, thinkTimer: 0,
+      costShown: false, asks: 0, ended: false };
     fxLoad();
 
     try {
@@ -2084,11 +2160,24 @@
     $('roomOut').addEventListener('click', roomLeave);
     $('roomSend').addEventListener('click', roomSay);
     $('roomAsk').addEventListener('click', roomAsk);
-    $('roomPdf').addEventListener('click', () => { if (R) roomPrint(); });
-    $('roomTxt').addEventListener('click', () => {
+    $('roomPdf').addEventListener('click', function () { if (R) roomPrint(); });
+    $('roomTxt').addEventListener('click', function () {
       if (!R) return;
-      roomDownload('함께상담-기록-' + roomStamp(Date.now()).replace(/[ :]/g, '') + '.txt', roomToText());
+      roomDownload('함께상담-전문-' + stamp() + '.txt', roomToText());
     });
+    $('roomTxtSum').addEventListener('click', async function () {
+      const d = await ensureDigest();
+      if (!d) return;
+      roomDownload('함께상담-요약-' + stamp() + '.txt', expToText('함께상담 요약', digestAsList(d)));
+    });
+    $('roomPdfSum').addEventListener('click', async function () {
+      const d = await ensureDigest();
+      if (!d) return;
+      expPrint('함께상담 요약',
+        '전문 ' + d.srcChars.toLocaleString() + '자 → 요약 ' + d.text.length.toLocaleString() +
+        '자 · 내보낸 시각 ' + roomStamp(Date.now()), digestAsList(d));
+    });
+    $('roomEnd').addEventListener('click', roomEnd);
 
     $('roomUp').addEventListener('change', (e) => {
       const f = e.target.files && e.target.files[0];

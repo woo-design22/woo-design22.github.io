@@ -1272,6 +1272,13 @@ function handleTogetherSocket(request, originOk) {
       return;
     }
 
+    // 상담사를 부르는 중이라는 표시. 내용이 없으니 잠글 것도 없다.
+    // 누른 사람만 기다림 표시를 보면 나머지는 왜 조용한지 모른다.
+    if (m.t === 'think') {
+      togetherSend(roomId, { t: 'think', name: myName, on: !!m.on, at: Date.now() });
+      return;
+    }
+
     if (m.t === 'ping') {
       try { sock.send(JSON.stringify({ t: 'pong' })); } catch (_e) {}
     }

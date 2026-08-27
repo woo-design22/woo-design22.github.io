@@ -1610,10 +1610,12 @@
       row.appendChild(body);
       log.appendChild(row);
     }
-    if (R.asking) {
+    if (R.thinking) {
       const d = document.createElement('div');
       d.className = 'rsys';
-      d.textContent = '상담사가 생각하고 있어요…';
+      d.textContent = R.thinking === R.me
+        ? '상담사가 생각하고 있어요…'
+        : R.thinking + '님이 상담사를 불렀어요 · 생각하는 중…';
       log.appendChild(d);
     }
     if (atBottom) log.scrollTop = log.scrollHeight;
@@ -1655,10 +1657,12 @@
         roomSys(m.name + '님이 나갔습니다');
         return;
       }
+      if (m.t === 'think') { thinkSet(m.on ? m.name : null); return; }
       if (m.t === 'say' || m.t === 'ai') {
         let text;
         try { text = await unseal(R.key, m.c); }
         catch (_e) { roomSys('읽을 수 없는 메시지가 왔습니다. 비밀번호가 다른 사람이 있는 것 같습니다.'); return; }
+        if (m.t === 'ai') thinkSet(null);   // 신호를 놓쳐도 답이 오면 표시는 꺼진다
         roomPush(m.t === 'ai' ? ROOM_AI_NAME : m.name, text, m.t === 'ai', m.at);
         if (m.t === 'ai') roomFold().then(roomSave);
         return;
@@ -1667,6 +1671,29 @@
 
     ws.onclose = () => { if (R && !R.closing) roomSys('연결이 끊겼습니다. 다시 들어와 주세요.'); };
     ws.onerror = () => {};
+  }
+
+  /* ---------- 기다림 표시 ---------- */
+
+  // 부른 사람이 도중에 끊기면 표시가 영영 남는다. 스스로 풀리게 해 둔다.
+  function thinkSet(who) {
+    if (!R) return;
+    if (R.thinkTimer) { clearTimeout(R.thinkTimer); R.thinkTimer = 0; }
+    R.thinking = who;
+    if (who) {
+      R.thinkTimer = setTimeout(function () {
+        if (R) { R.thinking = null; R.thinkTimer = 0; roomRender(); }
+      }, 180000);
+    }
+    roomRender();
+  }
+
+  function thinkTell(on) {
+    try {
+      if (R && R.ws && R.ws.readyState === 1) {
+        R.ws.send(JSON.stringify({ t: 'think', on: !!on }));
+      }
+    } catch (_e) { /* 표시가 안 가도 대화는 계속된다 */ }
   }
 
   /* ---------- 보내기 · 상담사 호출 ---------- */
@@ -1706,7 +1733,8 @@
     const msgs = roomApiMessages();
     if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return;
     R.asking = true;
-    roomRender();
+    thinkSet(R.me);      // 내 화면은 바로
+    thinkTell(true);     // 나머지 사람에게도
     try {
       const res = await fetch(ROOM_URL, {
         method: 'POST',
@@ -1729,7 +1757,8 @@
       roomSys('상담사를 부르지 못했습니다.');
     }
     R.asking = false;
-    roomRender();
+    thinkTell(false);
+    thinkSet(null);
   }
 
   /* ---------- 기록 접기 ---------- */
@@ -1997,7 +2026,7 @@
       key = await roomKey(name, pw);
     } catch (_e) { err.textContent = '방을 열지 못했습니다.'; return; }
 
-    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0, digest: null };
+    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0, digest: null, thinking: null, thinkTimer: 0 };
     fxLoad();
 
     try {

@@ -32,6 +32,7 @@
     --text: #f1f5f9;
     --muted: #94a3b8;
     --hud-bg: rgba(15, 23, 42, 0.72);
+    --hud-solid: #131c30;   /* 위 색을 불투명하게. 붙박이 줄은 뒤가 비치면 안 된다 */
     --accent: #22c55e;
     --danger: #ef4444;
     --kick-box: #67e8f9;       /* 앞차기 판정 네모 */
@@ -41,6 +42,11 @@
     --btn-on: rgba(34, 197, 94, 0.5);
     --btn-ult: rgba(244, 114, 182, 0.28);
     --stick: rgba(255, 255, 255, 0.16);
+    --stick-far: rgba(34, 197, 94, 0.55);   /* 끝까지 밀면 달리기 — 손잡이 색으로 알린다 */
+    --btn-kick: rgba(34, 197, 94, 0.26);
+    /* 터치 버튼 치수: **화면의 짧은 변** 기준. 폰이 커도 작아도 손끝에 같은 크기로 잡힌다. */
+    --tb: clamp(56px, 15vmin, 84px);
+    --tgap: clamp(6px, 1.8vmin, 12px);
     --stick-knob: rgba(255, 255, 255, 0.5);
     --map-bg: rgba(10, 20, 12, 0.6);
   }
@@ -137,19 +143,28 @@
   #stickZone { position: absolute; left: 0; bottom: 0; width: 42%; height: 72%; }
   #stick { position: absolute; width: 116px; height: 116px; margin: -58px 0 0 -58px; border-radius: 50%; background: var(--stick); display: none; pointer-events: none; }
   #stick .knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; background: var(--stick-knob); }
+  #stick.far .knob { background: var(--stick-far); }
   #stick.show { display: block; }
-  .tbtn { position: absolute; border-radius: 50%; background: var(--btn); border: 2px solid var(--btn-border); color: var(--text);
-    font-weight: 700; display: flex; align-items: center; justify-content: center; touch-action: none; text-align: center; line-height: 1.1; }
+  /* 버튼 크기는 **화면의 짧은 변**(vmin)을 따른다 — 작은 폰에서 너무 크고 큰 폰에서 너무 작던 것을 없앤다.
+     손끝이 닿는 최소치 56px 은 지킨다. */
+  #tpad { position: absolute; display: grid; gap: var(--tgap);
+    right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(3, var(--tb));
+    grid-template-areas: "ult curveL dribble" "pass curveR kick" ". . fart"; }
+  /* 세로로 들면 두 줄로 좁힌다 — 세 줄이면 왼쪽 조이스틱 자리를 파고든다. */
+  @media (orientation: portrait) {
+    #tpad { grid-template-columns: repeat(2, var(--tb));
+      grid-template-areas: "ult curveL" "pass dribble" "curveR kick" ". fart"; } }
+  #bUlt { grid-area: ult; } #bCurveL { grid-area: curveL; } #bDribble { grid-area: dribble; }
+  #bPass { grid-area: pass; } #bCurveR { grid-area: curveR; } #bKick { grid-area: kick; }
+  #bFart { grid-area: fart; }
+  .tbtn { width: var(--tb); height: var(--tb); border-radius: 50%; background: var(--btn); border: 2px solid var(--btn-border);
+    color: var(--text); font-weight: 700; font-size: clamp(11px, 2.7vmin, 15px); display: flex; align-items: center;
+    justify-content: center; touch-action: none; text-align: center; line-height: 1.1; }
   .tbtn.on { background: var(--btn-on); }
-  #bKick    { right: calc(24px + env(safe-area-inset-right));  bottom: calc(96px + env(safe-area-inset-bottom)); width: 88px; height: 88px; font-size: 17px; }
-  #bDribble { right: calc(120px + env(safe-area-inset-right)); bottom: calc(152px + env(safe-area-inset-bottom)); width: 66px; height: 66px; font-size: 14px; }
-  #bPass    { right: calc(120px + env(safe-area-inset-right)); bottom: calc(62px + env(safe-area-inset-bottom));  width: 66px; height: 66px; font-size: 14px; }
-  #bFart    { right: calc(34px + env(safe-area-inset-right));  bottom: calc(16px + env(safe-area-inset-bottom));  width: 66px; height: 66px; font-size: 14px; }
-  #bCurveL  { right: calc(200px + env(safe-area-inset-right)); bottom: calc(120px + env(safe-area-inset-bottom)); width: 58px; height: 58px; font-size: 13px; }
-  #bCurveR  { right: calc(200px + env(safe-area-inset-right)); bottom: calc(46px + env(safe-area-inset-bottom));  width: 58px; height: 58px; font-size: 13px; }
-  #bSprint  { left: calc(90px + env(safe-area-inset-left));    bottom: calc(118px + env(safe-area-inset-bottom)); width: 58px; height: 58px; font-size: 13px; }
-  #bUlt     { left: calc(18px + env(safe-area-inset-left));    bottom: calc(124px + env(safe-area-inset-bottom)); width: 62px; height: 62px; font-size: 13px;
-              background: var(--btn-ult); border-color: var(--ult); opacity: .45; }
+  /* 가장 많이 쓰는 버튼 하나는 색으로 구분한다 — 크기가 모두 같아졌기 때문. */
+  #bKick { background: var(--btn-kick); border-color: var(--accent); }
+  #bUlt { background: var(--btn-ult); border-color: var(--ult); opacity: .45; }
   #bUlt.ready { opacity: 1; border-color: var(--accent); box-shadow: 0 0 14px rgba(34,197,94,0.5); }
   /* 온라인 화면 (로비·방) */
   .panel.wide { min-width: min(560px, 92vw); }
@@ -217,8 +232,11 @@
   #chatBar.show { display: block; }
   #chatBar input { font: inherit; font-size: 14px; width: min(46vw, 420px); padding: 5px 9px; border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.3); background: rgba(8,14,10,0.72); color: var(--text); }
-  #rotateHint { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--hud-bg);
-    padding: 6px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); display: none; pointer-events: none; white-space: nowrap; z-index: 4; }
+  /* 아래 가운데는 이제 조이스틱과 버튼 자리다 — 안내는 위로 올리고 잠깐 뒤 사라진다. */
+  #rotateHint { position: fixed; left: 50%; top: calc(52px + env(safe-area-inset-top)); transform: translateX(-50%); background: var(--hud-bg);
+    padding: 6px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); display: none; pointer-events: none;
+    white-space: nowrap; z-index: 4; transition: opacity .5s; }
+  #rotateHint.gone { opacity: 0; }
   @media (orientation: portrait) { body.touch #rotateHint { display: block; } }
   @media (max-width: 760px) {
     .hud { font-size: 13px; padding: 3px 9px; gap: 7px; } .hud .score { font-size: 19px; }
@@ -232,6 +250,26 @@
   body.touch #ultBar { left: 50%; right: auto; transform: translateX(-50%); width: 150px; bottom: calc(8px + env(safe-area-inset-bottom)); }
   body.touch #ultBar .lbl { font-size: 11px; }
   body.touch #stamBar { left: 50%; right: auto; transform: translateX(-50%); width: 150px; bottom: calc(46px + env(safe-area-inset-bottom)); }
+  /* ── 폰에서 화면이 서로를 덮지 않게 ────────────────────────────────────────
+     조작부(왼쪽 조이스틱 · 오른쪽 버튼 무리)가 아래를 차지하므로 **나머지는 전부 위로 비킨다.**
+     특히 온라인 방 창(#dock)은 z-index 가 터치층보다 높아 그냥 두면 버튼을 덮어 버린다. */
+  body.touch #dock { max-height: min(44vh, calc(100vh - 250px)); }
+  @media (orientation: portrait) {
+    /* 세로로 들면 방 창을 넓고 낮게 — 폭 42vw 는 폰에서 글자가 한 줄에 두어 자밖에 안 들어간다. */
+    body.touch #dock { width: min(320px, 76vw); max-height: 42vh; }
+    /* 게이지는 아래 가운데를 떠나 왼쪽 위(소리 단추 아래)로. 아래 가운데는 엄지가 지나는 길이다. */
+    body.touch #ultBar, body.touch #stamBar {
+      left: calc(10px + env(safe-area-inset-left)); right: auto; transform: none;
+      width: min(46vw, 190px); bottom: auto; }
+    body.touch #stamBar { top: calc(50px + env(safe-area-inset-top)); }
+    body.touch #ultBar  { top: calc(74px + env(safe-area-inset-top)); }
+    /* 채팅 기록도 조이스틱 자리에서 비킨다. */
+    body.touch #chatLog { bottom: calc(42vh + env(safe-area-inset-bottom)); }
+    /* 방 창이 낮아지면서 **준비·시작·나가기가 접힌 아래로 밀려난다.** 폰에서 그건 "시작을 못 누른다"와
+       같은 말이라, 그 줄만 창 바닥에 붙여 둔다(위 내용은 그 아래로 스크롤된다). */
+    body.touch #rmActs { position: sticky; bottom: -8px; z-index: 1;
+      background: var(--hud-solid); box-shadow: 0 -10px 10px var(--hud-solid); margin-bottom: 0; padding: 7px 0 9px; }
+  }
 </style>
 </head>
 <body>
@@ -249,14 +287,18 @@
 <div id="debug"></div>
 <div id="touch">
   <div id="stickZone"><div id="stick"><div class="knob"></div></div></div>
-  <div class="tbtn" id="bKick" data-key="KeyD">슛<br>발차기</div>
-  <div class="tbtn" id="bDribble" data-key="KeyW">드리블</div>
-  <div class="tbtn" id="bPass" data-key="KeyZ">패스</div>
-  <div class="tbtn" id="bFart" data-key="KeyS">방귀</div>
-  <div class="tbtn" id="bCurveL" data-key="KeyQ">감아◀</div>
-  <div class="tbtn" id="bCurveR" data-key="KeyE">감아▶</div>
-  <div class="tbtn" id="bSprint" data-key="ShiftLeft">달리기</div>
-  <div class="tbtn" id="bUlt" data-key="KeyA">필살</div>
+  <!-- 오른쪽 엄지 자리. **자리를 픽셀로 하나씩 놓지 않는다** — 그렇게 두면 폭 390 짜리 폰에서
+       감아◀ 와 달리기가 실제로 겹쳤다(2026-08-27). 그리드가 놓으면 어떤 화면에서도 겹치지 않는다.
+       오른쪽 세로줄이 늘 방귀·슛·드리블이라 가로/세로를 돌려도 손가락이 헷갈리지 않는다. -->
+  <div id="tpad">
+    <div class="tbtn" id="bUlt"     data-key="KeyA">필살</div>
+    <div class="tbtn" id="bCurveL"  data-key="KeyQ">감아◀</div>
+    <div class="tbtn" id="bDribble" data-key="KeyW">드리블</div>
+    <div class="tbtn" id="bPass"    data-key="KeyZ">패스</div>
+    <div class="tbtn" id="bCurveR"  data-key="KeyE">감아▶</div>
+    <div class="tbtn" id="bKick"    data-key="KeyD">슛<br>발차기</div>
+    <div class="tbtn" id="bFart"    data-key="KeyS">방귀</div>
+  </div>
 </div>
 <div id="rotateHint">가로로 돌리면 경기장이 더 잘 보입니다</div>
 <div id="overlay">
@@ -331,7 +373,7 @@
         <button class="btn" id="rmTeam" type="button">팀 바꾸기</button>
       </div>
       <div class="row"><span id="rmChars" class="chars" style="margin:0"></span></div>
-      <div class="row">
+      <div class="row" id="rmActs">
         <button class="btn go" id="rmReady" type="button">준비</button>
         <button class="btn go" id="rmStart" type="button">시작</button>
         <button class="btn" id="rmLeave" type="button">나가기</button>
@@ -541,7 +583,7 @@
     dribble: ['KeyW'], curveL: ['KeyQ'], curveR: ['KeyE'], kick: ['KeyD'], fart: ['KeyS'], ult: ['KeyA'], pass: ['KeyZ'],
     sprint: ['ShiftLeft']
   };
-  var stickVec = { active: false, dx: 0, dy: 0 };   // 터치 조이스틱
+    var stickVec = { active: false, dx: 0, dy: 0, far: false };   // 터치 조이스틱(far = 끝까지 밀었다)
   function down(list) { for (var i = 0; i < list.length; i++) if (keys[list[i]]) return true; return false; }
   function readInput(out) {
     var dx = (down(KEY.right) ? 1 : 0) - (down(KEY.left) ? 1 : 0);
@@ -556,6 +598,10 @@
     if (down(KEY.fart)) b |= BTN.FART;
     if (down(KEY.ult)) b |= BTN.ULT;
     if (down(KEY.sprint)) b |= BTN.SPRINT;
+    // **조이스틱을 끝까지 밀면 달리기다**(2026-08-27, 폰 조작). 달리기 버튼을 따로 두면
+    // 왼쪽 엄지가 방향과 달리기를 동시에 맡아야 해서 둘 중 하나를 놓치게 된다.
+    // 체력은 그대로 닳으므로 "살짝 밀면 걷기 / 끝까지 밀면 달리기"가 그대로 성립한다.
+    if (stickVec.active && stickVec.far) b |= BTN.SPRINT;
     out.dx = dx; out.dy = dy; out.buttons = b;
     return out;
   }
@@ -580,7 +626,7 @@
     }
   });
   window.addEventListener('keyup', function (e) { keys[e.code] = false; flushInput(); });
-  window.addEventListener('blur', function () { keys = Object.create(null); stickVec.active = false; });
+    window.addEventListener('blur', function () { keys = Object.create(null); stickVec.active = false; stickVec.far = false; });
   window.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   // ── 터치 조작 ──
@@ -596,27 +642,30 @@
   function capture(el, id) { try { el.setPointerCapture(id); } catch (e) {} }
   (function initTouch() {
     var zone = $('stickZone'), stick = $('stick'), knob = stick.firstElementChild;
-    var stickId = null, baseX = 0, baseY = 0, RADIUS = 58, DEAD = 9;
+        var stickId = null, baseX = 0, baseY = 0, RADIUS = 58, DEAD = 9, FAR = 44;   // FAR 부터는 달리기
     zone.addEventListener('pointerdown', function (e) {
       if (stickId !== null) return;
       stickId = e.pointerId; baseX = e.clientX; baseY = e.clientY;
       capture(zone, e.pointerId);
       stick.style.left = baseX + 'px'; stick.style.top = baseY + 'px'; stick.classList.add('show');
       knob.style.transform = 'translate(0,0)';
-      stickVec.active = true; stickVec.dx = 0; stickVec.dy = 0;
+      stickVec.active = true; stickVec.dx = 0; stickVec.dy = 0; stickVec.far = false;
       e.preventDefault();
     });
     zone.addEventListener('pointermove', function (e) {
       if (e.pointerId !== stickId) return;
       var dx = e.clientX - baseX, dy = e.clientY - baseY, d = Math.hypot(dx, dy);
-      if (d < DEAD) { stickVec.dx = 0; stickVec.dy = 0; knob.style.transform = 'translate(0,0)'; return; }
+      if (d < DEAD) { stickVec.dx = 0; stickVec.dy = 0; stickVec.far = false; stick.classList.remove('far');
+                      knob.style.transform = 'translate(0,0)'; return; }
       var k = Math.min(1, d / RADIUS);
-      stickVec.dx = dx / d; stickVec.dy = dy / d;   // 등속이라 방향만 쓴다
+      stickVec.dx = dx / d; stickVec.dy = dy / d;   // 방향만 쓴다 — 속도는 걷기/달리기 두 단계다
+      stickVec.far = d >= FAR; stick.classList.toggle('far', stickVec.far);
       knob.style.transform = 'translate(' + (dx / d * k * RADIUS) + 'px,' + (dy / d * k * RADIUS) + 'px)';
     });
     function stickEnd(e) {
       if (e.pointerId !== stickId) return;
-      stickId = null; stickVec.active = false; stickVec.dx = 0; stickVec.dy = 0;
+      stickId = null; stickVec.active = false; stickVec.dx = 0; stickVec.dy = 0; stickVec.far = false;
+      stick.classList.remove('far');
       stick.classList.remove('show');
     }
     zone.addEventListener('pointerup', stickEnd); zone.addEventListener('pointercancel', stickEnd);
@@ -627,8 +676,22 @@
       el.addEventListener('pointerdown', press);
       el.addEventListener('pointerup', release); el.addEventListener('pointercancel', release);
     });
+    /* 가로 권유 안내는 **읽고 나면 사라진다.** 계속 띄워 두면 세로로 하겠다는 사람에게는
+       그냥 화면을 가리는 딱지일 뿐이다. 방향을 다시 바꾸면 한 번 더 보여 준다. */
+    var hintT = 0;
+    function nudgeRotate() {
+      var el = $('rotateHint'); if (!el) return;
+      clearTimeout(hintT); el.classList.remove('gone');
+      hintT = setTimeout(function () { el.classList.add('gone'); }, 5000);
+    }
+    window.addEventListener('orientationchange', nudgeRotate);
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(orientation: portrait)');
+      if (mq.addEventListener) mq.addEventListener('change', nudgeRotate);
+    }
     var wantTouch = params.get('touch') === '1' || (params.get('touch') !== '0' && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window));
     setTouch(wantTouch);
+    if (wantTouch) nudgeRotate();
   })();
   resize();
 
@@ -1406,7 +1469,7 @@
     } else $('ovSub').textContent = '혼자 하기 — 인공지능과 대전. 전·후반 각 3분, 골키퍼는 자동. 캐릭터와 인원을 고르고 시작하세요.';
     $('ovStart').textContent = final ? '다시 시작' : '시작';
     $('ovHint').innerHTML = touchOn
-      ? '왼쪽 아래를 누른 채 끌면 이동 · 오른쪽 버튼으로 슛·드리블·감아차기'
+      ? '왼쪽 아래를 누른 채 끌면 이동 · <b>끝까지 밀면 달리기</b> · 오른쪽 버튼으로 슛·드리블·방귀'
       : '<kbd>1</kbd>~<kbd>6</kbd> 캐릭터 · <kbd>Enter</kbd> 시작<br>방향키 이동 · <kbd>W</kbd> 드리블(길게=멀리) · <kbd>D</kbd> 슛/발차기 · <kbd>S</kbd> 방귀 · <kbd>Q</kbd><kbd>E</kbd> 감아차기 · <kbd>Z</kbd> 패스 · <kbd>A</kbd> 필살기';
     renderOverlay();
   }

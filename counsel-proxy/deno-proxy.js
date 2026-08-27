@@ -41,12 +41,13 @@ const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 
 // ---- 비용 상한 (여기 숫자가 곧 청구서다) ----
 const MODEL = 'claude-opus-5';     // 서버가 고정한다. 클라이언트가 못 바꾼다.
-const EFFORT = 'high';             // low < medium < high < xhigh < max
-                                   // xhigh 는 체감 차이 대비 비용이 커서 high 로 둔다
+const EFFORT = 'max';              // low < medium < high < xhigh < max
+                                   // 사용자 결정: 모든 상담을 가장 깊게 한다
+                                   // 회당 비용이 오르는 만큼 화면에 실측으로 보여 준다
 // max_tokens 는 "생각 + 답변"을 합친 천장이다. xhigh 는 생각을 많이 하므로
 // 넉넉히 줘야 답변이 중간에 잘리지 않는다. 실제 청구는 생성한 만큼만 된다.
 // 답변 길이는 max_tokens 가 아니라 프롬프트의 "3~5문장" 지시가 잡는다.
-const MAX_TOKENS = 8000;
+const MAX_TOKENS = 16000;
 const MAX_CHARS_PER_MSG = 2000;
 const MAX_HISTORY = 24;
 const MAX_TOTAL_CHARS = 24000;
@@ -1426,11 +1427,15 @@ async function handleTogetherPost(request, echoOrigin) {
       return jsonError(400, '요청 형식이 올바르지 않습니다.', echoOrigin);
     }
 
+    // 여러 명이면 부부상담 지시문을 얹고, 혼자면 고른 분야만 쓴다.
+    // 개인상담(PRT·CBT)이 이 길을 함께 쓰므로 분야를 클라이언트가 정한다.
+    const solo = body.solo === true;
+    const modeId = solo ? body.mode : 'couple';
     const systemBlocks = [
       { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: modeById('couple').prompt },
-      { type: 'text', text: TOGETHER_PROMPT }
+      { type: 'text', text: modeById(modeId).prompt }
     ];
+    if (!solo) systemBlocks.push({ type: 'text', text: TOGETHER_PROMPT });
 
     const out = await askAnthropic(apiKey, systemBlocks, messages, TOGETHER_MAX_TOKENS, TOGETHER_EFFORT);
     if (out.error) {

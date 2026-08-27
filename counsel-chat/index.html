@@ -449,7 +449,12 @@
     background: var(--card); border-radius: 999px; border: 1px solid var(--line); }
 
   #gateSheet { z-index: 60; }
-  #gateSheet .row, #roomSheet .row { display: flex; flex-direction: column; gap: 6px; }
+  #gateSheet .row, #roomSheet .row, #soloSheet .row { display: flex; flex-direction: column; gap: 6px; }
+  #soloSheet input, #soloSheet select { font: inherit; font-size: 15px; padding: 11px 12px;
+    border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  #soloSheet label { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+  #soloSheet .hint { font-size: 12.5px; color: var(--ink-3); }
+  .chip.solo { border-color: var(--crisis); color: var(--crisis); font-weight: 600; }
   #gateSheet input, #roomSheet input { font: inherit; font-size: 15px; padding: 11px 12px; border-radius: 10px;
     border: 1px solid var(--line); background: var(--card); color: var(--ink); }
   #gateSheet label, #roomSheet label { font-size: 13px; color: var(--ink-2); font-weight: 600; }
@@ -506,6 +511,29 @@
     </div>
     <button class="primary" id="gateGo">들어가기</button>
     <p class="hint" id="gateMsg"></p>
+  </div>
+</div>
+
+<!-- 개인상담 — 잠금 -->
+<div class="sheet hidden" id="soloSheet">
+  <div class="inner">
+    <h1>개인상담<span class="sub">나 혼자 하는 상담. 기록이 이어집니다</span></h1>
+    <div class="row">
+      <label for="soloPw">비밀번호</label>
+      <input id="soloPw" type="password" inputmode="numeric" autocomplete="off" maxlength="20">
+    </div>
+    <div class="row">
+      <label for="soloMode">분야</label>
+      <select id="soloMode">
+        <option value="prt">통증재처리 (PRT)</option>
+        <option value="cbt">인지행동 (CBT)</option>
+      </select>
+    </div>
+    <p class="hint">기록은 브라우저에서 잠근 뒤 보관하므로 서버는 내용을 볼 수 없습니다.
+      <b>비밀번호를 잊으면 지난 기록을 아무도 열 수 없습니다.</b></p>
+    <button class="primary" id="soloGo">들어가기</button>
+    <button class="ghost" id="soloCancel">닫기</button>
+    <p class="hint" id="soloErr"></p>
   </div>
 </div>
 
@@ -654,7 +682,8 @@
 
     <button class="primary" id="setSave">저장</button>
     <button class="ghost" id="setPdf">이번 상담 PDF로 저장</button>
-    <button class="ghost" id="setTxt">이번 상담 기록 파일 내려받기</button>
+    <button class="ghost" id="setTxt">이번 상담 txt 전문</button>
+    <button class="ghost" id="setTxtSum">이번 상담 txt 요약</button>
     <button class="ghost danger" id="setWipe">대화 기록 전체 삭제</button>
     <button class="ghost" id="setClose">닫기</button>
 
@@ -1219,6 +1248,17 @@
       $('roomErr').textContent = '';
     });
     bar.appendChild(rb);
+    // 둘째 칸은 개인상담 입구다. 따로 잠긴다.
+    const sb = document.createElement('button');
+    sb.className = 'chip solo';
+    sb.type = 'button';
+    sb.textContent = '개인상담';
+    sb.title = '나 혼자 하는 상담. 지난 기록이 이어진다';
+    sb.addEventListener('click', function () {
+      $('soloSheet').classList.remove('hidden');
+      $('soloErr').textContent = '';
+    });
+    bar.appendChild(sb);
     for (const m of MODES) {
       const b = document.createElement('button');
       b.className = 'chip';
@@ -1721,6 +1761,10 @@
     ce.title = '상담사가 한 번에 기억하는 범위입니다. 넘으면 오래된 대화는 요약으로만 남습니다.';
     if (used > ROOM_TRIM_AT) ce.classList.add('warn'); else ce.classList.remove('warn');
 
+    if (R.solo) {
+      $('roomMembers').textContent = modeById(R.mode).name + tot;
+      return;
+    }
     $('roomMembers').textContent = (R.members.length
       ? R.members.join(' · ') + ' (' + R.members.length + '명)'
       : '연결 중…') + tot;
@@ -1877,7 +1921,8 @@
       const res = await fetch(ROOM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'ask', room: R.id, messages: msgs, token: store.get('counsel_rt', '') })
+        body: JSON.stringify({ op: 'ask', room: R.id, messages: msgs,
+          solo: !!R.solo, mode: R.mode || 'couple', token: store.get('counsel_rt', '') })
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -2188,6 +2233,59 @@
     roomSys('기록을 가져가시려면 아래 버튼을 쓰세요. 나가면 이 화면은 닫힙니다.');
   }
 
+  /* ---------- 개인상담 ---------- */
+
+  // 함께상담의 방을 그대로 쓴다. 사람이 하나뿐이고 분야가 PRT·CBT 라는 것만 다르다.
+  // 그래서 저장·요약·내보내기·요금 표시가 전부 따라온다.
+  const SOLO_HASH = '954fff0e6cb7526a39d087ba89e25c0371cb3712e1deaf6247f8f4a37a622b3d';
+
+  async function soloEnter() {
+    const pw = $('soloPw').value;
+    const err = $('soloErr');
+    if (!USE_PROXY) { err.textContent = '이 판에서는 개인상담을 쓸 수 없습니다.'; return; }
+    if (!window.crypto || !crypto.subtle) {
+      err.textContent = '이 브라우저에서는 암호화를 쓸 수 없습니다. https 주소로 열어 주세요.';
+      return;
+    }
+    if (sha256('maumtalk-solo:' + pw) !== SOLO_HASH) {
+      err.textContent = '비밀번호가 다릅니다.';
+      return;
+    }
+
+    err.textContent = '여는 중…';
+    let id, key;
+    try {
+      id = await roomSha256Hex('maumtalk-solo-id:' + pw);
+      key = await roomKey('solo', pw);
+    } catch (_e) { err.textContent = '열지 못했습니다.'; return; }
+
+    R = { id: id, key: key, me: '나', members: [], ws: null, msgs: [], asking: false,
+      closing: false, spent: 0, digest: null, thinking: null, thinkTimer: 0,
+      costShown: false, asks: 0, ended: false, solo: true, mode: $('soloMode').value };
+    fxLoad();
+
+    try {
+      const past = (await roomLoad()) || {};
+      const pm = past.msgs || [];
+      R.digest = past.digest || null;
+      if (pm.length || R.digest) {
+        R.msgs = pm;
+        if (R.digest) roomSys(digestLine(R.digest));
+        if (pm.length) roomSys('지난 기록 ' + pm.length + '개를 불러왔습니다');
+      }
+    } catch (_e) {
+      roomSys('지난 기록을 불러오지 못했습니다. 이번 대화는 그대로 진행됩니다.');
+    }
+
+    $('soloSheet').classList.add('hidden');
+    $('roomView').classList.remove('hidden');
+    $('roomTop').querySelector('.rname').childNodes[0].nodeValue = '개인상담';
+    err.textContent = '';
+    $('soloPw').value = '';
+    roomRender();
+    roomConnect();   // 혼자여도 방에 붙는다 — 요금·기다림 표시가 같은 길을 쓴다
+  }
+
   /* ---------- 들어가기 · 나가기 ---------- */
 
   async function roomEnter() {
@@ -2245,6 +2343,7 @@
     await roomSave();
     try { if (R.ws) R.ws.close(); } catch (_e) {}
     R = null;
+    $('roomTop').querySelector('.rname').childNodes[0].nodeValue = '함께상담';
     $('roomView').classList.add('hidden');
   }
 
@@ -2311,10 +2410,44 @@
     $('setTxt').addEventListener('click', function () {
       const list = soloList();
       if (!list.length) return;
-      roomDownload('마음톡-기록-' + roomStamp(Date.now()).replace(/[ :]/g, '') + '.txt',
+      roomDownload('마음톡-전문-' + roomStamp(Date.now()).replace(/[ :]/g, '') + '.txt',
         expToText(modeById(mode).name, list));
     });
+    // 1:1 상담의 요약은 방 밖이라 방 기록을 잠시 흉내 내 만든다
+    $('setTxtSum').addEventListener('click', async function () {
+      const list = soloList();
+      if (!list.length) return;
+      const btn = $('setTxtSum');
+      btn.disabled = true;
+      const before = btn.textContent;
+      btn.textContent = '요약하는 중…';
+      try {
+        const asText = list.map(function (m) {
+          return (m.ai ? '상담사' : '나') + ': ' + m.text;
+        }).join('\n');
+        const res = await fetch(PROXY_URL.replace(/\/+$/, '') + '/together', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ op: 'digest', room: await roomSha256Hex('maumtalk-solo-export'),
+            text: asText, token: store.get('counsel_rt', '') })
+        });
+        const j = await res.json();
+        if (!res.ok || !j.text) { btn.textContent = '요약 실패'; return; }
+        roomDownload('마음톡-요약-' + roomStamp(Date.now()).replace(/[ :]/g, '') + '.txt',
+          expToText(modeById(mode).name + ' 요약',
+            [{ who: ROOM_AI_NAME, text: j.text, ai: true, at: null }]));
+        btn.textContent = before;
+      } catch (_e) {
+        btn.textContent = '요약 실패';
+      }
+      btn.disabled = false;
+      setTimeout(function () { btn.textContent = before; }, 3000);
+    });
 
+    $('soloGo').addEventListener('click', soloEnter);
+    $('soloCancel').addEventListener('click', function () { $('soloSheet').classList.add('hidden'); });
+    $('soloPw').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); soloEnter(); }
+    });
     $('roomGo').addEventListener('click', roomEnter);
     $('roomCancel').addEventListener('click', () => $('roomSheet').classList.add('hidden'));
     $('roomOut').addEventListener('click', roomLeave);

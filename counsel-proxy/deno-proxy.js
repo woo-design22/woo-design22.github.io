@@ -1118,8 +1118,14 @@ const TOGETHER_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 보관 기록 만료 (쓸 �
 const TOGETHER_BLOB_MAX = 256 * 1024;             // 잠긴 덩어리 상한
 const TOGETHER_NAME_MAX = 20;
 const TOGETHER_SAY_MAX = 8000;        // 잠근 뒤라 평문보다 길다
-const TOGETHER_TRIM_AT = 20000;       // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
-const TOGETHER_KEEP = 8000;           // 접고 나서 원문 그대로 남길 최근 분량
+// 사용자 결정: 함께상담에는 비용 상한을 두지 않는다.
+// 기본 상담의 24,000자 / 24개 상한 대신 사실상 열어 둔다.
+// 남은 것은 폭주 방지용 레이트리밋과 모델의 문맥 창(100만 토큰)뿐이고,
+// 진짜 마지막 방어선은 코드가 아니라 Anthropic 콘솔의 지출 상한이다.
+const TOGETHER_MAX_CHARS = 400000;    // 약 30만 토큰. 100만 문맥 안에 넉넉히 든다
+const TOGETHER_MAX_HISTORY = 400;
+const TOGETHER_TRIM_AT = 200000;       // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
+const TOGETHER_KEEP = 60000;           // 접고 나서 원문 그대로 남길 최근 분량
 const TOGETHER_DIGEST_EFFORT = 'medium';  // 요약은 압축이지 상담이 아니다. 깊게 갈 이유가 없다
 const TOGETHER_DIGEST_TOKENS = 3000;
 const TOGETHER_ASK_LIMIT = 20;        // 방 하나가 10분에 부를 수 있는 상담사 호출
@@ -1385,13 +1391,13 @@ async function handleTogetherPost(request, echoOrigin) {
     const incoming = Array.isArray(body.messages) ? body.messages : [];
     const messages = [];
     let totalChars = 0;
-    for (const m of incoming.slice(-MAX_HISTORY)) {
+    for (const m of incoming.slice(-TOGETHER_MAX_HISTORY)) {
       if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
       const text = typeof m.content === 'string' ? m.content : '';
       if (!text) continue;
       const clipped = text.slice(0, MAX_CHARS_PER_MSG);
       totalChars += clipped.length;
-      if (totalChars > MAX_TOTAL_CHARS) break;
+      if (totalChars > TOGETHER_MAX_CHARS) break;
       messages.push({ role: m.role, content: clipped });
     }
     if (!messages.length) return jsonError(400, '보낼 내용이 없습니다.', echoOrigin);

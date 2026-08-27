@@ -28,6 +28,8 @@
  *   ALLOWED_ORIGINS    (쉼표 구분, 예: https://woo-design22.github.io)
  *   OPENROUTER_KEY     (/room 용)  sk-or-v1-...
  *   ROOM_TOKEN_SHA     (/room 용)  회의실 비밀번호에서 나온 표. 비면 /room 이 닫힌다.
+ *   COUNSEL_TOKEN_SHA  (선택)  마음톡 접속 표. 비면 검사하지 않는다(옛 동작).
+ *                      값을 넣으면 웹앱에서 비밀번호를 통과한 사람만 부를 수 있다.
  *
  * 라우트: (기본) 마음톡 · /triage 구급대원 · /room AI 회의실 ·
  *         /telegram 텔레그램 봇 · /kakao 카카오 챗봇
@@ -1331,6 +1333,10 @@ async function handleTogetherPost(request, echoOrigin) {
     return jsonError(400, '요청 형식이 올바르지 않습니다.', echoOrigin);
   }
 
+  if (!(await counselTokenOk(body.token))) {
+    return jsonError(403, '이용 권한이 없습니다. 비밀번호를 다시 넣어 주세요.', echoOrigin);
+  }
+
   const roomId = body.room;
   if (!togetherIdOk(roomId)) return jsonError(400, '방 번호가 올바르지 않습니다.', echoOrigin);
 
@@ -1488,6 +1494,21 @@ const TOGETHER_PROMPT = [
   '여성긴급전화 1366(24시간)을 알린다.'
 ].join('\n');
 
+/* 접속 표 검사.
+ *
+ * COUNSEL_TOKEN_SHA 가 비어 있으면 검사하지 않는다 — 환경변수를 넣기 전에도
+ * 서비스가 죽지 않게 하려는 것이다. 값을 넣는 순간부터 잠긴다.
+ *
+ * 웹앱의 화면 잠금은 문턱일 뿐이고 실제로 크레딧을 지키는 것은 여기다.
+ * 텔레그램·카카오는 각자의 화이트리스트로 막으므로 이 검사를 지나지 않는다.
+ */
+async function counselTokenOk(token) {
+  const want = Deno.env.get('COUNSEL_TOKEN_SHA');
+  if (!want) return true;
+  if (typeof token !== 'string' || !token) return false;
+  return sameSecret(await sha256Hex('counsel:' + token), want);
+}
+
 function allowedOrigins() {
   return (Deno.env.get('ALLOWED_ORIGINS') || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
@@ -1573,6 +1594,10 @@ Deno.serve(async (request) => {
     body = await request.json();
   } catch (_e) {
     return jsonError(400, '요청 형식이 올바르지 않습니다.', echoOrigin);
+  }
+
+  if (!(await counselTokenOk(body.token))) {
+    return jsonError(403, '이용 권한이 없습니다. 비밀번호를 다시 넣어 주세요.', echoOrigin);
   }
 
   // ---- 클라이언트 입력을 신뢰하지 않고 다시 만든다 ----

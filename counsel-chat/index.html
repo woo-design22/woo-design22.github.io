@@ -448,11 +448,12 @@
   .rsys { align-self: center; font-size: 12px; color: var(--ink-3); padding: 4px 10px;
     background: var(--card); border-radius: 999px; border: 1px solid var(--line); }
 
-  #roomSheet .row { display: flex; flex-direction: column; gap: 6px; }
-  #roomSheet input { font: inherit; font-size: 15px; padding: 11px 12px; border-radius: 10px;
+  #gateSheet { z-index: 60; }
+  #gateSheet .row, #roomSheet .row { display: flex; flex-direction: column; gap: 6px; }
+  #gateSheet input, #roomSheet input { font: inherit; font-size: 15px; padding: 11px 12px; border-radius: 10px;
     border: 1px solid var(--line); background: var(--card); color: var(--ink); }
-  #roomSheet label { font-size: 13px; color: var(--ink-2); font-weight: 600; }
-  #roomSheet .hint { font-size: 12.5px; color: var(--ink-3); }
+  #gateSheet label, #roomSheet label { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+  #gateSheet .hint, #roomSheet .hint { font-size: 12.5px; color: var(--ink-3); }
 
   /* 인쇄(=PDF 저장)에서는 대화만 남긴다 */
   #printArea { display: none; }
@@ -494,6 +495,19 @@
   </div>
 </div>
 
+
+<!-- 접속 잠금 -->
+<div class="sheet hidden" id="gateSheet">
+  <div class="inner">
+    <h1>마음톡<span class="sub">비밀번호를 넣어 주세요</span></h1>
+    <div class="row">
+      <label for="gatePw">비밀번호</label>
+      <input id="gatePw" type="password" inputmode="numeric" autocomplete="off" maxlength="20">
+    </div>
+    <button class="primary" id="gateGo">들어가기</button>
+    <p class="hint" id="gateMsg"></p>
+  </div>
+</div>
 
 <!-- 함께상담 — 방 들어가기 -->
 <div class="sheet hidden" id="roomSheet">
@@ -669,6 +683,73 @@
       try { localStorage.removeItem(key); } catch (e) {}
     }
   };
+
+  /* ==================================================================
+   * 접속 잠금
+   *
+   * PASS_HASH 가 비어 있으면 잠그지 않는다. 비밀번호 원문은 이 파일에 없다.
+   *
+   * 분명히 해 둘 것 — 이건 화면을 가리는 문턱이지 서버가 막는 것이 아니다.
+   * 소스를 열면 프록시 주소가 그대로 보이므로, 잠금을 지나치고 API 를
+   * 직접 부를 수 있다. 크레딧을 실제로 지키는 것은 프록시 쪽
+   * COUNSEL_TOKEN_SHA 검사다. 통과하면 그 표를 만들어 보관했다가
+   * 호출할 때마다 함께 보낸다.
+   *
+   * sha256 을 직접 구현한 이유는 crypto.subtle 이 안전한 문맥에서만
+   * 열리기 때문이다 — APK 의 WebView 는 file:// 로 열리므로 거기 기대면
+   * 자물쇠가 통째로 죽는다. AI 회의실에 있는 것과 같은 구현이다.
+   * ================================================================== */
+  const PASS_HASH = 'e0c20c865f6d05d53dea7c2c85afddb19528a3c9fc2044a762de62ed85b2f533';
+  const LOCK_MINUTES = [5, 10, 15, 20, 30, 60];   // 마지막 값이 상한이다
+
+  const SHA_K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+  function sha256(msg) {
+    const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+    let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    const b = Array.from(new TextEncoder().encode(msg));
+    const bitLen = b.length * 8;
+    b.push(0x80);
+    while (b.length % 64 !== 56) b.push(0);
+    b.push(0, 0, 0, 0);   // 길이의 상위 32비트. 입력이 512MB 를 넘을 일이 없다.
+    b.push((bitLen >>> 24) & 255, (bitLen >>> 16) & 255, (bitLen >>> 8) & 255, bitLen & 255);
+
+    const w = new Uint32Array(64);
+    for (let off = 0; off < b.length; off += 64) {
+      for (let i = 0; i < 16; i++) {
+        w[i] = (b[off+i*4] << 24) | (b[off+i*4+1] << 16) | (b[off+i*4+2] << 8) | b[off+i*4+3];
+      }
+      for (let i = 16; i < 64; i++) {
+        const s0 = rotr(w[i-15], 7) ^ rotr(w[i-15], 18) ^ (w[i-15] >>> 3);
+        const s1 = rotr(w[i-2], 17) ^ rotr(w[i-2], 19) ^ (w[i-2] >>> 10);
+        w[i] = (w[i-16] + s0 + w[i-7] + s1) >>> 0;
+      }
+      let a = H[0], c1 = H[1], c2 = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+      for (let i = 0; i < 64; i++) {
+        const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+        const ch = (e & f) ^ (~e & g);
+        const t1 = (h + S1 + ch + SHA_K[i] + w[i]) >>> 0;
+        const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        const mj = (a & c1) ^ (a & c2) ^ (c1 & c2);
+        const t2 = (S0 + mj) >>> 0;
+        h = g; g = f; f = e; e = (d + t1) >>> 0;
+        d = c2; c2 = c1; c1 = a; a = (t1 + t2) >>> 0;
+      }
+      H = [(H[0]+a)>>>0, (H[1]+c1)>>>0, (H[2]+c2)>>>0, (H[3]+d)>>>0,
+           (H[4]+e)>>>0, (H[5]+f)>>>0, (H[6]+g)>>>0, (H[7]+h)>>>0];
+    }
+    return H.map((x) => ('00000000' + x.toString(16)).slice(-8)).join('');
+  }
+  const hashPass = (pw) => sha256('maumtalk:' + pw);
+  const authToken = (pw) => sha256('maumtalk-auth:' + pw);
 
   /* ---------- 배포 설정 ---------- */
   // PROXY_URL 을 채우면 "프록시 모드": 방문자는 API 키 없이 바로 쓴다.
@@ -1219,7 +1300,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // 분야는 id 만 보낸다. 프롬프트 본문은 서버가 고른다.
-        body: JSON.stringify({ mode: mode, messages: apiMessages() })
+        body: JSON.stringify({ mode: mode, messages: apiMessages(), token: store.get('counsel_rt', '') })
       });
     }
     return fetch(API_URL, {
@@ -1796,7 +1877,7 @@
       const res = await fetch(ROOM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'ask', room: R.id, messages: msgs })
+        body: JSON.stringify({ op: 'ask', room: R.id, messages: msgs, token: store.get('counsel_rt', '') })
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -1849,7 +1930,7 @@
     try {
       const res = await fetch(ROOM_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'digest', room: R.id, text: prior + asText })
+        body: JSON.stringify({ op: 'digest', room: R.id, text: prior + asText, token: store.get('counsel_rt', '') })
       });
       const j = await res.json();
       if (!res.ok || !j.text) { roomSys('요약하지 못했습니다. 기록은 그대로 둡니다.'); return false; }
@@ -2070,7 +2151,7 @@
     try {
       const res = await fetch(ROOM_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'digest', room: R.id, text: asText })
+        body: JSON.stringify({ op: 'digest', room: R.id, text: asText, token: store.get('counsel_rt', '') })
       });
       const j = await res.json();
       if (!res.ok || !j.text) { roomSys('요약을 만들지 못했습니다.'); return null; }
@@ -2169,6 +2250,54 @@
 
   /* ---------- 연결 ---------- */
 
+  /* ---------- 접속 잠금 동작 ---------- */
+
+  let gateWasLocked = false;
+
+  function gateState() {
+    const g = store.get('counsel_gate', { strikes: 0, until: 0 });
+    return (g && typeof g === 'object') ? g : { strikes: 0, until: 0 };
+  }
+
+  function gateShow() {
+    const g = gateState();
+    const left = Math.ceil((g.until - Date.now()) / 60000);
+    const msg = $('gateMsg');
+    $('gateGo').disabled = left > 0;
+    if (left > 0) {
+      gateWasLocked = true;
+      msg.textContent = left + '분 뒤에 다시 시도할 수 있습니다.';
+    } else {
+      msg.textContent = gateWasLocked ? '이제 다시 시도할 수 있습니다.' : '';
+      gateWasLocked = false;
+    }
+  }
+
+  function gateTry() {
+    const g = gateState();
+    if (g.until > Date.now()) { gateShow(); return; }   // 잠긴 동안엔 정답도 안 통한다
+    const v = $('gatePw').value.trim();
+    if (hashPass(v) === PASS_HASH) {
+      store.set('counsel_unlock', PASS_HASH);
+      store.set('counsel_rt', authToken(v));   // 서버에 낼 표
+      store.del('counsel_gate');
+      $('gatePw').value = '';
+      $('gateSheet').classList.add('hidden');
+      return;
+    }
+    g.tries = (g.tries || 0) + 1;
+    if (g.tries >= 5) {
+      const mins = LOCK_MINUTES[Math.min(g.strikes || 0, LOCK_MINUTES.length - 1)];
+      g.strikes = (g.strikes || 0) + 1;
+      g.tries = 0;
+      g.until = Date.now() + mins * 60000;
+    }
+    store.set('counsel_gate', g);
+    $('gatePw').value = '';
+    if (g.until > Date.now()) gateShow();
+    else $('gateMsg').textContent = '비밀번호가 다릅니다. (' + (5 - (g.tries || 0)) + '번 남음)';
+  }
+
   function initTogether() {
     // 입구는 분야 줄 첫칸(renderModeBar)에 있다.
 
@@ -2239,6 +2368,15 @@
 
     window.addEventListener('beforeunload', () => { if (R) { try { R.ws && R.ws.close(); } catch (_e) {} } });
   }
+
+  if (PASS_HASH && store.get('counsel_unlock', '') !== PASS_HASH) {
+    $('gateSheet').classList.remove('hidden');
+    gateShow();
+  }
+  $('gateGo').addEventListener('click', gateTry);
+  $('gatePw').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); gateTry(); }
+  });
 
   initTogether();
 })();

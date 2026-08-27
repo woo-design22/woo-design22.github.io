@@ -1529,11 +1529,10 @@
   const ROOM_WS = ROOM_URL.replace(/^http/, 'ws');
   const ROOM_ITER = 150000;      // PBKDF2 반복. 폰에서 1초 안팎이다.
   const ROOM_AI_NAME = '@상담사';
-  // 비용 상한을 두지 않기로 했다. 접기는 없애지 않고 문턱만 크게 올린다 —
-  // 아주 긴 상담에서도 맥락이 통째로 사라지지 않게 하는 장치이기 때문이다.
-  const ROOM_LIMIT = 400000;    // 상담사에게 실을 수 있는 글자 수 (서버와 같은 값)
-  const ROOM_TRIM_AT = 200000;  // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
-  const ROOM_KEEP = 60000;      // 접고 나서 원문 그대로 남길 최근 분량
+  // 상담사가 한 번에 기억하는 범위. 서버와 같은 값이어야 화면이 거짓말을 안 한다.
+  const ROOM_LIMIT = 24000;     // 이 선을 넘으면 오래된 대화는 요약으로만 남는다
+  const ROOM_TRIM_AT = 20000;   // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
+  const ROOM_KEEP = 8000;       // 접고 나서 원문 그대로 남길 최근 분량
 
   let R = null;   // {id, key, me, members:[], ws, msgs:[], asking, closing}
 
@@ -1638,6 +1637,7 @@
       (R.digest ? R.digest.text.length : 0);
     const ce = $('roomChars');
     ce.textContent = used.toLocaleString() + ' / ' + ROOM_LIMIT.toLocaleString() + '자';
+    ce.title = '상담사가 한 번에 기억하는 범위입니다. 넘으면 오래된 대화는 요약으로만 남습니다.';
     if (used > ROOM_TRIM_AT) ce.classList.add('warn'); else ce.classList.remove('warn');
 
     $('roomMembers').textContent = (R.members.length
@@ -1675,6 +1675,7 @@
         roomSys(m.name + '님이 나갔습니다');
         return;
       }
+      if (m.t === 'cost') { costTake(m); return; }
       if (m.t === 'think') { thinkSet(m.on ? m.name : null); return; }
       if (m.t === 'say' || m.t === 'ai') {
         let text;
@@ -1689,6 +1690,44 @@
 
     ws.onclose = () => { if (R && !R.closing) roomSys('연결이 끊겼습니다. 다시 들어와 주세요.'); };
     ws.onerror = () => {};
+  }
+
+  /* ---------- 요금 ---------- */
+
+  // 요금은 부른 사람의 것이 아니라 방의 것이다. 값을 방에 던지고,
+  // 화면에 더하는 일은 받는 쪽(아래 cost 처리)에서 한 번만 한다.
+  // 부른 사람도 중계를 되받으므로 여기서 직접 더하지 않는다 — 그러면 두 번 세어진다.
+  function costTell(c, kind, effort) {
+    if (!c || !R) return;
+    try {
+      if (R.ws && R.ws.readyState === 1) {
+        R.ws.send(JSON.stringify({
+          t: 'cost', usd: c.usd, inTok: c.inTok, outTok: c.outTok,
+          effort: effort || '', kind: kind || 'ask'
+        }));
+        return;
+      }
+    } catch (_e) { /* 아래로 떨어진다 */ }
+    // 연결이 끊겼으면 최소한 내 화면에는 남긴다
+    costTake({ usd: c.usd, inTok: c.inTok, outTok: c.outTok, effort: effort, kind: kind });
+  }
+
+  function costTake(m) {
+    if (!R) return;
+    R.spent += m.usd || 0;
+    if (m.kind === 'digest') {
+      roomSys('요약 비용 약 ' + won(m.usd || 0) + '원');
+    } else {
+      R.asks += 1;
+      // 회당 얼마인지는 한 번만 보여 준다. 매번 뜨면 값을 세는 대화가 된다.
+      if (!R.costShown) {
+        R.costShown = true;
+        roomSys(money({ usd: m.usd, krw: (m.usd || 0) * (fxRate.v || FX_FALLBACK),
+                        inTok: m.inTok || 0, outTok: m.outTok || 0 }, m.effort) +
+          '   — 이후 회차는 가리고, 총액은 상담을 마칠 때 알려 드립니다.');
+      }
+    }
+    roomRender();
   }
 
   /* ---------- 기다림 표시 ---------- */
@@ -1765,16 +1804,7 @@
       } else if (j.text) {
         // 답을 잠가서 방에 뿌린다. 나를 포함해 모두가 같은 경로로 받는다.
         R.ws.send(JSON.stringify({ t: 'ai', c: await seal(R.key, j.text) }));
-        const c = costOf(j.usage);
-        if (c) {
-          R.spent += c.usd;
-          R.asks += 1;
-          // 회당 얼마인지는 한 번만 보여 준다. 매번 뜨면 값을 세는 대화가 된다.
-          if (!R.costShown) {
-            R.costShown = true;
-            roomSys(money(c, j.effort) + '   — 이후 회차는 가리고, 총액은 상담을 마칠 때 알려 드립니다.');
-          }
-        }
+        costTell(costOf(j.usage), 'ask', j.effort);
       }
     } catch (_e) {
       roomSys('상담사를 부르지 못했습니다.');
@@ -1828,9 +1858,8 @@
         srcChars: (R.digest ? R.digest.srcChars : 0) + asText.length
       };
       R.msgs = R.msgs.filter(function (m) { return m.sys || tail.indexOf(m) >= 0; });
-      const c = costOf(j.usage);
-      if (c) R.spent += c.usd;
-      roomSys(digestLine(R.digest) + (c ? '  (요약 비용 약 ' + won(c.usd) + '원)' : ''));
+      roomSys(digestLine(R.digest));
+      costTell(costOf(j.usage), 'digest', null);
       return true;
     } catch (_e) {
       roomSys('요약하지 못했습니다. 기록은 그대로 둡니다.');
@@ -2046,9 +2075,8 @@
       const j = await res.json();
       if (!res.ok || !j.text) { roomSys('요약을 만들지 못했습니다.'); return null; }
       R.digest = { text: j.text, srcChars: asText.length };
-      const c = costOf(j.usage);
-      if (c) R.spent += c.usd;
-      roomSys(digestLine(R.digest) + (c ? '  (요약 비용 약 ' + won(c.usd) + '원)' : ''));
+      roomSys(digestLine(R.digest));
+      costTell(costOf(j.usage), 'digest', null);
       return R.digest;
     } catch (_e) {
       roomSys('요약을 만들지 못했습니다.');
@@ -2073,7 +2101,7 @@
       (R.digest ? R.digest.text.length : 0);
     roomSys('상담을 마쳤습니다.');
     roomSys(R.spent > 0
-      ? '총 요금 ≈ ' + R.spent.toFixed(3) + ' 달러 · 약 ' + won(R.spent) + '원' +
+      ? '총 요금(방 전체 합계) ≈ ' + R.spent.toFixed(3) + ' 달러 · 약 ' + won(R.spent) + '원' +
         '   (상담사 호출 ' + R.asks + '회 · 주고받은 글자 ' + used.toLocaleString() + '자)'
       : '이번 상담에서는 상담사를 부르지 않아 요금이 없습니다.');
     roomSys('기록을 가져가시려면 아래 버튼을 쓰세요. 나가면 이 화면은 닫힙니다.');

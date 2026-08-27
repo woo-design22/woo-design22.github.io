@@ -411,6 +411,57 @@
     line-height: 1.6;
     flex: none;
   }
+
+  /* ---------- 함께상담 ---------- */
+  #roomView { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; }
+  #roomView.hidden { display: none; }
+  #roomTop { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  #roomTop .rname { font-weight: 600; font-size: 15px; margin-right: auto; }
+  #roomTop .rname small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  #roomLog { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  #roomTools { display: flex; gap: 6px; padding: 8px 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  #roomTools button, #roomTools .fake { font: inherit; font-size: 12.5px; padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink-2); cursor: pointer; }
+  #roomTools input[type="file"] { display: none; }
+  #roomComposer { display: flex; gap: 8px; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
+  #roomComposer textarea { flex: 1; resize: none; font: inherit; font-size: 15px; padding: 10px 12px;
+    border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); max-height: 140px; }
+  #roomComposer button { font: inherit; font-weight: 600; padding: 0 18px; border-radius: 12px;
+    border: none; background: var(--accent); color: #fff; cursor: pointer; }
+  #roomComposer button:disabled { opacity: .45; cursor: default; }
+
+  .rmsg { max-width: 84%; display: flex; flex-direction: column; gap: 3px; }
+  .rmsg .who { font-size: 11.5px; color: var(--ink-3); padding: 0 4px; }
+  .rmsg .body { padding: 10px 13px; border-radius: 14px; background: var(--card); border: 1px solid var(--line);
+    white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.65; }
+  .rmsg.mine { align-self: flex-end; }
+  .rmsg.mine .body { background: var(--accent); color: #fff; border-color: transparent; }
+  .rmsg.mine .who { text-align: right; }
+  .rmsg.ai .body { background: var(--card-2, var(--card)); border-color: var(--accent); }
+  .rmsg.ai .who { color: var(--accent); font-weight: 600; }
+  .rsys { align-self: center; font-size: 12px; color: var(--ink-3); padding: 4px 10px;
+    background: var(--card); border-radius: 999px; border: 1px solid var(--line); }
+
+  #roomSheet .row { display: flex; flex-direction: column; gap: 6px; }
+  #roomSheet input { font: inherit; font-size: 15px; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  #roomSheet label { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+  #roomSheet .hint { font-size: 12.5px; color: var(--ink-3); }
+
+  /* 인쇄(=PDF 저장)에서는 대화만 남긴다 */
+  #printArea { display: none; }
+  @media print {
+    body * { visibility: hidden !important; }
+    #printArea, #printArea * { visibility: visible !important; }
+    #printArea { display: block !important; position: absolute; left: 0; top: 0; width: 100%;
+      padding: 0 6mm; color: #000; background: #fff; font-size: 11pt; line-height: 1.6; }
+    #printArea h1 { font-size: 15pt; margin-bottom: 2mm; }
+    #printArea .meta { font-size: 9pt; color: #555; margin-bottom: 6mm; }
+    #printArea .p { margin-bottom: 3mm; page-break-inside: avoid; }
+    #printArea .p b { display: block; font-size: 9.5pt; color: #333; }
+    #printArea .p span { white-space: pre-wrap; }
+    #printArea .foot { margin-top: 8mm; font-size: 8.5pt; color: #666; border-top: 1px solid #bbb; padding-top: 3mm; }
+  }
 </style>
 </head>
 <body>
@@ -436,6 +487,62 @@
     <button id="sendBtn">보내기</button>
   </div>
 </div>
+
+
+<!-- 함께상담 — 방 들어가기 -->
+<div class="sheet hidden" id="roomSheet">
+  <div class="inner">
+    <h1>함께상담<span class="sub">두 사람 이상이 한 방에서 나누는 상담</span></h1>
+
+    <div class="row">
+      <label for="roomName">방 이름</label>
+      <input id="roomName" type="text" autocomplete="off" placeholder="예: 우리집" maxlength="30">
+    </div>
+    <div class="row">
+      <label for="roomPw">비밀번호</label>
+      <input id="roomPw" type="password" autocomplete="off" placeholder="네 자리 이상" maxlength="40">
+    </div>
+    <div class="row">
+      <label for="roomMe">내 이름 (방에서 보일 이름)</label>
+      <input id="roomMe" type="text" autocomplete="off" placeholder="예: 철우" maxlength="20">
+    </div>
+
+    <p class="hint">
+      만들기와 들어가기가 따로 없습니다. <b>같은 방 이름과 비밀번호를 넣은 사람끼리 같은 방</b>이 됩니다.
+      상대에게는 방 이름과 비밀번호만 알려 주면 됩니다.
+    </p>
+    <p class="hint">
+      기록은 브라우저에서 잠근 뒤 보관하므로 서버는 내용을 볼 수 없습니다. 그래서
+      <b>비밀번호를 잊으면 지난 기록을 아무도 열 수 없습니다.</b> 중요한 기록은 방 안에서 파일로 내려받아 두세요.
+    </p>
+
+    <button class="primary" id="roomGo">들어가기</button>
+    <button class="ghost" id="roomCancel">닫기</button>
+    <p class="hint" id="roomErr"></p>
+  </div>
+</div>
+
+<!-- 함께상담 — 방 안 -->
+<div id="roomView" class="hidden">
+  <div id="roomTop">
+    <div class="rname">함께상담<small id="roomMembers">연결 중…</small></div>
+    <button class="tbtn" id="roomOut">나가기</button>
+  </div>
+  <div id="roomLog"></div>
+  <div id="roomTools">
+    <button id="roomAsk">상담사에게 묻기</button>
+    <button id="roomPdf">PDF로 저장</button>
+    <button id="roomTxt">기록 파일 내려받기</button>
+    <label class="fake" for="roomUp">기록 올리기</label>
+    <input type="file" id="roomUp" accept=".txt,text/plain">
+  </div>
+  <div id="roomComposer">
+    <textarea id="roomInput" rows="1" placeholder="여기에 적으면 방에 있는 사람에게 보입니다"></textarea>
+    <button id="roomSend">보내기</button>
+  </div>
+</div>
+
+<div id="printArea" aria-hidden="true"></div>
 
 <!-- 첫 실행 안내 + 키 입력 -->
 <div class="sheet" id="introSheet">
@@ -1277,6 +1384,507 @@
   }
   renderModeBar();
   render(true);
+
+  /* =====================================================================
+   * 함께상담 — 부부·집단 상담 방
+   *
+   * 서버는 방 이름도 비밀번호도 받지 않는다. 같은 재료에서 문맥을 달리해
+   * 두 값을 뽑아, 방 번호만 올려보내고 열쇠는 이 브라우저 밖으로 내보내지 않는다.
+   *   방 번호 = sha256 ('maumtalk-room-id:'  + 방이름 + ':' + 비밀번호)
+   *   열쇠    = PBKDF2 ('maumtalk-room-key:' + 방이름 + ':' + 비밀번호)
+   * 참가자끼리의 말은 잠근 채로 오간다. 평문이 서버를 지나는 건
+   * 「상담사에게 묻기」를 누른 그 순간의 대화록 하나뿐이다.
+   * ===================================================================== */
+
+
+  /* ---------- 상담료 (어림이 아니라 API 실측 토큰으로 센다) ---------- */
+
+  // Opus 5 단가 (100만 토큰당 달러). 바뀌면 여기만 고친다.
+  const PRICE_IN = 5.00;
+  const PRICE_OUT = 25.00;
+  const FX_FALLBACK = 1400;   // 환율을 못 받아올 때 쓰는 값
+  let fxRate = store.get('counsel_fx', { v: FX_FALLBACK, at: 0 });
+
+  // 환율은 하루 한 번만 받아온다. 못 받아와도 앱은 그냥 돈다.
+  async function fxLoad() {
+    if (Date.now() - (fxRate.at || 0) < 86400000) return;
+    try {
+      const r = await fetch('https://api.frankfurter.app/latest?from=USD&to=KRW');
+      const j = await r.json();
+      if (j && j.rates && j.rates.KRW) {
+        fxRate = { v: j.rates.KRW, at: Date.now() };
+        store.set('counsel_fx', fxRate);
+      }
+    } catch (_e) { /* 환율은 있으면 좋고 없으면 기본값 */ }
+  }
+
+  // 캐시된 입력은 더 싸게 과금되지만 여기서는 제값으로 센다.
+  // 비용 표시는 안전장치라, 틀린다면 많게 틀리는 쪽이 낫다.
+  function costOf(u) {
+    if (!u) return null;
+    const inTok = (u.in || 0) + (u.cached || 0);
+    const outTok = u.out || 0;
+    const usd = (inTok / 1e6) * PRICE_IN + (outTok / 1e6) * PRICE_OUT;
+    return { usd: usd, krw: usd * (fxRate.v || FX_FALLBACK), inTok: inTok, outTok: outTok };
+  }
+
+  function won(usd) { return Math.round(usd * (fxRate.v || FX_FALLBACK)).toLocaleString(); }
+
+  function money(c, effort) {
+    return '이번 답변 ≈ ' + c.usd.toFixed(3) + ' 달러 · 약 ' + won(c.usd) + '원' +
+      '  (입력 ' + c.inTok.toLocaleString() + ' · 출력 ' + c.outTok.toLocaleString() + ' 토큰' +
+      (effort ? ' · 깊이 ' + effort : '') + ')';
+  }
+
+  const ROOM_URL = USE_PROXY ? PROXY_URL.replace(/\/+$/, '') + '/together' : '';
+  const ROOM_WS = ROOM_URL.replace(/^http/, 'ws');
+  const ROOM_ITER = 150000;      // PBKDF2 반복. 폰에서 1초 안팎이다.
+  const ROOM_AI_NAME = '@상담사';
+
+  let R = null;   // {id, key, me, members:[], ws, msgs:[], asking, closing}
+
+  const te = new TextEncoder();
+  const td = new TextDecoder();
+
+  function b64(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s);
+  }
+  function unb64(str) {
+    const s = atob(str);
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+
+  async function roomSha256Hex(text) {
+    const buf = await crypto.subtle.digest('SHA-256', te.encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // 소금도 방 이름에서 결정적으로 뽑는다. 두 사람이 같은 열쇠에 닿아야 하기 때문이다.
+  async function roomKey(name, pw) {
+    const saltHex = await roomSha256Hex('maumtalk-room-salt:' + name);
+    const base = await crypto.subtle.importKey(
+      'raw', te.encode('maumtalk-room-key:' + name + ':' + pw), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: te.encode(saltHex), iterations: ROOM_ITER, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  }
+
+  async function seal(key, text) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, te.encode(text));
+    const all = new Uint8Array(iv.length + ct.byteLength);
+    all.set(iv, 0);
+    all.set(new Uint8Array(ct), iv.length);
+    return b64(all);
+  }
+
+  async function unseal(key, blob) {
+    const all = unb64(blob);
+    const iv = all.slice(0, 12);
+    const ct = all.slice(12);
+    const out = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return td.decode(out);
+  }
+
+  /* ---------- 화면 ---------- */
+
+  function roomSys(text) {
+    R.msgs.push({ at: Date.now(), who: '', text, sys: true });
+    roomRender();
+  }
+
+  function roomPush(who, text, ai, at) {
+    R.msgs.push({ at: at || Date.now(), who, text, ai: !!ai });
+    R.msgs.sort((a, b) => a.at - b.at);
+    roomRender();
+  }
+
+  function roomRender() {
+    const log = $('roomLog');
+    const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 60;
+    log.textContent = '';
+    for (const m of R.msgs) {
+      if (m.sys) {
+        const d = document.createElement('div');
+        d.className = 'rsys';
+        d.textContent = m.text;
+        log.appendChild(d);
+        continue;
+      }
+      const row = document.createElement('div');
+      row.className = 'rmsg' + (m.ai ? ' ai' : (m.who === R.me ? ' mine' : ''));
+      const who = document.createElement('div');
+      who.className = 'who';
+      who.textContent = m.ai ? '상담사' : m.who;
+      const body = document.createElement('div');
+      body.className = 'body';
+      body.textContent = m.text;
+      row.appendChild(who);
+      row.appendChild(body);
+      log.appendChild(row);
+    }
+    if (R.asking) {
+      const d = document.createElement('div');
+      d.className = 'rsys';
+      d.textContent = '상담사가 생각하고 있어요…';
+      log.appendChild(d);
+    }
+    if (atBottom) log.scrollTop = log.scrollHeight;
+    const tot = R.spent > 0
+      ? '  ·  이번 상담 ≈ ' + R.spent.toFixed(3) + ' 달러 / 약 ' + won(R.spent) + '원'
+      : '';
+    $('roomMembers').textContent = (R.members.length
+      ? R.members.join(' · ') + ' (' + R.members.length + '명)'
+      : '연결 중…') + tot;
+    $('roomAsk').disabled = R.asking || !R.msgs.some(m => !m.sys && !m.ai);
+  }
+
+  /* ---------- 연결 ---------- */
+
+  function roomConnect() {
+    let ws;
+    try { ws = new WebSocket(ROOM_WS); } catch (_e) { roomSys('연결하지 못했습니다.'); return; }
+    R.ws = ws;
+
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', room: R.id, name: R.me }));
+
+    ws.onmessage = async (ev) => {
+      let m;
+      try { m = JSON.parse(ev.data); } catch (_e) { return; }
+
+      if (m.t === 'err') {
+        roomSys(m.why === 'full' ? '방이 가득 찼습니다.' : '방에 들어가지 못했습니다.');
+        return;
+      }
+      if (m.t === 'welcome') { R.members = m.members || []; roomRender(); return; }
+      if (m.t === 'joined') {
+        R.members = m.members || [];
+        if (m.name !== R.me) roomSys(m.name + '님이 들어왔습니다');
+        else roomSys('방에 들어왔습니다');
+        return;
+      }
+      if (m.t === 'left') {
+        R.members = m.members || [];
+        roomSys(m.name + '님이 나갔습니다');
+        return;
+      }
+      if (m.t === 'say' || m.t === 'ai') {
+        let text;
+        try { text = await unseal(R.key, m.c); }
+        catch (_e) { roomSys('읽을 수 없는 메시지가 왔습니다. 비밀번호가 다른 사람이 있는 것 같습니다.'); return; }
+        roomPush(m.t === 'ai' ? ROOM_AI_NAME : m.name, text, m.t === 'ai', m.at);
+        if (m.t === 'ai') roomSave();
+        return;
+      }
+    };
+
+    ws.onclose = () => { if (R && !R.closing) roomSys('연결이 끊겼습니다. 다시 들어와 주세요.'); };
+    ws.onerror = () => {};
+  }
+
+  /* ---------- 보내기 · 상담사 호출 ---------- */
+
+  async function roomSay() {
+    const el = $('roomInput');
+    const text = el.value.trim();
+    if (!text || !R || !R.ws || R.ws.readyState !== 1) return;
+    el.value = '';
+    el.style.height = 'auto';
+    try {
+      R.ws.send(JSON.stringify({ t: 'say', c: await seal(R.key, text) }));
+    } catch (_e) { roomSys('보내지 못했습니다.'); }
+  }
+
+  // 상담사에게 보낼 대화록. 이름을 앞에 붙이고, 같은 역할이 이어지면 하나로 묶는다
+  // (Anthropic 은 user/assistant 가 번갈아 와야 한다).
+  function roomApiMessages() {
+    const out = [];
+    for (const m of R.msgs) {
+      if (m.sys) continue;
+      const role = m.ai ? 'assistant' : 'user';
+      const content = m.ai ? m.text : (m.who + ': ' + m.text);
+      const last = out[out.length - 1];
+      if (last && last.role === role) last.content += '\n' + content;
+      else out.push({ role, content });
+    }
+    return out.slice(-HISTORY_TURNS);
+  }
+
+  async function roomAsk() {
+    if (!R || R.asking) return;
+    const msgs = roomApiMessages();
+    if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return;
+    R.asking = true;
+    roomRender();
+    try {
+      const res = await fetch(ROOM_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'ask', room: R.id, messages: msgs })
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        roomSys((j.error && j.error.message) || '상담사를 부르지 못했습니다.');
+      } else if (j.text) {
+        // 답을 잠가서 방에 뿌린다. 나를 포함해 모두가 같은 경로로 받는다.
+        R.ws.send(JSON.stringify({ t: 'ai', c: await seal(R.key, j.text) }));
+        const c = costOf(j.usage);
+        if (c) {
+          R.spent += c.usd;
+          roomSys(money(c, j.effort));
+        }
+      }
+    } catch (_e) {
+      roomSys('상담사를 부르지 못했습니다.');
+    }
+    R.asking = false;
+    roomRender();
+  }
+
+  /* ---------- 보관 (서버는 잠긴 덩어리만 갖는다) ---------- */
+
+  async function roomSave() {
+    if (!R || !ROOM_URL) return;
+    const keep = R.msgs.filter(m => !m.sys);
+    if (!keep.length) return;
+    try {
+      const blob = await seal(R.key, JSON.stringify(keep));
+      await fetch(ROOM_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'save', room: R.id, blob })
+      });
+    } catch (_e) { /* 보관 실패는 대화를 막지 않는다. 파일 내려받기가 보험이다 */ }
+  }
+
+  async function roomLoad() {
+    if (!ROOM_URL) return [];
+    try {
+      const res = await fetch(ROOM_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'load', room: R.id })
+      });
+      const j = await res.json();
+      if (!j.blob) return [];
+      const arr = JSON.parse(await unseal(R.key, j.blob));
+      return Array.isArray(arr) ? arr : [];
+    } catch (_e) { return []; }
+  }
+
+  /* ---------- 내보내기 · 들여오기 ---------- */
+
+  function roomStamp(ms) {
+    const d = new Date(ms);
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+      ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  // 되읽을 파일이라 형식을 고정한다. 머리줄은 [ISO] 이름, 본문은 두 칸 들여쓴다.
+  function roomToText() {
+    const lines = [
+      '# 마음톡 함께상담 기록',
+      '# 내보낸 시각: ' + new Date().toISOString(),
+      '# 이 파일을 다음 상담 때 「기록 올리기」에 넣으면 지난 이야기를 이어서 봅니다.',
+      '# 방 이름과 비밀번호는 이 파일에 들어 있지 않습니다.',
+      '----'
+    ];
+    for (const m of R.msgs) {
+      if (m.sys) continue;
+      lines.push('[' + new Date(m.at).toISOString() + '] ' + (m.ai ? ROOM_AI_NAME : m.who));
+      for (const l of String(m.text).split('\n')) lines.push('  ' + l);
+    }
+    return lines.join('\n');
+  }
+
+  function roomFromText(text) {
+    const out = [];
+    let cur = null;
+    for (const raw of String(text).split(/\r?\n/)) {
+      const head = raw.match(/^\[([^\]]+)\]\s+(.+)$/);
+      if (head) {
+        const at = Date.parse(head[1]);
+        if (isNaN(at)) { cur = null; continue; }
+        const who = head[2].trim();
+        cur = { at, who: who === ROOM_AI_NAME ? ROOM_AI_NAME : who, text: [], ai: who === ROOM_AI_NAME };
+        out.push(cur);
+        continue;
+      }
+      if (cur && /^ {2}/.test(raw)) cur.text.push(raw.slice(2));
+    }
+    return out
+      .map(m => ({ at: m.at, who: m.who, text: m.text.join('\n').trim(), ai: m.ai }))
+      .filter(m => m.text);
+  }
+
+  // 같은 시각·같은 사람·같은 말은 한 번만 남긴다.
+  function roomMerge(a, b) {
+    const seen = new Set();
+    const all = [];
+    for (const m of a.concat(b)) {
+      const k = m.at + '|' + m.who + '|' + m.text;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      all.push(m);
+    }
+    all.sort((x, y) => x.at - y.at);
+    return all;
+  }
+
+  function roomDownload(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function roomPrint() {
+    const area = $('printArea');
+    area.textContent = '';
+    const h = document.createElement('h1');
+    h.textContent = '함께상담 기록';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = '참가자 ' + R.members.join(', ') + ' · 내보낸 시각 ' + roomStamp(Date.now());
+    area.appendChild(h);
+    area.appendChild(meta);
+    for (const m of R.msgs) {
+      if (m.sys) continue;
+      const p = document.createElement('div');
+      p.className = 'p';
+      const b = document.createElement('b');
+      b.textContent = (m.ai ? '상담사' : m.who) + ' · ' + roomStamp(m.at);
+      const s = document.createElement('span');
+      s.textContent = m.text;
+      p.appendChild(b);
+      p.appendChild(s);
+      area.appendChild(p);
+    }
+    const f = document.createElement('div');
+    f.className = 'foot';
+    f.textContent = 'AI가 생성한 대화이며 실제 상담·의료 행위가 아닙니다. 이 기록은 개인정보가 담긴 문서이니 보관에 유의하세요.';
+    area.appendChild(f);
+    window.print();
+  }
+
+  /* ---------- 들어가기 · 나가기 ---------- */
+
+  async function roomEnter() {
+    const name = $('roomName').value.trim();
+    const pw = $('roomPw').value;
+    const me = $('roomMe').value.trim().replace(/^@+/, '');
+    const err = $('roomErr');
+
+    if (!name || pw.length < 4 || !me) {
+      err.textContent = '방 이름, 네 자리 이상 비밀번호, 내 이름을 모두 넣어 주세요.';
+      return;
+    }
+    if (!USE_PROXY) { err.textContent = '이 판에서는 함께상담을 쓸 수 없습니다.'; return; }
+    if (!window.crypto || !crypto.subtle) {
+      err.textContent = '이 브라우저에서는 암호화를 쓸 수 없습니다. https 주소로 열어 주세요.';
+      return;
+    }
+
+    err.textContent = '여는 중…';
+    let id, key;
+    try {
+      id = await roomSha256Hex('maumtalk-room-id:' + name + ':' + pw);
+      key = await roomKey(name, pw);
+    } catch (_e) { err.textContent = '방을 열지 못했습니다.'; return; }
+
+    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0 };
+    fxLoad();
+
+    const past = await roomLoad();
+    if (past.length) {
+      R.msgs = past;
+      roomSys('지난 기록 ' + past.length + '개를 불러왔습니다');
+    }
+
+    $('roomSheet').classList.add('hidden');
+    $('roomView').classList.remove('hidden');
+    err.textContent = '';
+    $('roomPw').value = '';
+    roomRender();
+    roomConnect();
+  }
+
+  async function roomLeave() {
+    if (!R) return;
+    R.closing = true;
+    await roomSave();
+    try { if (R.ws) R.ws.close(); } catch (_e) {}
+    R = null;
+    $('roomView').classList.add('hidden');
+  }
+
+  /* ---------- 연결 ---------- */
+
+  function initTogether() {
+    const bar = $('topbar');
+    if (bar) {
+      const btn = document.createElement('button');
+      btn.className = 'tbtn';
+      btn.id = 'roomBtn';
+      btn.textContent = '함께상담';
+      btn.addEventListener('click', () => {
+        $('roomSheet').classList.remove('hidden');
+        $('roomErr').textContent = '';
+      });
+      bar.insertBefore(btn, bar.querySelector('#setBtn'));
+    }
+
+    $('roomGo').addEventListener('click', roomEnter);
+    $('roomCancel').addEventListener('click', () => $('roomSheet').classList.add('hidden'));
+    $('roomOut').addEventListener('click', roomLeave);
+    $('roomSend').addEventListener('click', roomSay);
+    $('roomAsk').addEventListener('click', roomAsk);
+    $('roomPdf').addEventListener('click', () => { if (R) roomPrint(); });
+    $('roomTxt').addEventListener('click', () => {
+      if (!R) return;
+      roomDownload('함께상담-기록-' + roomStamp(Date.now()).replace(/[ :]/g, '') + '.txt', roomToText());
+    });
+
+    $('roomUp').addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!f || !R) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        const got = roomFromText(fr.result);
+        if (!got.length) { roomSys('읽을 수 있는 기록이 없습니다.'); return; }
+        const before = R.msgs.length;
+        R.msgs = roomMerge(R.msgs, got);
+        roomSys('기록 ' + (R.msgs.length - before) + '개를 더했습니다 (모두 ' + R.msgs.length + '개)');
+        roomSave();
+      };
+      fr.readAsText(f, 'utf-8');
+    });
+
+    const ri = $('roomInput');
+    ri.addEventListener('input', () => {
+      ri.style.height = 'auto';
+      ri.style.height = Math.min(ri.scrollHeight, 140) + 'px';
+      $('roomSend').disabled = !ri.value.trim();
+    });
+    ri.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); roomSay(); }
+    });
+    $('roomSend').disabled = true;
+
+    window.addEventListener('beforeunload', () => { if (R) { try { R.ws && R.ws.close(); } catch (_e) {} } });
+  }
+
+  initTogether();
 })();
 </script>
 </body>

@@ -7,10 +7,14 @@
  *
  * 설계 원칙 (worker.js 와 동일 — 바꾸기 전에 반드시 읽을 것)
  * ------------------------------------------------------------------
- * 1. 대화 내용을 절대 저장·기록하지 않는다.
+ * 1. 대화 내용을 저장·기록하지 않는다. (예외 한 곳: /together)
  *    정신건강 상담 내용은 개인정보보호법상 민감정보다. 이 프록시는 요청을
  *    그대로 흘려보내기만 하므로 보관 의무 대부분이 발생하지 않는다.
  *    console.log 로 요청 본문을 찍는 순간 이 설계가 무너진다.
+ *
+ *    유일한 예외가 /together(함께상담)다. 거기서는 기록을 보관한다 —
+ *    다만 브라우저가 잠근 뒤에 올리므로 이 서버는 보관하되 읽지 못한다.
+ *    열쇠는 서버로 오지 않고, 복구 통로도 없다. 자세한 것은 해당 구역의 머리말에.
  *
  * 2. 크레딧 방어선은 여러 겹이다.
  *    Origin 검사 → 레이트리밋 → 입력 길이 상한 → 히스토리 상한 →
@@ -666,14 +670,14 @@ function tgHelp() {
 }
 
 // 완성된 답변 한 덩어리를 받아온다 (스트림을 모아서 반환)
-async function askAnthropic(apiKey, systemBlocks, messages, maxTokens) {
+async function askAnthropic(apiKey, systemBlocks, messages, maxTokens, effort) {
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
     stream: true,
     system: systemBlocks,
     thinking: { type: 'adaptive' },
-    output_config: { effort: EFFORT },
+    output_config: { effort: effort || EFFORT },
     fallbacks: 'default',
     messages
   };
@@ -697,6 +701,7 @@ async function askAnthropic(apiKey, systemBlocks, messages, maxTokens) {
 
   let text = '';
   let refused = false;
+  const use = { in: 0, out: 0, cached: 0 };
   const reader = res.body.getReader();
   const dec = new TextDecoder('utf-8');
   let buf = '';
@@ -713,12 +718,17 @@ async function askAnthropic(apiKey, systemBlocks, messages, maxTokens) {
       try {
         const j = JSON.parse(p);
         if (j.type === 'content_block_delta' && j.delta && j.delta.type === 'text_delta') text += j.delta.text;
+        if (j.type === 'message_start' && j.message && j.message.usage) {
+          use.in = j.message.usage.input_tokens || 0;
+          use.cached = j.message.usage.cache_read_input_tokens || 0;
+        }
+        if (j.type === 'message_delta' && j.usage) use.out = j.usage.output_tokens || use.out;
         if (j.type === 'message_delta' && j.delta && j.delta.stop_reason === 'refusal') refused = true;
       } catch (_e) { /* 조각난 줄은 버린다 */ }
     }
   }
   if (refused) return { error: 'refusal' };
-  return { text: text.trim() };
+  return { text: text.trim(), usage: use };
 }
 
 async function handleTelegram(request) {
@@ -1010,6 +1020,326 @@ async function handleKakao(request) {
 }
 
 
+/* =====================================================================
+ * 함께상담 (/together) — 부부·집단 상담 방
+ *
+ * 설계 원칙 1("대화를 저장하지 않는다")의 유일한 예외 구역이다.
+ * 예외를 두되 원칙의 뜻은 지킨다 — 서버는 보관하지만 읽지는 못한다.
+ *
+ * a. 서버는 방 이름도 비밀번호도 받지 않는다.
+ *    브라우저가 같은 재료에서 문맥을 달리해 두 값을 뽑는다:
+ *      방 번호 = sha256 ('maumtalk-room-id:'  + 방이름 + ':' + 비밀번호)  → 서버로 감
+ *      열쇠    = PBKDF2 ('maumtalk-room-key:' + 방이름 + ':' + 비밀번호)  → 안 나감
+ *    문맥이 다르므로 방 번호에서 열쇠를 되돌릴 수 없다.
+ *
+ * b. 참가자끼리 주고받는 말은 브라우저에서 잠긴 채로 오간다.
+ *    이 서버는 무슨 뜻인지 모르는 덩어리를 그대로 넘겨줄 뿐이다.
+ *
+ * c. 평문이 지나가는 곳은 한 군데뿐 — 「상담사에게 묻기」를 누른 순간의 대화록.
+ *    그것만 Anthropic 으로 간다. 마음톡 기본 경로와 똑같이 지나갈 뿐 저장하지 않는다.
+ *
+ * d. 보관하는 것은 잠긴 덩어리와 참가자 이름뿐이다. 90일 뒤 스스로 사라진다.
+ *    비밀번호를 잃으면 아무도 못 연다. 운영자도 못 연다. 복구 통로는 두지 않는다.
+ *
+ * e. Deno Deploy 는 여러 서버에 흩어져 돈다. 메모리 Map 만으로는 두 사람이
+ *    다른 서버에 붙었을 때 서로 안 보인다. BroadcastChannel 이 그것을 잇는다.
+ * ===================================================================== */
+
+const TOGETHER_MAX_MEMBERS = 12;      // 화면에 안 보이는 안전판. 넘으면 입장 거부.
+const TOGETHER_EFFORT = 'max';        // 부부상담은 가장 깊게 (기본 상담은 high)
+const TOGETHER_MAX_TOKENS = 16000;    // max 는 생각이 길다. 넉넉해야 답이 안 잘린다.
+                                      // 실제 청구는 생성한 만큼만 된다.
+const TOGETHER_IDLE_MS = 10 * 60 * 1000;          // 빈 방을 이만큼 들고 있는다
+const TOGETHER_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 보관 기록 만료 (쓸 때마다 갱신)
+const TOGETHER_BLOB_MAX = 256 * 1024;             // 잠긴 덩어리 상한
+const TOGETHER_NAME_MAX = 20;
+const TOGETHER_SAY_MAX = 8000;        // 잠근 뒤라 평문보다 길다
+const TOGETHER_ASK_LIMIT = 20;        // 방 하나가 10분에 부를 수 있는 상담사 호출
+const TOGETHER_ASK_WINDOW_MS = 10 * 60 * 1000;
+
+// roomId -> { socks:Set<WebSocket>, names:Map<WebSocket,string>, asks:number[], sweep:number }
+const togetherRooms = new Map();
+
+// 인스턴스끼리 잇는 통로. 여기에도 잠긴 덩어리만 흐른다.
+let togetherBus = null;
+try {
+  togetherBus = new BroadcastChannel('maumtalk-together');
+  togetherBus.onmessage = (ev) => {
+    const m = ev.data;
+    if (m && m.room) togetherLocal(m.room, m.payload);
+  };
+} catch (_e) { /* BroadcastChannel 이 없는 환경이면 한 인스턴스 안에서만 돈다 */ }
+
+let togetherKv = null;
+let togetherKvTried = false;
+async function togetherStore() {
+  if (togetherKvTried) return togetherKv;
+  togetherKvTried = true;
+  try { togetherKv = await Deno.openKv(); } catch (_e) { togetherKv = null; }
+  return togetherKv;
+}
+
+// 방 번호는 sha256 16진수 64자리여야 한다. 그 밖의 값은 받지 않는다
+// (아무 문자열이나 받으면 KV 에 쓰레기 키가 쌓인다).
+function togetherIdOk(id) {
+  return typeof id === 'string' && /^[0-9a-f]{64}$/.test(id);
+}
+
+function togetherRoom(id) {
+  let r = togetherRooms.get(id);
+  if (!r) {
+    r = { socks: new Set(), names: new Map(), asks: [], sweep: 0 };
+    togetherRooms.set(id, r);
+  }
+  if (r.sweep) { clearTimeout(r.sweep); r.sweep = 0; }
+  return r;
+}
+
+// 빈 방은 곧바로 지우지 않는다. 잠깐 끊긴 사람이 돌아올 자리를 남겨 둔다.
+function togetherSweep(id) {
+  const r = togetherRooms.get(id);
+  if (!r || r.socks.size > 0) return;
+  if (r.sweep) clearTimeout(r.sweep);
+  r.sweep = setTimeout(() => {
+    const cur = togetherRooms.get(id);
+    if (cur && cur.socks.size === 0) togetherRooms.delete(id);
+  }, TOGETHER_IDLE_MS);
+}
+
+function togetherMembers(r) {
+  return Array.from(r.names.values());
+}
+
+// 이 인스턴스에 붙어 있는 소켓들에만 보낸다.
+function togetherLocal(id, payload) {
+  const r = togetherRooms.get(id);
+  if (!r) return;
+  const line = JSON.stringify(payload);
+  for (const s of r.socks) {
+    try { if (s.readyState === 1) s.send(line); } catch (_e) { /* 끊긴 소켓은 넘긴다 */ }
+  }
+}
+
+// 이 인스턴스 + 다른 모든 인스턴스.
+function togetherSend(id, payload) {
+  togetherLocal(id, payload);
+  if (togetherBus) {
+    try { togetherBus.postMessage({ room: id, payload }); } catch (_e) { /* 통로가 막혀도 로컬은 간다 */ }
+  }
+}
+
+function togetherAskOk(r) {
+  const now = Date.now();
+  r.asks = r.asks.filter((t) => now - t < TOGETHER_ASK_WINDOW_MS);
+  if (r.asks.length >= TOGETHER_ASK_LIMIT) return false;
+  r.asks.push(now);
+  return true;
+}
+
+function togetherClean(s, max) {
+  // 제어문자만 걷어낸다. base64 의 + / = 를 건드리면 기록이 깨진다.
+  var out = (typeof s === 'string' ? s : '');
+  out = out.replace(/[\u0000-\u001F\u007F]/g, '');
+  return out.slice(0, max).trim();
+}
+
+function handleTogetherSocket(request, originOk) {
+  if (!originOk) return new Response('forbidden', { status: 403 });
+
+  let sock, response;
+  try {
+    ({ socket: sock, response } = Deno.upgradeWebSocket(request));
+  } catch (_e) {
+    return new Response('websocket required', { status: 400 });
+  }
+
+  let roomId = null;
+  let myName = '';
+
+  sock.onmessage = (ev) => {
+    let m;
+    try { m = JSON.parse(ev.data); } catch (_e) { return; }
+    if (!m || typeof m.t !== 'string') return;
+
+    // 첫 마디는 반드시 join 이다.
+    if (m.t === 'join') {
+      if (roomId) return;
+      if (!togetherIdOk(m.room)) {
+        try { sock.send(JSON.stringify({ t: 'err', why: 'bad-room' })); sock.close(); } catch (_e) {}
+        return;
+      }
+      const r = togetherRoom(m.room);
+      if (r.socks.size >= TOGETHER_MAX_MEMBERS) {
+        try { sock.send(JSON.stringify({ t: 'err', why: 'full' })); sock.close(); } catch (_e) {}
+        return;
+      }
+      roomId = m.room;
+      myName = togetherClean(m.name, TOGETHER_NAME_MAX) || '이름 없음';
+      r.socks.add(sock);
+      r.names.set(sock, myName);
+
+      // 들어온 사람에게는 지금 누가 있는지, 나머지에게는 누가 왔는지 알린다.
+      try {
+        sock.send(JSON.stringify({ t: 'welcome', you: myName, members: togetherMembers(r) }));
+      } catch (_e) {}
+      togetherSend(roomId, { t: 'joined', name: myName, members: togetherMembers(r), at: Date.now() });
+      return;
+    }
+
+    if (!roomId) return;
+
+    // 참가자끼리의 말. c 는 브라우저가 잠근 덩어리라 서버는 내용을 모른다.
+    if (m.t === 'say') {
+      const c = togetherClean(m.c, TOGETHER_SAY_MAX);
+      if (!c) return;
+      togetherSend(roomId, { t: 'say', name: myName, c, at: Date.now() });
+      return;
+    }
+
+    // 상담사 답변을 방에 뿌린다. 부른 사람이 받아서 잠근 뒤 이리로 보낸다.
+    if (m.t === 'ai') {
+      const c = togetherClean(m.c, TOGETHER_SAY_MAX);
+      if (!c) return;
+      togetherSend(roomId, { t: 'ai', c, at: Date.now() });
+      return;
+    }
+
+    if (m.t === 'ping') {
+      try { sock.send(JSON.stringify({ t: 'pong' })); } catch (_e) {}
+    }
+  };
+
+  const bye = () => {
+    if (!roomId) return;
+    const r = togetherRooms.get(roomId);
+    if (!r) return;
+    r.socks.delete(sock);
+    r.names.delete(sock);
+    togetherSend(roomId, { t: 'left', name: myName, members: togetherMembers(r), at: Date.now() });
+    togetherSweep(roomId);
+  };
+  sock.onclose = bye;
+  sock.onerror = bye;
+
+  return response;
+}
+
+async function handleTogetherPost(request, echoOrigin) {
+  const ip = (request.headers.get('x-forwarded-for') || 'unknown').split(',')[0].trim();
+  if (!roomRateOk(ip)) {
+    return jsonError(429, '잠시 뒤에 다시 시도해 주세요.', echoOrigin);
+  }
+
+  let body;
+  try { body = await request.json(); } catch (_e) {
+    return jsonError(400, '요청 형식이 올바르지 않습니다.', echoOrigin);
+  }
+
+  const roomId = body.room;
+  if (!togetherIdOk(roomId)) return jsonError(400, '방 번호가 올바르지 않습니다.', echoOrigin);
+
+  // ---- 기록 불러오기: 잠긴 덩어리를 그대로 돌려준다 ----
+  if (body.op === 'load') {
+    const kv = await togetherStore();
+    if (!kv) return new Response(JSON.stringify({ blob: null }), {
+      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(echoOrigin) }
+    });
+    let got = null;
+    try { got = (await kv.get(['together', roomId])).value; } catch (_e) { got = null; }
+    return new Response(JSON.stringify({ blob: got ? got.blob : null, at: got ? got.at : null }), {
+      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(echoOrigin) }
+    });
+  }
+
+  // ---- 기록 저장: 내용을 볼 수 없는 채로 넣는다 ----
+  if (body.op === 'save') {
+    const blob = typeof body.blob === 'string' ? body.blob : '';
+    if (!blob || blob.length > TOGETHER_BLOB_MAX) {
+      return jsonError(400, '기록이 비었거나 너무 큽니다.', echoOrigin);
+    }
+    if (!/^[A-Za-z0-9+/=]+$/.test(blob)) {
+      return jsonError(400, '기록 형식이 올바르지 않습니다.', echoOrigin);
+    }
+    const kv = await togetherStore();
+    if (!kv) return jsonError(503, '이 서버에서는 기록 보관을 쓸 수 없습니다.', echoOrigin);
+    try {
+      await kv.set(['together', roomId], { blob, at: new Date().toISOString() }, { expireIn: TOGETHER_TTL_MS });
+    } catch (_e) {
+      return jsonError(500, '기록을 저장하지 못했습니다.', echoOrigin);
+    }
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(echoOrigin) }
+    });
+  }
+
+  // ---- 상담사 호출: 여기만 평문이 지난다. 지나갈 뿐 저장하지 않는다 ----
+  if (body.op === 'ask') {
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!apiKey) return jsonError(500, '서버에 API 키가 설정되지 않았습니다.', echoOrigin);
+
+    const r = togetherRoom(roomId);
+    if (!togetherAskOk(r)) {
+      return jsonError(429, '이 방에서 상담사를 너무 자주 불렀습니다. 잠시 뒤에 다시 눌러 주세요.', echoOrigin);
+    }
+
+    const incoming = Array.isArray(body.messages) ? body.messages : [];
+    const messages = [];
+    let totalChars = 0;
+    for (const m of incoming.slice(-MAX_HISTORY)) {
+      if (!m || (m.role !== 'user' && m.role !== 'assistant')) continue;
+      const text = typeof m.content === 'string' ? m.content : '';
+      if (!text) continue;
+      const clipped = text.slice(0, MAX_CHARS_PER_MSG);
+      totalChars += clipped.length;
+      if (totalChars > MAX_TOTAL_CHARS) break;
+      messages.push({ role: m.role, content: clipped });
+    }
+    if (!messages.length) return jsonError(400, '보낼 내용이 없습니다.', echoOrigin);
+    if (messages[messages.length - 1].role !== 'user') {
+      return jsonError(400, '요청 형식이 올바르지 않습니다.', echoOrigin);
+    }
+
+    const systemBlocks = [
+      { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: modeById('couple').prompt },
+      { type: 'text', text: TOGETHER_PROMPT }
+    ];
+
+    const out = await askAnthropic(apiKey, systemBlocks, messages, TOGETHER_MAX_TOKENS, TOGETHER_EFFORT);
+    if (out.error) {
+      const msg = out.error === 'refusal'
+        ? '이 내용에는 답하기 어렵습니다. 다른 방식으로 물어봐 주세요.'
+        : '상담사를 부르지 못했습니다. ' + out.error;
+      return jsonError(502, msg, echoOrigin);
+    }
+    return new Response(JSON.stringify({ text: out.text, usage: out.usage, effort: TOGETHER_EFFORT }), {
+      status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(echoOrigin) }
+    });
+  }
+
+  return jsonError(400, '알 수 없는 요청입니다.', echoOrigin);
+}
+
+// 여러 사람이 한 방에 있을 때만 얹는 지시. 1:1 상담과 가장 크게 다른 점은
+// "누가 옳은지 가리지 않는다"이다. 판정을 시작하는 순간 진 쪽이 방을 나간다.
+const TOGETHER_PROMPT = [
+  '# 지금은 여러 사람이 한 방에 있는 공동 상담이다',
+  '발언 앞에 누가 말했는지 이름이 붙어 온다. 각자를 다른 사람으로 대한다.',
+  '',
+  '- **누가 옳은지 가리지 않는다.** 판정을 요구받아도 하지 않는다.',
+  '  대신 각자가 무엇을 원하고 무엇이 두려운지를 드러내 준다.',
+  '- **한쪽 편을 들지 않는다.** 한 사람의 말을 받아 준 다음에는 반드시 다른 사람에게도 자리를 준다.',
+  '- 방에 있는데 아직 말하지 않은 사람이 있으면 그 사람에게 물어본다.',
+  '- 사실 다툼(누가 몇 시에 뭐라고 했는지)에 끌려가지 않는다. 기억이 다르면 다른 채로 두고 넘어간다.',
+  '- 한 번에 3~5문장을 넘기지 않는다. 길게 정리해 주면 두 사람의 대화가 끊긴다.',
+  '- 매번 결론을 내려 하지 않는다. 이 방의 주인은 참가자들이고 당신은 사이를 틔워 주는 역할이다.',
+  '- 이혼·이별·헤어짐을 당신이 먼저 꺼내지 않는다. 참가자가 꺼내면 판단하지 말고 그 마음부터 듣는다.',
+  '',
+  '위기 신호(자해·자살·폭력·학대)는 공동 상담이라도 최우선이다. 공통 원칙대로 즉시 다룬다.',
+  '가정폭력이 의심되면 함께 있는 자리에서 캐묻지 않는다. 안전을 먼저 확인하고,',
+  '여성긴급전화 1366(24시간)을 알린다.'
+].join('\n');
+
 function allowedOrigins() {
   return (Deno.env.get('ALLOWED_ORIGINS') || '')
     .split(',').map((s) => s.trim()).filter(Boolean);
@@ -1051,6 +1381,12 @@ Deno.serve(async (request) => {
   const originOk = allow.length === 0 || allow.includes(origin);
   const echoOrigin = originOk ? (origin || '*') : (allow[0] || '*');
 
+  // 함께상담은 WebSocket 이라 POST 가 아니다. 아래 메서드 검사보다 먼저 가른다.
+  if (new URL(request.url).pathname.replace(/\/+$/, '') === '/together' &&
+      (request.headers.get('upgrade') || '').toLowerCase() === 'websocket') {
+    return handleTogetherSocket(request, originOk);
+  }
+
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(echoOrigin) });
   }
@@ -1068,6 +1404,10 @@ Deno.serve(async (request) => {
   // 회의실은 오픈라우터를 부르고 자기 키·자기 상한을 쓴다. 아래 상담 경로와 섞이면 안 된다.
   if (path === '/room') {
     return await handleRoom(request, echoOrigin);
+  }
+
+  if (path === '/together') {
+    return await handleTogetherPost(request, echoOrigin);
   }
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');

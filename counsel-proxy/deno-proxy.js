@@ -1054,6 +1054,10 @@ const TOGETHER_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 보관 기록 만료 (쓸 �
 const TOGETHER_BLOB_MAX = 256 * 1024;             // 잠긴 덩어리 상한
 const TOGETHER_NAME_MAX = 20;
 const TOGETHER_SAY_MAX = 8000;        // 잠근 뒤라 평문보다 길다
+const TOGETHER_TRIM_AT = 20000;       // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
+const TOGETHER_KEEP = 8000;           // 접고 나서 원문 그대로 남길 최근 분량
+const TOGETHER_DIGEST_EFFORT = 'medium';  // 요약은 압축이지 상담이 아니다. 깊게 갈 이유가 없다
+const TOGETHER_DIGEST_TOKENS = 3000;
 const TOGETHER_ASK_LIMIT = 20;        // 방 하나가 10분에 부를 수 있는 상담사 호출
 const TOGETHER_ASK_WINDOW_MS = 10 * 60 * 1000;
 
@@ -1272,6 +1276,31 @@ async function handleTogetherPost(request, echoOrigin) {
     });
   }
 
+  // ---- 기록 접기: 오래된 대화를 요약으로 압축한다 ----
+  //      평문이 지나지만 저장하지 않는 것은 상담사 호출과 같다.
+  if (body.op === 'digest') {
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+    if (!apiKey) return jsonError(500, '서버에 API 키가 설정되지 않았습니다.', echoOrigin);
+
+    const r = togetherRoom(roomId);
+    if (!togetherAskOk(r)) {
+      return jsonError(429, '잠시 뒤에 다시 시도해 주세요.', echoOrigin);
+    }
+
+    const src = typeof body.text === 'string' ? body.text.slice(0, 200000) : '';
+    if (!src.trim()) return jsonError(400, '요약할 내용이 없습니다.', echoOrigin);
+
+    const out = await askAnthropic(
+      apiKey, [{ type: 'text', text: TOGETHER_DIGEST_PROMPT }],
+      [{ role: 'user', content: src }],
+      TOGETHER_DIGEST_TOKENS, TOGETHER_DIGEST_EFFORT);
+
+    if (out.error) return jsonError(502, '요약하지 못했습니다.', echoOrigin);
+    return new Response(JSON.stringify({
+      text: out.text, usage: out.usage, srcChars: src.length, outChars: out.text.length
+    }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders(echoOrigin) } });
+  }
+
   // ---- 상담사 호출: 여기만 평문이 지난다. 지나갈 뿐 저장하지 않는다 ----
   if (body.op === 'ask') {
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -1319,6 +1348,33 @@ async function handleTogetherPost(request, echoOrigin) {
 
   return jsonError(400, '알 수 없는 요청입니다.', echoOrigin);
 }
+
+// 회차가 쌓이면 대화록이 상한을 넘는다. 그냥 앞부분을 버리면
+// "지난번 그 얘기"를 기억하게 하려던 목적이 무너지므로 요약으로 접는다.
+// 한 번 접은 요약은 브라우저가 보관해 두고 다시 쓰므로 호출은 회차당 한 번뿐이다.
+const TOGETHER_DIGEST_PROMPT = [
+  '당신은 상담 기록을 압축하는 서기다. 상담을 하지 말고 요약만 한다.',
+  '',
+  '아래는 한 부부(또는 집단)의 지난 상담 기록이다. 다음 상담에서 상담사가 읽고',
+  '맥락을 되찾을 수 있도록 압축한다. 분량은 원문의 10분의 1 이하로 줄인다.',
+  '',
+  '# 반드시 남길 것',
+  '- 참가자 각자가 반복해서 말한 것, 각자가 원한다고 밝힌 것',
+  '- 서로 합의한 것과 아직 못 좁힌 것',
+  '- 갈등이 커진 지점과 그때의 계기',
+  '- 상담사가 제안했던 것과 그것을 해봤는지',
+  '- 위기 신호(자해·폭력·학대)가 있었다면 반드시 그대로 남긴다',
+  '',
+  '# 버릴 것',
+  '- 인사말, 잡담, 같은 말의 반복',
+  '- 누가 몇 시에 무엇을 했는지 같은 사실 다툼의 세부',
+  '',
+  '# 형식',
+  '- 이름을 그대로 쓴다. "남편"·"아내"로 바꾸지 않는다.',
+  '- 항목 목록으로 쓴다. 서술형 문단으로 늘어놓지 않는다.',
+  '- 판단하거나 편들지 않는다. 무슨 일이 있었는지만 적는다.',
+  '- 앞선 요약이 함께 주어지면 그것과 새 기록을 하나로 합쳐 다시 쓴다.'
+].join('\n');
 
 // 여러 사람이 한 방에 있을 때만 얹는 지시. 1:1 상담과 가장 크게 다른 점은
 // "누가 옳은지 가리지 않는다"이다. 판정을 시작하는 순간 진 쪽이 방을 나간다.

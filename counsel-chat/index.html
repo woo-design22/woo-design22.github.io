@@ -1440,6 +1440,8 @@
   const ROOM_WS = ROOM_URL.replace(/^http/, 'ws');
   const ROOM_ITER = 150000;      // PBKDF2 반복. 폰에서 1초 안팎이다.
   const ROOM_AI_NAME = '@상담사';
+  const ROOM_TRIM_AT = 20000;   // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
+  const ROOM_KEEP = 8000;       // 접고 나서 원문 그대로 남길 최근 분량
 
   let R = null;   // {id, key, me, members:[], ws, msgs:[], asking, closing}
 
@@ -1577,7 +1579,7 @@
         try { text = await unseal(R.key, m.c); }
         catch (_e) { roomSys('읽을 수 없는 메시지가 왔습니다. 비밀번호가 다른 사람이 있는 것 같습니다.'); return; }
         roomPush(m.t === 'ai' ? ROOM_AI_NAME : m.name, text, m.t === 'ai', m.at);
-        if (m.t === 'ai') roomSave();
+        if (m.t === 'ai') roomFold().then(roomSave);
         return;
       }
     };
@@ -1603,6 +1605,10 @@
   // (Anthropic 은 user/assistant 가 번갈아 와야 한다).
   function roomApiMessages() {
     const out = [];
+    if (R.digest) {
+      out.push({ role: 'user', content: '[지난 상담 요약]\n' + R.digest.text });
+      out.push({ role: 'assistant', content: '지난 이야기를 확인했습니다.' });
+    }
     for (const m of R.msgs) {
       if (m.sys) continue;
       const role = m.ai ? 'assistant' : 'user';
@@ -1645,6 +1651,60 @@
     roomRender();
   }
 
+  /* ---------- 기록 접기 ---------- */
+
+  function roomChars(list) {
+    return list.reduce(function (n, m) { return n + (m.text ? m.text.length : 0); }, 0);
+  }
+
+  function digestLine(d) {
+    return '지난 기록 요약 · 전문 ' + d.srcChars.toLocaleString() + '자 → 요약 ' +
+      d.text.length.toLocaleString() + '자';
+  }
+
+  // 대화록이 상한을 넘으면 오래된 앞부분을 요약으로 접는다.
+  // 그냥 버리면 지난 회차가 통째로 사라져 이 기능의 존재 이유가 없어진다.
+  async function roomFold() {
+    if (!R || roomChars(R.msgs.filter(function (m) { return !m.sys; })) <= ROOM_TRIM_AT) return false;
+
+    const real = R.msgs.filter(function (m) { return !m.sys; });
+    let tail = [], n = 0;
+    for (let i = real.length - 1; i >= 0; i--) {
+      n += real[i].text.length;
+      if (n > ROOM_KEEP && tail.length) break;
+      tail.unshift(real[i]);
+    }
+    const head = real.slice(0, real.length - tail.length);
+    if (!head.length) return false;
+
+    const asText = head.map(function (m) {
+      return (m.ai ? '상담사' : m.who) + ': ' + m.text;
+    }).join('\n');
+    const prior = R.digest ? '[앞선 요약]\n' + R.digest.text + '\n\n[이어지는 기록]\n' : '';
+
+    roomSys('지난 기록이 길어 요약하는 중…');
+    try {
+      const res = await fetch(ROOM_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'digest', room: R.id, text: prior + asText })
+      });
+      const j = await res.json();
+      if (!res.ok || !j.text) { roomSys('요약하지 못했습니다. 기록은 그대로 둡니다.'); return false; }
+      R.digest = {
+        text: j.text,
+        srcChars: (R.digest ? R.digest.srcChars : 0) + asText.length
+      };
+      R.msgs = R.msgs.filter(function (m) { return m.sys || tail.indexOf(m) >= 0; });
+      const c = costOf(j.usage);
+      if (c) R.spent += c.usd;
+      roomSys(digestLine(R.digest) + (c ? '  (요약 비용 약 ' + won(c.usd) + '원)' : ''));
+      return true;
+    } catch (_e) {
+      roomSys('요약하지 못했습니다. 기록은 그대로 둡니다.');
+      return false;
+    }
+  }
+
   /* ---------- 보관 (서버는 잠긴 덩어리만 갖는다) ---------- */
 
   async function roomSave() {
@@ -1652,7 +1712,7 @@
     const keep = R.msgs.filter(m => !m.sys);
     if (!keep.length) return;
     try {
-      const blob = await seal(R.key, JSON.stringify(keep));
+      const blob = await seal(R.key, JSON.stringify({ v: 2, digest: R.digest || null, msgs: keep }));
       await fetch(ROOM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1671,8 +1731,9 @@
       });
       const j = await res.json();
       if (!j.blob) return [];
-      const arr = JSON.parse(await unseal(R.key, j.blob));
-      return Array.isArray(arr) ? arr : [];
+      const got = JSON.parse(await unseal(R.key, j.blob));
+      if (Array.isArray(got)) return { digest: null, msgs: got };          // 옛 형식
+      return { digest: got.digest || null, msgs: got.msgs || [] };
     } catch (_e) { return []; }
   }
 
@@ -1801,13 +1862,15 @@
       key = await roomKey(name, pw);
     } catch (_e) { err.textContent = '방을 열지 못했습니다.'; return; }
 
-    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0 };
+    R = { id, key, me, members: [], ws: null, msgs: [], asking: false, closing: false, spent: 0, digest: null };
     fxLoad();
 
     const past = await roomLoad();
-    if (past.length) {
-      R.msgs = past;
-      roomSys('지난 기록 ' + past.length + '개를 불러왔습니다');
+    R.digest = past.digest;
+    if (past.msgs.length || past.digest) {
+      R.msgs = past.msgs;
+      if (past.digest) roomSys(digestLine(past.digest));
+      if (past.msgs.length) roomSys('지난 기록 ' + past.msgs.length + '개를 불러왔습니다');
     }
 
     $('roomSheet').classList.add('hidden');

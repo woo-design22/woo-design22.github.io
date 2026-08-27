@@ -1529,8 +1529,11 @@
   const ROOM_WS = ROOM_URL.replace(/^http/, 'ws');
   const ROOM_ITER = 150000;      // PBKDF2 반복. 폰에서 1초 안팎이다.
   const ROOM_AI_NAME = '@상담사';
-  const ROOM_TRIM_AT = 20000;   // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
-  const ROOM_KEEP = 8000;       // 접고 나서 원문 그대로 남길 최근 분량
+  // 비용 상한을 두지 않기로 했다. 접기는 없애지 않고 문턱만 크게 올린다 —
+  // 아주 긴 상담에서도 맥락이 통째로 사라지지 않게 하는 장치이기 때문이다.
+  const ROOM_LIMIT = 400000;    // 상담사에게 실을 수 있는 글자 수 (서버와 같은 값)
+  const ROOM_TRIM_AT = 200000;  // 이 글자 수를 넘으면 앞부분을 요약으로 접는다
+  const ROOM_KEEP = 60000;      // 접고 나서 원문 그대로 남길 최근 분량
 
   let R = null;   // {id, key, me, members:[], ws, msgs:[], asking, closing}
 
@@ -1630,11 +1633,11 @@
     const tot = R.spent > 0
       ? '  ·  이번 상담 ≈ ' + R.spent.toFixed(3) + ' 달러 / 약 ' + won(R.spent) + '원'
       : '';
-    // 24,000자를 넘으면 오래된 대화가 상담사에게 안 실린다. 미리 보이게 둔다.
+    // 상한을 넘으면 오래된 대화가 상담사에게 안 실린다. 미리 보이게 둔다.
     const used = roomChars(R.msgs.filter(function (m) { return !m.sys; })) +
       (R.digest ? R.digest.text.length : 0);
     const ce = $('roomChars');
-    ce.textContent = used.toLocaleString() + ' / 24,000자';
+    ce.textContent = used.toLocaleString() + ' / ' + ROOM_LIMIT.toLocaleString() + '자';
     if (used > ROOM_TRIM_AT) ce.classList.add('warn'); else ce.classList.remove('warn');
 
     $('roomMembers').textContent = (R.members.length

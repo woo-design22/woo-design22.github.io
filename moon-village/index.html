@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>달빛여울</title>
+<style>
+  :root{
+    --bg:#0b0d12;
+    --panel:rgba(13,16,24,.88);
+    --line:#2b3140;
+    --ink:#ece7db;
+    --dim:#98a0ad;
+    --gold:#d8b04a;
+    --green:#7fc47f;
+    --btn:#161b25;
+    --btn-on:#2e3a4c;
+    --shadow:0 6px 24px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);overflow:hidden}
+  body{
+    font-family:'Segoe UI', Pretendard, sans-serif;
+    color:var(--ink);
+    -webkit-tap-highlight-color:transparent;
+    user-select:none;
+  }
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+  /* ── HUD: 왼쪽 위 목표, 오른쪽 위 상태 ── */
+  #hud{
+    position:fixed;left:max(12px,env(safe-area-inset-left));
+    top:max(12px,env(safe-area-inset-top));
+    max-width:min(62vw,340px);
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:9px 13px;box-shadow:var(--shadow);pointer-events:none;
+    font-size:13px;line-height:1.5;
+  }
+  #hud b{color:var(--gold);font-weight:600;font-size:11px;letter-spacing:.14em;display:block;margin-bottom:2px}
+  #stat{
+    position:fixed;right:max(12px,env(safe-area-inset-right));
+    top:max(12px,env(safe-area-inset-top));
+    display:flex;gap:8px;align-items:center;
+  }
+  #stat .chip{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:7px 11px;font-size:13px;box-shadow:var(--shadow);
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+  #wool{display:none}
+  #btnSnd{pointer-events:auto;cursor:pointer}
+  #btnSnd[aria-pressed="false"]{color:var(--dim)}
+
+  /* ── 상호작용 안내 ── */
+  #prompt{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(120px + env(safe-area-inset-bottom));
+    background:var(--panel);border:1px solid var(--gold);border-radius:20px;
+    padding:8px 18px;font-size:14px;box-shadow:var(--shadow);
+    pointer-events:none;display:none;white-space:nowrap;
+  }
+  #prompt.on{display:block}
+  #prompt b{color:var(--gold)}
+
+  /* ── 인물 이름표 ── */
+  #npcLabel{
+    position:fixed;transform:translate(-50%,-100%);
+    font-size:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.9);
+    pointer-events:none;display:none;white-space:nowrap;
+  }
+
+  /* ── 대화창 ── */
+  #dlg{
+    position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(14px + env(safe-area-inset-bottom));
+    width:min(640px,94vw);
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:13px 17px 15px;box-shadow:var(--shadow);display:none;
+  }
+  #dlg.on{display:block}
+  #dlgName{color:var(--gold);font-size:12.5px;font-weight:600;letter-spacing:.1em;margin-bottom:5px}
+  #dlgText{font-size:14.5px;line-height:1.65;min-height:3.3em;white-space:pre-line}
+  #dlgMore{position:absolute;right:14px;bottom:9px;color:var(--dim);font-size:12px;animation:bob 1s infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+
+  /* ── 조작: 왼쪽 조이스틱 + 오른쪽 A 버튼 ── */
+  #joy{position:fixed;left:0;bottom:0;width:45vw;height:46vh;touch-action:none;pointer-events:none}
+  #joyBase{
+    position:fixed;width:104px;height:104px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);
+    transform:translate(-50%,-50%);display:none;pointer-events:none;
+  }
+  #joyKnob{
+    position:fixed;width:46px;height:46px;border-radius:50%;
+    background:rgba(255,255,255,.30);transform:translate(-50%,-50%);
+    display:none;pointer-events:none;
+  }
+  #btnA{
+    position:fixed;right:calc(20px + env(safe-area-inset-right));
+    bottom:calc(26px + env(safe-area-inset-bottom));
+    width:66px;height:66px;border-radius:50%;
+    background:var(--panel);border:2px solid var(--line);color:var(--ink);
+    font-size:20px;font-weight:700;box-shadow:var(--shadow);
+    touch-action:manipulation;cursor:pointer;
+  }
+  #btnA:active{background:var(--btn-on);border-color:var(--gold)}
+  @media (hover:hover) and (pointer:fine){ #btnA{display:none} }
+
+  /* ── 알림 ── */
+  #toast{
+    position:fixed;left:50%;transform:translateX(-50%);
+    top:calc(64px + env(safe-area-inset-top));
+    background:var(--panel);border:1px solid var(--gold);border-radius:12px;
+    padding:9px 17px;font-size:13.5px;box-shadow:var(--shadow);
+    opacity:0;transition:opacity .4s ease;pointer-events:none;max-width:88vw;text-align:center;
+  }
+  #toast.on{opacity:1}
+
+  /* ── 제목 화면 ── */
+  #title{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 30%, #1a2340 0%, #0b0d16 70%);
+    z-index:10;transition:opacity .8s ease;
+  }
+  #title.off{opacity:0;pointer-events:none}
+  #title .card{text-align:center;padding:24px;max-width:430px}
+  #title .moon{
+    width:92px;height:92px;border-radius:50%;margin:0 auto 22px;
+    background:radial-gradient(circle at 36% 34%, #fdf6dd 0%, #e8d9a8 55%, #c9b878 100%);
+    box-shadow:0 0 60px rgba(240,225,170,.45);
+  }
+  #title h1{margin:0;font-size:34px;letter-spacing:.3em;font-weight:600;text-indent:.3em}
+  #title p.sub{color:var(--dim);font-size:13px;margin:10px 0 26px;line-height:1.7}
+  #btnStart{
+    font-family:inherit;font-size:16px;color:var(--gold);
+    background:var(--btn);border:1px solid var(--gold);border-radius:12px;
+    padding:12px 44px;cursor:pointer;letter-spacing:.2em;text-indent:.2em;
+  }
+  #btnStart:active{background:var(--btn-on)}
+  #title p.how{color:var(--dim);font-size:11.5px;margin-top:22px;line-height:1.9}
+  #title p.how b{color:var(--ink);font-weight:600}
+
+  /* ── WebGL2 미지원 안내 ── */
+  #nogl{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;z-index:20;background:var(--bg)}
+  #nogl div{max-width:430px;background:var(--panel);border:1px solid var(--line);
+            border-radius:14px;padding:22px;line-height:1.75;font-size:14px}
+  #nogl b{color:var(--gold)}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="hud"><b>목표</b><span id="hudGoal">…</span></div>
+<div id="stat">
+  <span class="chip" id="wool">🧶 ×0</span>
+  <span class="chip" id="clock">☀️ --:--</span>
+  <span class="chip" id="btnSnd" role="button" aria-pressed="true">🔊</span>
+</div>
+
+<div id="prompt"><b>Ⓐ</b> <span id="promptText"></span></div>
+<div id="npcLabel"></div>
+
+<div id="dlg"><div id="dlgName"></div><div id="dlgText"></div><div id="dlgMore">▼</div></div>
+
+<div id="joy"></div>
+<div id="joyBase"></div><div id="joyKnob"></div>
+<button id="btnA">A</button>
+
+<div id="toast"></div>
+
+<div id="title">
+  <div class="card">
+    <div class="moon"></div>
+    <h1>달빛여울</h1>
+    <p class="sub">양털을 모으고, 모닥불 곁에서 류트를 연주하는<br>작은 3D 마을. 밤이 오면 큰 달이 뜬다.</p>
+    <button id="btnStart">마을로 가기</button>
+    <p class="how"><b>이동</b> 왼쪽 화면 끌기 · WASD/방향키 &nbsp; <b>시점</b> 오른쪽 화면 끌기 · 마우스 끌기<br><b>행동 Ⓐ</b> 화면 버튼 · Z / Enter / Space</p>
+  </div>
+</div>
+
+<div id="nogl"><div>
+  <b>WebGL2를 쓸 수 없는 브라우저입니다.</b><br>
+  이 마을은 WebGL2로 그립니다. 최신 크롬 · 엣지 · 사파리(15 이상)에서 열어 주세요.
+  카카오톡 · 인스타그램 같은 인앱 브라우저에서는 막혀 있을 수 있으니,
+  오른쪽 위 메뉴의 <b>다른 브라우저로 열기</b>를 눌러 주세요.
+</div></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════════
+   달빛여울 — 작은 3D 생활 RPG
+   초원 마을에서 양털을 깎아 양치기에게 가져다주면 류트를 받고,
+   모닥불 곁에서 연주할 수 있다. 하루가 흐르고 밤에는 큰 달이 뜬다.
+   세계·인물·지명은 전부 창작이다(상용 작품의 설정을 옮기지 않는다).
+   외부 라이브러리 없음. WebGL2를 직접 부른다. 파일 하나로 끝난다.
+   ?debug=1 이면 window.MV 훅(숨은 탭에서는 rAF가 멈추므로
+   자동 검증은 MV.frame(dt)로 프레임을 직접 돌린다).
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ══════════════ store 래퍼 ══════════════
+   file://이나 쿠키 차단 환경에서 localStorage가 예외를 던져도 앱이 멈추지 않게. */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : v; }catch(_){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, v); }catch(_){} }
+};
+const SAVE_KEY = 'mv_save';
+
+/* ══════════════ 상수 ══════════════ */
+const DAY_SEC  = 420;                    // 하루 = 실시간 7분
+const START_F  = 0.10;                   // 아침 8시 24분쯤 시작
+const WATER_Y  = -0.42;                  // 개울 수면 높이
+const WORLD_R  = 86;                     // 걸어갈 수 있는 반지름
+const HERO_SPD = 4.0;                    // m/s
+
+/* 색은 여기 한곳에 모아 둔다(CSS의 :root에 해당하는 자리). 낮 기준값이고
+   밤의 어두움은 색을 바꾸는 게 아니라 광량(조명 유니폼)으로만 만든다. */
+const PAL = {
+  grass :[0.35,0.54,0.28], grass2:[0.30,0.48,0.25], dirt:[0.52,0.42,0.27],
+  sand  :[0.58,0.53,0.40], waterD:[0.13,0.30,0.42],
+  stone :[0.60,0.58,0.54], stoneD:[0.45,0.44,0.42],
+  thatch:[0.74,0.58,0.32], wood:[0.42,0.30,0.19],  woodD:[0.30,0.21,0.13],
+  leaf  :[0.24,0.44,0.22], leaf2:[0.33,0.52,0.24], pine:[0.16,0.34,0.20],
+  trunk :[0.33,0.24,0.16],
+  daySkyZen:[0.30,0.52,0.86], daySkyHor:[0.72,0.83,0.94],
+  nightZen :[0.030,0.045,0.10], nightHor:[0.075,0.095,0.17],
+  duskHor  :[0.96,0.55,0.30],
+  sunCol :[1.00,0.95,0.82], moonCol:[0.82,0.86,1.00],
+  fire  :[1.00,0.62,0.22], lampGlow:[1.00,0.83,0.48],
+  skin  :[0.83,0.66,0.52], wool:[0.92,0.90,0.84], shorn:[0.85,0.72,0.66]
+};
+
+/* 등장인물 차림새 */
+const WHO = {
+  hero : { skin:PAL.skin, hair:[0.28,0.19,0.11], top:[0.28,0.46,0.30],
+           bot:[0.35,0.28,0.20], shoe:[0.28,0.21,0.14], h:1.0 },
+  mir  : { skin:PAL.skin, hair:[0.62,0.30,0.18], top:[0.30,0.38,0.58],
+           bot:[0.24,0.30,0.48], shoe:[0.30,0.22,0.15], skirt:true, h:0.93 }
+};
+
+/* ══════════════ 4×4 행렬 ══════════════ */
+const m4 = {
+  make(){ return new Float32Array(16); },
+  ident(o){ o.fill(0); o[0]=o[5]=o[10]=o[15]=1; return o; },
+  mul(o,a,b){
+    for(let c=0;c<4;c++){
+      const b0=b[c*4],b1=b[c*4+1],b2=b[c*4+2],b3=b[c*4+3];
+      o[c*4  ]=a[0]*b0+a[4]*b1+a[8 ]*b2+a[12]*b3;
+      o[c*4+1]=a[1]*b0+a[5]*b1+a[9 ]*b2+a[13]*b3;
+      o[c*4+2]=a[2]*b0+a[6]*b1+a[10]*b2+a[14]*b3;
+      o[c*4+3]=a[3]*b0+a[7]*b1+a[11]*b2+a[15]*b3;
+    }
+    return o;
+  },
+  persp(o,fovy,asp,n,f){
+    const t=1/Math.tan(fovy/2);
+    o.fill(0); o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f);
+    return o;
+  },
+  look(o,e,c,up){
+    let zx=e[0]-c[0], zy=e[1]-c[1], zz=e[2]-c[2];
+    let l=Math.hypot(zx,zy,zz)||1; zx/=l; zy/=l; zz/=l;
+    let xx=up[1]*zz-up[2]*zy, xy=up[2]*zx-up[0]*zz, xz=up[0]*zy-up[1]*zx;
+    l=Math.hypot(xx,xy,xz)||1; xx/=l; xy/=l; xz/=l;
+    const yx=zy*xz-zz*xy, yy=zz*xx-zx*xz, yz=zx*xy-zy*xx;
+    o[0]=xx; o[1]=yx; o[2]=zx; o[3]=0;
+    o[4]=xy; o[5]=yy; o[6]=zy; o[7]=0;
+    o[8]=xz; o[9]=yz; o[10]=zz; o[11]=0;
+    o[12]=-(xx*e[0]+xy*e[1]+xz*e[2]);
+    o[13]=-(yx*e[0]+yy*e[1]+yz*e[2]);
+    o[14]=-(zx*e[0]+zy*e[1]+zz*e[2]);
+    o[15]=1;
+    return o;
+  },
+  inv(o,m){                                      // 하늘 광선용 일반 역행렬
+    const a=m[0],b=m[1],c=m[2],d=m[3],e=m[4],f=m[5],g=m[6],h=m[7],
+          i=m[8],j=m[9],k=m[10],l=m[11],n=m[12],p=m[13],q=m[14],r=m[15];
+    const s0=a*f-b*e, s1=a*g-c*e, s2=a*h-d*e, s3=b*g-c*f,
+          s4=b*h-d*f, s5=c*h-d*g, t0=i*p-j*n, t1=i*q-k*n,
+          t2=i*r-l*n, t3=j*q-k*p, t4=j*r-l*p, t5=k*r-l*q;
+    let det=s0*t5-s1*t4+s2*t3+s3*t2-s4*t1+s5*t0;
+    if(!det) return m4.ident(o);
+    det=1/det;
+    o[0]=( f*t5-g*t4+h*t3)*det; o[1]=(-b*t5+c*t4-d*t3)*det;
+    o[2]=( p*s5-q*s4+r*s3)*det; o[3]=(-j*s5+k*s4-l*s3)*det;
+    o[4]=(-e*t5+g*t2-h*t1)*det; o[5]=( a*t5-c*t2+d*t1)*det;
+    o[6]=(-n*s5+q*s2-r*s1)*det; o[7]=( i*s5-k*s2+l*s1)*det;
+    o[8]=( e*t4-f*t2+h*t0)*det; o[9]=(-a*t4+b*t2-d*t0)*det;
+    o[10]=( n*s4-p*s2+r*s0)*det; o[11]=(-i*s4+j*s2-l*s0)*det;
+    o[12]=(-e*t3+f*t1-g*t0)*det; o[13]=( a*t3-b*t1+c*t0)*det;
+    o[14]=(-n*s3+p*s1-q*s0)*det; o[15]=( i*s3-j*s1+k*s0)*det;
+    return o;
+  }
+};
+
+/* ══════════════ 변환 스택 ══════════════
+   규칙(lucky-day와 동일): 스택에는 이동·회전과 균일 크기만 넣는다.
+   축마다 다른 크기는 반드시 part()에서 준다 — 그래야 법선 행렬이 정확하다. */
+const MS = (function(){
+  const pool=[]; for(let i=0;i<32;i++) pool.push(m4.ident(m4.make()));
+  const tmp=m4.make(); const scr=m4.make();
+  let top=0;
+  const api={
+    reset(){ top=0; m4.ident(pool[0]); return api; },
+    push(){ pool[top+1].set(pool[top]); top++; return api; },
+    pop(){ top--; return api; },
+    cur(){ return pool[top]; },
+    mulIn(m){ m4.mul(scr,pool[top],m); pool[top].set(scr); return api; },
+    move(x,y,z){ m4.ident(tmp); tmp[12]=x; tmp[13]=y; tmp[14]=z; return api.mulIn(tmp); },
+    rotY(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[0]=c; tmp[2]=-s; tmp[8]=s; tmp[10]=c; return api.mulIn(tmp); },
+    rotX(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[5]=c; tmp[6]=s; tmp[9]=-s; tmp[10]=c; return api.mulIn(tmp); },
+    rotZ(a){ const c=Math.cos(a),s=Math.sin(a); m4.ident(tmp);
+             tmp[0]=c; tmp[1]=s; tmp[4]=-s; tmp[5]=c; return api.mulIn(tmp); },
+    scaleU(k){ m4.ident(tmp); tmp[0]=tmp[5]=tmp[10]=k; return api.mulIn(tmp); }
+  };
+  return api;
+})();
+
+/* ══════════════ WebGL 준비 ══════════════ */
+const cv = document.getElementById('gl');
+const gl = cv.getContext('webgl2', { antialias:true, alpha:false, powerPreference:'high-performance' });
+if(!gl){
+  document.getElementById('nogl').style.display='flex';
+  document.getElementById('title').style.display='none';
+  return;
+}
+
+function shader(type,src){
+  const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error('셰이더 컴파일 실패\n'+gl.getShaderInfoLog(s)+'\n'+src);
+  return s;
+}
+function program(vs,fs,names){
+  const p=gl.createProgram();
+  gl.attachShader(p,shader(gl.VERTEX_SHADER,vs));
+  gl.attachShader(p,shader(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)) console.error('프로그램 링크 실패\n'+gl.getProgramInfoLog(p));
+  const u={}; names.forEach(n=>{ u[n]=gl.getUniformLocation(p,n); });
+  return { p:p, u:u };
+}
+
+/* ── 본체 셰이더: 램버트 + 반구광 + 모닥불 점광 + 물 + 안개 ── */
+const MAIN = program(`#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec3 aNrm;
+layout(location=2) in vec3 aCol;
+uniform mat4 uProj, uView, uModel;
+uniform mat3 uNrm;
+out vec3 vN; out vec3 vC; out vec3 vW;
+void main(){
+  vec4 w = uModel * vec4(aPos,1.0);
+  vW = w.xyz;
+  vN = uNrm * aNrm;
+  vC = aCol;
+  gl_Position = uProj * uView * w;
+}`,
+`#version 300 es
+precision highp float;
+in vec3 vN; in vec3 vC; in vec3 vW;
+uniform vec3  uTint;
+uniform vec3  uEye;
+uniform vec3  uLightDir;    /* 해 또는 달 */
+uniform vec3  uLightCol;
+uniform vec3  uAmbSky;      /* 반구광: 하늘 쪽 */
+uniform vec3  uAmbGnd;      /* 반구광: 땅 쪽 */
+uniform vec3  uFog;
+uniform vec3  uSkyRef;      /* 물에 비칠 하늘색 */
+uniform vec4  uFire;        /* xyz=자리, w=세기(밤에만 커진다) */
+uniform vec3  uFireCol;
+uniform float uFogD;
+uniform float uTime;
+uniform float uAlpha;
+uniform float uFlat;        /* 그림자·빛무리 같은 납작한 것 */
+uniform float uLight;
+uniform float uWater;
+out vec4 outColor;
+void main(){
+  if(uFlat > 0.5){
+    outColor = vec4(uTint, uAlpha * vC.r);
+    return;
+  }
+  vec3 N = normalize(vN);
+  vec3 V = normalize(uEye - vW);
+  float d = length(uEye - vW);
+  vec3 base = vC * uTint;
+  vec3 c;
+  if(uWater > 0.5){
+    /* 개울: 잔물결 + 하늘 비침 + 하이라이트 */
+    float r1 = sin(vW.x*1.9 + uTime*1.4) * sin(vW.z*2.3 - uTime*1.1);
+    float r2 = sin(vW.x*4.3 - uTime*2.2) * sin(vW.z*3.7 + uTime*1.7);
+    N = normalize(vec3((r1+r2*0.5)*0.10, 1.0, (r2-r1*0.5)*0.10));
+    float lam = max(dot(N, uLightDir), 0.0);
+    float fres = pow(1.0 - max(dot(N,V), 0.0), 3.0);
+    c = base * (mix(uAmbGnd, uAmbSky, 0.5+0.5*N.y) + uLightCol * lam * 0.55);
+    c = mix(c, uSkyRef, 0.30 + 0.45*fres);
+    vec3 H = normalize(uLightDir + V);
+    c += uLightCol * pow(max(dot(N,H), 0.0), 90.0) * 0.8;
+  }else{
+    float lam = max(dot(N, uLightDir), 0.0);
+    vec3 amb = mix(uAmbGnd, uAmbSky, 0.5 + 0.5*N.y);
+    c = base * (amb + uLightCol * lam) * uLight;
+  }
+  /* 모닥불 점광 — 밤의 감정선을 여기서 만든다 */
+  if(uFire.w > 0.001){
+    vec3 fd = uFire.xyz - vW;
+    float fl = max(length(fd), 0.001);
+    float fa = uFire.w / (1.0 + fl*fl*0.20);
+    c += base * uFireCol * fa * (0.25 + 0.75 * max(dot(N, fd/fl), 0.0));
+  }
+  c = mix(c, uFog, 1.0 - exp(-d / uFogD));
+  outColor = vec4(c, uAlpha);
+}`,
+['uProj','uView','uModel','uNrm','uTint','uEye','uLightDir','uLightCol','uAmbSky','uAmbGnd',
+ 'uFog','uSkyRef','uFire','uFireCol','uFogD','uTime','uAlpha','uFlat','uLight','uWater']);
+
+/* ── 하늘: 전체 화면 삼각형. 낮 그라데이션 + 해 + 큰 달 + 별 ── */
+const SKY = program(
+`#version 300 es
+out vec2 vNdc;
+void main(){
+  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
+  vNdc = p * 2.0 - 1.0;
+  gl_Position = vec4(vNdc, 1.0, 1.0);
+}`,
+`#version 300 es
+precision highp float;
+in vec2 vNdc;
+uniform mat4 uInvVP;
+uniform vec3 uEye, uZen, uHor, uSunDir, uMoonDir, uSunCol, uMoonCol;
+uniform float uTime, uNight;
+out vec4 outColor;
+void main(){
+  vec4 p = uInvVP * vec4(vNdc, 1.0, 1.0);
+  vec3 dir = normalize(p.xyz / p.w - uEye);
+  float h = clamp(dir.y, 0.0, 1.0);
+  vec3 c = mix(uHor, uZen, pow(h, 0.55));
+
+  /* 옅은 구름결 */
+  float n = 0.5 + 0.5*sin(dir.x*5.0 + uTime*0.02)*sin(dir.z*4.0 - uTime*0.017);
+  c = mix(c, mix(uHor, uZen, 0.35), n * 0.20 * smoothstep(0.02, 0.4, h) * (1.0-uNight*0.7));
+
+  /* 해 */
+  float sd = dot(dir, uSunDir);
+  c += uSunCol * smoothstep(0.9988, 0.9997, sd) * 1.2 * (1.0-uNight);
+  c += uSunCol * pow(max(sd,0.0), 90.0) * 0.20 * (1.0-uNight);
+
+  /* 큰 달 — 이 마을의 이름이 여기서 온다 */
+  float md = dot(dir, uMoonDir);
+  float moon = smoothstep(cos(0.085), cos(0.078), md);
+  if(moon > 0.001){
+    float pat = 0.5 + 0.5*sin(dir.x*57.0 + dir.y*43.0)*sin(dir.y*66.0 - dir.z*49.0);
+    float surf = 1.0 - 0.20*smoothstep(0.35, 0.8, pat);
+    c = mix(c, uMoonCol * surf * (0.55 + 0.5*uNight), moon);
+  }
+  c += uMoonCol * pow(max(md,0.0), 50.0) * 0.16 * uNight;
+
+  /* 별 — 밤에만 */
+  if(uNight > 0.02 && h > 0.02){
+    vec3 sp = dir * 130.0;
+    vec3 id = floor(sp); vec3 f = fract(sp);
+    float hh = fract(sin(dot(id, vec3(12.9898,78.233,37.719))) * 43758.5453);
+    float s = step(0.986, hh) * smoothstep(0.38, 0.05, length(f - 0.5));
+    float tw = 0.6 + 0.4*sin(uTime*2.6 + hh*40.0);
+    c += vec3(0.85,0.90,1.0) * s * tw * uNight * smoothstep(0.02, 0.2, h);
+  }
+  outColor = vec4(c, 1.0);
+}`,
+['uInvVP','uEye','uZen','uHor','uSunDir','uMoonDir','uSunCol','uMoonCol','uTime','uNight']);
+
+/* ══════════════ 형상 만들기 ══════════════
+   모든 형상은 코드로 찍는다. 내려받은 에셋이 하나도 없다.
+   감김 방향은 바깥면이 반시계(CCW) — 뒷면 컬링에 잘리지 않게. */
+function Builder(){ this.a = []; }
+Builder.prototype.tri = function(p, n, col){
+  const M = MS.cur(), a = this.a;
+  for(let i=0;i<3;i++){
+    const x=p[i][0], y=p[i][1], z=p[i][2];
+    a.push(M[0]*x+M[4]*y+M[8]*z+M[12], M[1]*x+M[5]*y+M[9]*z+M[13], M[2]*x+M[6]*y+M[10]*z+M[14]);
+    const nx=n[i][0], ny=n[i][1], nz=n[i][2];
+    let tx=M[0]*nx+M[4]*ny+M[8]*nz, ty=M[1]*nx+M[5]*ny+M[9]*nz, tz=M[2]*nx+M[6]*ny+M[10]*nz;
+    const l=Math.hypot(tx,ty,tz)||1;
+    /* col이 [r,g,b]면 세 정점이 같은 색, [[r,g,b]×3]이면 정점마다 다른 색(지형).
+       숫자인지로 가른다 — col[i]||col 로 가르면 숫자 r이 참으로 잡혀 색이 NaN이 된다. */
+    const cc = (typeof col[0] === 'number') ? col : col[i];
+    a.push(tx/l, ty/l, tz/l, cc[0], cc[1], cc[2]);
+  }
+};
+Builder.prototype.quad = function(p0,p1,p2,p3,col){
+  const ux=p1[0]-p0[0], uy=p1[1]-p0[1], uz=p1[2]-p0[2];
+  const vx=p3[0]-p0[0], vy=p3[1]-p0[1], vz=p3[2]-p0[2];
+  const n=[uy*vz-uz*vy, uz*vx-ux*vz, ux*vy-uy*vx];
+  const l=Math.hypot(n[0],n[1],n[2])||1; n[0]/=l; n[1]/=l; n[2]/=l;
+  this.tri([p0,p1,p2],[n,n,n],col);
+  this.tri([p0,p2,p3],[n,n,n],col);
+};
+Builder.prototype.box = function(sx,sy,sz,col){
+  const x=sx/2, y=sy/2, z=sz/2;
+  const v=[[-x,-y,-z],[x,-y,-z],[x,y,-z],[-x,y,-z],[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]];
+  this.quad(v[4],v[5],v[6],v[7],col);
+  this.quad(v[1],v[0],v[3],v[2],col);
+  this.quad(v[5],v[1],v[2],v[6],col);
+  this.quad(v[0],v[4],v[7],v[3],col);
+  this.quad(v[3],v[7],v[6],v[2],col);
+  this.quad(v[0],v[1],v[5],v[4],col);
+};
+Builder.prototype.cyl = function(r,h,seg,col,caps){
+  const y=h/2, U=[0,1,0], D=[0,-1,0];
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
+    const p0=[c0*r,-y,s0*r], p1=[c1*r,-y,s1*r], p2=[c1*r,y,s1*r], p3=[c0*r,y,s0*r];
+    const n0=[c0,0,s0], n1=[c1,0,s1];
+    this.tri([p0,p2,p1],[n0,n1,n1],col);
+    this.tri([p0,p3,p2],[n0,n0,n1],col);
+    if(caps!==false){
+      this.tri([[0,y,0],p2,p3],[U,U,U],col);
+      this.tri([[0,-y,0],p0,p1],[D,D,D],col);
+    }
+  }
+};
+Builder.prototype.cone = function(r0,r1,h,seg,col){
+  const y=h/2, ny=(r0-r1)/h, U=[0,1,0], D=[0,-1,0];
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
+    const p0=[c0*r0,-y,s0*r0], p1=[c1*r0,-y,s1*r0], p2=[c1*r1,y,s1*r1], p3=[c0*r1,y,s0*r1];
+    const n0=[c0,ny,s0], n1=[c1,ny,s1];
+    this.tri([p0,p2,p1],[n0,n1,n1],col);
+    this.tri([p0,p3,p2],[n0,n0,n1],col);
+    this.tri([[0,-y,0],p0,p1],[D,D,D],col);
+    if(r1>0.001) this.tri([[0,y,0],p2,p3],[U,U,U],col);
+  }
+};
+Builder.prototype.disc = function(r,seg){
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    this.tri([[0,0,0],[Math.cos(a1)*r,0,Math.sin(a1)*r],[Math.cos(a0)*r,0,Math.sin(a0)*r]],
+             [[0,1,0],[0,1,0],[0,1,0]], [1,1,1]);
+    const n=this.a.length;
+    this.a[n-13]=0; this.a[n-12]=0; this.a[n-11]=0;
+    this.a[n-4]=0;  this.a[n-3]=0;  this.a[n-2]=0;
+  }
+};
+Builder.prototype.sph = function(r,seg,ring,col){
+  for(let j=0;j<ring;j++){
+    const t0=j/ring*Math.PI, t1=(j+1)/ring*Math.PI;
+    for(let i=0;i<seg;i++){
+      const p0=i/seg*Math.PI*2, p1=(i+1)/seg*Math.PI*2;
+      const P=(t,p)=>[Math.sin(t)*Math.cos(p), Math.cos(t), Math.sin(t)*Math.sin(p)];
+      const a=P(t0,p0), b=P(t1,p0), c=P(t1,p1), d=P(t0,p1);
+      const S=v=>[v[0]*r,v[1]*r,v[2]*r];
+      this.tri([S(a),S(c),S(b)],[a,c,b],col);
+      this.tri([S(a),S(d),S(c)],[a,d,c],col);
+    }
+  }
+};
+
+function upload(arr){
+  const vao=gl.createVertexArray(); gl.bindVertexArray(vao);
+  const buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(arr), gl.STATIC_DRAW);
+  const S=36;
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,3,gl.FLOAT,false,S,0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1,3,gl.FLOAT,false,S,12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2,3,gl.FLOAT,false,S,24);
+  gl.bindVertexArray(null);
+  return { vao:vao, n:arr.length/9 };
+}
+function bake(fn){ MS.reset(); const b=new Builder(); fn(b); return upload(b.a); }
+
+/* 단위 형상 — 움직이는 것들이 쓴다 */
+const P = {
+  box  : bake(b=>b.box(1,1,1,[1,1,1])),
+  cyl  : bake(b=>b.cyl(0.5,1,12,[1,1,1],true)),
+  cone : bake(b=>b.cone(0.5,0.001,1,12,[1,1,1])),
+  skirt: bake(b=>b.cone(0.5,0.24,1,14,[1,1,1])),
+  limb : bake(b=>b.cone(0.40,0.50,1,8,[1,1,1])),
+  sph  : bake(b=>b.sph(0.5,12,8,[1,1,1])),
+  disc : bake(b=>b.disc(0.5,18))
+};
+
+/* 그리기: 단위 형상을 현재 변환 × 크기로 놓는다. 드로우 콜을 센다(성능 검증용). */
+const _M=m4.make(), _S=m4.make(), _N=new Float32Array(9);
+let drawCalls = 0;
+function part(prim, sx,sy,sz, col, opt){
+  const C=MS.cur();
+  m4.ident(_S); _S[0]=sx; _S[5]=sy; _S[10]=sz;
+  m4.mul(_M, C, _S);
+  const ix=1/sx, iy=1/sy, iz=1/sz;
+  _N[0]=C[0]*ix; _N[1]=C[1]*ix; _N[2]=C[2]*ix;
+  _N[3]=C[4]*iy; _N[4]=C[5]*iy; _N[5]=C[6]*iy;
+  _N[6]=C[8]*iz; _N[7]=C[9]*iz; _N[8]=C[10]*iz;
+  gl.uniformMatrix4fv(MAIN.u.uModel,false,_M);
+  gl.uniformMatrix3fv(MAIN.u.uNrm,false,_N);
+  gl.uniform3fv(MAIN.u.uTint, col);
+  gl.uniform1f(MAIN.u.uAlpha, (opt && opt.alpha!==undefined) ? opt.alpha : 1);
+  gl.uniform1f(MAIN.u.uFlat,  (opt && opt.flat) ? 1 : 0);
+  gl.uniform1f(MAIN.u.uLight, (opt && opt.light!==undefined) ? opt.light : 1);
+  gl.uniform1f(MAIN.u.uWater, (opt && opt.water) ? 1 : 0);
+  gl.bindVertexArray(prim.vao);
+  gl.drawArrays(gl.TRIANGLES, 0, prim.n);
+  drawCalls++;
+}
+
+/* ══════════════ 땅 ══════════════ */
+function sstep(a,b,x){ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); }
+function lerp(a,b,k){ return a+(b-a)*k; }
+function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+function mix3(a,b,k){ return [lerp(a[0],b[0],k), lerp(a[1],b[1],k), lerp(a[2],b[2],k)]; }
+
+function streamZ(x){ return 27 + 5*Math.sin(x*0.045); }
+
+/* 지형 높이. 굽기(정적 메시)와 플레이(발 붙이기)가 같은 함수를 본다 —
+   달라지면 발이 뜨거나 파묻힌다. */
+function groundH(x,z){
+  let h = 1.7*Math.sin(x*0.041+1.7)*Math.cos(z*0.049-0.6)
+        + 0.8*Math.sin(x*0.083-0.9)*Math.sin(z*0.077+2.1)
+        + 0.35*Math.sin(x*0.19+z*0.16);
+  const d = Math.hypot(x,z);
+  h *= sstep(10,34,d);                                            // 마을 중심은 평탄
+  h += 2.6*Math.exp(-(((x-26)*(x-26))+((z+22)*(z+22)))/150);      // 풍차 언덕
+  h += 1.2*Math.exp(-(((x+38)*(x+38))+((z+30)*(z+30)))/420);
+  const sc = 1 - sstep(0, 5.0, Math.abs(z - streamZ(x)));         // 개울 파임
+  h = h*(1-sc) + (-0.95)*sc;
+  return h;
+}
+
+/* 길: 광장에서 뻗는 몇 가닥. 값 1이면 길 한복판이다(지형 색에만 쓴다). */
+const PATH_SEGS = [
+  [0,-2, -9,5], [-9,5, -11,11],       // 양 우리로
+  [0,0, 22,-19],                      // 풍차로
+  [0,-2, 0,-36],                      // 남쪽 길
+  [0,0, 11,6], [0,-1, -13,-8], [1,-1, 12,-12], [0,1, -6,15]   // 집들로
+];
+function distSeg(px,pz, ax,az, bx,bz){
+  const dx=bx-ax, dz=bz-az;
+  const t = clamp(((px-ax)*dx+(pz-az)*dz)/(dx*dx+dz*dz||1), 0, 1);
+  return Math.hypot(px-(ax+dx*t), pz-(az+dz*t));
+}
+function pathAmt(x,z){
+  let a=0;
+  for(const s of PATH_SEGS){
+    a = Math.max(a, 1 - sstep(1.3, 2.6, distSeg(x,z, s[0],s[1], s[2],s[3])));
+  }
+  return a;
+}
+
+/* ══════════════ 마을 배치 ══════════════
+   집·나무 자리는 굽기 전에 배열로 만들어 둔다 — 충돌 판정도 같은 배열을 본다. */
+function rand(seed){ let s=seed; return function(){ s=(s*1103515245+12345)&0x7fffffff; return s/0x7fffffff; }; }
+
+const HOUSES = [ {x:-14,z:-8}, {x:12,z:7}, {x:13,z:-13}, {x:-7,z:17} ];
+const FIRE   = { x:2.5, z:1.5 };
+const WELL   = { x:-4.5, z:-4 };
+const MILL   = { x:26, z:-22 };
+const NPC    = { x:-9, z:5, dir:0.9 };
+const PEN    = { x0:-27, z0:7, x1:-11, z1:17, gap0:10.5, gap1:13.5 };   // 동쪽 변에 문
+const LAMPS  = [ {x:3,z:-5}, {x:-6,z:3}, {x:9,z:-1}, {x:-1,z:9} ];
+
+const TREES = (function(){
+  const R = rand(20260831), out=[];
+  function ok(x,z){
+    if(Math.abs(z - streamZ(x)) < 6) return false;                      // 개울
+    if(x>PEN.x0-3 && x<PEN.x1+3 && z>PEN.z0-3 && z<PEN.z1+3) return false;
+    if(pathAmt(x,z) > 0.05) return false;
+    for(const hh of HOUSES) if(Math.hypot(x-hh.x,z-hh.z) < 7) return false;
+    if(Math.hypot(x-MILL.x,z-MILL.z) < 6) return false;
+    if(Math.hypot(x-FIRE.x,z-FIRE.z) < 6) return false;
+    return true;
+  }
+  for(let i=0;i<90 && out.length<40;i++){
+    const a=R()*Math.PI*2, r=20+R()*58;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r;
+    if(!ok(x,z)) continue;
+    out.push({ x:x, z:z, h:3.2+R()*2.6, pine:R()<0.45, s:1+R()*0.5 });
+  }
+  return out;
+})();
+
+const ROCKS = (function(){
+  const R = rand(777), out=[];
+  for(let i=0;i<26 && out.length<12;i++){
+    const a=R()*Math.PI*2, r=16+R()*60;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r;
+    if(pathAmt(x,z)>0.05) continue;
+    for(const hh of HOUSES) if(Math.hypot(x-hh.x,z-hh.z)<6) continue;
+    out.push({x:x, z:z, s:0.5+R()*0.9, a:R()*Math.PI});
+  }
+  return out;
+})();
+
+/* 충돌: 원 + 선분 */
+const COLL = [];
+const SEGS = [];
+for(const h of HOUSES) COLL.push({x:h.x, z:h.z, r:3.9});
+COLL.push({x:WELL.x, z:WELL.z, r:1.15});
+COLL.push({x:MILL.x, z:MILL.z, r:2.7});
+COLL.push({x:FIRE.x, z:FIRE.z, r:1.25});
+COLL.push({x:NPC.x, z:NPC.z, r:0.45});
+for(const t of TREES) COLL.push({x:t.x, z:t.z, r:0.7*t.s});
+for(const l of LAMPS) COLL.push({x:l.x, z:l.z, r:0.25});
+/* 울타리 — 동쪽 변 가운데가 문이라 두 토막이다 */
+SEGS.push([PEN.x0,PEN.z0, PEN.x1,PEN.z0]);
+SEGS.push([PEN.x0,PEN.z1, PEN.x1,PEN.z1]);
+SEGS.push([PEN.x0,PEN.z0, PEN.x0,PEN.z1]);
+SEGS.push([PEN.x1,PEN.z0, PEN.x1,PEN.gap0]);
+SEGS.push([PEN.x1,PEN.gap1, PEN.x1,PEN.z1]);
+
+/* ══════════════ 거리 굽기(정적 메시) ══════════════ */
+const WORLD = bake(function(b){
+  const R = rand(31415);
+
+  /* ── 지형 — 정점색으로 풀·흙·모래를 칠한다 ── */
+  const STEP=2.0, EXT=96;
+  function gcol(x,z,h){
+    const n = 0.5+0.5*Math.sin(x*0.9+z*0.7)*Math.sin(x*0.31-z*0.53);
+    let c = mix3(PAL.grass2, PAL.grass, n);
+    const p = pathAmt(x,z);
+    if(p>0.01) c = mix3(c, PAL.dirt, Math.min(1, p*1.15));
+    const sc = 1 - sstep(0.5, 5.5, Math.abs(z - streamZ(x)));
+    if(sc>0.01 && h>WATER_Y-0.05) c = mix3(c, PAL.sand, sc*0.85);
+    if(h<WATER_Y+0.03) c = mix3(c, PAL.waterD, 0.6);                 // 물밑 바닥
+    return c;
+  }
+  function gn(x,z){
+    const e=0.6;
+    const nx=groundH(x-e,z)-groundH(x+e,z), nz=groundH(x,z-e)-groundH(x,z+e);
+    const l=Math.hypot(nx,2*e,nz)||1;
+    return [nx/l, 2*e/l, nz/l];
+  }
+  for(let x=-EXT; x<EXT; x+=STEP){
+    for(let z=-EXT; z<EXT; z+=STEP){
+      const x1=x+STEP, z1=z+STEP;
+      const h00=groundH(x,z), h10=groundH(x1,z), h11=groundH(x1,z1), h01=groundH(x,z1);
+      const c00=gcol(x,z,h00), c10=gcol(x1,z,h10), c11=gcol(x1,z1,h11), c01=gcol(x,z1,h01);
+      const n00=gn(x,z), n10=gn(x1,z), n11=gn(x1,z1), n01=gn(x,z1);
+      b.tri([[x,h00,z],[x1,h11,z1],[x1,h10,z]], [n00,n11,n10], [c00,c11,c10]);
+      b.tri([[x,h00,z],[x,h01,z1],[x1,h11,z1]], [n00,n01,n11], [c00,c01,c11]);
+    }
+  }
+
+  /* ── 둥근 돌집: 원통 돌벽 + 원뿔 초가지붕 ── */
+  function house(hx,hz){
+    const hy = groundH(hx,hz);
+    const face = Math.atan2(-hx, -hz);                     // 문이 광장을 본다
+    MS.push(); MS.move(hx,hy,hz); MS.rotY(face);
+      MS.push(); MS.move(0,0.15,0); b.cyl(3.15,0.5,14,PAL.stoneD,true); MS.pop();  // 기단
+      MS.push(); MS.move(0,1.55,0); b.cyl(2.85,2.6,14,PAL.stone,true); MS.pop();   // 돌벽
+      /* 돌 켜 */
+      for(let yy=0.75; yy<2.7; yy+=0.62){
+        MS.push(); MS.move(0,yy+0.15,0); b.cyl(2.87,0.07,14,[0.50,0.48,0.45],false); MS.pop();
+      }
+      MS.push(); MS.move(0,3.9,0); b.cone(3.85,0.12,2.6,14,PAL.thatch); MS.pop();  // 초가지붕
+      MS.push(); MS.move(0,2.72,0); b.cone(3.9,3.6,0.28,14,[0.60,0.47,0.26]); MS.pop(); // 처마단
+      /* 문 */
+      MS.push(); MS.move(0,1.25,2.86); b.box(1.15,2.0,0.16,PAL.woodD); MS.pop();
+      MS.push(); MS.move(0,2.32,2.88); b.box(1.5,0.2,0.2,PAL.wood); MS.pop();
+      /* 창 두 개 — 밤에는 불이 켜진다(동적으로 덧그린다) */
+      for(const s of [-1,1]){
+        MS.push(); MS.rotY(s*1.25); MS.move(0,1.7,2.86); b.box(0.85,0.85,0.14,PAL.woodD); MS.pop();
+      }
+      /* 굴뚝 */
+      MS.push(); MS.move(1.6,4.6,-1.2); b.box(0.55,1.6,0.55,PAL.stoneD); MS.pop();
+    MS.pop();
+  }
+  for(const h of HOUSES) house(h.x, h.z);
+
+  /* ── 우물 ── */
+  (function(){
+    const wy = groundH(WELL.x, WELL.z);
+    MS.push(); MS.move(WELL.x, wy, WELL.z);
+      MS.push(); MS.move(0,0.45,0); b.cyl(1.0,0.9,12,PAL.stoneD,false); MS.pop();
+      MS.push(); MS.move(0,0.92,0); b.cyl(1.08,0.14,12,PAL.stone,true); MS.pop();
+      for(const s of [-1,1]){
+        MS.push(); MS.move(s*0.85,1.7,0); b.box(0.16,1.7,0.16,PAL.wood); MS.pop();
+      }
+      MS.push(); MS.move(0,2.75,0); b.cone(1.5,0.05,0.8,10,PAL.thatch); MS.pop();
+      MS.push(); MS.move(0,2.35,0); MS.rotZ(Math.PI/2); b.cyl(0.07,1.7,6,PAL.woodD,true); MS.pop();
+      MS.push(); MS.move(0,1.75,0); b.box(0.34,0.3,0.34,PAL.woodD); MS.pop();      // 두레박
+    MS.pop();
+  })();
+
+  /* ── 풍차: 탑과 지붕(날개는 돌아가므로 동적으로 그린다) ── */
+  (function(){
+    const my = groundH(MILL.x, MILL.z);
+    MS.push(); MS.move(MILL.x, my, MILL.z);
+      MS.push(); MS.move(0,0.3,0); b.cyl(3.0,0.7,14,PAL.stoneD,true); MS.pop();
+      MS.push(); MS.move(0,3.6,0); b.cone(2.6,1.7,6.2,14,PAL.stone); MS.pop();
+      for(let yy=1.3; yy<6.4; yy+=1.0){
+        const rr = 2.6 - (yy-0.5)/6.2*0.9;
+        MS.push(); MS.move(0,yy,0); b.cyl(rr+0.03,0.07,14,[0.50,0.48,0.45],false); MS.pop();
+      }
+      MS.push(); MS.move(0,7.5,0); b.cone(2.3,0.1,1.9,12,PAL.thatch); MS.pop();
+      MS.push(); MS.move(0,1.45,2.35); b.box(1.0,1.8,0.3,PAL.woodD); MS.pop();     // 문
+    MS.pop();
+  })();
+
+  /* ── 모닥불: 돌 두름 + 장작(불꽃은 동적) + 둘러앉을 통나무 ── */
+  (function(){
+    const fy = groundH(FIRE.x, FIRE.z);
+    MS.push(); MS.move(FIRE.x, fy, FIRE.z);
+      for(let i=0;i<8;i++){
+        const a=i/8*Math.PI*2;
+        MS.push(); MS.move(Math.cos(a)*1.0, 0.14, Math.sin(a)*1.0); MS.rotY(a);
+          b.box(0.42,0.3,0.3,[0.42,0.40,0.38]); MS.pop();
+      }
+      for(let i=0;i<4;i++){
+        MS.push(); MS.rotY(i*Math.PI/4+0.3); MS.rotZ(0.5); MS.move(0,0.3,0);
+          b.cyl(0.11,1.1,6,PAL.woodD,true); MS.pop();
+      }
+      /* 둘러앉는 통나무 세 개 */
+      for(const a of [0.7, 2.6, 4.5]){
+        MS.push(); MS.move(Math.cos(a)*2.3, 0.22, Math.sin(a)*2.3); MS.rotY(-a); MS.rotZ(Math.PI/2);
+          b.cyl(0.24,1.6,8,PAL.wood,true); MS.pop();
+      }
+    MS.pop();
+  })();
+
+  /* ── 양 우리 울타리 — 나무 기둥과 가로대 ── */
+  (function(){
+    function fence(ax,az,bx,bz){
+      const len = Math.hypot(bx-ax, bz-az), n = Math.max(1, Math.round(len/2));
+      for(let i=0;i<=n;i++){
+        const x=lerp(ax,bx,i/n), z=lerp(az,bz,i/n), y=groundH(x,z);
+        MS.push(); MS.move(x,y+0.55,z); b.box(0.16,1.1,0.16,PAL.wood); MS.pop();
+      }
+      for(let i=0;i<n;i++){
+        const x0=lerp(ax,bx,i/n), z0=lerp(az,bz,i/n);
+        const x1=lerp(ax,bx,(i+1)/n), z1=lerp(az,bz,(i+1)/n);
+        const y0=groundH(x0,z0), y1=groundH(x1,z1);
+        for(const ry of [0.45, 0.85]){
+          const mx=(x0+x1)/2, mz=(z0+z1)/2, my=(y0+y1)/2;
+          const ang=Math.atan2(x1-x0, z1-z0);
+          MS.push(); MS.move(mx,my+ry,mz); MS.rotY(ang);
+            b.box(0.09,0.09,Math.hypot(x1-x0,z1-z0,y1-y0)+0.1,[0.48,0.36,0.22]); MS.pop();
+        }
+      }
+    }
+    for(const s of SEGS) fence(s[0],s[1],s[2],s[3]);
+  })();
+
+  /* ── 나무 ── */
+  for(const t of TREES){
+    const ty = groundH(t.x,t.z);
+    MS.push(); MS.move(t.x,ty,t.z); MS.scaleU(t.s);
+      MS.push(); MS.move(0,t.h*0.4,0); b.cone(0.28,0.14,t.h*0.8,8,PAL.trunk); MS.pop();
+      if(t.pine){
+        for(let k=0;k<3;k++){
+          MS.push(); MS.move(0, t.h*0.55 + k*t.h*0.28, 0);
+            b.cone(1.5-k*0.38, 0.05, t.h*0.5, 9, PAL.pine); MS.pop();
+        }
+      }else{
+        MS.push(); MS.move(0,t.h*0.85,0); b.sph(1.45,9,6,PAL.leaf); MS.pop();
+        MS.push(); MS.move(0.8,t.h*0.72,0.3); b.sph(1.0,8,5,PAL.leaf2); MS.pop();
+        MS.push(); MS.move(-0.7,t.h*0.70,-0.4); b.sph(0.95,8,5,PAL.leaf); MS.pop();
+      }
+    MS.pop();
+  }
+
+  /* ── 바위 ── */
+  for(const r of ROCKS){
+    const ry = groundH(r.x,r.z);
+    MS.push(); MS.move(r.x,ry+r.s*0.25,r.z); MS.rotY(r.a);
+      b.sph(r.s,7,5,[0.48,0.47,0.45]);
+      MS.move(r.s*0.5,-r.s*0.1,r.s*0.3); b.sph(r.s*0.55,6,4,[0.42,0.41,0.40]);
+    MS.pop();
+  }
+
+  /* ── 개울 징검돌 ── */
+  for(let i=0;i<5;i++){
+    const x = -2 + i*1.9, z = streamZ(x) - 3 + i*1.5;
+    MS.push(); MS.move(x, WATER_Y+0.08, z);
+      b.cyl(0.55,0.3,8,[0.55,0.54,0.51],true); MS.pop();
+  }
+
+  /* ── 꽃 — 마을 언저리에만 ── */
+  for(let i=0;i<90;i++){
+    const a=R()*Math.PI*2, rr=4+R()*24;
+    const x=Math.cos(a)*rr, z=Math.sin(a)*rr;
+    if(pathAmt(x,z)>0.02) continue;
+    if(Math.hypot(x-FIRE.x,z-FIRE.z)<2.5) continue;
+    const y=groundH(x,z);
+    if(y<WATER_Y+0.2) continue;
+    const c=[[0.95,0.85,0.35],[0.92,0.55,0.65],[0.85,0.88,0.95],[0.75,0.55,0.85]][ (R()*4)|0 ];
+    MS.push(); MS.move(x,y+0.14,z);
+      b.box(0.05,0.28,0.05,[0.30,0.48,0.26]);
+      MS.move(0,0.16,0); b.box(0.13,0.10,0.13,c);
+    MS.pop();
+  }
+
+  /* ── 등롱 기둥(불빛은 동적) ── */
+  for(const l of LAMPS){
+    const y=groundH(l.x,l.z);
+    MS.push(); MS.move(l.x,y,l.z);
+      MS.push(); MS.move(0,1.05,0); b.cyl(0.09,2.1,7,PAL.woodD,true); MS.pop();
+      MS.push(); MS.move(0,2.2,0); b.box(0.34,0.42,0.34,PAL.wood); MS.pop();
+      MS.push(); MS.move(0,2.46,0); b.cone(0.34,0.05,0.24,8,PAL.woodD); MS.pop();
+    MS.pop();
+  }
+
+  /* ── 광장 이정표 ── */
+  (function(){
+    const y=groundH(0,-2.5);
+    MS.push(); MS.move(0.8,y,-2.5);
+      MS.push(); MS.move(0,0.9,0); b.box(0.14,1.8,0.14,PAL.wood); MS.pop();
+      MS.push(); MS.move(0,1.55,0); MS.rotY(0.5); b.box(1.0,0.26,0.07,[0.55,0.42,0.26]); MS.pop();
+      MS.push(); MS.move(0,1.2,0); MS.rotY(-0.7); b.box(0.9,0.24,0.07,[0.55,0.42,0.26]); MS.pop();
+    MS.pop();
+  })();
+});
+
+/* 개울 수면 — 따로 구워서 물 셰이더로 그린다 */
+const WATER = bake(function(b){
+  for(let x=-96; x<96; x+=3){
+    const z0=streamZ(x)-4.6, z1=streamZ(x)+4.6;
+    const x1=x+3, z0b=streamZ(x1)-4.6, z1b=streamZ(x1)+4.6;
+    b.quad([x,WATER_Y,z0],[x,WATER_Y,z1],[x1,WATER_Y,z1b],[x1,WATER_Y,z0b],PAL.waterD);
+  }
+});
+
+/* ══════════════ 사람 · 양 그리기 ══════════════ */
+let camEye=[0,0,0];
+
+/* 사람. 제 좌표계 +Z를 본다. y는 발밑 지면 높이. */
+function drawPerson(w, x, y, z, dirY, phase, opt){
+  opt = opt || {};
+  const moving = !!opt.moving;
+  const sw = moving ? Math.sin(phase) : 0;
+  const dist = Math.hypot(x-camEye[0], y+1.3-camEye[1], z-camEye[2]);
+  const fine = dist < 12;
+  MS.push();
+  MS.move(x, y, z);
+  MS.rotY(dirY);
+
+  /* 발밑 그림자 */
+  gl.depthMask(false);
+  MS.push(); MS.move(0,0.04,0); part(P.disc, 0.9,1,0.72, [0,0,0], {flat:true, alpha:0.25}); MS.pop();
+  gl.depthMask(true);
+
+  MS.scaleU(w.h || 1);
+  MS.move(0, moving ? Math.abs(sw)*0.03 : 0, 0);
+  if(opt.bend) MS.rotX(opt.bend*0.55);
+
+  /* 다리 */
+  for(const s of [-1,1]){
+    const swing = moving ? Math.sin(phase + (s>0?0:Math.PI)) : 0;
+    MS.push(); MS.move(s*0.10, 0.88, 0); MS.rotX(-swing*0.55);
+      MS.push(); MS.move(0,-0.215,0); part(P.limb, 0.33,0.44,0.31, w.bot); MS.pop();
+      MS.move(0,-0.43,0); MS.rotX(Math.max(0,-swing)*0.8+0.04);
+      MS.push(); MS.move(0,-0.19,0); part(P.limb, 0.25,0.40,0.24, w.bot); MS.pop();
+      MS.push(); MS.move(0,-0.40,0.05); part(P.box, 0.12,0.08,0.24, w.shoe); MS.pop();
+    MS.pop();
+  }
+
+  /* 몸통 */
+  MS.push(); MS.move(0,0.95,0); part(P.box, 0.30,0.22,0.19, w.bot); MS.pop();
+  MS.push(); MS.move(0,1.16,0); part(P.box, 0.34,0.34,0.21, w.top); MS.pop();
+  MS.push(); MS.move(0,1.325,0); part(P.box, 0.39,0.10,0.22, w.top); MS.pop();
+  if(w.skirt){
+    MS.push(); MS.move(0,0.66,0); MS.rotZ(sw*0.04); part(P.skirt, 0.95,1.0,0.82, w.bot); MS.pop();
+  }
+  /* 허리끈 */
+  MS.push(); MS.move(0,1.02,0); part(P.box, 0.35,0.07,0.215, [0.50,0.38,0.20]); MS.pop();
+
+  /* 팔 — 류트를 들면 두 팔이 악기를 감싼다 */
+  const lute = opt.lute !== undefined;
+  for(const s of [-1,1]){
+    let shA, elA, zA;
+    if(lute){ shA = s>0 ? -0.85 : -0.55; elA = s>0 ? 1.5 : 1.25; zA = s*0.35; }
+    else if(opt.bend){ shA = -0.9; elA = 0.5; zA = s*0.2; }
+    else { shA = moving ? Math.sin(phase+(s>0?Math.PI:0))*0.45 : 0.06;
+           elA = 0.2 + Math.abs(shA)*0.3; zA = -s*0.08; }
+    MS.push(); MS.move(s*0.205, 1.31, 0); MS.rotZ(zA); MS.rotX(shA);
+      if(lute && s>0) MS.rotX(Math.sin(phase*7)*0.12);        // 오른손이 줄을 뜯는다
+      MS.push(); MS.move(0,-0.16,0); part(P.limb, 0.24,0.33,0.23, w.top); MS.pop();
+      MS.move(0,-0.325,0); MS.rotX(elA);
+      MS.push(); MS.move(0,-0.14,0); part(P.limb, 0.19,0.28,0.18, w.skirt?w.top:w.top); MS.pop();
+      MS.push(); MS.move(0,-0.30,0.01); part(P.box, 0.085,0.11,0.06, w.skin); MS.pop();
+    MS.pop();
+  }
+
+  /* 류트 — 가슴에 비스듬히 */
+  if(lute){
+    MS.push(); MS.move(0.05,1.02,0.24); MS.rotZ(-0.5); MS.rotX(0.18);
+      part(P.sph, 0.42,0.52,0.16, [0.55,0.38,0.18]);
+      MS.push(); MS.move(0,0.02,0.085); part(P.disc, 0.13,1,0.13, [0.12,0.08,0.05]); MS.pop();
+      MS.push(); MS.move(0,0.48,0.02); part(P.box, 0.09,0.55,0.06, PAL.woodD); MS.pop();
+      MS.push(); MS.move(0,0.76,0.02); part(P.box, 0.13,0.13,0.08, [0.30,0.20,0.10]); MS.pop();
+    MS.pop();
+  }
+  if(opt.staff){                                              // 양치기 지팡이
+    MS.push(); MS.move(0.32,0.95,0.1); MS.rotX(-0.08);
+      part(P.cyl, 0.05,1.9,0.05, [0.55,0.42,0.26]);
+      MS.push(); MS.move(0,0.98,0.06); part(P.sph, 0.16,0.16,0.10, [0.55,0.42,0.26]); MS.pop();
+    MS.pop();
+  }
+
+  /* 목·머리 */
+  MS.push(); MS.move(0,1.42,0); part(P.cyl, 0.10,0.10,0.095, w.skin); MS.pop();
+  MS.push(); MS.move(0,1.56,0); MS.rotY(opt.look||0);
+    part(P.sph, 0.21,0.25,0.205, w.skin);
+    if(fine){
+      for(const s of [-1,1]){
+        MS.push(); MS.move(s*0.052,0.02,0.092); part(P.box, 0.035,0.04,0.02, [0.12,0.10,0.10]); MS.pop();
+      }
+      MS.push(); MS.move(0,-0.055,0.09); part(P.box, 0.05,0.012,0.02, [0.55,0.32,0.28]); MS.pop();
+    }
+    /* 머리칼 */
+    MS.push(); MS.move(0,0.055,-0.03); part(P.sph, 0.225,0.17,0.215, w.hair); MS.pop();
+    MS.push(); MS.move(0,0.10,0.02); part(P.box, 0.18,0.05,0.12, w.hair); MS.pop();
+    if(w.skirt){                                              // 미르의 갈래머리
+      for(const s of [-1,1]){
+        MS.push(); MS.move(s*0.16,-0.10,-0.06); part(P.sph, 0.09,0.22,0.09, w.hair); MS.pop();
+      }
+    }
+  MS.pop();
+  MS.pop();
+}
+
+/* 양. wool 0(깎임)~1(복슬). */
+function drawSheep(s){
+  const w = s.wool;
+  MS.push();
+  MS.move(s.x, s.y, s.z);
+  MS.rotY(s.dir);
+  gl.depthMask(false);
+  MS.push(); MS.move(0,0.04,0); part(P.disc, 0.95,1,0.7, [0,0,0], {flat:true, alpha:0.22}); MS.pop();
+  gl.depthMask(true);
+  const bob = s.moving ? Math.abs(Math.sin(s.phase))*0.03 : 0;
+  const bodyC = mix3(PAL.shorn, PAL.wool, w);
+  /* 다리 */
+  for(const sx of [-1,1]) for(const sz of [-1,1]){
+    const swing = s.moving ? Math.sin(s.phase + (sx*sz>0?0:Math.PI))*0.5 : 0;
+    MS.push(); MS.move(sx*0.16, 0.34, sz*0.22); MS.rotX(swing);
+      MS.push(); MS.move(0,-0.16,0); part(P.box, 0.09,0.34,0.09, [0.35,0.30,0.26]); MS.pop();
+    MS.pop();
+  }
+  /* 몸(양털) */
+  MS.push(); MS.move(0, 0.52+bob, 0);
+    part(P.sph, 0.62+0.30*w, 0.50+0.26*w, 0.86+0.34*w, bodyC);
+    if(w>0.4){
+      MS.push(); MS.move(0,0.18,0.2); part(P.sph, 0.4,0.3,0.4, bodyC); MS.pop();
+      MS.push(); MS.move(0,0.14,-0.3); part(P.sph, 0.38,0.3,0.36, bodyC); MS.pop();
+    }
+  MS.pop();
+  /* 머리 */
+  MS.push(); MS.move(0, 0.62+bob, 0.52+0.14*w);
+    part(P.sph, 0.24,0.26,0.28, [0.30,0.27,0.25]);
+    MS.push(); MS.move(0,0.16,-0.02); part(P.sph, 0.20,0.14,0.18, bodyC); MS.pop();   // 이마 털
+    for(const sx of [-1,1]){
+      MS.push(); MS.move(sx*0.15,0.05,0); MS.rotZ(sx*0.9); part(P.box, 0.05,0.16,0.08, [0.28,0.25,0.23]); MS.pop();
+      MS.push(); MS.move(sx*0.07,0.03,0.13); part(P.box, 0.035,0.05,0.02, [0.05,0.05,0.05]); MS.pop();
+    }
+  MS.pop();
+  /* 꼬리 */
+  MS.push(); MS.move(0, 0.60+bob, -0.55-0.2*w); part(P.sph, 0.14,0.14,0.16, bodyC); MS.pop();
+  MS.pop();
+}
+
+/* ══════════════ 상태 ══════════════ */
+const S = {
+  started:false,
+  x:0, z:-7, dir:0, moving:false, phase:0,
+  camYaw:-Math.PI/2, camPitch:0.36, camDist:6.5,
+  time: START_F*DAY_SEC,
+  wool:0, stage:0,                       // 0 처음, 1 양털 모으기, 2 류트 있음
+  playing:false, busy:false, act:null,
+  q:{ moonlit:0 },
+  millAng:0
+};
+
+function saveGame(){
+  store.set(SAVE_KEY, JSON.stringify({
+    v:1, x:+S.x.toFixed(1), z:+S.z.toFixed(1), time:Math.round(S.time),
+    wool:S.wool, stage:S.stage, q:S.q
+  }));
+}
+(function loadGame(){
+  try{
+    const d = JSON.parse(store.get(SAVE_KEY, 'null'));
+    if(d && d.v===1){
+      S.x=d.x; S.z=d.z; S.time=d.time%DAY_SEC;
+      S.wool=d.wool|0; S.stage=d.stage|0; S.q=d.q||{moonlit:0};
+    }
+  }catch(_){}
+})();
+
+/* 양 다섯 마리 */
+const SHEEP = (function(){
+  const R = rand(555), out=[];
+  for(let i=0;i<5;i++){
+    const x = lerp(PEN.x0+2, PEN.x1-2, R());
+    const z = lerp(PEN.z0+1.5, PEN.z1-1.5, R());
+    out.push({ x:x, z:z, y:groundH(x,z), dir:R()*Math.PI*2, wool:1, regrow:0,
+               phase:R()*6, moving:false, tgt:null, wait:R()*3 });
+  }
+  return out;
+})();
+
+/* 반딧불이 — 밤의 개울가 */
+const FLIES = (function(){
+  const R = rand(999), out=[];
+  for(let i=0;i<14;i++){
+    const x=-20+R()*44;
+    out.push({ x:x, z:streamZ(x)-6+R()*4, p:R()*10, s:0.6+R()*0.8 });
+  }
+  return out;
+})();
+
+/* 불티·양털 뭉치·음표 파티클 */
+const PARTS = [];
+function puff(x,y,z,kind){
+  for(let i=0;i<(kind==='wool'?7:1);i++){
+    PARTS.push({ k:kind, x:x+(Math.random()-0.5)*0.5, y:y+Math.random()*0.4,
+                 z:z+(Math.random()-0.5)*0.5,
+                 vx:(Math.random()-0.5)*0.8, vy:0.9+Math.random()*0.9, vz:(Math.random()-0.5)*0.8,
+                 age:0, life:kind==='wool'?1.1:1.8 });
+  }
+}
+
+/* ══════════════ 하루의 빛 ══════════════ */
+function skyState(){
+  const f = S.time / DAY_SEC;                      // 0 = 아침 6시
+  const ang = f * Math.PI * 2;
+  const sunY = Math.sin(ang);
+  let sun = [Math.cos(ang), sunY, -0.45];
+  let sl = Math.hypot(sun[0],sun[1],sun[2]); sun=[sun[0]/sl,sun[1]/sl,sun[2]/sl];
+  let moon = [-Math.cos(ang), -sunY, 0.35];
+  let ml = Math.hypot(moon[0],moon[1],moon[2]); moon=[moon[0]/ml,moon[1]/ml,moon[2]/ml];
+  const day = sstep(-0.06, 0.20, sunY);
+  const night = 1 - day;
+  const dusk = Math.exp(-Math.pow(sunY/0.16, 2));
+  let zen = mix3(PAL.nightZen, PAL.daySkyZen, day);
+  let hor = mix3(PAL.nightHor, PAL.daySkyHor, day);
+  hor = mix3(hor, PAL.duskHor, dusk*0.6);
+  /* 조명: 낮에는 해, 밤에는 달 */
+  let L, lc;
+  if(day > 0.04){
+    L = [sun[0], Math.max(sun[1], 0.06), sun[2]];
+    lc = mix3([1.0,0.55,0.30], PAL.sunCol, sstep(0.0,0.35,sunY));
+    lc = [lc[0]*0.95*day, lc[1]*0.95*day, lc[2]*0.95*day];
+  }else{
+    L = [moon[0], Math.max(moon[1], 0.15), moon[2]];
+    lc = [PAL.moonCol[0]*0.16, PAL.moonCol[1]*0.18, PAL.moonCol[2]*0.24];
+  }
+  const ll = Math.hypot(L[0],L[1],L[2]); L=[L[0]/ll,L[1]/ll,L[2]/ll];
+  const ambSky = mix3([0.10,0.12,0.20], [0.58,0.64,0.74], day);
+  const ambGnd = mix3([0.045,0.05,0.08], [0.30,0.29,0.26], day);
+  return { f:f, sun:sun, moon:moon, day:day, night:night, dusk:dusk,
+           zen:zen, hor:hor, L:L, lc:lc, ambSky:ambSky, ambGnd:ambGnd,
+           fogD: lerp(80, 170, day) };
+}
+
+/* ══════════════ 그리기 ══════════════ */
+const proj=m4.make(), view=m4.make(), vp=m4.make(), invVP=m4.make();
+const emptyVAO = gl.createVertexArray();
+let renderScale = 1, frameMsAvg = 16, nowSec = 0;
+
+function cameraNow(){
+  const ty = groundH(S.x,S.z) + 1.5;
+  const cp = Math.cos(S.camPitch), sp = Math.sin(S.camPitch);
+  let ex = S.x + Math.cos(S.camYaw)*cp*S.camDist;
+  let ez = S.z + Math.sin(S.camYaw)*cp*S.camDist;
+  let ey = ty + sp*S.camDist;
+  ey = Math.max(ey, groundH(ex,ez) + 0.45);            // 땅속으로 들어가지 않게
+  return { eye:[ex,ey,ez], at:[S.x, ty, S.z], fov:52 };
+}
+
+function draw(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.75) * renderScale;
+  const w = Math.max(1, Math.round(cv.clientWidth * dpr));
+  const h = Math.max(1, Math.round(cv.clientHeight * dpr));
+  if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  drawCalls = 0;
+
+  const sky = skyState();
+  const cam = cameraNow();
+  camEye = cam.eye;
+  m4.persp(proj, cam.fov*Math.PI/180, w/h, 0.08, 420);
+  m4.look(view, cam.eye, cam.at, [0,1,0]);
+  m4.mul(vp, proj, view);
+  m4.inv(invVP, vp);
+
+  gl.viewport(0,0,w,h);
+  gl.disable(gl.BLEND);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthMask(true);
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+  gl.clearColor(sky.hor[0], sky.hor[1], sky.hor[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  /* 하늘 */
+  gl.depthMask(false); gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(SKY.p);
+  gl.uniformMatrix4fv(SKY.u.uInvVP,false,invVP);
+  gl.uniform3fv(SKY.u.uEye, cam.eye);
+  gl.uniform3fv(SKY.u.uZen, sky.zen);
+  gl.uniform3fv(SKY.u.uHor, sky.hor);
+  gl.uniform3fv(SKY.u.uSunDir, sky.sun);
+  gl.uniform3fv(SKY.u.uMoonDir, sky.moon);
+  gl.uniform3fv(SKY.u.uSunCol, PAL.sunCol);
+  gl.uniform3fv(SKY.u.uMoonCol, PAL.moonCol);
+  gl.uniform1f(SKY.u.uTime, nowSec);
+  gl.uniform1f(SKY.u.uNight, sky.night);
+  gl.bindVertexArray(emptyVAO);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+
+  /* 본체 */
+  gl.useProgram(MAIN.p);
+  gl.uniformMatrix4fv(MAIN.u.uProj,false,proj);
+  gl.uniformMatrix4fv(MAIN.u.uView,false,view);
+  gl.uniform3fv(MAIN.u.uEye, cam.eye);
+  gl.uniform3fv(MAIN.u.uLightDir, sky.L);
+  gl.uniform3fv(MAIN.u.uLightCol, sky.lc);
+  gl.uniform3fv(MAIN.u.uAmbSky, sky.ambSky);
+  gl.uniform3fv(MAIN.u.uAmbGnd, sky.ambGnd);
+  gl.uniform3fv(MAIN.u.uFog, sky.hor);
+  gl.uniform3fv(MAIN.u.uSkyRef, sky.hor);
+  gl.uniform1f(MAIN.u.uFogD, sky.fogD);
+  gl.uniform1f(MAIN.u.uTime, nowSec);
+  /* 모닥불 점광 — 낮에도 아주 약하게, 밤에 활짝 */
+  const flick = 0.85 + 0.15*Math.sin(nowSec*11) + 0.08*Math.sin(nowSec*23+1.7);
+  const fireI = (0.35 + sky.night*2.3) * flick;
+  const fy = groundH(FIRE.x,FIRE.z);
+  gl.uniform4f(MAIN.u.uFire, FIRE.x, fy+0.8, FIRE.z, fireI);
+  gl.uniform3fv(MAIN.u.uFireCol, PAL.fire);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  MS.reset();
+  part(WORLD, 1,1,1, [1,1,1]);
+
+  /* 풍차 날개 */
+  (function(){
+    const my = groundH(MILL.x,MILL.z);
+    const face = Math.atan2(0-MILL.x, 0-MILL.z);            // 광장을 향한다
+    MS.reset(); MS.move(MILL.x, my+6.4, MILL.z); MS.rotY(face); MS.move(0,0,2.55);
+    MS.push(); part(P.sph, 0.5,0.5,0.5, PAL.woodD); MS.pop();
+    for(let i=0;i<4;i++){
+      MS.push(); MS.rotZ(S.millAng + i*Math.PI/2);
+        MS.push(); MS.move(0,2.6,0); part(P.box, 0.16,5.2,0.10, PAL.wood); MS.pop();
+        MS.push(); MS.move(0.45,2.9,0); part(P.box, 0.75,4.0,0.05, [0.86,0.83,0.74]); MS.pop();
+      MS.pop();
+    }
+  })();
+
+  /* 주인공 */
+  const heroY = groundH(S.x,S.z);
+  MS.reset();
+  drawPerson(WHO.hero, S.x, heroY, S.z, S.dir, S.phase,
+    { moving:S.moving,
+      bend: S.act && S.act.k==='shear' ? Math.min(1, S.act.t*3) : 0,
+      lute: S.playing ? nowSec : undefined });
+
+  /* 미르 */
+  MS.reset();
+  drawPerson(WHO.mir, NPC.x, groundH(NPC.x,NPC.z), NPC.z,
+             NPC.dir + Math.sin(nowSec*0.5)*0.08, 0, { moving:false, staff:true });
+
+  /* 양들 */
+  for(const sh of SHEEP){ MS.reset(); drawSheep(sh); }
+
+  /* 집 창문 불빛 — 밤에만 */
+  if(sky.night > 0.15){
+    const a = sky.night;
+    for(const hh of HOUSES){
+      const hy = groundH(hh.x,hh.z);
+      const face = Math.atan2(-hh.x, -hh.z);
+      for(const s of [-1,1]){
+        MS.reset(); MS.move(hh.x,hy,hh.z); MS.rotY(face); MS.rotY(s*1.25); MS.move(0,1.7,2.90);
+        part(P.box, 0.62,0.62,0.05, PAL.lampGlow, {flat:true, alpha:0.85*a});
+      }
+    }
+    for(const l of LAMPS){
+      const y=groundH(l.x,l.z);
+      MS.reset(); MS.move(l.x, y+2.2, l.z);
+      part(P.sph, 0.26,0.30,0.26, PAL.lampGlow, {flat:true, alpha:0.9*a});
+    }
+  }
+
+  /* 모닥불 불꽃 */
+  gl.depthMask(false);
+  for(let i=0;i<5;i++){
+    const ph = nowSec*7 + i*2.3;
+    const fh = 0.7 + 0.35*Math.sin(ph) * Math.sin(ph*0.7+i);
+    const col = i%2 ? PAL.fire : [1.0,0.85,0.35];
+    MS.reset(); MS.move(FIRE.x + Math.sin(ph*0.9+i)*0.16, fy+0.35+fh*0.4, FIRE.z + Math.cos(ph*0.8+i*2)*0.16);
+    part(P.cone, 0.34-i*0.04, fh, 0.34-i*0.04, col, {flat:true, alpha:0.75});
+  }
+  MS.reset(); MS.move(FIRE.x, fy+0.75, FIRE.z);
+  part(P.sph, 1.5,1.5,1.5, PAL.fire, {flat:true, alpha:0.10+0.08*Math.sin(nowSec*9)});
+
+  /* 반딧불이 */
+  if(sky.night > 0.4){
+    for(const fl of FLIES){
+      const t = nowSec*fl.s + fl.p;
+      const bx = fl.x + Math.sin(t*0.7)*1.6, bz = fl.z + Math.cos(t*0.53)*1.4;
+      const by = groundH(bx,bz) + 0.8 + Math.sin(t*1.3)*0.5;
+      const a = (0.4+0.6*Math.abs(Math.sin(t*1.1))) * sky.night;
+      MS.reset(); MS.move(bx,by,bz);
+      part(P.sph, 0.07,0.07,0.07, [0.85,1.0,0.45], {flat:true, alpha:a});
+    }
+  }
+
+  /* 파티클: 양털 뭉치 / 음표 */
+  for(const p of PARTS){
+    const k = 1 - p.age/p.life;
+    MS.reset(); MS.move(p.x,p.y,p.z);
+    if(p.k==='wool') part(P.sph, 0.16,0.16,0.16, PAL.wool, {alpha:k});
+    else { MS.rotY(nowSec*2);
+           part(P.box, 0.09,0.12,0.03, [1.0,0.92,0.55], {flat:true, alpha:k});
+           MS.move(0.05,0.10,0); part(P.box, 0.03,0.14,0.03, [1.0,0.92,0.55], {flat:true, alpha:k}); }
+  }
+  gl.depthMask(true);
+
+  /* 개울 수면 — 반투명이라 맨 마지막 */
+  gl.depthMask(false);
+  MS.reset();
+  part(WATER, 1,1,1, [1,1,1], {water:true, alpha:0.82});
+  gl.depthMask(true);
+  gl.bindVertexArray(null);
+}
+
+/* ══════════════ 소리 ══════════════
+   음원 파일 없이 그 자리에서 만든다. 류트는 카플러스-스트롱(뜯는 현),
+   바람은 띠통과 잡음. 브라우저 정책상 첫 조작 뒤에야 소리가 난다. */
+const AUD = (function(){
+  const KEY='mv_bgm';
+  let ac=null, master=null, windG=null, ready=false;
+  let on = store.get(KEY,'1') !== '0';
+  const buf = {};
+  /* 류트 가락: 단조 5음(라 도 레 미 솔). 쉼이 많은 32걸음 도막. */
+  const SCALE = [220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+  const PHRASE = [0,null,2,null, 3,null,4,null, 5,null,4,3, 2,null,null,null,
+                  4,null,3,null, 2,null,1,null, 0,null,1,2, 0,null,null,null];
+  const BEAT = 60/84/2;
+  let nextStep=0, stepIdx=0;
+
+  function pluck(freq, dur, decay){
+    const sr=ac.sampleRate, n=Math.round(sr*dur);
+    const b=ac.createBuffer(1,n,sr), d=b.getChannelData(0);
+    const N=Math.max(2,Math.round(sr/freq)), ring=new Float32Array(N);
+    for(let i=0;i<N;i++) ring[i]=Math.random()*2-1;
+    for(let k=0;k<2;k++) for(let i=0;i<N;i++) ring[i]=(ring[i]+ring[(i+1)%N])*0.5;
+    let p=0;
+    for(let i=0;i<n;i++){
+      d[i]=ring[p];
+      ring[p]=(ring[p]+ring[(p+1)%N])*0.5*decay;
+      p=(p+1)%N;
+    }
+    const tail=Math.round(sr*0.1);
+    for(let i=0;i<tail;i++) d[n-1-i]*=i/tail;
+    return b;
+  }
+  function noiseBuf(sec){
+    const sr=ac.sampleRate, n=Math.round(sr*sec);
+    const b=ac.createBuffer(1,n,sr), d=b.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+    return b;
+  }
+  function build(){
+    master=ac.createGain(); master.gain.value=0;
+    const comp=ac.createDynamicsCompressor();
+    comp.threshold.value=-14; comp.ratio.value=5;
+    master.connect(comp); comp.connect(ac.destination);
+    /* 바람 */
+    const nb=ac.createBufferSource(); nb.buffer=noiseBuf(3); nb.loop=true;
+    const bp=ac.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=420; bp.Q.value=0.5;
+    windG=ac.createGain(); windG.gain.value=0.035;
+    nb.connect(bp); bp.connect(windG); windG.connect(master); nb.start();
+    SCALE.forEach(f=>{ buf[f]=pluck(f,2.2,0.9963); });
+    buf.ding = pluck(659.25, 1.6, 0.9958);
+    ready=true;
+    nextStep=ac.currentTime+0.2;
+    master.gain.setTargetAtTime(on?0.9:0, ac.currentTime, 0.4);
+  }
+  function fire(b, at, g){
+    if(!b || !ready) return;
+    const s=ac.createBufferSource(); s.buffer=b;
+    const gg=ac.createGain(); gg.gain.value=g;
+    s.connect(gg); gg.connect(master); s.start(at);
+  }
+  function start(){
+    if(ac){ if(ac.state==='suspended') ac.resume(); return; }
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return;
+    try{ ac=new AC(); build(); }catch(_){ ac=null; }
+  }
+  return {
+    start:start,
+    isOn(){ return on; },
+    setOn(v){ on=v; store.set(KEY, v?'1':'0'); if(v) start();
+              if(ac&&master) master.gain.setTargetAtTime(v?0.9:0, ac.currentTime, 0.3); },
+    snip(){                                                  // 가위질
+      if(!ready||!on) return;
+      const t=ac.currentTime;
+      const s=ac.createBufferSource(); s.buffer=noiseBuf(0.09);
+      const f=ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=2400;
+      const g=ac.createGain(); g.gain.setValueAtTime(0.5,t);
+      g.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+      s.connect(f); f.connect(g); g.connect(master); s.start(t);
+    },
+    ding(){ fire(buf.ding, ac?ac.currentTime+0.01:0, 0.7); },
+    strum(){                                                 // 류트를 받을 때 화음 한 번
+      if(!ready||!on) return;
+      [0,2,4].forEach((d,i)=>fire(buf[SCALE[d]], ac.currentTime+0.02+i*0.07, 0.5));
+    },
+    tick(playing, near, night){
+      if(!ready) return;
+      const now=ac.currentTime;
+      windG.gain.setTargetAtTime(0.028 + (night?0.012:0), now, 1.0);
+      if(!on || !playing){ nextStep=Math.max(nextStep, now); return; }
+      /* 밀린 걸음은 몰아서 쏟지 않는다(lucky-day에서 실측한 지뢰) */
+      if(nextStep < now) nextStep = now + 0.02;
+      let guard=0;
+      while(nextStep < now+0.3 && guard++<4){
+        const deg = PHRASE[stepIdx % PHRASE.length];
+        if(deg !== null){
+          fire(buf[SCALE[deg]], nextStep, 0.55);
+          if((stepIdx%16)===0) fire(buf[SCALE[0]], nextStep, 0.28);
+        }
+        nextStep += BEAT;
+        stepIdx++;
+      }
+    }
+  };
+})();
+
+/* ══════════════ DOM ══════════════ */
+const el = id => document.getElementById(id);
+const elGoal=el('hudGoal'), elWool=el('wool'), elClock=el('clock'),
+      elPrompt=el('prompt'), elPromptText=el('promptText'),
+      elDlg=el('dlg'), elDlgName=el('dlgName'), elDlgText=el('dlgText'),
+      elToast=el('toast'), elLabel=el('npcLabel');
+
+let toastTimer=0;
+function toast(msg){
+  elToast.textContent = msg;
+  elToast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>elToast.classList.remove('on'), 2600);
+}
+
+/* 대화: say()는 A(또는 탭)로 넘어갈 때 풀리는 약속 */
+let dlgResolve = null;
+function say(name, text){
+  return new Promise(res=>{
+    S.busy = true;
+    elDlgName.textContent = name;
+    elDlgText.textContent = text;
+    elDlg.classList.add('on');
+    dlgResolve = res;
+  });
+}
+function advanceDlg(){
+  if(!dlgResolve) return false;
+  const r = dlgResolve; dlgResolve = null;
+  r();
+  return true;
+}
+function closeDlg(){
+  elDlg.classList.remove('on');
+  S.busy = false;
+}
+
+/* ══════════════ 퀘스트 ══════════════ */
+function goalText(){
+  if(S.stage===0) return '양치기 미르에게 말을 걸어 보자';
+  if(S.stage===1) return S.wool>=3 ? '미르에게 양털을 가져다주자'
+                                   : '양털 모으기 ('+S.wool+'/3) — 복슬복슬한 양 곁에서 Ⓐ';
+  return '모닥불 곁에서 Ⓐ — 류트 연주 (밤의 연주가 특히 좋다)';
+}
+
+async function talkMir(){
+  if(S.stage===0){
+    await say('미르', '어서 와! 달빛여울 마을은 처음이지?\n난 미르. 이 마을의 양치기야.');
+    await say('미르', '마침 잘 왔어 — 양들 털이 잔뜩 자랐는데\n혼자서는 도무지 다 못 깎겠거든.');
+    await say('미르', '양털 세 뭉치만 모아다 줄래?\n복슬복슬한 양 곁에서 Ⓐ를 누르면 돼.\n답례로 좋은 걸 줄게.');
+    closeDlg();
+    S.stage=1; saveGame();
+  }else if(S.stage===1 && S.wool<3){
+    await say('미르', '양털은 '+S.wool+'뭉치 모았네.\n세 뭉치면 돼. 우리 안의 복슬복슬한 애들로 부탁해!');
+    closeDlg();
+  }else if(S.stage===1){
+    await say('미르', '와, 세 뭉치나! 정말 고마워.\n이 답례는… 약속한 선물.');
+    await say('미르', '할아버지가 만드신 류트야.\n모닥불 곁에서 Ⓐ를 누르면 연주할 수 있어.');
+    await say('미르', '달이 뜨면 모닥불가에서 한 곡 들려줘.\n달빛여울의 밤은 노래가 제일 잘 어울리거든.');
+    closeDlg();
+    S.wool-=3; S.stage=2; saveGame();
+    AUD.strum();
+    toast('🪕 류트를 받았다!');
+  }else{
+    await say('미르', '연주는 마음에 들어?\n밤에 모닥불 곁에서 연주하면… 정말 근사해.');
+    closeDlg();
+  }
+}
+
+/* ══════════════ 상호작용 ══════════════ */
+function nearestTarget(){
+  if(S.busy || S.act) return null;
+  /* 미르 */
+  const dn = Math.hypot(S.x-NPC.x, S.z-NPC.z);
+  let best = dn < 2.6 ? { k:'npc', d:dn, label:'말 걸기' } : null;
+  /* 양 */
+  for(const sh of SHEEP){
+    if(sh.wool < 0.85) continue;
+    const d = Math.hypot(S.x-sh.x, S.z-sh.z);
+    if(d < 2.3 && (!best || d < best.d)) best = { k:'sheep', d:d, sheep:sh, label:'양털 깎기' };
+  }
+  /* 모닥불 */
+  if(S.stage>=2){
+    const df = Math.hypot(S.x-FIRE.x, S.z-FIRE.z);
+    if(df < 3.4 && (!best || df < best.d))
+      best = { k:'fire', d:df, label: S.playing ? '연주 그만하기' : '류트 연주하기' };
+  }
+  return best;
+}
+
+function pressA(){
+  AUD.start();
+  if(advanceDlg()) return;
+  if(S.busy || S.act) return;
+  const t = nearestTarget();
+  if(!t) return;
+  if(t.k==='npc'){
+    S.playing=false;
+    talkMir();
+  }else if(t.k==='sheep'){
+    S.playing=false;
+    S.act = { k:'shear', t:0, sheep:t.sheep, snips:0 };
+  }else if(t.k==='fire'){
+    S.playing = !S.playing;
+    if(S.playing){
+      S.dir = Math.atan2(FIRE.x-S.x, FIRE.z-S.z);
+      const sky = skyState();
+      if(sky.night>0.6 && !S.q.moonlit){
+        S.q.moonlit=1; saveGame();
+        setTimeout(()=>toast('🌕 달빛이 여울에 부서진다… 마을이 연주에 귀 기울인다.'), 1500);
+      }
+    }
+  }
+}
+
+/* ══════════════ 걸음 ══════════════ */
+const keys = {};
+const joy = { on:false, id:-1, cx:0, cy:0, x:0, y:0 };
+let camDrag = null;
+
+function inputVec(){
+  let ix=0, iy=0;
+  if(keys.w||keys.ArrowUp) iy+=1;
+  if(keys.s||keys.ArrowDown) iy-=1;
+  if(keys.d||keys.ArrowRight) ix+=1;
+  if(keys.a||keys.ArrowLeft) ix-=1;
+  if(joy.on){ ix+=joy.x; iy+=joy.y; }
+  const l=Math.hypot(ix,iy);
+  if(l>1){ ix/=l; iy/=l; }
+  return [ix,iy];
+}
+
+function collide(){
+  for(const c of COLL){
+    let dx=S.x-c.x, dz=S.z-c.z, d=Math.hypot(dx,dz);
+    const r=c.r+0.35;
+    if(d>=r) continue;
+    if(d<0.001){ dx=1; dz=0; d=1; }        // 정중앙에 서도(순간이동) 밀어낸다
+    S.x=c.x+dx/d*r; S.z=c.z+dz/d*r;
+  }
+  for(const s of SEGS){
+    const ax=s[0],az=s[1],bx=s[2],bz=s[3];
+    const dx=bx-ax, dz=bz-az;
+    const t=clamp(((S.x-ax)*dx+(S.z-az)*dz)/(dx*dx+dz*dz||1),0,1);
+    const px=ax+dx*t, pz=az+dz*t;
+    const ddx=S.x-px, ddz=S.z-pz, d=Math.hypot(ddx,ddz), r=0.55;
+    if(d<r && d>0.001){ S.x=px+ddx/d*r; S.z=pz+ddz/d*r; }
+  }
+  const d0=Math.hypot(S.x,S.z);
+  if(d0>WORLD_R){ S.x*=WORLD_R/d0; S.z*=WORLD_R/d0; }
+}
+
+let saveTimer=0, uiTimer=0;
+function step(dt){
+  nowSec += dt;
+  S.time = (S.time + dt) % DAY_SEC;
+  S.millAng += dt*0.7;
+
+  /* 양털 깎기 진행 */
+  if(S.act && S.act.k==='shear'){
+    const a=S.act;
+    S.dir = Math.atan2(a.sheep.x-S.x, a.sheep.z-S.z);
+    a.t += dt;
+    if(a.t>0.35 && a.snips<1){ a.snips=1; AUD.snip(); }
+    if(a.t>0.75 && a.snips<2){ a.snips=2; AUD.snip(); }
+    if(a.t>1.15){
+      a.sheep.wool=0; a.sheep.regrow=0;
+      puff(a.sheep.x, a.sheep.y+0.7, a.sheep.z, 'wool');
+      S.wool++; S.act=null;
+      AUD.ding();
+      toast('🧶 양털 +1  ('+S.wool+(S.stage===1?'/3':'')+')');
+      saveGame();
+    }
+  }
+
+  /* 이동 */
+  S.moving=false;
+  if(!S.busy && !S.act){
+    const [ix,iy]=inputVec();
+    if(ix||iy){
+      S.playing=false;
+      /* 카메라 기준으로 방향을 푼다 */
+      const fy2=-Math.cos(S.camYaw), fz2=-Math.sin(S.camYaw);
+      const rx2=-fz2, rz2=fy2;
+      let mx=fy2*iy+rx2*ix, mz=fz2*iy+rz2*ix;
+      const ml=Math.hypot(mx,mz)||1; mx/=ml; mz/=ml;
+      const tgt=Math.atan2(mx,mz);
+      /* 최단 호로 몸을 돌린다 */
+      let da=tgt-S.dir;
+      while(da>Math.PI) da-=Math.PI*2;
+      while(da<-Math.PI) da+=Math.PI*2;
+      S.dir += da*Math.min(1, dt*12);
+      const spd=HERO_SPD*Math.min(1,Math.hypot(ix,iy));
+      S.x+=mx*spd*dt; S.z+=mz*spd*dt;
+      S.moving=true;
+      S.phase+=dt*9;
+    }
+  }
+  collide();                               // 서 있어도 민다(물체 속에 갇히지 않게)
+
+  /* 양 거닐기 — 우리 안에서만 */
+  for(const sh of SHEEP){
+    sh.wool = Math.min(1, sh.wool + dt/90);
+    sh.moving=false;
+    if(sh.wait>0){ sh.wait-=dt; }
+    else if(!sh.tgt){
+      const R=Math.random;
+      sh.tgt=[ lerp(PEN.x0+2,PEN.x1-2,R()), lerp(PEN.z0+1.5,PEN.z1-1.5,R()) ];
+    }else{
+      const dx=sh.tgt[0]-sh.x, dz=sh.tgt[1]-sh.z, d=Math.hypot(dx,dz);
+      if(d<0.3){ sh.tgt=null; sh.wait=2+Math.random()*5; }
+      else{
+        const tgt=Math.atan2(dx,dz);
+        let da=tgt-sh.dir;
+        while(da>Math.PI) da-=Math.PI*2;
+        while(da<-Math.PI) da+=Math.PI*2;
+        sh.dir+=da*Math.min(1,dt*4);
+        sh.x+=Math.sin(sh.dir)*0.8*dt;
+        sh.z+=Math.cos(sh.dir)*0.8*dt;
+        sh.moving=true; sh.phase+=dt*7;
+      }
+    }
+    sh.y=groundH(sh.x,sh.z);
+  }
+
+  /* 파티클 */
+  for(let i=PARTS.length-1;i>=0;i--){
+    const p=PARTS[i];
+    p.age+=dt;
+    if(p.age>=p.life){ PARTS.splice(i,1); continue; }
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.z+=p.vz*dt;
+    p.vy-= (p.k==='wool'?2.2:-0.3)*dt;                      // 음표는 떠오른다
+  }
+  /* 연주 중엔 음표를 흩뿌린다 */
+  if(S.playing && Math.random()<dt*2.4){
+    PARTS.push({ k:'note', x:S.x+(Math.random()-0.5)*0.6, y:groundH(S.x,S.z)+1.7,
+                 z:S.z+(Math.random()-0.5)*0.6,
+                 vx:(Math.random()-0.5)*0.4, vy:0.7, vz:(Math.random()-0.5)*0.4,
+                 age:0, life:2.2 });
+  }
+
+  const sky = skyState();
+  AUD.tick(S.playing, Math.hypot(S.x-FIRE.x,S.z-FIRE.z)<10, sky.night>0.5);
+
+  /* UI는 조금 성기게 갱신한다 */
+  uiTimer-=dt;
+  if(uiTimer<=0){
+    uiTimer=0.25;
+    elGoal.textContent = goalText();
+    elWool.style.display = S.stage>=1 ? 'inline-block' : 'none';
+    elWool.textContent = '🧶 ×'+S.wool;
+    const hour=(6+sky.f*24)%24;
+    const hh=Math.floor(hour), mm=Math.floor((hour-hh)*60);
+    elClock.textContent=(sky.day>0.5?'☀️ ':'🌙 ')+(hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm;
+    const t=nearestTarget();
+    elPrompt.classList.toggle('on', !!t && !S.busy);
+    if(t) elPromptText.textContent=t.label;
+  }
+
+  /* 미르 이름표 */
+  (function(){
+    const y=groundH(NPC.x,NPC.z)+2.1;
+    const cx=vp, X=NPC.x, Z=NPC.z;
+    const cw=cx[3]*X+cx[7]*y+cx[11]*Z+cx[15];
+    if(cw>0.1 && Math.hypot(S.x-NPC.x,S.z-NPC.z)<22){
+      const sx2=(cx[0]*X+cx[4]*y+cx[8]*Z+cx[12])/cw;
+      const sy2=(cx[1]*X+cx[5]*y+cx[9]*Z+cx[13])/cw;
+      elLabel.style.display='block';
+      elLabel.style.left=((sx2*0.5+0.5)*cv.clientWidth)+'px';
+      elLabel.style.top=((-sy2*0.5+0.5)*cv.clientHeight)+'px';
+      elLabel.textContent='🐑 미르';
+    }else elLabel.style.display='none';
+  })();
+
+  saveTimer-=dt;
+  if(saveTimer<=0){ saveTimer=12; saveGame(); }
+}
+
+/* ══════════════ 루프 ══════════════ */
+let lastNow=0, rafOn=false;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min((now-lastNow)/1000, 0.05);
+  lastNow=now;
+  if(!S.started) return;
+  /* 프레임이 무거우면 해상도를 내린다(그림보다 프레임이 우선) */
+  frameMsAvg = frameMsAvg*0.95 + Math.min(dt*1000,80)*0.05;
+  if(frameMsAvg>26 && renderScale>0.55) renderScale=Math.max(0.55, renderScale*0.97);
+  else if(frameMsAvg<15 && renderScale<1) renderScale=Math.min(1, renderScale*1.02);
+  step(dt);
+  draw();
+}
+
+/* ══════════════ 입력 ══════════════ */
+window.addEventListener('keydown', e=>{
+  const tag=(e.target&&e.target.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
+  const k=e.key.length===1?e.key.toLowerCase():e.key;
+  if(k==='w'||k==='a'||k==='s'||k==='d'||k.startsWith('Arrow')){ keys[k]=true; e.preventDefault(); }
+  else if(k==='z'||k==='Enter'||k===' '){ e.preventDefault(); pressA(); }
+  else if(k==='m'){ sndBtn.click(); }
+  AUD.start();
+});
+window.addEventListener('keyup', e=>{
+  const k=e.key.length===1?e.key.toLowerCase():e.key;
+  keys[k]=false;
+});
+
+/* 포인터: 왼쪽 절반 = 조이스틱, 나머지 = 시점 끌기 */
+const touches=new Map();
+const elJoyBase=el('joyBase'), elJoyKnob=el('joyKnob');
+cv.addEventListener('pointerdown', e=>{
+  AUD.start();
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  const isTouch = e.pointerType==='touch';
+  if(isTouch && !joy.on && e.clientX < window.innerWidth*0.45 && e.clientY > window.innerHeight*0.35){
+    joy.on=true; joy.id=e.pointerId;
+    joy.cx=e.clientX; joy.cy=e.clientY; joy.x=0; joy.y=0;
+    elJoyBase.style.display='block';
+    elJoyBase.style.left=joy.cx+'px'; elJoyBase.style.top=joy.cy+'px';
+    elJoyKnob.style.display='block';
+    elJoyKnob.style.left=joy.cx+'px'; elJoyKnob.style.top=joy.cy+'px';
+  }else{
+    camDrag=e.pointerId;
+  }
+});
+cv.addEventListener('pointermove', e=>{
+  const prev=touches.get(e.pointerId);
+  if(!prev) return;
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(joy.on && e.pointerId===joy.id){
+    const R=52;
+    let dx=e.clientX-joy.cx, dy=e.clientY-joy.cy;
+    const l=Math.hypot(dx,dy);
+    if(l>R){ dx*=R/l; dy*=R/l; }
+    joy.x=dx/R; joy.y=-dy/R;
+    elJoyKnob.style.left=(joy.cx+dx)+'px';
+    elJoyKnob.style.top=(joy.cy+dy)+'px';
+  }else if(e.pointerId===camDrag){
+    S.camYaw  -= (e.clientX-prev.x)*0.007;
+    S.camPitch = clamp(S.camPitch+(e.clientY-prev.y)*0.005, 0.08, 1.25);
+  }
+});
+function endPtr(e){
+  touches.delete(e.pointerId);
+  if(joy.id===e.pointerId){
+    joy.on=false; joy.id=-1; joy.x=0; joy.y=0;
+    elJoyBase.style.display='none';
+    elJoyKnob.style.display='none';
+  }
+  if(camDrag===e.pointerId) camDrag=null;
+}
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('wheel', e=>{
+  e.preventDefault();
+  S.camDist=clamp(S.camDist*(1+Math.sign(e.deltaY)*0.1), 3.2, 13);
+},{passive:false});
+/* 두 손가락 벌리기 = 거리 */
+let pinchD=0;
+cv.addEventListener('touchmove', e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
+                       e.touches[0].clientY-e.touches[1].clientY);
+    if(pinchD>0) S.camDist=clamp(S.camDist*pinchD/d, 3.2, 13);
+    pinchD=d;
+  }
+},{passive:true});
+cv.addEventListener('touchend', ()=>{ pinchD=0; },{passive:true});
+
+el('btnA').addEventListener('click', pressA);
+/* 대화 중에는 화면 탭으로도 넘어간다 */
+elDlg.addEventListener('pointerdown', e=>{ e.stopPropagation(); advanceDlg(); });
+
+const sndBtn=el('btnSnd');
+function paintSnd(){ sndBtn.textContent=AUD.isOn()?'🔊':'🔇'; sndBtn.setAttribute('aria-pressed',AUD.isOn()?'true':'false'); }
+paintSnd();
+sndBtn.addEventListener('click', ()=>{ AUD.setOn(!AUD.isOn()); paintSnd(); });
+
+el('btnStart').addEventListener('click', ()=>{
+  AUD.start();
+  el('title').classList.add('off');
+  S.started=true;
+});
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden) saveGame();
+});
+window.addEventListener('beforeunload', saveGame);
+
+/* ══════════════ ?debug=1 훅 ══════════════
+   숨은 탭에서는 rAF가 멈추므로 자동 검증은 MV.frame(dt)로 직접 돌린다. */
+if(/[?&]debug=1/.test(location.search)){
+  window.MV = {
+    S:S, SHEEP:SHEEP, NPC:NPC, FIRE:FIRE,
+    start(){ el('title').classList.add('off'); S.started=true; },
+    frame(dt){ step(dt||0.016); draw(); return this.state(); },
+    tp(x,z){ S.x=x; S.z=z; },
+    key(k,v){ keys[k]=v; },
+    press(){ pressA(); },
+    say: advanceDlg,
+    wool(n){ S.wool=n; },
+    timeSet(f){ S.time=((f%1)+1)%1*DAY_SEC; },
+    ground: groundH,
+    state(){
+      const sky=skyState();
+      return { x:+S.x.toFixed(2), z:+S.z.toFixed(2), y:+groundH(S.x,S.z).toFixed(2),
+               dir:+S.dir.toFixed(2), stage:S.stage, wool:S.wool,
+               playing:S.playing, busy:S.busy, act:S.act?S.act.k:null,
+               day:+sky.day.toFixed(2), f:+sky.f.toFixed(3),
+               draws:drawCalls, tris:(WORLD.n/3)|0, scale:+renderScale.toFixed(2),
+               dlg: elDlg.classList.contains('on') ? elDlgText.textContent.slice(0,40) : null,
+               size:[cv.width,cv.height] };
+    },
+    /* 화면을 볼 수 없을 때 쓰는 픽셀 통계 */
+    probe(){
+      draw();
+      const w=cv.width, h=cv.height, n=64;
+      const px=new Uint8Array(n*n*4);
+      gl.readPixels((w-n)>>1,(h-n)>>1,n,n,gl.RGBA,gl.UNSIGNED_BYTE,px);
+      let r=0,g=0,b=0;
+      for(let i=0;i<n*n;i++){ r+=px[i*4]; g+=px[i*4+1]; b+=px[i*4+2]; }
+      const m=n*n;
+      return { avg:[Math.round(r/m),Math.round(g/m),Math.round(b/m)], draws:drawCalls };
+    }
+  };
+}
+
+requestAnimationFrame(n=>{ lastNow=n; frame(n); });
+
+})();
+</script>
+</body>
+</html>

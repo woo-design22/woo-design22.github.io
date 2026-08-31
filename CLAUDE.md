@@ -52,6 +52,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   공통 틀의 정본은 `docs/dot-rpg-engine.md`. **게임을 만들거나 고치면 대사집을 반드시 함께 낸다** —
   `python tools/extract_script.py <폴더>` 가 `<폴더>/대사집.txt` 를 만든다(다섯 게임 공용).
   공통 틀의 정본은 `docs/dot-rpg-engine.md` — 새 도트 RPG를 만들기 전에 반드시 먼저 읽는다.
+- `moon-village/index.html` — 「달빛여울」: **3인칭 3D 생활 RPG**(양털 깎기 → 류트 → 모닥불 연주, 낮밤 순환과 큰 달).
+  판타지 생활 MMO의 감성만 가져오고 **세계·인물·지명은 전부 창작**(상용 작품의 설정을 옮기지 않는다).
+  iso-faces·lucky-day처럼 **three.js 없이 WebGL2 직접 호출**, 모델·소리 전부 코드 생성. 웹 게시 가능.
 - `ai-council/index.html` — 「AI 회의실」: **회사가 다른 모델들을 한 방에 앉히고 순번제로 토론시킨 뒤**
   **회의의 결론**을 서기가 정리해 내놓는다(복사하거나 .md 로 내려받는다).
   문서(hwp·hwpx·docx·pdf·txt)·코드 파일·그림을 올리면 참가자들이 읽고 회의한다.
@@ -104,6 +107,7 @@ python -m http.server 8765
 - http://localhost:8765/goth-rpg/ (판매 데모, 비밀번호 0000, `?debug=1` 훅)
 - http://localhost:8765/iso-faces/ (`?debug=1`이면 `window.BD` 훅)
 - http://localhost:8765/lucky-day/ (`?debug=1`이면 `window.LD` 훅)
+- http://localhost:8765/moon-village/ (`?debug=1`이면 `window.MV` 훅 — `frame(dt)`로 프레임을 직접 돌린다)
 - http://localhost:8765/ai-council/ (오픈라우터 키(`sk-or-…`) 또는 앤트로픽 키가 있어야 회의가 돈다. `?debug=1`이면 `window.AC` 훅)
 - http://localhost:8765/event-price/
 - http://localhost:8765/voxel-world/?debug=1
@@ -136,7 +140,7 @@ python -m http.server 8765
 **새로운 영속 상태도 반드시 `store`를 통해야 한다.**
 
 사용 중인 키: `2048_best`, `pomo_sessions`, `pomo_activeTask`, `pomo_todos`,
-`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `council_*`(AI 회의실), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `gt_*`(goth-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
+`mood_me`, `mood_partner`, `mood_profile`, `counsel_*`(마음톡), `council_*`(AI 회의실), `emg_*`(구급대원), `sandmix_*`, `shade_*`, `fly_*`(fly-brain), `namsan_save`, `namsan_bgm`, `cs_*`(couple-rpg 전용 접두사), `eu_*`(europe-rpg 전용 접두사), `lv_*`(love-rpg 전용 접두사), `rt_*`(retire-rpg 전용 접두사), `gt_*`(goth-rpg 전용 접두사), `luck_bgm`(lucky-day 소리 켜짐), `mv_*`(moon-village — save/bgm), `vx_*`(voxel-world 전용 접두사), `soc_*`(soccer 전용 접두사).
 `file://`에서는 모든 앱이 같은 localStorage 네임스페이스를 쓰므로 접두사가 충돌 방지 수단이다.
 
 ## 앱별 구조
@@ -651,6 +655,28 @@ couple-rpg와 같은 챕터형(`CHAPTERS` + `QUESTS.c1~c7`). 공통 엔진은 `d
   삼각형 30~51k — 이 범위를 크게 넘지 않으면 정상이다.
 - **자막은 전부 원문 그대로다.** 지어낸 문장을 섞지 말 것. `SCRIPT`의 `m` 필드가 "이 구절 → 화면의 무엇"
   대응표이고 화면의 📖 버튼이 그대로 보여 준다.
+
+### moon-village (달빛여울)
+
+판타지 생활 MMO풍 **3인칭 3D 마을**. 도트 RPG 엔진(`docs/dot-rpg-engine.md`)과 무관하고,
+lucky-day의 WebGL2 뼈대(m4·MS 변환 스택·Builder·part·하늘 셰이더)를 이어받아 조작을 얹었다.
+파일 하나, 외부 의존 0, `file://`에서도 돈다.
+
+- **세계·인물·지명은 전부 창작이다.** 특정 상용 작품의 설정을 옮기지 않는다(goth-rpg와 같은 규칙, 공개 게시라 반드시 지킬 것).
+- **정적/동적 이분법이 성능의 핵심**: 지형·집·나무·울타리·꽃은 `WORLD` 한 덩어리로 구워 드로우 콜 1회,
+  사람·양·풍차 날개·불꽃·음표만 매 프레임 `part()`로 그린다. 실측 드로우 콜 142~168, 삼각형 34k.
+- **`groundH(x,z)`가 유일한 지형 정의다.** 굽기(메시)와 플레이(발 붙이기·카메라)가 같은 함수를 본다 —
+  한쪽만 고치면 발이 뜨거나 파묻힌다. 개울 수면은 `WATER_Y` 고정(지형을 그 밑으로 파낸다).
+- **`Builder.tri`의 색 인자**: `[r,g,b]`면 세 정점 공통, `[[r,g,b]×3]`이면 정점별(지형 전용).
+  숫자인지(`typeof col[0]`)로 가른다 — `col[i]||col`로 가르면 숫자가 참으로 잡혀 전부 NaN(검정)이 된다(실제로 그랬다).
+- **밤은 색이 아니라 빛으로 만든다**: 팔레트는 낮 기준 고정, 하루(`DAY_SEC` 7분)의 해·달 방향과
+  조명 유니폼만 바뀐다. 모닥불은 셰이더의 점광(`uFire`) 하나 — 밤 감정선의 전부라 빼지 말 것.
+- **집·나무 자리는 굽기 전에 배열(`HOUSES`/`TREES`…)로 만든다** — 메시와 충돌 판정이 같은 배열을 봐야 한다.
+  충돌은 원(`COLL`)+선분(`SEGS`, 울타리)이고 `collide()`는 서 있어도 매 프레임 돈다(순간이동으로 못 갇히게).
+- 퀘스트는 하나(양털 3뭉치 → 류트 → 모닥불 연주, 밤 연주에 특전 문구). 진행은 `S.stage`/`S.wool`,
+  저장은 `mv_save` 하나. 류트 가락은 카플러스-스트롱 합성(lucky-day 방식), 밀린 예약을 몰아 쏟지 않는 guard 유지.
+- `?debug=1`이면 `window.MV` — `frame(dt)`(숨은 탭 검증용 수동 프레임)·`tp`·`press`·`timeSet`·`wool`·
+  `state()`·`probe()`(중앙 64×64 픽셀 평균 + 드로우 콜). 검증은 Playwright 헤드리스로 스크린샷까지 확인했다.
 
 ### android-* (APK 셸 4개)
 

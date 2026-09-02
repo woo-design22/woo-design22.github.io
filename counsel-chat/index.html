@@ -2012,12 +2012,19 @@
     if (!keep.length) return;
     try {
       const blob = await seal(R.key, JSON.stringify({ v: 2, digest: R.digest || null, msgs: keep }));
-      await fetch(ROOM_URL, {
+      const res = await fetch(ROOM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'save', room: R.id, blob })
+        body: JSON.stringify({ op: 'save', room: R.id, blob, token: store.get('counsel_rt', '') })
       });
-    } catch (_e) { /* 보관 실패는 대화를 막지 않는다. 파일 내려받기가 보험이다 */ }
+      if (!res.ok) throw new Error('save ' + res.status);
+    } catch (_e) {
+      // 보관 실패는 대화를 막지 않는다. 다만 조용히 넘기면 기록이 안 남는 줄 모른다 — 한 번은 알린다.
+      if (!R.saveWarned) {
+        R.saveWarned = true;
+        roomSys('기록을 서버에 남기지 못했습니다. 끝날 때 txt로 내려받아 두세요.');
+      }
+    }
   }
 
   async function roomLoad() {
@@ -2026,7 +2033,7 @@
       const res = await fetch(ROOM_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'load', room: R.id })
+        body: JSON.stringify({ op: 'load', room: R.id, token: store.get('counsel_rt', '') })
       });
       const j = await res.json();
       if (!j.blob) return { digest: null, msgs: [] };

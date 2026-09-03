@@ -748,16 +748,54 @@ function tgHelp() {
 }
 
 // 완성된 답변 한 덩어리를 받아온다 (스트림을 모아서 반환)
+// ── 프롬프트 캐싱 ─────────────────────────────────────────────────────
+// 같은 앞부분을 다시 보내면 입력값의 10% 만 낸다. 상담은 앞부분이 크다 —
+// 지시문에 지금까지의 대화 전부가 발언마다 통째로 다시 실려 나가기 때문이다.
+//
+// **TTL 을 1시간으로 잡은 것이 이 설정의 핵심이다.** 기본값 5분은 여기서 거의 못 맞힌다 —
+// 상담은 사람이 긴 답을 읽고 생각한 뒤 답하는 일이라 5~20분 간격이 예사다.
+// 못 맞히면 쓰기 요금만 더 내고 아끼는 것은 0 이 되어 안 하느니만 못하다.
+// 쓰기가 2배지만 읽기가 10분의 1이라 같은 앞부분을 두 번만 써도 이득이다.
+const CACHE_TTL = '1h';
+const CACHE_MARK = { type: 'ephemeral', ttl: CACHE_TTL };
+
+// 지시문 묶음의 처음과 끝에 표를 단다.
+//   처음(BASE_PROMPT) — 분야가 달라도 여기까지는 모든 상담이 함께 쓴다
+//   끝              — 같은 분야를 이어 쓸 때 분야 지시문까지 함께 맞는다
+// 표는 개수가 늘어도 돈이 더 들지 않는다. 맞힐 자리만 늘어난다(최대 4개).
+function cacheSystem(blocks) {
+  if (!Array.isArray(blocks) || !blocks.length) return blocks;
+  const out = blocks.map((b) => Object.assign({}, b));
+  out[0].cache_control = CACHE_MARK;
+  out[out.length - 1].cache_control = CACHE_MARK;
+  return out;
+}
+
+// 마지막 말에 표를 단다. 매번 변하는 자리에 다는 것처럼 보이지만 그렇지 않다 —
+// **이번에 적어 둔 자리를 다음 요청이 되짚어 찾는** 구조라, 대화가 길어질수록 이득이 커진다.
+// 원본 배열은 건드리지 않는다(부른 쪽이 그대로 쓰고 있다).
+function cacheMessages(messages) {
+  if (!Array.isArray(messages) || !messages.length) return messages;
+  const last = messages[messages.length - 1];
+  if (!last || typeof last.content !== 'string' || !last.content) return messages;
+  const out = messages.slice();
+  out[out.length - 1] = {
+    role: last.role,
+    content: [{ type: 'text', text: last.content, cache_control: CACHE_MARK }]
+  };
+  return out;
+}
+
 async function askAnthropic(apiKey, systemBlocks, messages, maxTokens, effort) {
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
     stream: true,
-    system: systemBlocks,
+    system: cacheSystem(systemBlocks),
     thinking: { type: 'adaptive' },
     output_config: { effort: effort || EFFORT },
     fallbacks: 'default',
-    messages
+    messages: cacheMessages(messages)
   };
   const headers = {
     'Content-Type': 'application/json',
@@ -779,7 +817,7 @@ async function askAnthropic(apiKey, systemBlocks, messages, maxTokens, effort) {
 
   let text = '';
   let refused = false;
-  const use = { in: 0, out: 0, cached: 0 };
+  const use = { in: 0, out: 0, cached: 0, write: 0 };
   const reader = res.body.getReader();
   const dec = new TextDecoder('utf-8');
   let buf = '';
@@ -799,6 +837,7 @@ async function askAnthropic(apiKey, systemBlocks, messages, maxTokens, effort) {
         if (j.type === 'message_start' && j.message && j.message.usage) {
           use.in = j.message.usage.input_tokens || 0;
           use.cached = j.message.usage.cache_read_input_tokens || 0;
+          use.write = j.message.usage.cache_creation_input_tokens || 0;
         }
         if (j.type === 'message_delta' && j.usage) use.out = j.usage.output_tokens || use.out;
         if (j.type === 'message_delta' && j.delta && j.delta.stop_reason === 'refusal') refused = true;
@@ -885,9 +924,9 @@ async function handleTelegram(request) {
   const mode = tgFindMode(state.mode) || tgFindMode('chat');
   const isTriage = mode.cmd === 'triage';
   const systemBlocks = isTriage
-    ? [{ type: 'text', text: TRIAGE_PROMPT, cache_control: { type: 'ephemeral' } }]
+    ? [{ type: 'text', text: TRIAGE_PROMPT }]
     : [
-        { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: BASE_PROMPT },
         { type: 'text', text: mode.prompt }
       ];
 
@@ -1052,9 +1091,9 @@ async function handleKakao(request) {
   const mode = tgFindMode(state.mode) || tgFindMode('chat');
   const isTriage = mode.cmd === 'triage';
   const systemBlocks = isTriage
-    ? [{ type: 'text', text: TRIAGE_PROMPT, cache_control: { type: 'ephemeral' } }]
+    ? [{ type: 'text', text: TRIAGE_PROMPT }]
     : [
-        { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: BASE_PROMPT },
         { type: 'text', text: mode.prompt }
       ];
   const maxTokens = isTriage ? TRIAGE_MAX_TOKENS : MAX_TOKENS;
@@ -1124,7 +1163,7 @@ async function handleKakao(request) {
  * ===================================================================== */
 
 const TOGETHER_MAX_MEMBERS = 12;      // 화면에 안 보이는 안전판. 넘으면 입장 거부.
-const TOGETHER_EFFORT = 'max';        // 부부상담은 가장 깊게 (기본 상담은 high)
+const TOGETHER_EFFORT = 'max';        // 부부상담도 기본 상담과 같은 깊이
 const TOGETHER_MAX_TOKENS = 16000;    // max 는 생각이 길다. 넉넉해야 답이 안 잘린다.
                                       // 실제 청구는 생성한 만큼만 된다.
 const TOGETHER_IDLE_MS = 10 * 60 * 1000;          // 빈 방을 이만큼 들고 있는다
@@ -1443,7 +1482,7 @@ async function handleTogetherPost(request, echoOrigin) {
     const solo = body.solo === true;
     const modeId = solo ? body.mode : 'couple';
     const systemBlocks = [
-      { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: BASE_PROMPT },
       { type: 'text', text: modeById(modeId).prompt }
     ];
     if (!solo) systemBlocks.push({ type: 'text', text: TOGETHER_PROMPT });
@@ -1640,12 +1679,12 @@ Deno.serve(async (request) => {
     model: MODEL,
     max_tokens: isTriage ? TRIAGE_MAX_TOKENS : MAX_TOKENS,
     stream: true,
-    system: isTriage
-      ? [{ type: 'text', text: TRIAGE_PROMPT, cache_control: { type: 'ephemeral' } }]
+    system: cacheSystem(isTriage
+      ? [{ type: 'text', text: TRIAGE_PROMPT }]
       : [
-          { type: 'text', text: BASE_PROMPT, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: BASE_PROMPT },
           { type: 'text', text: modeById(body.mode).prompt }
-        ],
+        ]),
     // 응급 판단은 대충 넘길 일이 아니다. 상담보다 한 단계 올린다.
     // Opus 5 는 생각(thinking)이 기본으로 켜져 있다. effort 가 그 깊이를 정한다.
     thinking: { type: 'adaptive' },
@@ -1653,7 +1692,7 @@ Deno.serve(async (request) => {
     // 안전 분류기가 거절하면 서버가 알아서 다른 모델로 이어받는다.
     // 상담·응급은 민감한 주제라 대화가 통째로 끊기는 것을 막아야 한다.
     fallbacks: 'default',
-    messages
+    messages: cacheMessages(messages)
   };
 
   function callUpstream(withFallback) {

@@ -1,0 +1,7 @@
+{
+  "_읽는_법": "이 파일을 keys.json 으로 복사해 값을 채운다. keys.json 은 .gitignore 에 있어 커밋되지 않는다. 환경변수(같은 이름)로 줘도 된다.",
+
+  "SEOUL_OPEN_KEY": "서울 열린데이터광장 인증키 — https://data.seoul.go.kr 회원가입 후 즉시 발급",
+  "DATA_GO_KR_KEY": "공공데이터포털 서비스키 — https://www.data.go.kr 활용신청 승인 필요. 디코딩된 키를 넣는다",
+  "TDATA_KEY": "T-DATA(TAIMS) 인증키 — https://t-data.seoul.go.kr 활용신청"
+}

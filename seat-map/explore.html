@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>앉을 자리 — 자료 살펴보기</title>
+<style>
+  /* 색은 전부 여기서만 정한다(집 규칙). 하드코딩 금지. */
+  :root{
+    --bg:#f7f8fa; --card:#fff; --ink:#16181d; --ink2:#4a5058; --line:#dfe3e8;
+    --accent:#1e5eff; --accent-soft:#e8efff;
+    --good:#12805c; --good-bg:#e3f5ee;
+    --mid:#8a6100;  --mid-bg:#fdf1d8;
+    --bad:#b3261e;  --bad-bg:#fdeceb;
+    --font:'Segoe UI', Pretendard, sans-serif;
+    --fs:17px;              /* 사양서 7.3: 기본 17px 이상 */
+    --tap:52px;             /* 사양서 7.3: 버튼 최소 높이 */
+  }
+  html[data-big="1"]{ --fs:20px; }   /* 「큰 글씨」 = 1.18배 */
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); font-size:var(--fs); line-height:1.55;
+    -webkit-text-size-adjust:100%;
+  }
+  header{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:14px 16px; background:var(--card); border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:5;
+  }
+  h1{font-size:1.15em; margin:0; letter-spacing:-.02em}
+  h1 small{font-weight:400; color:var(--ink2); font-size:.72em; margin-left:8px}
+  .spacer{flex:1}
+  main{max-width:960px; margin:0 auto; padding:16px 16px 48px}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:16px;
+  }
+  .card > h2{font-size:1em; margin:0 0 12px; color:var(--ink2); font-weight:600}
+
+  /* ── 조작부 ── */
+  .row{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px}
+  .field{flex:1 1 190px; min-width:0}
+  label{display:block; font-size:.82em; color:var(--ink2); margin-bottom:4px}
+  select, input[type=text], button{
+    font:inherit; color:inherit; width:100%;
+    min-height:var(--tap); padding:8px 12px;
+    border:1px solid var(--line); border-radius:10px; background:var(--card);
+  }
+  select:focus-visible, input:focus-visible, button:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px;   /* 키보드 초점 표시 */
+  }
+  select:disabled{background:var(--bg); color:var(--ink2)}
+  .seg{display:flex; gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .seg button{
+    border:0; border-radius:0; background:var(--card); flex:1;
+    border-right:1px solid var(--line); cursor:pointer;
+  }
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent); font-weight:600}
+  .ghost{
+    min-height:auto; padding:8px 14px; width:auto; cursor:pointer;
+    background:var(--card); border-radius:999px; font-size:.9em;
+  }
+  .ghost[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+
+  /* ── 결과 ── */
+  .big{font-size:2.1em; font-weight:700; letter-spacing:-.03em; line-height:1.2}
+  .phrase{
+    display:inline-flex; align-items:center; gap:8px; margin-top:8px;
+    padding:8px 14px; border-radius:999px; font-weight:600; font-size:.95em;
+  }
+  /* 색만으로 알리지 않는다 — 점(●)과 문구가 항상 함께 간다(사양서 7.3) */
+  .tone-good{background:var(--good-bg); color:var(--good)}
+  .tone-mid {background:var(--mid-bg);  color:var(--mid)}
+  .tone-bad {background:var(--bad-bg);  color:var(--bad)}
+  .sub{color:var(--ink2); font-size:.9em}
+  .note{
+    color:var(--ink2); font-size:.85em; margin-top:10px;
+    padding:10px 12px; background:var(--bg); border-radius:10px;
+  }
+  .warn{background:var(--mid-bg); color:var(--mid)}
+
+  /* 좌석 배치도 — 실제 좌석 수만큼 그린다(사양서 7.5) */
+  #seats{display:flex; flex-wrap:wrap; gap:5px; margin-top:14px}
+  .seat{width:20px; height:20px; border-radius:5px; background:var(--line)}
+  .seat.free{background:var(--good)}
+
+  /* 그래프 */
+  #chart{width:100%; height:230px; display:block; touch-action:pan-y}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:.85em; color:var(--ink2); margin-top:8px}
+
+  table{width:100%; border-collapse:collapse; font-size:.9em}
+  th,td{padding:8px 6px; text-align:right; border-bottom:1px solid var(--line)}
+  th:first-child, td:first-child{text-align:left}
+  th{color:var(--ink2); font-weight:600}
+  .scroll{overflow-x:auto}
+
+  #stopBox{position:relative}
+  #stopList{
+    position:absolute; z-index:9; left:0; right:0; top:100%;
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    max-height:280px; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,.10);
+  }
+  #stopList button{
+    border:0; border-radius:0; text-align:left; background:none; cursor:pointer;
+    border-bottom:1px solid var(--line);
+  }
+  #stopList button:hover, #stopList button:focus-visible{background:var(--accent-soft)}
+  [hidden]{display:none !important}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important} }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html" class="ghost" style="text-decoration:none">← 길찾기</a>
+  <h1>자료 살펴보기</h1>
+  <div class="spacer"></div>
+  <button class="ghost" id="bigText" aria-pressed="false">큰 글씨</button>
+</header>
+
+<main>
+  <div class="card" id="controls">
+    <div class="row">
+      <div class="field">
+        <label id="lb-mode">무엇을 볼까요</label>
+        <div class="seg" role="group" aria-labelledby="lb-mode">
+          <button id="mSubway" aria-pressed="true">지하철</button>
+          <button id="mBus" aria-pressed="false">버스</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="measure">보여줄 값</label>
+        <select id="measure"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field"><label for="line">노선</label><select id="line"></select></div>
+      <div class="field" id="stationField"><label for="station">역</label><select id="station"></select></div>
+      <div class="field" id="stopField" hidden>
+        <label for="stopQ">정류장 (이름이나 번호)</label>
+        <div id="stopBox">
+          <input type="text" id="stopQ" placeholder="예: 종로2가 또는 01001" autocomplete="off">
+          <div id="stopList" hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field" id="dirField"><label for="direction">방향</label><select id="direction"></select></div>
+      <div class="field" id="kindField" hidden><label for="kind">승차/하차</label><select id="kind"></select></div>
+      <div class="field">
+        <label id="lb-day">요일</label>
+        <div class="seg" role="group" aria-labelledby="lb-day">
+          <button data-day="weekday" aria-pressed="true">평일</button>
+          <button data-day="saturday" aria-pressed="false">토</button>
+          <button data-day="sunday" aria-pressed="false">일·공휴일</button>
+        </div>
+      </div>
+      <div class="field">
+        <label id="lb-step">시간 단위</label>
+        <div class="seg" role="group" aria-labelledby="lb-step">
+          <button data-step="10" aria-pressed="true">10분</button>
+          <button data-step="30" aria-pressed="false">30분</button>
+          <button data-step="60" aria-pressed="false">1시간</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="result" aria-live="polite">
+    <h2 id="resultTitle">불러오는 중…</h2>
+    <div class="big" id="peakValue">—</div>
+    <div class="sub" id="peakWhen"></div>
+    <div id="phraseWrap"></div>
+    <div id="seats" aria-hidden="true"></div>
+    <div class="sub" id="seatText" style="margin-top:8px"></div>
+    <div class="note" id="sourceNote"></div>
+    <div class="note warn" id="warnNote" hidden></div>
+  </div>
+
+  <div class="card">
+    <h2>시간에 따라</h2>
+    <svg id="chart" role="img" aria-label="시간대별 값 그래프"></svg>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="card">
+    <h2>표로 보기</h2>
+    <div class="scroll"><table id="table"><tbody></tbody></table></div>
+  </div>
+</main>
+
+<script src="engine/interp.js"></script>
+<script src="engine/seat-model.js"></script>
+<script src="engine/query.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  /* localStorage 직접 부르지 않는다 — file:// 이나 쿠키 차단에서 예외가 나도 앱이 안 멈추게(집 규칙). */
+  var store = {
+    get: function(k, d){ try{ var v = localStorage.getItem(k); return v === null ? d : v; }catch(e){ return d; } },
+    set: function(k, v){ try{ localStorage.setItem(k, v); }catch(e){} }
+  };
+  var PFX = 'seat_';   // 이 앱 전용 접두사
+
+  var $ = function(id){ return document.getElementById(id); };
+  var S = {
+    mode: 'subway', measure: 'congestion',
+    line: '6', station: '월곡', direction: '', dayType: 'weekday',
+    kind: '승차', step: 10,
+    route: null, stopId: null, stopName: ''
+  };
+  var DATA = { congestion:null, ride:null, facets:null, busIndex:null, routeDoc:null };
+  var routeCache = {};
+
+  // ── 불러오기 ──────────────────────────────────────────────────────────
+  function getJSON(path){
+    return fetch(path, { cache:'no-store' }).then(function(r){
+      if (!r.ok) throw new Error(path + ' — ' + r.status);
+      return r.json();
+    });
+  }
+
+  function boot(){
+    Promise.all([
+      getJSON('data/subway/congestion.json'),
+      getJSON('data/subway/ride.json'),
+      getJSON('data/facets.json'),
+      getJSON('data/bus/index.json')
+    ]).then(function(v){
+      DATA.congestion = v[0]; DATA.ride = v[1]; DATA.facets = v[2]; DATA.busIndex = v[3];
+      restore();
+      buildControls();
+      render();
+    }).catch(function(e){
+      $('resultTitle').textContent = '자료를 못 읽었습니다';
+      $('peakValue').textContent = '—';
+      $('sourceNote').innerHTML =
+        '<b>' + esc(e.message) + '</b><br>' +
+        'file:// 로 직접 열면 브라우저가 자료 파일 읽기를 막습니다. 정적 서버로 여세요:<br>' +
+        '<code>python -m http.server 8765</code> → <code>http://localhost:8765/seat-map/</code><br>' +
+        '자료가 아직 없다면: <code>python pipeline/fetch_open_files.py</code> → ' +
+        '<code>build_congestion.py</code> → <code>build_datasets.py</code>';
+    });
+  }
+
+  function esc(s){ return String(s).replace(/[&<>]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c]; }); }
+
+  // ── 저장/복원 ─────────────────────────────────────────────────────────
+  function save(){
+    store.set(PFX + 'sel', JSON.stringify({
+      mode:S.mode, measure:S.measure, line:S.line, station:S.station, direction:S.direction,
+      dayType:S.dayType, kind:S.kind, step:S.step, route:S.route, stopId:S.stopId, stopName:S.stopName
+    }));
+  }
+  function restore(){
+    try{
+      var o = JSON.parse(store.get(PFX + 'sel', 'null'));
+      if (o) for (var k in o) if (o[k] !== undefined && o[k] !== null) S[k] = o[k];
+    }catch(e){}
+    if (store.get(PFX + 'big', '0') === '1') setBig(true);
+  }
+  function setBig(on){
+    document.documentElement.setAttribute('data-big', on ? '1' : '0');
+    $('bigText').setAttribute('aria-pressed', on ? 'true' : 'false');
+    store.set(PFX + 'big', on ? '1' : '0');
+    drawChart(lastSeries);
+  }
+
+  // ── 조작부 만들기 ─────────────────────────────────────────────────────
+  function fillSelect(el, items, value){
+    el.innerHTML = '';
+    items.forEach(function(it){
+      var o = document.createElement('option');
+      o.value = it.id; o.textContent = it.name;
+      if (String(it.id) === String(value)) o.selected = true;
+      el.appendChild(o);
+    });
+  }
+
+  function buildControls(){
+    // 지표
+    var ms = S.mode === 'subway'
+      ? [{id:'congestion', name:'혼잡도 (얼마나 붐비나)'}, {id:'ride', name:'승·하차 인원'}]
+      : [{id:'ride', name:'승·하차 인원'}];
+    if (S.mode === 'bus') S.measure = 'ride';
+    fillSelect($('measure'), ms, S.measure);
+
+    if (S.mode === 'subway') {
+      var opts = SeatQuery.optionsFor(DATA.facets, { line:S.line });
+      if (!opts.lines.some(function(l){ return l.id === S.line; })) S.line = opts.lines[0] ? opts.lines[0].id : '';
+      opts = SeatQuery.optionsFor(DATA.facets, { line:S.line });
+      fillSelect($('line'), opts.lines, S.line);
+
+      var stations = [{id:'전체', name:'노선 전체 (가장 붐비는 지점)'}].concat(
+        opts.stations.map(function(s){ return { id:s, name:displayName(s) }; }));
+      if (!opts.stations.indexOf || opts.stations.indexOf(S.station) < 0) {
+        if (S.station !== '전체') S.station = opts.stations[0] || '전체';
+      }
+      fillSelect($('station'), stations, S.station);
+
+      var dirs = [{id:'', name:'둘 중 더 붐비는 쪽'}].concat(
+        opts.directions.map(function(d){ return { id:d, name:d }; }));
+      fillSelect($('direction'), dirs, S.direction);
+
+      $('stationField').hidden = false; $('stopField').hidden = true;
+      $('dirField').hidden = (S.measure !== 'congestion');
+      $('kindField').hidden = (S.measure !== 'ride');
+      $('line').previousElementSibling.textContent = '노선';
+    } else {
+      var routes = SeatQuery.findRoutes(DATA.busIndex, '', 900)
+        .map(function(r){ return { id:r.route, name:r.route + '번  (' + r.stops + '개 정류장)' }; });
+      if (!S.route) S.route = routes[0] ? routes[0].id : null;
+      fillSelect($('line'), routes, S.route);
+      $('line').previousElementSibling.textContent = '버스 노선';
+      $('stationField').hidden = true; $('stopField').hidden = false;
+      $('dirField').hidden = true; $('kindField').hidden = false;
+      $('stopQ').value = S.stopName || '';
+    }
+
+    fillSelect($('kind'), [{id:'승차', name:'승차 (타는 사람)'}, {id:'하차', name:'내리는 사람'}], S.kind);
+
+    seg('mSubway', 'mBus');
+    document.querySelectorAll('[data-day]').forEach(function(b){
+      b.setAttribute('aria-pressed', b.dataset.day === S.dayType ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-step]').forEach(function(b){
+      b.setAttribute('aria-pressed', +b.dataset.step === S.step ? 'true' : 'false');
+    });
+  }
+
+  function displayName(s){
+    var names = (DATA.facets && DATA.facets.stationNames) || {};
+    return names[s] || s;
+  }
+  function seg(a, b){
+    $(a).setAttribute('aria-pressed', S.mode === 'subway' ? 'true' : 'false');
+    $(b).setAttribute('aria-pressed', S.mode === 'bus' ? 'true' : 'false');
+  }
+
+  // ── 그리기 ────────────────────────────────────────────────────────────
+  var lastSeries = null;
+
+  function render(){
+    save();
+    if (S.mode === 'bus') { renderBus(); return; }
+
+    var s = SeatQuery.subway({ congestion:DATA.congestion, ride:DATA.ride }, {
+      measure:S.measure, line:S.line, station:S.station,
+      direction:S.direction || undefined, dayType:S.dayType,
+      kind:S.kind, stepMinutes:S.step
+    });
+    show(s, s.label);
+  }
+
+  function renderBus(){
+    if (!S.route) return;
+    loadRoute(S.route).then(function(doc){
+      DATA.routeDoc = doc;
+      var s = SeatQuery.bus(doc, { stopId:S.stopId || undefined, kind:S.kind, stepMinutes:S.step });
+      show(s, s.label);
+    }).catch(function(e){
+      $('resultTitle').textContent = '노선 자료를 못 읽었습니다';
+      $('sourceNote').textContent = e.message;
+    });
+  }
+
+  function loadRoute(route){
+    if (routeCache[route]) return Promise.resolve(routeCache[route]);
+    var safe = route.replace(/[^0-9A-Za-z가-힣_-]/g, '_');
+    return getJSON('data/bus/routes/' + encodeURIComponent(safe) + '.json').then(function(d){
+      routeCache[route] = d; return d;                    // 필요한 노선만 받아 둔다(사양서 3.4)
+    });
+  }
+
+  function show(s, title){
+    lastSeries = s;
+    $('resultTitle').textContent = title || '';
+    var sum = SeatQuery.summarize(s);
+
+    if (!s.found || !sum) {
+      $('peakValue').textContent = '자료 없음';
+      $('peakWhen').textContent = '이 조합의 자료가 아직 없습니다.';
+      $('phraseWrap').innerHTML = ''; $('seats').innerHTML = ''; $('seatText').textContent = '';
+      $('sourceNote').textContent = ''; $('warnNote').hidden = true;
+      drawChart(null); drawTable(null);
+      return;
+    }
+
+    var isCong = (s.measure === 'congestion');
+    $('peakValue').textContent = isCong
+      ? sum.peak.value.toFixed(1) + '%'
+      : Math.round(sum.peak.value).toLocaleString('ko-KR') + '명/시';
+    $('peakWhen').textContent = '가장 붐비는 시각 ' + sum.peak.at
+      + ' · 가장 한산한 시각 ' + sum.low.at
+      + (isCong ? ' (' + sum.low.value.toFixed(1) + '%)' : '');
+
+    // 혼잡도일 때만 좌석으로 바꿔 말한다 — 사양서 7.3 "전문용어 금지"
+    if (isCong && S.mode === 'subway') {
+      var V = SeatModel.VEHICLES.subwayCar;
+      var load = SeatModel.loadFromCongestion(sum.peak.value, V.capacity);
+      var p = SeatModel.pBoard(load, V.seats);
+      var ph = SeatModel.seatPhrase(p);
+      $('phraseWrap').innerHTML = '<span class="phrase tone-' + ph.tone + '">● ' + esc(ph.text)
+        + ' · 앉을 확률 ' + Math.round(p * 100) + '%</span>';
+      drawSeats(SeatModel.emptySeats(load, V.seats), V.seats);
+      $('seatText').textContent = '가장 붐빌 때 ' + SeatModel.describeSeats(load, V.seats)
+        + ' (지하철 1칸 기준)';
+    } else {
+      $('phraseWrap').innerHTML = '';
+      $('seats').innerHTML = ''; $('seatText').textContent = '';
+    }
+
+    /* 출처는 반드시 지금 보고 있는 자료의 것이어야 한다.
+       버스인데 지하철 출처를 달면 그건 틀린 표시다 — 이용약관 문제이기도 하다. */
+    var src = S.mode === 'bus' ? (DATA.busIndex || {})
+            : (isCong ? DATA.congestion : DATA.ride) || {};
+    $('sourceNote').innerHTML = esc(s.note)
+      + (s.stepMinutes < s.slotMinutes ? ' — 원천은 ' + s.slotMinutes + '분 단위입니다.' : '')
+      + (src.source ? '<br>출처: ' + esc(src.source) : '');
+
+    var warn = s.fellBack || s.noDayType || '';
+    $('warnNote').hidden = !warn;
+    $('warnNote').textContent = warn;
+
+    drawChart(s); drawTable(s);
+  }
+
+  function drawSeats(free, total){
+    var box = $('seats'); box.innerHTML = '';
+    for (var i = 0; i < total; i++){
+      var d = document.createElement('div');
+      d.className = 'seat' + (i < free ? ' free' : '');
+      box.appendChild(d);
+    }
+  }
+
+  // 그래프는 SVG 로 직접 그린다(라이브러리 없음 — 집 규칙)
+  function drawChart(s){
+    var svg = $('chart');
+    svg.innerHTML = '';
+    if (!s || !s.points.length) return;
+    var W = svg.clientWidth || 640, H = svg.clientHeight || 230;
+    var padL = 46, padR = 10, padT = 12, padB = 26;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+    var vals = s.points.map(function(p){ return p.value; });
+    var max = Math.max.apply(null, vals) || 1;
+    var nice = Math.ceil(max / 10) * 10 || 10;
+    var t0 = s.points[0].minutes, t1 = s.points[s.points.length - 1].minutes;
+    var x = function(t){ return padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR); };
+    var y = function(v){ return H - padB - (v / nice) * (H - padT - padB); };
+
+    var ns = 'http://www.w3.org/2000/svg';
+    function el(n, a){ var e = document.createElementNS(ns, n); for (var k in a) e.setAttribute(k, a[k]); return e; }
+
+    // 가로 눈금
+    [0, 0.5, 1].forEach(function(f){
+      var v = nice * f;
+      svg.appendChild(el('line', {x1:padL, x2:W - padR, y1:y(v), y2:y(v), stroke:'var(--line)'}));
+      var tx = el('text', {x:padL - 8, y:y(v) + 4, 'text-anchor':'end', fill:'var(--ink2)', 'font-size':'12'});
+      tx.textContent = s.measure === 'congestion' ? v + '%' : Math.round(v).toLocaleString('ko-KR');
+      svg.appendChild(tx);
+    });
+    // 시각 눈금 (3시간마다)
+    for (var t = Math.ceil(t0 / 180) * 180; t <= t1; t += 180){
+      var tx2 = el('text', {x:x(t), y:H - 8, 'text-anchor':'middle', fill:'var(--ink2)', 'font-size':'12'});
+      tx2.textContent = SeatInterp.hhmm(t);
+      svg.appendChild(tx2);
+    }
+    // 값
+    var d = s.points.map(function(p, i){ return (i ? 'L' : 'M') + x(p.minutes).toFixed(1) + ' ' + y(p.value).toFixed(1); }).join(' ');
+    svg.appendChild(el('path', {d:d + ' L' + x(t1) + ' ' + y(0) + ' L' + x(t0) + ' ' + y(0) + ' Z',
+                                fill:'var(--accent-soft)'}));
+    svg.appendChild(el('path', {d:d, fill:'none', stroke:'var(--accent)', 'stroke-width':'2.5',
+                                'stroke-linejoin':'round'}));
+    // 좌석 만석선(혼잡도 34%)
+    if (s.measure === 'congestion' && nice > 34){
+      svg.appendChild(el('line', {x1:padL, x2:W - padR, y1:y(34), y2:y(34),
+                                  stroke:'var(--good)', 'stroke-dasharray':'5 4'}));
+      var lb = el('text', {x:W - padR, y:y(34) - 6, 'text-anchor':'end', fill:'var(--good)', 'font-size':'12'});
+      lb.textContent = '34% = 좌석이 다 참';
+      svg.appendChild(lb);
+    }
+    $('legend').textContent = s.measure === 'congestion'
+      ? '세로축 = 혼잡도(%). 34%면 좌석이 딱 다 찹니다.'
+      : '세로축 = 시간당 인원(명). 10분 눈금에서는 그 10분 동안의 인원이 아니라 시간당 값입니다.';
+  }
+
+  function drawTable(s){
+    var tb = $('table').querySelector('tbody');
+    tb.innerHTML = '';
+    if (!s || !s.points.length) return;
+    var head = document.createElement('tr');
+    head.innerHTML = '<th>시각</th><th>' + (s.measure === 'congestion' ? '혼잡도' : '시간당 인원')
+      + '</th><th>' + (s.measure === 'congestion' ? '빈 좌석' : '이 눈금 동안') + '</th>';
+    tb.appendChild(head);
+    var V = SeatModel.VEHICLES.subwayCar;
+    // 30분마다 한 줄만 (10분 단위면 표가 너무 길다)
+    s.points.forEach(function(p){
+      if (p.minutes % 30 !== 0) return;
+      var tr = document.createElement('tr');
+      var c3;
+      if (s.measure === 'congestion' && S.mode === 'subway'){
+        var load = SeatModel.loadFromCongestion(p.value, V.capacity);
+        c3 = SeatModel.emptySeats(load, V.seats) + '석';
+      } else {
+        c3 = Math.round(p.perStep).toLocaleString('ko-KR') + '명';
+      }
+      tr.innerHTML = '<td>' + SeatInterp.hhmm(p.minutes) + '</td><td>'
+        + (s.measure === 'congestion' ? p.value.toFixed(1) + '%'
+           : Math.round(p.value).toLocaleString('ko-KR') + '명/시')
+        + '</td><td>' + c3 + '</td>';
+      tb.appendChild(tr);
+    });
+  }
+
+  // ── 입력 (마우스·키보드·터치 모두 같은 경로) ──────────────────────────
+  function on(id, ev, fn){ var e = $(id); if (e) e.addEventListener(ev, fn); }
+
+  on('bigText', 'click', function(){
+    setBig($('bigText').getAttribute('aria-pressed') !== 'true');
+  });
+  on('mSubway', 'click', function(){ S.mode = 'subway'; S.measure = 'congestion'; buildControls(); render(); });
+  on('mBus', 'click', function(){ S.mode = 'bus'; S.measure = 'ride'; buildControls(); render(); });
+  on('measure', 'change', function(e){ S.measure = e.target.value; buildControls(); render(); });
+  on('line', 'change', function(e){
+    if (S.mode === 'subway'){ S.line = e.target.value; S.station = '전체'; }
+    else { S.route = e.target.value; S.stopId = null; S.stopName = ''; $('stopQ').value = ''; }
+    buildControls(); render();
+  });
+  on('station', 'change', function(e){ S.station = e.target.value; render(); });
+  on('direction', 'change', function(e){ S.direction = e.target.value; render(); });
+  on('kind', 'change', function(e){ S.kind = e.target.value; render(); });
+
+  document.querySelectorAll('[data-day]').forEach(function(b){
+    b.addEventListener('click', function(){
+      S.dayType = b.dataset.day;
+      document.querySelectorAll('[data-day]').forEach(function(x){
+        x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+      });
+      render();
+    });
+  });
+  document.querySelectorAll('[data-step]').forEach(function(b){
+    b.addEventListener('click', function(){
+      S.step = +b.dataset.step;
+      document.querySelectorAll('[data-step]').forEach(function(x){
+        x.setAttribute('aria-pressed', x === b ? 'true' : 'false');
+      });
+      render();
+    });
+  });
+
+  // 정류장 찾기 — 12,500개라 목록으로는 못 고른다
+  on('stopQ', 'input', function(e){
+    var q = e.target.value.trim();
+    var box = $('stopList');
+    if (!q){ box.hidden = true; box.innerHTML = ''; S.stopId = null; S.stopName = ''; render(); return; }
+    var inRoute = (DATA.routeDoc && DATA.routeDoc.stops) || [];
+    var hits = inRoute.filter(function(s){
+      return s.name.replace(/\s+/g,'').indexOf(q.replace(/\s+/g,'')) >= 0 || s.ars.indexOf(q) === 0;
+    }).slice(0, 30);
+    box.innerHTML = '';
+    if (!hits.length){
+      var none = document.createElement('button');
+      none.textContent = '이 노선에 그런 정류장이 없습니다';
+      none.disabled = true;
+      box.appendChild(none);
+    }
+    hits.forEach(function(s){
+      var b = document.createElement('button');
+      b.textContent = s.name + '  ' + s.ars;
+      b.addEventListener('click', function(){
+        S.stopId = s.stopId; S.stopName = s.name;
+        $('stopQ').value = s.name; box.hidden = true;
+        render();
+      });
+      box.appendChild(b);
+    });
+    box.hidden = false;
+  });
+  on('stopQ', 'keydown', function(e){ if (e.key === 'Escape'){ $('stopList').hidden = true; } });
+  document.addEventListener('click', function(e){
+    if (!$('stopBox').contains(e.target)) $('stopList').hidden = true;
+  });
+
+  var rt;
+  window.addEventListener('resize', function(){
+    clearTimeout(rt); rt = setTimeout(function(){ drawChart(lastSeries); }, 120);
+  });
+
+  if (location.search.indexOf('debug=1') >= 0) window.SM = { S:S, DATA:DATA, render:render, show:show };
+  boot();
+})();
+</script>
+</body>
+</html>

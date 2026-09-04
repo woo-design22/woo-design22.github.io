@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>앉을 자리</title>
+<style>
+  /* 색은 전부 여기서만 정한다(집 규칙). 하드코딩 금지. */
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#15171c; --ink2:#4c525b; --line:#dde1e7;
+    --accent:#1e5eff; --accent-soft:#e9efff; --accent-ink:#0b3ec9;
+    /* 착석 확률 다섯 단계 — 초록에서 빨강까지. 색만으로 알리지 않으므로(문구·숫자 병기)
+       색약이어도 읽히지만, 단계 사이는 명도까지 벌려 흑백으로 봐도 구분되게 한다. */
+    --best:#0b5c42; --best-bg:#d3efe4;
+    --good:#0f7a57; --good-bg:#e6f6ef;
+    --mid:#7f5900;  --mid-bg:#fcf0d6;
+    --low:#93400b;  --low-bg:#fbe6d5;
+    --bad:#a92019;  --bad-bg:#fceceb;
+    --font:'Segoe UI', Pretendard, sans-serif;
+    --fs:17px;            /* 사양서 7.3 — 본문 17px 이상 */
+    --tap:52px;           /* 버튼 최소 높이 */
+    --tap-main:64px;      /* 주요 버튼 */
+  }
+  html[data-big="1"]{ --fs:20px; }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--font); font-size:var(--fs); line-height:1.55;
+    -webkit-text-size-adjust:100%;
+  }
+  header{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 14px; background:var(--card); border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:20;
+  }
+  /* 뒤로 가기는 언제나 왼쪽 위 같은 자리 (사양서 7.2) */
+  #back{width:44px; height:44px; flex:0 0 auto; border:1px solid var(--line);
+        border-radius:12px; background:var(--card); font-size:1.2em; cursor:pointer}
+  h1{font-size:1.1em; margin:0; letter-spacing:-.02em; flex:1; min-width:0;
+     overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  main{max-width:760px; margin:0 auto; padding:14px 14px 40px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px}
+  .muted{color:var(--ink2)} .small{font-size:.86em}
+
+  label{display:block; font-size:.85em; color:var(--ink2); margin-bottom:5px; font-weight:600}
+  input[type=text], select, button{font:inherit; color:inherit}
+  input[type=text], select{width:100%; min-height:var(--tap); padding:10px 13px;
+    border:1px solid var(--line); border-radius:12px; background:var(--card)}
+  input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible{
+    outline:3px solid var(--accent); outline-offset:2px}
+  .primary{width:100%; min-height:var(--tap-main); border:0; border-radius:14px;
+    background:var(--accent); color:#fff; font-weight:700; font-size:1.05em; cursor:pointer}
+  .primary[disabled]{background:var(--line); color:var(--ink2); cursor:default}
+  .ghost{min-height:var(--tap); padding:9px 15px; border:1px solid var(--line);
+    border-radius:999px; background:var(--card); cursor:pointer; font-size:.92em}
+  .ghost[aria-pressed="true"]{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-ink); font-weight:700}
+  .seg{display:flex; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .seg button{flex:1; min-height:var(--tap); border:0; border-right:1px solid var(--line); background:var(--card); cursor:pointer}
+  .seg button:last-child{border-right:0}
+  .seg button[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent-ink); font-weight:700}
+
+  /* 자동완성 */
+  .box{position:relative; margin-bottom:12px}
+  .withBtn{display:flex; gap:8px}
+  .withBtn input{flex:1}
+  .withBtn button{flex:0 0 auto; width:var(--tap); min-height:var(--tap); border:1px solid var(--line);
+    border-radius:12px; background:var(--card); cursor:pointer; font-size:1.1em}
+  .list{position:absolute; z-index:15; left:0; right:0; top:100%; margin-top:4px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    max-height:320px; overflow:auto; box-shadow:0 10px 30px rgba(0,0,0,.12)}
+  .list button{display:block; width:100%; text-align:left; min-height:var(--tap);
+    padding:10px 14px; border:0; border-bottom:1px solid var(--line); background:none; cursor:pointer}
+  .list button:last-child{border-bottom:0}
+  .list button:hover, .list button:focus-visible{background:var(--accent-soft)}
+  .list .nm{font-weight:600}
+  .list .dt{font-size:.82em; color:var(--ink2)}
+  .tag{display:inline-block; font-size:.75em; padding:2px 7px; border-radius:999px;
+       background:var(--bg); color:var(--ink2); margin-left:6px}
+
+  /* 경로 목록 */
+  .journey{display:block; width:100%; text-align:left; background:var(--card);
+    border:1px solid var(--line); border-radius:14px; padding:15px; margin-bottom:11px; cursor:pointer}
+  .journey:hover, .journey:focus-visible{border-color:var(--accent)}
+  .journey.top{border-color:var(--accent); border-width:2px}
+  .badge{display:inline-block; font-size:.8em; font-weight:700; padding:3px 10px;
+    border-radius:999px; background:var(--accent-soft); color:var(--accent-ink); margin-bottom:8px}
+  .stand{font-size:1.5em; font-weight:800; letter-spacing:-.02em}
+  .chain{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:9px 0 4px}
+  .pill{font-size:.86em; padding:3px 10px; border-radius:8px; background:var(--bg); border:1px solid var(--line)}
+  .pill.subway{background:var(--accent-soft); border-color:var(--accent-soft); color:var(--accent-ink)}
+  .pill.walk{background:var(--good-bg); border-color:var(--good-bg); color:var(--good)}
+  .arrow{color:var(--ink2)}
+  /* 색만으로 알리지 않는다 — 점(●)과 문구가 항상 같이 간다 (사양서 7.3) */
+  .phrase{display:inline-flex; gap:7px; align-items:center; padding:6px 12px; border-radius:999px; font-weight:700; font-size:.9em}
+  .tone-best{background:var(--best-bg); color:var(--best)}
+  .tone-good{background:var(--good-bg); color:var(--good)}
+  .tone-mid{background:var(--mid-bg); color:var(--mid)}
+  .tone-low{background:var(--low-bg); color:var(--low)}
+  .tone-bad{background:var(--bad-bg); color:var(--bad)}
+
+  /* 상세 */
+  .walkrow{display:flex; gap:9px; align-items:baseline; padding:7px 0; color:var(--ink2); font-size:.92em}
+  .leg{border-left:3px solid var(--line); padding:2px 0 16px 15px; margin-left:6px}
+  .leg.subway{border-left-color:var(--accent)}
+  .leg h3{margin:0 0 4px; font-size:1.02em}
+  .seats{display:flex; flex-wrap:wrap; gap:4px; margin:9px 0 6px; max-width:420px}
+  .seat{width:17px; height:17px; border-radius:4px; background:var(--line)}
+  .seat.free{background:var(--good)}
+  .note{margin-top:10px; padding:11px 13px; background:var(--bg); border-radius:11px; font-size:.85em; color:var(--ink2)}
+  .note.warn{background:var(--mid-bg); color:var(--mid)}
+  /* 결과창 위의 편집 바 — 결과를 보면서 바로 고친다 */
+  #editBar{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin-bottom:12px}
+  .slot{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+  .slot .tagname{flex:0 0 44px; font-size:.82em; color:var(--ink2); font-weight:700}
+  .slot .val{flex:1; min-width:0; min-height:var(--tap); padding:9px 12px; text-align:left;
+    border:1px solid var(--line); border-radius:11px; background:var(--card); cursor:pointer;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .slot .val:hover{border-color:var(--accent)}
+  .slot .val[aria-expanded="true"]{border-color:var(--accent); background:var(--accent-soft)}
+  .slot .x{flex:0 0 auto; width:42px; min-height:42px; border:1px solid var(--line);
+    border-radius:11px; background:var(--card); cursor:pointer; color:var(--ink2); font-size:1.1em}
+  /* 경유지는 평소에 안 보인다 — 작은 ＋ 하나만 두고, 누르면 칸이 생긴다 */
+  #edPick, #sPick{margin:0 0 10px 46px}   /* 고치는 칸과 같은 들여쓰기 */
+  .farBadge{display:inline-block; font-size:.8em; font-weight:700; padding:3px 10px;
+    border-radius:999px; background:var(--bg); color:var(--ink2); margin-bottom:6px}
+  #viaAdd{display:flex; margin:0 0 8px 46px}
+  #addVia{width:34px; height:34px; min-height:34px; padding:0; line-height:1;
+    border:1px solid var(--line); border-radius:50%; background:var(--card);
+    cursor:pointer; color:var(--ink2); font-size:1.05em}
+  #addVia:hover{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft)}
+  .whenRow{display:flex; gap:8px}
+  .whenRow select{flex:1; min-width:0}
+  /* 「앉아 가는 차 찾기」 — 평소엔 작은 탭 하나로만 있다 */
+  .seatTab{display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:7px 14px;
+    border:1px solid var(--line); border-radius:999px; background:var(--card);
+    cursor:pointer; font-size:.88em; color:var(--ink2)}
+  .seatTab:hover{border-color:var(--good); color:var(--good); background:var(--good-bg)}
+  .tabRow{display:flex; justify-content:center; margin:10px 0 4px}
+  .seatCard{background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:14px; margin-bottom:10px}
+  .seatCard.reach{border-color:var(--good); border-width:2px}
+  .seatTop{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .seatPct{font-size:1.35em; font-weight:800; letter-spacing:-.02em}
+  footer{max-width:760px; margin:0 auto; padding:0 14px 30px; font-size:.8em; color:var(--ink2)}
+  footer a{color:var(--ink2)}
+  [hidden]{display:none !important}
+  @media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important}}
+</style>
+</head>
+<body>
+<header>
+  <button id="back" aria-label="뒤로 가기" hidden>←</button>
+  <h1 id="title">앉을 자리</h1>
+  <button class="ghost" id="bigText" aria-pressed="false" style="flex:0 0 auto">큰 글씨</button>
+</header>
+
+<main>
+  <!-- ① 출발지·도착지 -->
+  <section id="step1">
+    <div class="card">
+      <div class="box">
+        <label for="fromQ">어디서 출발하세요?</label>
+        <div class="withBtn">
+          <input type="text" id="fromQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
+          <button id="here" title="지금 있는 곳" aria-label="지금 있는 곳으로 넣기">◎</button>
+        </div>
+        <div class="list" id="fromList" hidden></div>
+      </div>
+      <div class="box" style="margin-bottom:0">
+        <label for="toQ">어디로 가세요?</label>
+        <input type="text" id="toQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
+        <div class="list" id="toList" hidden></div>
+      </div>
+      <div class="note" id="places" hidden></div>
+    </div>
+    <button class="primary" id="next1" disabled>다음</button>
+    <div class="tabRow"><button class="seatTab" id="tab1">🪑 앉아 가는 대중교통 위치</button></div>
+    <div class="note small" id="bootNote">자료를 불러오는 중입니다…</div>
+  </section>
+
+  <!-- ② 언제 -->
+  <section id="step2" hidden>
+    <div class="card">
+      <label id="lb-day">무슨 요일에 출발하세요?</label>
+      <div class="seg" role="group" aria-labelledby="lb-day" style="margin-bottom:14px">
+        <button data-day="weekday" aria-pressed="true">평일</button>
+        <button data-day="saturday" aria-pressed="false">토요일</button>
+        <button data-day="sunday" aria-pressed="false">일요일·공휴일</button>
+      </div>
+      <label for="hourH">몇 시에 출발하세요?</label>
+      <div class="whenRow">
+        <select id="hourH" aria-label="시"></select>
+        <select id="hourM" aria-label="분"></select>
+      </div>
+      <label for="walk" style="margin-top:14px">걸음 속도</label>
+      <select id="walk">
+        <option value="normal">보통</option>
+        <option value="slow">느림</option>
+        <option value="vslow">아주 느림</option>
+      </select>
+      <div class="note small">도보 시간은 직선거리가 아니라 <b>실제로 돌아 걷는 거리</b>로 계산합니다.
+        설정은 이 기기에만 저장되고 서버로 보내지 않습니다.</div>
+    </div>
+    <button class="primary" id="next2">길 찾기</button>
+  </section>
+
+  <!-- ③ 경로 목록 -->
+  <section id="step3" hidden>
+    <div id="editBar">
+      <div class="slot" id="slotFrom"><span class="tagname">출발</span>
+        <button class="val" id="edFrom" aria-expanded="false"></button></div>
+      <div id="viaSlots"></div>
+      <div id="viaAdd"><button id="addVia" aria-label="경유지 추가" title="경유지 추가">＋</button></div>
+      <div class="slot" id="slotTo"><span class="tagname">도착</span>
+        <button class="val" id="edTo" aria-expanded="false"></button></div>
+      <div class="box" id="edPick" hidden>
+        <input type="text" id="edQ" placeholder="주소·건물·역·정류장" autocomplete="off" enterkeyhint="search">
+        <div class="list" id="edList" hidden></div>
+      </div>
+      <div class="whenRow">
+        <select id="edDay" aria-label="요일"></select>
+        <select id="edH" aria-label="시"></select>
+        <select id="edM" aria-label="분"></select>
+      </div>
+    </div>
+    <div class="tabRow"><button class="seatTab" id="tab3">🪑 앉아 가는 대중교통 위치</button></div>
+    <div class="note small" id="listNote"></div>
+    <div id="results"></div>
+  </section>
+
+  <!-- ⑤ 앉아 가는 차 (길찾기의 반대) -->
+  <section id="step5" hidden>
+    <div class="card">
+      <div class="slot" id="slotSTo"><span class="tagname">목적지</span>
+        <button class="val" id="sTo" aria-expanded="false"></button></div>
+      <div class="box" id="sPick" hidden>
+        <input type="text" id="sQ" placeholder="목적지 — 주소·건물·역·정류장" autocomplete="off" enterkeyhint="search">
+        <div class="list" id="sList" hidden></div>
+      </div>
+      <div class="whenRow">
+        <select id="sDay" aria-label="요일"></select>
+        <select id="sH" aria-label="시"></select>
+        <select id="sM" aria-label="분"></select>
+      </div>
+      <div class="note small" id="seatWhere"></div>
+    </div>
+    <div id="seatList"></div>
+  </section>
+
+  <!-- ④ 상세 -->
+  <section id="step4" hidden>
+    <div class="card" id="detail"></div>
+  </section>
+</main>
+
+<footer>
+  <span id="attrib"></span> · 대중교통 자료 © 서울교통공사 · 서울특별시 (서울 열린데이터광장) ·
+  <a href="explore.html">자료 살펴보기</a>
+</footer>
+
+<script src="engine/interp.js"></script>
+<script src="engine/seat-model.js"></script>
+<script src="engine/transfer.js"></script>
+<script src="engine/sim-seoul.js"></script>
+<script src="engine/route.js"></script>
+<script src="engine/loads.js"></script>
+<script src="engine/geocode.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  /* localStorage 를 직접 부르지 않는다 — file:// 이나 쿠키 차단에서 예외가 나도 앱이 안 멈추게(집 규칙). */
+  var store = {
+    get:function(k,d){ try{ var v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } },
+    set:function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  };
+  var PFX='seat_';
+  var $=function(id){ return document.getElementById(id); };
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  var G=null, IDX=null, CONG=null, RIDE=null, busCache={};
+  var S={ from:null, to:null, via:[], dayType:'weekday', minutes:8*60, walk:'normal', step:1, picked:null, list:[] };
+
+  $('attrib').textContent = SeatGeo.ATTRIBUTION;
+
+  // ── 불러오기 ────────────────────────────────────────────────────────────
+  function getJSON(p, timeoutMs){
+    var ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    var t = ctl && setTimeout(function(){ ctl.abort(); }, timeoutMs||20000);
+    return fetch(p,{cache:'no-store', signal:ctl&&ctl.signal}).then(function(r){
+      if(t) clearTimeout(t);
+      if(!r.ok) throw new Error(p+' — '+r.status); return r.json();
+    });
+  }
+
+  Promise.all([
+    getJSON('data/graph/nodes.json'), getJSON('data/graph/routes.json'),
+    getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json')
+  ]).then(function(v){
+    G={ nodes:v[0].nodes, routes:v[1].routes };
+    IDX=SeatRoute.buildIndex(G);
+    CONG=v[2]; RIDE=v[3];
+    $('bootNote').textContent = '역·정류장 ' + G.nodes.length.toLocaleString('ko-KR')
+      + '곳, 노선 ' + G.routes.length + '개. 주소·건물 이름도 넣을 수 있습니다.';
+    restore(); refreshNext();
+  }).catch(function(e){
+    $('bootNote').innerHTML = '<b>자료를 못 읽었습니다: '+esc(e.message)+'</b><br>'
+      + 'file:// 로 열면 브라우저가 자료 파일을 막습니다. <code>python -m http.server 8765</code> 로 여세요.';
+  });
+
+  function preloadBus(names){
+    return Promise.all(names.filter(function(n){ return !(n in busCache); }).map(function(n){
+      var safe = String(n).replace(/[^0-9A-Za-z가-힣_-]/g,'_');
+      return getJSON('data/bus/routes/'+encodeURIComponent(safe)+'.json')
+        .then(function(d){ busCache[n]=d; }).catch(function(){ busCache[n]=null; });
+    }));
+  }
+
+  // ── 저장 ────────────────────────────────────────────────────────────────
+  /* ★ 출발지·도착지는 저장하지 않는다 ★
+     다음에 열었을 때 지난번 자리가 채워져 있으면, 그걸 못 보고 그대로 눌러
+     엉뚱한 길을 받게 된다. 매번 빈칸에서 시작한다.
+     걸음 속도도 늘 「보통」에서 시작한다 — 한 번 느리게 골라 둔 것이 몇 달 뒤까지 남아
+     모든 경로가 길어 보이면 그게 더 나쁘다.
+     요일·시각만 남긴다(둘은 눈에 보이는 자리에 값이 그대로 찍혀 있어 확인하고 고치기 쉽다). */
+  function save(){ store.set(PFX+'plan', JSON.stringify({dayType:S.dayType, minutes:S.minutes})); }
+  function restore(){
+    try{ var o=JSON.parse(store.get(PFX+'plan','null'));
+      if(o){ S.dayType=o.dayType||'weekday'; S.minutes=o.minutes||480; }
+    }catch(e){}
+    S.from=null; S.to=null; S.via=[]; S.walk='normal';
+    $('fromQ').value=''; $('toQ').value='';
+    $('walk').value='normal'; if(setStepTime) setStepTime(S.minutes);
+    document.querySelectorAll('[data-day]').forEach(function(b){
+      b.setAttribute('aria-pressed', b.dataset.day===S.dayType?'true':'false'); });
+    if(store.get(PFX+'big','0')==='1') setBig(true);
+    showPlaces();
+  }
+  function setBig(on){
+    document.documentElement.setAttribute('data-big', on?'1':'0');
+    $('bigText').setAttribute('aria-pressed', on?'true':'false');
+    store.set(PFX+'big', on?'1':'0');
+  }
+  $('bigText').addEventListener('click', function(){ setBig($('bigText').getAttribute('aria-pressed')!=='true'); });
+
+  // ── 시각·요일·걸음속도 ──────────────────────────────────────────────────
+  /* ★ 시각은 10분 단위 ★ (2026-09-04 사용자 지시)
+     05:00~24:00 을 10분으로 끊으면 115개다 — 목록 하나로는 못 고른다.
+     그래서 **시 20칸 · 분 6칸** 두 칸으로 나눈다. 어르신이 훑기에도 이 쪽이 쉽다. */
+  var HOURS=[], MINS=[0,10,20,30,40,50];
+  for(var _h=5; _h<=24; _h++) HOURS.push(_h);
+  function fillTime(hSel, mSel, minutes, onChange){
+    hSel.innerHTML=''; mSel.innerHTML='';
+    HOURS.forEach(function(h){
+      var o=document.createElement('option'); o.value=h;
+      // 「오전·낮·저녁·자정」은 붙이지 않는다 — 24시간 표기면 이미 명확하고, 칸이 좁아 두 줄로 밀린다.
+      o.textContent=(h<10?'0':'')+h+'시';
+      hSel.appendChild(o);
+    });
+    MINS.forEach(function(m){
+      var o=document.createElement('option'); o.value=m;
+      o.textContent=(m<10?'0':'')+m+'분'; mSel.appendChild(o);
+    });
+    function setFrom(v){
+      var h=Math.min(24,Math.max(5,Math.floor(v/60)));
+      var m=MINS.reduce(function(a,b){ return Math.abs(b-(v%60))<Math.abs(a-(v%60))?b:a; }, 0);
+      if(h===24) m=0;
+      hSel.value=h; mSel.value=m;
+    }
+    setFrom(minutes);
+    function read(){
+      var h=+hSel.value, m=+mSel.value;
+      if(h===24 && m>0){ m=0; mSel.value=0; }        // 24시 이후는 다루지 않는다
+      onChange(h*60+m);
+    }
+    hSel.addEventListener('change', read);
+    mSel.addEventListener('change', read);
+    return setFrom;
+  }
+  var setStepTime = fillTime($('hourH'), $('hourM'), S.minutes, function(v){ S.minutes=v; save(); });
+  $('walk').addEventListener('change', function(){ S.walk=$('walk').value; save(); });
+  document.querySelectorAll('[data-day]').forEach(function(b){
+    b.addEventListener('click', function(){
+      S.dayType=b.dataset.day;
+      document.querySelectorAll('[data-day]').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
+      save();
+    });
+  });
+
+  // ── 장소 찾기: 로컬(정류장·역) + 온라인(주소·건물) ──────────────────────
+  /* 로컬이 먼저 그려지고 온라인은 뒤늦게 보태진다. 인터넷이 없으면 로컬만 나오고 앱은 그대로 돈다. */
+  function onlineSearch(q){
+    return getJSON(SeatGeo.photonUrl(q), 6000)
+      .then(function(j){ return SeatGeo.fromPhoton(j); })
+      .catch(function(){
+        return getJSON(SeatGeo.nominatimUrl(q), 6000)
+          .then(function(j){ return SeatGeo.fromNominatim(j); })
+          .catch(function(){ return []; });
+      });
+  }
+
+  /* 입력칸 하나에 「로컬 즉시 + 주소 나중」 검색을 붙인다.
+     결과창의 편집 바도 같은 함수를 쓴다 — 두 벌로 두면 한쪽만 고치게 된다. */
+  function attachSearch(inp, box, onPick){
+    var timer=null, seq=0;
+
+    function draw(items, loading){
+      box.innerHTML='';
+      if(!items.length && !loading){
+        var none=document.createElement('button');
+        none.textContent='그런 곳을 못 찾았습니다'; none.disabled=true; box.appendChild(none);
+      }
+      items.forEach(function(h){
+        var b=document.createElement('button');
+        b.innerHTML='<div class="nm">'+esc(h.name)
+          + (h.source==='local'?'':'<span class="tag">주소</span>')+'</div>'
+          + '<div class="dt">'+esc(h.detail)+'</div>';
+        b.addEventListener('click', function(){ box.hidden=true; onPick(h); });
+        box.appendChild(b);
+      });
+      if(loading){
+        var l=document.createElement('button');
+        l.textContent='주소도 찾는 중…'; l.disabled=true; box.appendChild(l);
+      }
+      box.hidden=false;
+    }
+
+    inp.addEventListener('input', function(){
+      var q=inp.value.trim();
+      if(!G || q.length<1){ box.hidden=true; box.innerHTML=''; return; }
+      var localHits=SeatGeo.local(G, q, 6);
+      draw(localHits, q.length>=2);
+      if(q.length<2) return;
+      clearTimeout(timer);
+      var mine=++seq;
+      timer=setTimeout(function(){                 // 글자를 칠 때마다 부르지 않는다(공용 서버다)
+        onlineSearch(q).then(function(on){
+          if(mine!==seq || inp.value.trim()!==q) return;
+          draw(SeatGeo.merge(localHits, on, 12, q), false);
+        });
+      }, 450);
+    });
+    inp.addEventListener('keydown', function(e){ if(e.key==='Escape') box.hidden=true; });
+    document.addEventListener('click', function(e){
+      if(!inp.parentNode.contains(e.target)) box.hidden=true;
+    });
+  }
+  function hookSearch(inputId, listId, key){
+    var inp=$(inputId);
+    attachSearch(inp, $(listId), function(h){
+      S[key]={name:h.name, detail:h.detail, lat:h.lat, lon:h.lon};
+      inp.value=h.name; save(); refreshNext(); showPlaces();
+    });
+    inp.addEventListener('input', function(){ S[key]=null; refreshNext(); showPlaces(); });
+  }
+  hookSearch('fromQ','fromList','from');
+  hookSearch('toQ','toList','to');
+
+  // 지금 있는 곳 — 위치는 브라우저가 물어보고, 좌표는 서버로 보내지 않는다
+  $('here').addEventListener('click', function(){
+    if(!navigator.geolocation){ alert('이 브라우저는 위치를 알려주지 못합니다.'); return; }
+    $('here').textContent='…';
+    navigator.geolocation.getCurrentPosition(function(pos){
+      $('here').textContent='◎';
+      var lat=pos.coords.latitude, lon=pos.coords.longitude;
+      if(!SeatGeo.inSeoul(lat,lon)){ alert('서울 밖이라 이 서비스가 답할 수 없습니다.'); return; }
+      S.from={name:'지금 있는 곳', detail:'내 위치', lat:lat, lon:lon};
+      $('fromQ').value='지금 있는 곳'; $('fromList').hidden=true;
+      save(); refreshNext(); showPlaces();
+    }, function(){ $('here').textContent='◎'; alert('위치를 못 받았습니다. 이름으로 넣어 주세요.'); },
+    {enableHighAccuracy:false, timeout:8000, maximumAge:60000});
+  });
+
+  function showPlaces(){
+    var el=$('places');
+    if(S.from && S.to){
+      var d=SeatTransfer.haversine(S.from, S.to);
+      var msg = S.from.name+' 에서 '+S.to.name+' 까지 (직선 '+fmtM(d)+')';
+      var bad = G ? (SeatGeo.reason(G,S.from) || SeatGeo.reason(G,S.to)) : null;
+      el.hidden=false;
+      el.innerHTML = esc(msg) + (bad? '<br><b>'+esc(bad)+'</b>' : '');
+    } else el.hidden=true;
+  }
+  function fmtM(m){ return m>=1000 ? (m/1000).toFixed(1)+'km' : Math.round(m)+'m'; }
+  function refreshNext(){ $('next1').disabled = !(G && S.from && S.to); }
+
+  // ── 화면 넘기기 ─────────────────────────────────────────────────────────
+  function go(step){
+    if(step!==5) S.backTo=step;              // 「앉아 가는 차」에서 돌아갈 자리
+    S.step=step;
+    [1,2,3,4,5].forEach(function(n){ $('step'+n).hidden = (n!==step); });
+    $('back').hidden = (step===1);
+    $('title').textContent = step===1 ? '앉을 자리'
+      : step===2 ? '언제 출발하세요?'
+      : step===3 ? (S.from.name+' → '+S.to.name)
+      : step===4 ? '경로 자세히' : '앉아 가는 대중교통 위치';
+    window.scrollTo(0,0);
+  }
+  $('back').addEventListener('click', function(){
+    if(S.step===5) return go(S.backTo||1);
+    go(S.step===4?3:(S.step===3?2:1));
+  });
+  $('next1').addEventListener('click', function(){ go(2); });
+  $('next2').addEventListener('click', function(){ findRoutes(); });
+
+  // ── 결과창 편집 바 (출발·경유·도착·시각을 결과를 보면서 바로 고친다) ────
+  var edTarget=null;              // 지금 고치는 자리: 'from' | 'to' | {via:i}
+
+  attachSearch($('edQ'), $('edList'), function(h){
+    var place={name:h.name, detail:h.detail, lat:h.lat, lon:h.lon};
+    if(edTarget==='from') S.from=place;
+    else if(edTarget==='to') S.to=place;
+    else if(edTarget && edTarget.via!==undefined) S.via[edTarget.via]=place;
+    closePick(); renderEditBar(); findRoutes();
+  });
+
+  /* ★ 입력칸을 **고치는 자리 바로 밑**으로 옮긴다 ★
+     한 자리에 고정해 뒀더니 출발지를 고치는데 입력칸이 도착지 밑에 떠서 헷갈렸다.
+     칸은 하나만 두고(둘로 두면 한쪽만 고치게 된다) 자리만 옮긴다. */
+  function movePickUnder(target){
+    var pick=$('edPick'), anchor;
+    if(target==='from') anchor=$('slotFrom');
+    else if(target==='to') anchor=$('slotTo');
+    else anchor=$('viaSlots').children[target.via];
+    if(!anchor) return;
+    anchor.parentNode.insertBefore(pick, anchor.nextSibling);
+  }
+
+  function openPick(target, label){
+    edTarget=target;
+    movePickUnder(target);
+    $('edPick').hidden=false;
+    $('edQ').value=''; $('edQ').placeholder=label+' — 주소·건물·역·정류장';
+    $('edList').hidden=true; $('edList').innerHTML='';
+    $('edQ').focus();
+    markExpanded(target);
+  }
+  function closePick(){ edTarget=null; $('edPick').hidden=true; $('edList').hidden=true; markExpanded(null); }
+  function markExpanded(t){
+    $('edFrom').setAttribute('aria-expanded', t==='from'?'true':'false');
+    $('edTo').setAttribute('aria-expanded', t==='to'?'true':'false');
+  }
+
+  function renderEditBar(){
+    // #viaSlots 안에 입력칸이 들어가 있으면 통째로 지워진다 — 먼저 빼 둔다
+    var pick=$('edPick');
+    if(pick.parentNode !== $('editBar'))
+      $('editBar').insertBefore(pick, $('editBar').querySelector('.whenRow'));
+    $('edFrom').textContent = S.from ? S.from.name : '출발지를 고르세요';
+    $('edTo').textContent   = S.to   ? S.to.name   : '도착지를 고르세요';
+    var box=$('viaSlots'); box.innerHTML='';
+    S.via.forEach(function(v, i){
+      var row=document.createElement('div'); row.className='slot';
+      var nm=document.createElement('span'); nm.className='tagname'; nm.textContent='경유';
+      var b=document.createElement('button'); b.className='val';
+      b.textContent = v ? v.name : '경유지를 고르세요';
+      b.addEventListener('click', function(){ openPick({via:i}, '경유지'); });
+      var x=document.createElement('button'); x.className='x'; x.textContent='×';
+      x.setAttribute('aria-label','경유지 빼기');
+      x.addEventListener('click', function(){ S.via.splice(i,1); closePick(); renderEditBar(); findRoutes(); });
+      row.appendChild(nm); row.appendChild(b); row.appendChild(x);
+      box.appendChild(row);
+    });
+    $('viaAdd').hidden = S.via.length >= 2;   // 경유지는 둘까지
+  }
+
+  $('edFrom').addEventListener('click', function(){ openPick('from','출발지'); });
+  $('edTo').addEventListener('click', function(){ openPick('to','도착지'); });
+  $('addVia').addEventListener('click', function(){
+    S.via.push(null); renderEditBar(); openPick({via:S.via.length-1}, '경유지');
+  });
+  document.addEventListener('click', function(e){
+    if($('edPick').hidden) return;
+    if(!$('editBar').contains(e.target)) closePick();
+  });
+
+  (function(){
+    var d=$('edDay');
+    [['weekday','평일'],['saturday','토요일'],['sunday','일요일·공휴일']].forEach(function(p){
+      var o=document.createElement('option'); o.value=p[0]; o.textContent=p[1]; d.appendChild(o);
+    });
+    d.addEventListener('change', function(){
+      S.dayType=d.value;
+      document.querySelectorAll('[data-day]').forEach(function(x){
+        x.setAttribute('aria-pressed', x.dataset.day===S.dayType?'true':'false'); });
+      save(); findRoutes();
+    });
+  })();
+  var setEdTime = fillTime($('edH'), $('edM'), S.minutes, function(v){
+    S.minutes=v; setStepTime(v); if(setSeatTime) setSeatTime(v); save(); findRoutes();
+  });
+
+  // ── ⑤ 앉아 가는 대중교통 위치 ──────────────────────────────────────────
+  /* ★ 길찾기와 묻는 것이 다르다 ★
+     길찾기: 「A 에서 B 로 어떻게 갈까」 — 출발지가 정해져 있다.
+     이 화면: 「B 로 가려는데 **어디서 타면 앉아서 갈 수 있나**」 — **출발지를 안 쓴다.**
+     앉으려고 몇 정거장 거슬러 올라가 타는 요령을 자리로 찍어 주는 것이다.
+     목적지에서 **가까운 순** — 덜 거슬러 올라가는 쪽이 낫다. */
+  (function(){
+    var d=$('sDay');
+    [['weekday','평일'],['saturday','토요일'],['sunday','일요일·공휴일']].forEach(function(p){
+      var o=document.createElement('option'); o.value=p[0]; o.textContent=p[1]; d.appendChild(o);
+    });
+    d.addEventListener('change', function(){ S.dayType=d.value; save(); renderSeatable(); });
+  })();
+  var setSeatTime = fillTime($('sH'), $('sM'), S.minutes, function(v){
+    S.minutes=v; setStepTime(v); if(setEdTime) setEdTime(v); save(); renderSeatable();
+  });
+
+  attachSearch($('sQ'), $('sList'), function(h){
+    S.to={name:h.name, detail:h.detail, lat:h.lat, lon:h.lon};
+    $('toQ').value=h.name; $('sPick').hidden=true; $('sTo').setAttribute('aria-expanded','false');
+    save(); refreshNext(); showPlaces(); renderSeatable();
+  });
+  $('sTo').addEventListener('click', function(){
+    $('sPick').hidden=!$('sPick').hidden;
+    $('sTo').setAttribute('aria-expanded', $('sPick').hidden?'false':'true');
+    if(!$('sPick').hidden){ $('sQ').value=''; $('sList').hidden=true; $('sQ').focus(); }
+  });
+
+  function openSeatable(){
+    if(!G) return;
+    go(5);
+    $('sDay').value=S.dayType; if(setSeatTime) setSeatTime(S.minutes);
+    renderSeatable();
+  }
+  $('tab1').addEventListener('click', openSeatable);
+  $('tab3').addEventListener('click', openSeatable);
+
+  /* 시각을 바꾸면 새로 찾는데, 앞 요청의 버스 자료 받기가 늦게 끝나면
+     **옛 결과가 새 결과를 덮는다**(실제로 14시로 바꿔도 08:00 결과가 남았다).
+     마지막 요청 번호를 들고 있다가 그것만 그린다. */
+  var seatSeq=0;
+  function renderSeatable(){
+    if(S.step!==5) return;
+    var mine=++seatSeq;
+    $('sTo').textContent = S.to ? S.to.name : '목적지를 고르세요';
+    var box=$('seatList');
+    if(!S.to){
+      $('seatWhere').textContent='';
+      box.innerHTML='<div class="card">목적지를 고르면 <b>거기까지 앉아서 갈 수 있는 자리</b>를 찾아 드립니다.<br>'
+        + '<span class="small">출발지는 쓰지 않습니다 — 어디서 타야 앉는지를 찾는 화면입니다.</span></div>';
+      return;
+    }
+    $('seatWhere').innerHTML='<b>'+esc(S.to.name)+'</b>까지 앉아서 갈 수 있는 자리를 '
+      + '<b>목적지에서 가까운 순</b>으로 놓았습니다. 여기까지 가서 타면 앉아 갑니다.';
+    box.innerHTML='<div class="card">찾고 있습니다…</div>';
+
+    var toNodes=SeatRoute.nearbyMixed(G.nodes, S.to.lat, S.to.lon, 900, 10);
+    if(!toNodes.length){
+      box.innerHTML='<div class="card">'+esc(SeatGeo.reason(G,S.to)||'그 근처에 정류장·역이 없습니다.')+'</div>';
+      return;
+    }
+    // 목적지로 오는 노선의 버스 자료를 미리 받는다
+    var names={};
+    G.routes.forEach(function(r){
+      if(r.kind==='subway') return;
+      for(var d=0; d<r.dirs.length; d++)
+        for(var i=0;i<r.dirs[d].length;i++)
+          if(toNodes.some(function(t){ return t.node===r.dirs[d][i]; })){ names[r.name]=1; return; }
+    });
+    preloadBus(Object.keys(names)).then(function(){
+      if(mine!==seatSeq) return;              // 그 사이 시각·목적지가 바뀌었다
+      SeatLoads.clearCache();
+      var ctx={ graph:G, congestion:CONG, ride:RIDE, busRouteOf:function(n){ return busCache[n]||null; },
+                minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
+      ctx.loadFor=SeatLoads.makeLoadFor(ctx);
+      var t0=Date.now();
+      var opts={ graph:G, index:IDX, toNodes:toNodes, loadFor:ctx.loadFor,
+                 alpha:SeatModel.ALPHA_DEFAULT, limit:20, maxRideMinutes:60 };
+      var sure=SeatRoute.boardingPointsTo(Object.assign({}, opts, {minP:0.95}));
+      /* 100% 자리가 적을 수 있다(강남역 아침처럼). 그럴 때 빈 화면을 주지 않고
+         「거의 앉는 자리」를 따로 묶어 보여 준다 — 다만 **섞지는 않는다.** */
+      var sureKeys={}; sure.forEach(function(r){ sureKeys[r.routeId+'|'+r.dirIdx]=1; });
+      var likely = sure.length>=6 ? []
+        : SeatRoute.boardingPointsTo(Object.assign({}, opts, {minP:0.7}))
+            .filter(function(r){ return !sureKeys[r.routeId+'|'+r.dirIdx]; }).slice(0,8);
+      box.innerHTML='';
+      if(!sure.length && !likely.length){
+        box.innerHTML='<div class="card">이 시각엔 <b>'+esc(S.to.name)+'까지 앉아서 갈 수 있는 자리를 못 찾았습니다.</b><br>'
+          + '<span class="small">시각을 바꿔 보세요 — 같은 자리도 시각에 따라 크게 달라집니다.</span></div>';
+        return;
+      }
+      function head(t, sub){
+        var h=document.createElement('div'); h.className='note small';
+        h.innerHTML='<b>'+esc(t)+'</b>'+(sub?'<br>'+esc(sub):''); box.appendChild(h);
+      }
+      if(sure.length){ head('여기서 타면 앉습니다', '앉을 확률 95% 이상'); sure.forEach(draw); }
+      if(likely.length){ head('거의 앉습니다', '앉을 확률 70% 이상 — 확실하진 않습니다'); likely.forEach(draw); }
+      $('seatWhere').innerHTML += ' <span class="small">('+(sure.length+likely.length)+'곳 · '+(Date.now()-t0)+'ms)</span>';
+
+      function draw(r){
+        var ch=SeatModel.seatChance(r.pBoard);
+        var d=document.createElement('div');
+        d.className='seatCard';
+        d.innerHTML =
+          '<div class="farBadge">'+esc(S.to.name)+'에서 '+fmtM(r.metersFromDest)+'</div>'
+          + '<div class="seatTop">'
+          + '<span class="seatPct">'+esc(r.boardName)+'</span>'
+          + '<span class="pill'+(r.kind==='subway'?' subway':'')+'">'+esc(r.routeName)+'</span>'
+          + '<span class="muted small">'+esc(r.headsign)+'</span></div>'
+          + '<div class="muted small" style="margin-top:6px">여기서 타면 '
+          + r.stops+'정거장 · '+Math.round(r.rideMinutes)+'분 뒤 <b>'+esc(r.arriveName)+'</b> 도착'
+          + (typeof r.boardMinutes==='number' ? ' · '+SeatInterp.hhmm(Math.round(r.boardMinutes))+'쯤 탑승' : '')
+          + '</div>'
+          + '<div class="small" style="margin-top:6px">'+esc(r.seatText)+'</div>'
+          + '<div style="margin-top:8px"><span class="phrase tone-'+ch.tone+'">● '+esc(ch.text)
+          + (ch.label?' · '+esc(ch.label):'')+'</span></div>';
+        box.appendChild(d);
+      }
+    });
+  }
+
+  // ── 길찾기 ──────────────────────────────────────────────────────────────
+  var findSeq=0;
+  function findRoutes(){
+    if(!G || !S.from || !S.to) return;
+    var mineF=++findSeq;
+    go(3);
+    renderEditBar();
+    if(setEdTime) setEdTime(S.minutes);
+    $('edDay').value=S.dayType;
+    $('results').innerHTML='';
+    $('listNote').textContent='길을 찾고 있습니다…';
+    setTimeout(function(){
+      var t0=Date.now();
+      // 출발 → (경유…) → 도착. 구간마다 따로 찾아 이어 붙인다.
+      var pts=[S.from].concat(S.via.filter(Boolean)).concat([S.to]);
+      var segs=[], i;
+      for(i=0;i+1<pts.length;i++){
+        segs.push(SeatRoute.search({
+          graph:G, index:IDX,
+          fromPoint:pts[i], toPoint:pts[i+1],
+          fromNodes:SeatRoute.nearbyMixed(G.nodes, pts[i].lat, pts[i].lon, 900, 12),
+          toNodes:SeatRoute.nearbyMixed(G.nodes, pts[i+1].lat, pts[i+1].lon, 900, 12),
+          maxTransfers:2, walkSpeed:S.walk
+        }));
+      }
+      var empty=segs.findIndex(function(x){ return !x.length; });
+      if(empty>=0){
+        $('listNote').textContent='';
+        $('results').innerHTML='<div class="card"><b>'+esc(pts[empty].name)+' → '+esc(pts[empty+1].name)
+          +'</b> 구간에서 환승 2번 안으로 가는 길을 못 찾았습니다.<br>'
+          + esc(SeatGeo.reason(G,pts[empty])||SeatGeo.reason(G,pts[empty+1])
+                ||'그 자리를 조금 다르게 골라 보세요.')+'</div>';
+        return;
+      }
+      var names={};
+      segs.forEach(function(list){ list.forEach(function(j){
+        j.legs.forEach(function(l){ if(l.kind!=='subway') names[l.routeName]=1; }); }); });
+      preloadBus(Object.keys(names)).then(function(){
+        if(mineF!==findSeq) return;           // 그 사이 조건이 바뀌었다
+        var ctx={ graph:G, congestion:CONG, ride:RIDE, busRouteOf:function(n){ return busCache[n]||null; },
+                  minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
+        ctx.loadFor=SeatLoads.makeLoadFor(ctx);
+        segs.forEach(function(list){ list.forEach(function(j){ SeatRoute.evaluate(j, ctx); }); });
+        var ranked=segs.map(function(list){ return SeatRoute.rank(list); });
+        S.list = ranked.length===1 ? ranked[0]
+               : SeatRoute.rank(SeatRoute.combineVia(ranked, 3));
+        S.viaNames = S.via.filter(Boolean).map(function(v){ return v.name; });
+        renderList(Date.now()-t0);
+      });
+    }, 30);
+  }
+
+  function renderList(ms){
+    $('listNote').innerHTML = '<b>서서 가는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다.'
+      + ((S.viaNames && S.viaNames.length) ? ' <b>'+esc(S.viaNames.join(' · '))+'</b> 들렀다 갑니다.' : '')
+      + ' <span class="small">(' + S.list.length + '개 · ' + ms + 'ms)</span>';
+    var box=$('results'); box.innerHTML='';
+    S.list.forEach(function(j, i){
+      var b=document.createElement('button');
+      b.className='journey' + (i===0?' top':'');
+      var chain = j.walkOnly
+        ? '<span class="pill walk">걸어서</span>'
+        : j.legs.map(function(l){
+            return '<span class="pill'+(l.kind==='subway'?' subway':'')+'">'+esc(l.routeName)+'</span>';
+          }).join('<span class="arrow">→</span>');
+      var ph = j.walkOnly ? { tone:'best', text:'걸어서 갑니다', label:'' } : j.seatChance;
+      var sub = j.walkOnly
+        ? '전체 '+Math.round(j.totalMinutes)+'분 · '+fmtM(j.walkMeters)+' 걷기'
+        : '전체 '+Math.round(j.totalMinutes)+'분 · 환승 '+j.transfers+'회 · 걷기 '+Math.round(j.walkMinutes)+'분';
+      b.innerHTML =
+        (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
+        '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)+'</div>' +
+        '<div class="chain">'+chain+'</div>' +
+        '<div class="muted small">'+sub+'</div>' +
+        /* 「서서 24분」과 「앉을 확률 92%」가 나란히 있으면 모순처럼 읽힌다.
+           둘 다 맞는 말이다 — 앉게 되기까지 24분을 서 있는 것이다.
+           사양서 6.2-⑤ 가 경고한 「정렬 키와 문구가 어긋나 보이는」 바로 그 자리라 한 줄을 붙인다. */
+        '<div style="margin-top:9px"><span class="phrase tone-'+ph.tone+'">● '+esc(ph.text)
+        + (ph.label?' · '+esc(ph.label):'') + '</span>'
+        + '</div>'
+        + (!j.walkOnly && j.pLater >= 0.15
+            ? '<div class="muted small" style="margin-top:5px">서서 가다가 앉아 갈 가능성 '
+              + Math.round(j.pLater*100) + '%</div>' : '');
+      b.addEventListener('click', function(){ S.picked=j; renderDetail(); go(4); });
+      box.appendChild(b);
+    });
+  }
+
+  function walkRow(icon, text){ return '<div class="walkrow"><span>'+icon+'</span><span>'+text+'</span></div>'; }
+
+  function renderDetail(){
+    var j=S.picked, d=$('detail');
+    var html = '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)+'</div>';
+
+    if(j.walkOnly){
+      html += '<div class="muted small" style="margin-bottom:14px">전체 '+Math.round(j.totalMinutes)+'분</div>'
+        + walkRow('🚶', esc(S.from.name)+' 에서 '+esc(S.to.name)+' 까지 '+fmtM(j.walkMeters)
+                  +' · 약 '+Math.round(j.totalMinutes)+'분')
+        + '<div class="note">차를 타지 않고 걸어가는 길입니다. 걷는 거리는 직선거리에 '
+        + '실제 도로를 도는 만큼(×'+SeatTransfer.WALK_DETOUR+')을 곱한 값입니다.</div>';
+      d.innerHTML=html; return;
+    }
+
+    html += '<div class="muted small">전체 '+Math.round(j.totalMinutes)+'분 · 환승 '
+      + j.transfers+'회 · 걷기 '+Math.round(j.walkMinutes)+'분</div>'
+      + '<div style="margin:8px 0 14px"><span class="phrase tone-'+j.seatChance.tone+'">● '
+      + esc(j.seatChance.text) + (j.seatChance.label?' · '+esc(j.seatChance.label):'')
+      + '</span> <span class="muted small">구간 시간으로 가중평균</span></div>'
+      + (j.pLater >= 0.10 ? '<div class="note">서서 가다가 사람들이 빠지면 앉아 갈 수 있습니다 — '
+          + '그럴 가능성 <b>' + Math.round(j.pLater*100) + '%</b>. '
+          + '위 「서서 가는 시간」에는 이미 그 몫이 들어 있습니다.</div>' : '');
+    // 도착지가 그 역 자체면 「충무로역 → 충무로역 0m 걷기」가 나온다. 그런 줄은 안 그린다.
+    if (j.startWalkMeters > 25)
+      html += walkRow('🚶', esc(S.from.name)+' → '+esc(j.legs[0].fromName)+' 까지 '
+        + fmtM(j.startWalkWalked)+' · '+Math.round(SeatTransfer.walkMinutes(j.startWalkMeters,S.walk))+'분 걷기');
+
+    var anyEstimate=false;
+    j.legs.forEach(function(l, i){
+      if(l.estimated) anyEstimate=true;
+      if(l.afterVia) html += walkRow('📍', '<b>경유지에 들렀다 다시 탑니다</b>');
+      else if(i>0) html += walkRow('🚶', '갈아타기 · 약 '+SeatRoute.TRANSFER_WALK_MIN+'분 걷기');
+      html += '<div class="leg'+(l.kind==='subway'?' subway':'')+'">'
+        + '<h3>'+esc(l.routeName)+' <span class="tag">'+esc(l.headsign)+'</span>'
+        + (l.direction?'<span class="tag">'+esc(l.direction)+'</span>':'')+'</h3>'
+        + '<div class="muted small">'+esc(l.fromName)+' → '+esc(l.toName)+' · '+l.stops+'정거장 · '
+        + Math.round(l.rideMinutes)+'분 (기다림 '+l.waitMinutes+'분)'
+        + (typeof l.boardMinutes==='number'
+            ? ' · <b>'+SeatInterp.hhmm(Math.round(l.boardMinutes))+'쯤 탑니다</b>' : '')+'</div>'
+        + (l.outOfRange ? '<div class="note warn">'+esc(l.outOfRange)+'</div>' : '');
+      if(l.seatText){
+        html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)+'</div>' + seatGrid(l);
+        var p=SeatModel.seatChance(l.pSeated);
+        html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)
+             + (p.label?' · '+esc(p.label):'')
+             + '</span> <span class="muted small">이 구간 서서 '+Math.round(l.standingMinutes)+'분</span></div>';
+        /* 탈 때는 못 앉아도 가다가 사람이 많이 빠지면 자리가 난다 — 그것도 알려야 한다
+           (2026-09-04 사용자 지시). 「서서 가는 시간」에는 이미 반영돼 있다. */
+        if (l.pLater >= 0.10) {
+          html += '<div class="muted small" style="margin-top:5px">서서 가다가 앉아 갈 가능성 '
+               + Math.round(l.pLater*100) + '%'
+               + (l.bestOffAt ? ' (<b>'+esc(l.bestOffAt)+'</b>에서 많이 내립니다)' : '') + '</div>';
+        }
+      } else if(l.notRunning){
+        html += '<div class="note warn">그 시각에는 이 노선이 다니지 않습니다.</div>';
+      } else {
+        html += '<div class="note">이 노선의 혼잡 자료가 없어 앉을 수 있을지 알 수 없습니다. '
+             + '모르는 구간은 <b>서서 간다고 보고</b> 계산했습니다.</div>';
+      }
+      html += '</div>';
+    });
+    if (j.endWalkMeters > 25)
+      html += walkRow('🚶', esc(j.legs[j.legs.length-1].toName)+' → '+esc(S.to.name)+' 까지 '
+        + fmtM(j.endWalkWalked)+' · '+Math.round(SeatTransfer.walkMinutes(j.endWalkMeters,S.walk))+'분 걷기');
+
+    html += '<div class="note">지하철 혼잡도는 서울교통공사 실측(30분 단위), 버스는 정류장별 승·하차 실측(1시간 단위)입니다. '
+      + '그 사이 값은 부드럽게 이은 예상값입니다. 도보는 직선거리에 ×'+SeatTransfer.WALK_DETOUR+'를 곱해 잡았습니다.';
+    if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 시간당 운행 대수를 실제로 받으려면 '
+      + '열차시간표·T-DATA 인증키가 필요합니다.';
+    html += '</div>';
+    d.innerHTML=html;
+  }
+
+  function seatGrid(l){
+    var n=l.seats||0, free=l.emptySeats||0, s='<div class="seats" aria-hidden="true">';
+    for(var i=0;i<n;i++) s+='<div class="seat'+(i<free?' free':'')+'"></div>';
+    return s+'</div>';
+  }
+
+  go(1);
+  if(location.search.indexOf('debug=1')>=0)
+    window.SM={ S:S, get graph(){return G;}, get index(){return IDX;}, find:findRoutes, geo:SeatGeo };
+})();
+</script>
+</body>
+</html>

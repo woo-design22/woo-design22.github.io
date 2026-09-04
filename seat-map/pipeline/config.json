@@ -1,0 +1,80 @@
+{
+  "_읽는_법": "verified=false 인 것은 아직 실제 호출로 확인하지 못한 주소다. 키를 받은 뒤 --probe 로 확인하고 true 로 바꾼다. 확인 절차는 docs/DATA_SOURCES.md 참고.",
+
+  "seoul_open": {
+    "_설명": "서울 열린데이터광장. 인증키가 즉시 발급돼 오늘 바로 축적을 시작할 수 있다.",
+    "base": "http://openapi.seoul.go.kr:8088",
+    "key": "SEOUL_OPEN_KEY",
+    "verified": false,
+    "services": {
+      "subway_time": {
+        "_설명": "지하철 호선별 역별 시간대별 승하차 인원",
+        "name": "CardSubwayTime",
+        "page_size": 1000,
+        "verified": false
+      },
+      "subway_daily": {
+        "_설명": "지하철 호선별 역별 일별 승하차 인원",
+        "name": "CardSubwayStatsNew",
+        "page_size": 1000,
+        "verified": false
+      },
+      "bus_stop_master": {
+        "_설명": "정류장 마스터(좌표 포함). 환승 노드 클러스터링의 입력이다.",
+        "name": "busStopLocationXyInfo",
+        "page_size": 1000,
+        "verified": false
+      }
+    }
+  },
+
+  "data_go_kr": {
+    "_설명": "공공데이터포털. 활용신청 승인이 필요하고 개발계정은 1,000건/일이다. 착수 즉시 운영계정 전환을 신청할 것(사양서 4.4).",
+    "key": "DATA_GO_KR_KEY",
+    "verified": false,
+    "services": {
+      "subway_boarding_recent": {
+        "_설명": "서울교통공사_역별승하차인원. 최근 1주일치만 준다 — 오늘 안 받으면 영영 못 받는다.",
+        "_주소를_비워둔_이유": "포털의 서비스 상세 화면에서 '엔드포인트 + 샘플 URL'을 그대로 복사해 넣는다. 추측해서 적으면 조용히 빈 응답이 쌓인다.",
+        "url": null,
+        "params": { "serviceKey": "{KEY}", "numOfRows": 1000, "pageNo": 1, "_type": "json" },
+        "verified": false
+      },
+      "subway_congestion": {
+        "_설명": "서울교통공사_지하철혼잡도정보. 파일(분기별) 제공이라 API 가 아니다. 내려받아 data/raw/congestion/ 에 둔다.",
+        "url": null,
+        "file_based": true,
+        "verified": false
+      },
+      "holiday": {
+        "_설명": "특일정보(공휴일). 음력 명절·대체공휴일을 여기서 받아 data/holidays.json 을 채운다.",
+        "url": "http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo",
+        "params": { "serviceKey": "{KEY}", "solYear": "{YEAR}", "numOfRows": 100, "_type": "json" },
+        "verified": false
+      }
+    }
+  },
+
+  "tdata": {
+    "_설명": "T-DATA(TAIMS). 이 프로젝트의 핵심 데이터다 — 구간별 재차인원의 평균·최대·운행횟수를 함께 준다.",
+    "key": "TDATA_KEY",
+    "verified": false,
+    "services": {
+      "route_section": {
+        "_설명": "일자별-시간대별-버스노선별-구간별-승객수 (사양서 4.2)",
+        "url": "http://t-data.seoul.go.kr/apig/apiman-gateway/tapi/TaimsTpssA18RouteSection/1.0",
+        "params": { "apikey": "{KEY}", "stdrDe": "{YYYYMMDD}", "startRow": 1, "rowCnt": 1000 },
+        "page_size": 1000,
+        "verified": false
+      }
+    }
+  },
+
+  "collect": {
+    "_설명": "수집 정책",
+    "backfill_weeks": 8,
+    "_backfill_이유": "T-DATA 는 일자별로만 주고 평일/토/일 구분값이 없다. 요일별 평균을 내려면 각 요일이 최소 8번은 있어야 한다(사양서 4.2).",
+    "tdata_lag_days": 40,
+    "_lag_이유": "월 1회 갱신이라 최근 날짜는 아직 없다. 40일 전부터 거슬러 찾는다."
+  }
+}

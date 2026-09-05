@@ -193,6 +193,13 @@
   #pickCancel{flex:0 0 96px; min-height:56px; border:1px solid var(--line); border-radius:12px;
     background:var(--bg); color:var(--ink); font-size:1em; cursor:pointer}
 
+  /* 머리기사 지표 보기 칩 (D-75) — 끄면 모든 경로 카드에서 함께 사라진다 */
+  #viewChips{margin:0 0 8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  #viewChips .chip{min-height:40px; padding:6px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:.92em}
+  #viewChips .chip[aria-pressed="false"]{opacity:.45; text-decoration:line-through}
+  .standLine{font-size:1.25em; font-weight:800; line-height:1.5}
+  .standLine .mSep{color:var(--ink2); font-weight:400; margin:0 6px}
   .whenSeat{display:inline-block; margin-top:7px; padding:7px 12px; border-radius:9px;
     border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer}
   .whenSeat[aria-expanded="true"]{background:var(--card)}
@@ -281,6 +288,11 @@
       </div>
     </div>
     <div class="tabRow"><button class="seatTab" id="tab3">🪑 앉아 가는 대중교통 위치</button></div>
+    <div id="viewChips" class="small">보기:
+      <button class="chip" id="showWalk"  aria-pressed="true">걷는 시간</button>
+      <button class="chip" id="showNosit" aria-pressed="true">못 앉는 시간</button>
+      <button class="chip" id="showTotal" aria-pressed="true">이동 시간</button>
+    </div>
     <div class="note small" id="listNote"></div>
     <div id="results"></div>
   </section>
@@ -443,6 +455,35 @@
      「앉아서 기다림」으로 바꿀 수 있다 — 바꾸면 정렬까지 다시 한다(잣대가 바뀌므로). */
   S.waitSit = store.get('seat_waitsit') === '1';   // 기본: 기다림 = 서 있음
 
+  /* ── 머리기사 네 지표 (D-75) ──────────────────────────────────────────
+     서는 시간(항상) · 걷는 시간 · 못 앉는 시간(=서는+걷는) · 이동 시간(=전체).
+     서는 시간 말고는 칩으로 끌 수 있고, 끄면 모든 카드에서 함께 사라진다. */
+  S.show = { walk:  store.get('seat_show_walk')  !== '0',
+             nosit: store.get('seat_show_nosit') !== '0',
+             total: store.get('seat_show_total') !== '0' };
+  function metricsLine(j){
+    var st = Math.round(j.standingMinutes), wk = Math.round(j.walkMinutes);
+    var parts = ['서는 시간 <b>' + st + '분</b>'];
+    if (S.show.walk)  parts.push('걷는 시간 <b>' + wk + '분</b>');
+    if (S.show.nosit) parts.push('못 앉는 시간 <b>' + (st + wk) + '분</b>');
+    if (S.show.total) parts.push('이동 시간 <b>' + Math.round(j.totalMinutes) + '분</b>');
+    return '<div class="standLine">' + parts.join('<span class="mSep">·</span>') + '</div>';
+  }
+  function bindChip(id, key){
+    $(id).setAttribute('aria-pressed', S.show[key] ? 'true' : 'false');
+    return function(){
+      S.show[key] = !S.show[key];
+      store.set('seat_show_' + key, S.show[key] ? '1' : '0');
+      $(id).setAttribute('aria-pressed', S.show[key] ? 'true' : 'false');
+      if (S.list) renderList(S.lastMs || 0);
+      if (S.picked && S.step === 4) renderDetail();
+    };
+  }
+  // 정적 검사(ui.test)가 배선을 눈으로 보게 — 반복문으로 감지 말고 한 줄씩 건다
+  $('showWalk').addEventListener('click', bindChip('showWalk', 'walk'));
+  $('showNosit').addEventListener('click', bindChip('showNosit', 'nosit'));
+  $('showTotal').addEventListener('click', bindChip('showTotal', 'total'));
+
   function waitBtn(id){
     var sit = S.waitSit;
     return '<button class="ghost" id="'+id+'" style="font-size:.85em; padding:5px 10px" '
@@ -474,7 +515,7 @@
       head = j.waitMinutes >= 0.5
         ? '차 안 ' + Math.round(j.vehicleStandingMinutes) + '분 + 기다림 ' + Math.round(j.waitMinutes) + '분 · '
         : '';
-    return '(' + head + '걷는 시간 ' + wk + '분 따로 → 총 ' + (st + wk) + '분 걷거나 서 있음)';
+    return head ? '(' + head.replace(/ · $/, '') + ')' : '';
   }
 
   // ── 시각·요일·걸음속도 ──────────────────────────────────────────────────
@@ -946,9 +987,9 @@
           +'분 · 환승 '+j.transfers+'회';
       b.innerHTML =
         (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
-        /* 서는(차 안 + 기다림) + 걷는 = 「발로 버티는 시간」 전체(사용자 지시) */
-        '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)
-        +(j.walkOnly?'':' <span class="muted small" style="font-weight:400">'+standSuffix(j)+'</span>')+'</div>' +
+        /* 네 지표 머리기사 (D-75) + 작은 분해 줄 */
+        metricsLine(j) +
+        (j.walkOnly?'':'<div class="muted small" style="margin-top:2px">'+standSuffix(j)+'</div>') +
         '<div class="chain">'+chain+'</div>' +
         '<div class="muted small">'+sub+'</div>' +
         /* 「서서 24분」과 「앉을 확률 92%」가 나란히 있으면 모순처럼 읽힌다.
@@ -971,9 +1012,8 @@
 
   function renderDetail(){
     var j=S.picked, d=$('detail');
-    var html = '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)
-      +' <span class="muted small" style="font-weight:400">'+standSuffix(j)+'</span> '
-      +waitBtn('waitSit2')+'</div>';
+    var html = metricsLine(j)
+      + '<div class="muted small" style="margin:2px 0 4px">'+standSuffix(j)+' '+waitBtn('waitSit2')+'</div>';
 
     if(j.walkOnly){
       html += '<div class="muted small" style="margin-bottom:14px">전체 '+Math.round(j.totalMinutes)+'분</div>'

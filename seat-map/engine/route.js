@@ -435,7 +435,14 @@
        한 카드 안에서 산수가 안 맞았다(49분×72% ≠ 8분 — 사용자가 잡아냈다).
        가다가 앉는 것까지 포함한 시간 비율(pSeatedTime = 1 − 서서/타는)로 말한다.
        구간별 「탈 때 앉을 확률」(pBoard)은 확률 그대로 남는다 — 확률과 비율을 섞지 않는다. */
-    journey.seatChance = M.seatChanceJourney(journey.knownLegs > 0 ? journey.pSeatedTime : null);
+    /* ★ 퍼센트는 화면의 분에서 유도한다 (D-76) ★
+       원값 비율(75.3%)과 반올림-유도 분(18분 중 14분 = 78%)이 한 문장에서 딴소리를 했다
+       (사용자 검산). 표시용 비율은 「반올림된 타는 분」과 「반올림된 차 안 서는 분」에서
+       다시 계산해 괄호와 퍼센트가 항상 같은 것을 말하게 한다. 원값(pSeatedTime)은
+       검증·시험용으로 그대로 남는다. */
+    var rideShown = Math.round(total), vehShown = Math.round(journey.vehicleStandingMinutes);
+    journey.pSeatedShown = rideShown > 0 ? Math.max(0, rideShown - vehShown) / rideShown : 1;
+    journey.seatChance = M.seatChanceJourney(journey.knownLegs > 0 ? journey.pSeatedShown : null);
     journey.seatPhrase = M.seatPhrase(journey.pSeated);
     return journey;
   }
@@ -634,7 +641,9 @@
     // standingMinutes 는 부르는 쪽(rank 전)에서 이미 부분별로 합쳐져 있다 — 기다림 규칙만 다시 맞춘다
     out.standingMinutes = vehSum + (opt && opt.waitAsStanding === false ? 0 : waitSum2);
     out.pSeatedTime = rideSum > 0 ? 1 - vehSum / rideSum : 1;
-    out.seatChance = M.seatChanceJourney(out.pSeatedTime);
+    var rs = Math.round(rideSum), vs = Math.round(vehSum);
+    out.pSeatedShown = rs > 0 ? Math.max(0, rs - vs) / rs : 1;
+    out.seatChance = M.seatChanceJourney(out.pSeatedShown);          // 괄호의 분과 같은 잣대(D-76)
     out.seatPhrase = M.seatPhrase(out.pSeated);
     return out;
   }

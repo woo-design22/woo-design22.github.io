@@ -973,7 +973,7 @@
 
   function renderList(ms){
     S.lastMs = ms;
-    $('listNote').innerHTML = '<b>서는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다. '
+    $('listNote').innerHTML = '<b>못 앉는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다. '
       + waitBtn('waitSit1')
       + ((S.viaNames && S.viaNames.length) ? ' <b>'+esc(S.viaNames.join(' · '))+'</b> 들렀다 갑니다.' : '')
       + ' <span class="small">(' + S.list.length + '개 · ' + ms + 'ms)</span>';

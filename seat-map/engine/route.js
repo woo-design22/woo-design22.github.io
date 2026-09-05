@@ -689,7 +689,7 @@
     if (running.length) journeys = running;
     journeys = prune(journeys);
     var sorted = M.sortRoutes(journeys);
-    if (sorted.length) sorted[0].badge = M.SORT_BADGE;      // 「가장 적게 서서 가는 길」
+    if (sorted.length) sorted[0].badge = M.SORT_BADGE;      // 「못 앉는 시간이 가장 짧은 길」
     var fastest = sorted.slice().sort(function (a, b) { return a.totalMinutes - b.totalMinutes; })[0];
     if (fastest && fastest !== sorted[0]) fastest.badge = '가장 빨리 가는 길';
     return sorted.slice(0, MAX_RESULTS);

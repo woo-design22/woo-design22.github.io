@@ -96,14 +96,15 @@ t('월곡 → 을지로4가, 평일 08:00 — 경로가 나오고 되돌아가�
   }
 });
 
-t('경로 정렬 1순위는 서서 가는 시간이다 (소요시간이 아니다)', () => {
+t('경로 정렬 1순위는 못 앉는 시간(서는+걷는)이다 — 소요시간이 아니다 (D-77)', () => {
   const got = plan('월곡', '을지로4가', 8 * 60, 'weekday');
+  const noSit = j => j.standingMinutes + j.walkMinutes;
   for (let i = 1; i < got.length; i++) {
-    assert.ok(got[i].standingMinutes >= got[i - 1].standingMinutes - 1e-9,
-      `${i}번째가 앞보다 덜 서서 간다 — 정렬이 틀렸다`);
+    assert.ok(noSit(got[i]) >= noSit(got[i - 1]) - 1e-9,
+      `${i}번째(${noSit(got[i]).toFixed(1)}분)가 앞(${noSit(got[i - 1]).toFixed(1)}분)보다 못 앉는 시간이 짧다 — 정렬이 틀렸다`);
   }
   assert.strictEqual(got[0].badge, M.SORT_BADGE);
-  assert.ok(M.SORT_BADGE.includes('서는'));   // D-74 문구
+  assert.ok(M.SORT_BADGE.includes('못 앉는'));   // D-77 문구
 });
 
 t('06시대는 앉아서 간다 — 08시보다 서서 가는 시간이 짧다 (사양서 M2)', () => {
@@ -187,7 +188,8 @@ t('경로마다 앉을 확률이 퍼센트로 나온다', () => {
   const got = plan('월곡', '을지로4가', 8 * 60, 'weekday');
   for (const j of got) {
     assert.ok(j.seatChance, '확률 표시가 없다');
-    assert.ok(/\d+%|알 수 없음/.test(j.seatChance.text), `"${j.seatChance.text}" — 숫자가 없다`);
+    assert.ok(/\d+%|알 수 없음|타는 동안 못 앉아 갑니다|웬만하면 타는 내내 앉아 갑니다/.test(j.seatChance.text),
+      `"${j.seatChance.text}" — 숫자도 규정 문장도 아니다`);
     if (j.seatChance.percent !== null) {
       assert.ok(j.seatChance.percent >= 0 && j.seatChance.percent <= 100);
       // D-76: 카드 퍼센트는 화면의 분(반올림 유도)에서 다시 계산한 값이다

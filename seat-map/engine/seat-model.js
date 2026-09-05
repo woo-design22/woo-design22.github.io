@@ -251,12 +251,17 @@
   /* 정렬 키와 화면 문구는 한 곳에 둔다. 사양서 6.2-⑤ 의 버그가
      "서서가는시간으로 정렬해 놓고 배지엔 앉는다고 썼다"였다.
      문구를 고치려면 여기를 고치고, 그러면 테스트가 정렬 키와의 일치를 다시 본다. */
-  var SORT_KEY = 'standingMinutes';
-  var SORT_BADGE = '가장 적게 서는 길';
+  /* ★ 정렬 = 못 앉는 시간 (D-77, 2026-09-05 사용자 지시) ★
+     서는 시간만 재면 「서기 3분 + 걷기 30분」이 「서기 8분 + 걷기 5분」을 이긴다 —
+     발로 버티기는 매한가지다. 카드 머리기사(D-75)의
+     「못 앉는 시간 = 서는 시간 + 걷는 시간」과 같은 잣대로 세운다. */
+  function noSitMinutes(j) { return (j.standingMinutes || 0) + (j.walkMinutes || 0); }
+  var SORT_KEY = 'standingMinutes+walkMinutes';   // 배지 문구와의 일치 검사용 표식
+  var SORT_BADGE = '못 앉는 시간이 가장 짧은 길';
 
-  /* 1순위 서서 가는 시간, 동점이면 총 소요시간. */
+  /* 1순위 못 앉는 시간, 동점이면 총 소요시간. */
   function compareRoutes(a, b) {
-    var d = a[SORT_KEY] - b[SORT_KEY];
+    var d = noSitMinutes(a) - noSitMinutes(b);
     if (Math.abs(d) > 1e-9) return d;
     return a.totalMinutes - b.totalMinutes;
   }
@@ -309,6 +314,15 @@
     if (pSeated == null || isNaN(pSeated))
       return { tone: 'bad', text: '앉아 가는 시간을 알 수 없음', label: '자료가 없습니다', percent: null };
     var pct = Math.round(pSeated * 100), l = levelOf(pSeated);
+    /* 0% 는 문장으로 (사용자 지시) — 「타는 시간의 0%는 앉아 갑니다」는 어색하다.
+       label 은 비운다 — 붙이면 「…못 앉아 갑니다 · 못 앉습니다」로 같은 말이 두 번이다. */
+    if (pct <= 0)
+      return { tone: l.tone, text: '타는 동안 못 앉아 갑니다', label: '', percent: 0 };
+    /* 90 초과는 숫자를 입에 담지 않는다 (D-73 사용자 지시: 백 프로 절대 금지, 아무리
+       확실해도 90 까지만). 괄호의 분수(타는 N분 중 M분)는 그대로 나가므로 산수는 닫힌
+       채, 문장에서만 확신을 뺀다. label 은 「웬만하면 앉아 갑니다」와 겹쳐 비운다. */
+    if (pct > 90)
+      return { tone: l.tone, text: '웬만하면 타는 내내 앉아 갑니다', label: '', percent: pct };
     return { tone: l.tone, text: '타는 시간의 ' + pct + '%는 앉아 갑니다', label: l.text, percent: pct };
   }
 
@@ -339,7 +353,7 @@
     pBoard: pBoard, pBoardExpress: pBoardExpress, pSitAtStop: pSitAtStop,
     ride: ride, rideSpread: rideSpread,
     invNorm: invNorm, expectedMaxZ: expectedMaxZ, sdFromMeanMax: sdFromMeanMax,
-    SORT_KEY: SORT_KEY, SORT_BADGE: SORT_BADGE,
+    SORT_KEY: SORT_KEY, SORT_BADGE: SORT_BADGE, noSitMinutes: noSitMinutes,
     compareRoutes: compareRoutes, sortRoutes: sortRoutes,
     describeSeats: describeSeats, SEAT_LEVELS: SEAT_LEVELS, levelOf: levelOf, toneOf: toneOf,
     seatPhrase: seatPhrase, seatChance: seatChance,

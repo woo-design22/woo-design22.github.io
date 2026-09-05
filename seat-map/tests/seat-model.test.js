@@ -146,17 +146,44 @@ test('사양서 1.2 의 예시대로 정렬한다 — 52분 앉아가는 버스�
   assert.strictEqual(sorted[0].name, '버스');
 });
 
-test('서서 가는 시간이 같으면 총 소요시간으로 2차 정렬한다', () => {
+test('못 앉는 시간이 같으면 총 소요시간으로 2차 정렬한다', () => {
   const a = { name: 'a', totalMinutes: 50, standingMinutes: 10 };
   const b = { name: 'b', totalMinutes: 40, standingMinutes: 10 };
   assert.strictEqual(M.sortRoutes([a, b])[0].name, 'b');
 });
 
-test('버그 ⑤ — 배지 문구가 정렬 키와 어긋나지 않는다', () => {
-  assert.strictEqual(M.SORT_KEY, 'standingMinutes');
-  assert.ok(M.SORT_BADGE.includes('서는'), '정렬은 서는 시간인데 문구에 그 말이 없다');   // D-74 문구
-  assert.ok(!M.SORT_BADGE.includes('앉'),
-    '"가장 앉아서 갈 수 있는 길" 류의 문구는 짧은 구간에서 "1% · 가장 앉아서 갈 수 있는 길"이 된다');
+test('D-77 — 서기 3분+걷기 30분보다 서기 8분+걷기 5분이 앞이다 (못 앉는 시간 정렬)', () => {
+  const a = { name: 'lessStand', totalMinutes: 40, standingMinutes: 3, walkMinutes: 30 };
+  const b = { name: 'lessNoSit', totalMinutes: 45, standingMinutes: 8, walkMinutes: 5 };
+  assert.strictEqual(M.sortRoutes([a, b])[0].name, 'lessNoSit',
+    '서는 시간만 보고 세웠다 — 걷기도 못 앉는 시간이다');
+  assert.strictEqual(M.noSitMinutes(a), 33);
+});
+
+test('D-77 — 90 초과는 숫자 없이 「웬만하면 타는 내내」 (백 프로 절대 금지)', () => {
+  for (const p of [0.91, 0.97, 1.0]) {
+    const c = M.seatChanceJourney(p);
+    assert.strictEqual(c.text, '웬만하면 타는 내내 앉아 갑니다', `${p} 에서 "${c.text}"`);
+    assert.ok(!/\d/.test(c.text), '90 초과 숫자가 입 밖에 나왔다');
+    assert.ok(!c.label, '「웬만하면 앉아 갑니다」가 겹쳐 붙는다');
+  }
+  assert.ok(M.seatChanceJourney(0.90).text.includes('90%'), '90 까지는 숫자로 말한다');
+});
+
+test('D-77 — 0% 는 「타는 동안 못 앉아 갑니다」 (사용자 지시)', () => {
+  const c = M.seatChanceJourney(0);
+  assert.strictEqual(c.text, '타는 동안 못 앉아 갑니다');
+  assert.strictEqual(c.percent, 0);
+  assert.ok(!c.label, '「못 앉습니다」를 붙이면 같은 말이 두 번이다');
+  assert.ok(M.seatChanceJourney(0.004).text.includes('못 앉아'), '반올림해서 0 이어도 같은 문구');
+  assert.ok(M.seatChanceJourney(0.01).text.includes('1%'), '1% 부터는 숫자로 말한다');
+});
+
+test('버그 ⑤ — 배지 문구가 정렬 키와 어긋나지 않는다 (D-77)', () => {
+  assert.strictEqual(M.SORT_KEY, 'standingMinutes+walkMinutes');   // 정렬 = 못 앉는 시간
+  assert.ok(M.SORT_BADGE.includes('못 앉는'), '정렬은 못 앉는 시간인데 문구에 그 말이 없다');
+  // 「가장 앉아서 갈 수 있는 길」 류(확률 얘기)로 돌아가면 안 된다 — 시간 얘기만 한다.
+  assert.ok(M.SORT_BADGE.includes('시간'), '배지는 확률이 아니라 시간을 말해야 한다');
 });
 
 test('7.3 — 숫자가 아니라 자리 수로 말한다', () => {

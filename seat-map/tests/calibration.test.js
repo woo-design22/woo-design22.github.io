@@ -167,3 +167,13 @@ t('버스 요일·시간 계수는 버스 자신의 실측에서 온다 (D-64)',
   const v = L.busDayFactor({ busCalib: nullCal, ride: RIDE, dayType: 'weekday' }, 'trunk', 8);
   assert.ok(v > 0.5, `null 칸에서 ${v} — 계수가 죽었다`);
 });
+
+t('확률 표기는 90 을 넘지 않는다 — 계산이 97·100 이어도 (D-73)', () => {
+  for (const p of [0.97, 1.0, 0.91]) {
+    const c = M.seatChance(p);
+    assert.ok(c.percent <= 90, `${p} → ${c.percent}% 표기 — 상한이 뚫렸다`);
+    assert.ok(c.text.indexOf(String(c.percent) + '%') >= 0);
+  }
+  assert.strictEqual(M.seatChance(1.0).label, '웬만하면 앉아 갑니다', '분류는 원값으로 매겨야 한다');
+  assert.strictEqual(M.seatChance(0.68).percent, 68, '상한 아래 값이 왜곡됐다');
+});

@@ -178,7 +178,8 @@ test('착석 확률은 다섯 단계로 나뉘고 경계가 정확하다 (2026-0
 
 test('확률은 숫자로 말하고, 문구가 항상 함께 붙는다', () => {
   const c = M.seatChance(0.923);
-  assert.strictEqual(c.text, '탈 때 앉을 확률 92%');
+  // D-73: 표기 상한 90 — 계산 92 라도 입 밖으로는 90
+  assert.strictEqual(c.text, '탈 때 앉을 확률 90%');
   assert.strictEqual(c.label, '웬만하면 앉아 갑니다');
   // 뜻(「탈 때」)이 이름 안에 있어야 한다 — 밖에 꼬리말로 붙이면 뒷줄과 붙어 읽힌다.
   assert.ok(c.text.startsWith('탈 때'), '「탈 때」가 이름에 없다');

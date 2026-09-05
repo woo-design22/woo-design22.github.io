@@ -144,3 +144,24 @@ t('승객이 겪는 차는 평균 차보다 붐빈다 (D-62)', () => {
   assert.ok(L.RIDER_LOAD_FACTOR >= 1.1 && L.RIDER_LOAD_FACTOR <= 1.5,
     `승객 가중 계수가 ${L.RIDER_LOAD_FACTOR} — 근거 없이 움직였다`);
 });
+
+t('버스 요일·시간 계수는 버스 자신의 실측에서 온다 (D-64)', () => {
+  const cal = load(path.join(D, 'bus', 'tdata-calib.json'));
+  assert.ok(cal && cal.factors, 'tdata-calib.json 이 없다 — fetch_tdata_file.py → build_tdata_calib.js');
+  const wd8 = cal.factors.trunk.weekday[8], su8 = cal.factors.trunk.sunday[8];
+  // 실측(2026-08-31/30): 평일 08시 1.19, 일요일 08시 0.55. 파일이 갱신돼도 이 폭을 벗어나면 의심하라
+  assert.ok(wd8 > 0.8 && wd8 < 1.7, `평일 08시 계수가 ${wd8} — 지하철 차용(1.28)과도 실측과도 멀다`);
+  assert.ok(su8 > 0.3 && su8 < 0.9, `일요일 08시 계수가 ${su8}`);
+  assert.ok(su8 < wd8, '일요일 아침이 평일보다 붐비게 나온다');
+  // busDayFactor 가 표를 1순위로, 없으면 지하철 차용으로 무너지지 않고 물러나는지
+  const RIDE = load(path.join(D, 'subway', 'ride.json'));
+  const withCal = L.busDayFactor({ busCalib: cal, ride: RIDE, dayType: 'weekday' }, 'trunk', 8);
+  const noCal   = L.busDayFactor({ ride: RIDE, dayType: 'weekday' }, 'trunk', 8);
+  assert.strictEqual(withCal, wd8, 'busDayFactor 가 실측 표를 안 쓴다');
+  assert.ok(Math.abs(noCal - L.dayFactor({ ride: RIDE, dayType: 'weekday' }, 8)) < 1e-9,
+    '표가 없을 때 지하철 차용으로 물러나지 않는다');
+  // 표본이 얇은 칸(null)도 조용히 0이 되지 말고 물러나야 한다
+  const nullCal = { factors: { trunk: { weekday: new Array(24).fill(null) } } };
+  const v = L.busDayFactor({ busCalib: nullCal, ride: RIDE, dayType: 'weekday' }, 'trunk', 8);
+  assert.ok(v > 0.5, `null 칸에서 ${v} — 계수가 죽었다`);
+});

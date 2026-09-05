@@ -278,7 +278,7 @@
   var $=function(id){ return document.getElementById(id); };
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
-  var G=null, IDX=null, CONG=null, RIDE=null, busCache={};
+  var G=null, IDX=null, CONG=null, RIDE=null, CALIB=null, busCache={};
   var S={ from:null, to:null, via:[], dayType:'weekday', minutes:8*60, walk:'normal', step:1, picked:null, list:[] };
 
   $('attrib').textContent = SeatGeo.ATTRIBUTION;
@@ -295,11 +295,12 @@
 
   Promise.all([
     getJSON('data/graph/nodes.json'), getJSON('data/graph/routes.json'),
-    getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json')
+    getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json'),
+    getJSON('data/bus/tdata-calib.json')     // 없으면 null — 지하철 차용 계수로 물러난다
   ]).then(function(v){
     G={ nodes:v[0].nodes, routes:v[1].routes };
     IDX=SeatRoute.buildIndex(G);
-    CONG=v[2]; RIDE=v[3];
+    CONG=v[2]; RIDE=v[3]; CALIB=v[4]||null;
     $('bootNote').textContent = '역·정류장 ' + G.nodes.length.toLocaleString('ko-KR')
       + '곳, 노선 ' + G.routes.length + '개. 주소·건물 이름도 넣을 수 있습니다.';
     restore(); refreshNext();
@@ -662,7 +663,7 @@
     preloadBus(Object.keys(names)).then(function(){
       if(mine!==seatSeq) return;              // 그 사이 시각·목적지가 바뀌었다
       SeatLoads.clearCache();
-      var ctx={ graph:G, congestion:CONG, ride:RIDE, busRouteOf:function(n){ return busCache[n]||null; },
+      var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, busRouteOf:function(n){ return busCache[n]||null; },
                 minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
       ctx.loadFor=SeatLoads.makeLoadFor(ctx);
       var t0=Date.now();
@@ -750,7 +751,7 @@
         j.legs.forEach(function(l){ if(l.kind!=='subway') names[l.routeName]=1; }); }); });
       preloadBus(Object.keys(names)).then(function(){
         if(mineF!==findSeq) return;           // 그 사이 조건이 바뀌었다
-        var ctx={ graph:G, congestion:CONG, ride:RIDE, busRouteOf:function(n){ return busCache[n]||null; },
+        var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, busRouteOf:function(n){ return busCache[n]||null; },
                   minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
         ctx.loadFor=SeatLoads.makeLoadFor(ctx);
         segs.forEach(function(list){ list.forEach(function(j){ SeatRoute.evaluate(j, ctx); }); });
@@ -872,9 +873,9 @@
 
     html += '<div class="note">지하철 혼잡도는 서울교통공사 실측(30분 단위), 버스는 정류장별 승·하차 실측(1시간 단위)입니다. '
       + '그 사이 값은 부드럽게 이은 예상값입니다. 도보는 직선거리에 ×'+SeatTransfer.WALK_DETOUR+'를 곱해 잡았습니다.';
-    if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 버스는 노선별 인가 배차간격'
-      + '(2024년 기준)으로 나눈 값입니다. 같은 시각에도 차마다 붐빔이 다른 것'
-      + '(예: 8대 중 3대만 만원)까지 보려면 T-DATA 인증키가 필요합니다.';
+    if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 노선별 인가 배차간격으로 나누고, '
+      + '요일·시간대 쏠림은 버스 구간 실측(T-DATA 재차인원)으로 맞춘 값입니다. '
+      + '같은 시각에도 차마다 붐빔이 다른 것(예: 8대 중 3대만 만원)은 아직 공개 자료가 없어 근사로 담았습니다.';
     html += '</div>';
     d.innerHTML=html;
   }

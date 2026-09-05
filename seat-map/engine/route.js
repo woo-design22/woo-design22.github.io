@@ -404,7 +404,16 @@
       leg.seatText = M.describeSeats(info.segments[0].load, veh.seats);
       standing += r.standingMinutes;
     }
-    journey.standingMinutes = standing;
+    /* ★ 기다림도 서 있는 것이다 (D-74, 사용자 지시) ★
+       정류장·승강장에서 기다리는 시간은 기본적으로 「서는 시간」에 든다 — 벤치가 있을지는
+       복불복이니 없다고 가정하는 쪽이 정직하다. 앉아서 기다린다고 가정하고 싶으면
+       ctx.waitAsStanding=false (화면의 전환 단추). 차 안에서 서는 몫은 따로 남겨 둔다 —
+       「타는 시간의 N%」(D-71)와 「언제쯤 앉나」는 차 안 이야기라 그 값으로 계산해야 한다. */
+    var waitSum = 0;
+    for (i = 0; i < legs.length; i++) waitSum += legs[i].waitMinutes || 0;
+    journey.waitMinutes = waitSum;
+    journey.vehicleStandingMinutes = standing;
+    journey.standingMinutes = standing + (ctx.waitAsStanding === false ? 0 : waitSum);
     journey.knownLegs = known;
     journey.rideMinutes = total;
 
@@ -419,7 +428,7 @@
     }
     journey.pSeated = total > 0 ? wsum / total : 1;
     journey.pLater = total > 0 ? wlater / total : 0;
-    journey.pSeatedTime = total > 0 ? 1 - standing / total : 1;
+    journey.pSeatedTime = total > 0 ? 1 - journey.vehicleStandingMinutes / total : 1;   // 차 안 기준(D-71)
     // 여정은 「탈 때」가 여러 번이다 — 구간용 문구(탈 때 앉을 확률)를 그대로 붙이면 거짓말이 된다
     /* ★ 카드의 큰 퍼센트는 머리기사(서서 N분)와 **같은 잣대**여야 한다 (D-71) ★
        탈 때 기준 가중평균(pSeated)을 쓰면 「서서 8분」 옆에 「28%만 앉아 감」이 나와
@@ -578,7 +587,7 @@
      사용자가 원해서 내리는 것이지 갈아타는 게 아니기 때문이다.
      경유지에 머무는 시간은 더하지 않는다(얼마나 머물지는 사람마다 다르다).
      화면이 「경유」라고 분명히 표시한다. */
-  function joinJourneys(parts) {
+  function joinJourneys(parts, opt) {
     var ok = (parts || []).filter(Boolean);
     if (!ok.length) return null;
     if (ok.length === 1) return ok[0];
@@ -613,10 +622,18 @@
       notRunning: ok.some(function (p) { return p.notRunning; })
     };
     // 경유지를 이은 것도 여정이다 — 같은 잣대(시간 비율, D-71)
-    var rideSum = 0, standSum = 0;
-    ok.forEach(function (p) { rideSum += p.rideMinutes || 0; standSum += p.standingMinutes || 0; });
+    var rideSum = 0, vehSum = 0, waitSum2 = 0;
+    ok.forEach(function (p) {
+      rideSum += p.rideMinutes || 0;
+      vehSum += (p.vehicleStandingMinutes !== undefined ? p.vehicleStandingMinutes : p.standingMinutes) || 0;
+      waitSum2 += p.waitMinutes || 0;
+    });
     out.rideMinutes = rideSum;
-    out.pSeatedTime = rideSum > 0 ? 1 - standSum / rideSum : 1;
+    out.waitMinutes = waitSum2;
+    out.vehicleStandingMinutes = vehSum;
+    // standingMinutes 는 부르는 쪽(rank 전)에서 이미 부분별로 합쳐져 있다 — 기다림 규칙만 다시 맞춘다
+    out.standingMinutes = vehSum + (opt && opt.waitAsStanding === false ? 0 : waitSum2);
+    out.pSeatedTime = rideSum > 0 ? 1 - vehSum / rideSum : 1;
     out.seatChance = M.seatChanceJourney(out.pSeatedTime);
     out.seatPhrase = M.seatPhrase(out.pSeated);
     return out;

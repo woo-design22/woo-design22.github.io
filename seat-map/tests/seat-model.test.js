@@ -154,7 +154,7 @@ test('서서 가는 시간이 같으면 총 소요시간으로 2차 정렬한다
 
 test('버그 ⑤ — 배지 문구가 정렬 키와 어긋나지 않는다', () => {
   assert.strictEqual(M.SORT_KEY, 'standingMinutes');
-  assert.ok(M.SORT_BADGE.includes('서서'), '정렬은 서서가는시간으로 하면서 문구에 그 말이 없다');
+  assert.ok(M.SORT_BADGE.includes('서는'), '정렬은 서는 시간인데 문구에 그 말이 없다');   // D-74 문구
   assert.ok(!M.SORT_BADGE.includes('앉'),
     '"가장 앉아서 갈 수 있는 길" 류의 문구는 짧은 구간에서 "1% · 가장 앉아서 갈 수 있는 길"이 된다');
 });
@@ -194,7 +194,7 @@ test('7.3 — 색에는 항상 문구가 따라붙는다', () => {
     const s = M.seatPhrase(p);
     assert.ok(s.tone && s.text && s.text.length > 3, '색만 있고 문구가 없다');
   }
-  assert.strictEqual(M.standingPhrase(11), '서서 가는 시간 11분');
+  assert.strictEqual(M.standingPhrase(11), '서는 시간 11분');   // D-74 문구
 });
 
 // ── 6.2 이미 겪은 버그들 ──────────────────────────────────────────────────

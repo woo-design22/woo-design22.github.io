@@ -120,6 +120,18 @@
     var names = route.stops && route.stops[leg.dirIdx];
     if (!names) return null;
     var cap = 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
+    /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★
+       혼잡도는 첫차(05:30)부터 막차 언저리(자정 넘어 24:30)까지만 있다 — 그건 공백이
+       아니라 그 밖에는 열차가 없다는 뜻이다. 40분 넘게 벗어나면 안 다닌다고 말한다.
+       (02시 검색에 지하철 넷이 「첫차가 없을 수 있습니다」 딱지로 나오던 것을 끊는다.
+        자정 직후 00~03시는 하루의 연장으로 계산한다 — 00:30 막차 시간대는 살아 있어야 한다.) */
+    if (ctx.congestion && ctx.congestion.startMinutes !== undefined) {
+      var svc0 = ctx.congestion.startMinutes;
+      var svc1 = svc0 + ((ctx.congestion.slots || 39) - 1) * (ctx.congestion.slotMinutes || 30);
+      var effMin = minutes < 180 ? minutes + 1440 : minutes;
+      if (effMin < svc0 - 40 || effMin > svc1 + 40)
+        return { notRunning: true, why: '그 시각에는 지하철이 다니지 않는다' };
+    }
     var oor = outOfRange(ctx.congestion, minutes);
     var per = trainsPerHour(minutes) * SUBWAY_CARS;
     var side = dirName(route, leg.dirIdx);
@@ -130,6 +142,7 @@
       var here = names[p], next = names[p + 1];
       var t = minutes + (p - leg.fromPos) * (route.minutes || 2);
       var pct = gridValue(ctx.congestion, line + '|' + here + '|' + day + '|' + side, t);
+      var tierName = pct !== null ? '방향값' : null;
       if (pct !== null) usedDir = true;
       /* ★ 이웃 메우기 (D-79) ★
          지선 접점(성수·신도림)은 원천에 그 방향 줄이 아예 없다(전부 0이라 수집기가 버린다).
@@ -144,11 +157,14 @@
             cand = gridValue(ctx.congestion, line + '|' + names[p + nb] + '|' + day + '|' + side, t);
           if (cand === null && names[p - nb] !== undefined)
             cand = gridValue(ctx.congestion, line + '|' + names[p - nb] + '|' + day + '|' + side, t);
-          if (cand !== null) { pct = cand; usedDir = true; estimated = true; }
+          if (cand !== null) { pct = cand; usedDir = true; estimated = true; tierName = '이웃메움'; }
         }
       }
-      if (pct === null) pct = gridValue(ctx.congestion, line + '|' + here + '|' + day, t);
-      if (pct === null) pct = gridValue(ctx.congestion, line + '|전체|' + day, t);
+      /* 어느 층의 자료를 밟았는지 센다 (D-82) — 조용한 폴백이 오류를 숨기는 게
+         이 앱 결함사의 공통 뿌리라, 부르는 쪽이 ctx.stats 를 주면 층별로 계수한다. */
+      if (pct === null) { pct = gridValue(ctx.congestion, line + '|' + here + '|' + day, t); if (pct !== null) tierName = '역최대'; }
+      if (pct === null) { pct = gridValue(ctx.congestion, line + '|전체|' + day, t); if (pct !== null) tierName = '호선피크'; }
+      if (ctx.stats && ctx.stats.tier) ctx.stats.tier[tierName || '없음'] = (ctx.stats.tier[tierName || '없음'] || 0) + 1;
       if (pct === null) continue;
       if (pct <= 0.01) return { notRunning: true, why: '그 시각에는 열차가 다니지 않는다' };
       any = true;
@@ -194,7 +210,7 @@
      「자료 없음」으로 빠지는데, 그러면 낮 시간 후보에 그대로 남는다
      (실제로 08시 경로에 「새벽A160」이 올라왔다). 시간대로 먼저 자른다. */
   function nightBusRunning(minutes) {
-    var h = minutes / 60;
+    var h = (minutes % 1440) / 60;                   // 새벽은 25~28시(하루의 연장)로도 온다
     return h >= 23 || h < 5;
   }
 
@@ -272,6 +288,12 @@
     var when = legMinutes(ctx, leg);
     if (route.kind === 'night' && !nightBusRunning(when))
       return { notRunning: true, why: '심야·새벽버스라 그 시각에는 다니지 않는다' };
+    /* 낮 버스의 막차~첫차 공백 (D-81): 서울 시내버스는 대개 00:30~01:00에 끊기고
+       04:00~05:00에 시작한다. 02시 검색에 공항·지선 버스가 살아 있던 것을 끊는다.
+       (노선별 첫·막차는 노선정보조회 API 가 000000 을 줘 못 얻는다 — 그때까지의
+        안전한 공통 공백만 막는다. 8101 같은 출근전용의 낮 시간은 여전히 남은 일.) */
+    if (route.kind !== 'night' && (when % 1440) >= 90 && (when % 1440) < 240)
+      return { notRunning: true, why: '그 시각에는 이 버스가 다니지 않는다' };
     var doc = ctx.busRoute;                     // data/bus/routes/<노선명>.json
     if (!doc || !doc.stops || !doc.stops.length) return null;
     var ids = route.stops && route.stops[leg.dirIdx];
@@ -303,7 +325,11 @@
        자료가 없을수록 점수가 좋아지는 구조는 이 서비스에서 가장 위험한 함정이다. */
     var moved = 0;
     for (k = 0; k < ids.length; k++) moved += boardings[k] + (attract[k] - 0.0001);
-    if (moved < 1) return { notRunning: true, why: '그 시각에는 이 노선이 다니지 않는다' };
+    /* 심야버스는 제 시간대엔 자료가 얇아도 다닌다 (D-81): 승하차 표본이 적은 N15·N16이
+       「승객<1 = 안 다님」 규칙(원래 낮 유령 노선용)에 제 시간대에 살해당해, 02시 미아에서
+       심야버스가 전멸했다. 심야 창(23~05시)의 night 노선만 면제 — 낮 유령은 계속 죽는다. */
+    if (moved < 1 && !(route.kind === 'night' && nightBusRunning(when)))
+      return { notRunning: true, why: '그 시각에는 이 노선이 다니지 않는다' };
 
     /* OD 배분은 노선 하나에 정류장 수만큼 도는 계산이라 비싸다.
        「앉아 갈 수 있는 위치 찾기」는 한 노선의 여러 승차 지점을 훑으므로 수천 번 부른다.

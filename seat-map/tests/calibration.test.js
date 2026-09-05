@@ -273,3 +273,48 @@ test('D-80 — 지하철 그래프: 좌표·순서·지선이 실제 선형이�
   assert.strictEqual(m8.length, 1, '8호선이 갈라져 있다');
   assert.ok(m8[0].stops[0].includes('남위례'), '남위례(2021 신설)가 빠졌다');
 });
+
+/* ── D-81 (2026-09-06): 심층 훑기(tools/verify_deep.js)가 잡은 것들 ── */
+test('D-81 — 심야 02시: 지하철·낮버스는 안 다니고, 심야버스는 제 시간대에 산다', (t) => {
+  const NO = load(path.join(D, 'graph', 'nodes.json'));
+  const RO = load(path.join(D, 'graph', 'routes.json'));
+  const CG = load(path.join(D, 'subway', 'congestion.json'));
+  const RD = load(path.join(D, 'subway', 'ride.json'));
+  if (!NO || !RO || !CG) return t.skip('자료 없음');
+  const R2 = require('../engine/route.js'), L2 = require('../engine/loads.js');
+  const g = { nodes: NO.nodes, routes: RO.routes };
+  const idx = R2.buildIndex(g);
+  const at = m => { const c = { graph: g, congestion: CG, ride: RD, minutes: m, dayType: 'weekday', alpha: M.ALPHA_DEFAULT }; c.loadFor = L2.makeLoadFor(c); return c; };
+  const ri = idx.routes.findIndex(r => r.kind === 'subway' && r.name === '4호선');
+  const route = idx.routes[ri];
+  const leg = { routeIdx: ri, dirIdx: 0, fromPos: 3, toPos: 6, from: route.dirs[0][3], to: route.dirs[0][6],
+                stops: 3, kind: 'subway', vehicle: route.vehicle, rideMinutes: 6, offsetMinutes: 0 };
+  // 02시: 자료 범위(05:30~24:30) 40분 밖 = 운행 종료. 「첫차가 없을 수 있습니다」 딱지로 살아 나오면 안 된다.
+  assert.ok(at(2 * 60).loadFor(leg).notRunning, '02시에 지하철이 산 채로 나온다');
+  // 00:30: 막차 시간대 — 하루의 연장으로 보고 살아 있어야 한다.
+  assert.ok(!at(30).loadFor(leg).notRunning, '00:30 막차 시간대 지하철이 죽었다');
+  // 04:30: 첫차(05:30) 40분 전 — 아직 없다.
+  assert.ok(at(4 * 60 + 30).loadFor(leg).notRunning, '04:30에 지하철이 나온다');
+});
+
+test('D-81 — 걷기 경로는 상위 잘라내기에서 살아남는다 (600m에 차편 12개가 밀어냈다)', (t) => {
+  const NO = load(path.join(D, 'graph', 'nodes.json'));
+  const RO = load(path.join(D, 'graph', 'routes.json'));
+  if (!NO || !RO) return t.skip('그래프 없음');
+  const R2 = require('../engine/route.js'), L2 = require('../engine/loads.js');
+  const CG = load(path.join(D, 'subway', 'congestion.json'));
+  const RD = load(path.join(D, 'subway', 'ride.json'));
+  const g = { nodes: NO.nodes, routes: RO.routes };
+  const idx = R2.buildIndex(g);
+  const a = R2.findNodes(g, '을지로3가역', 3)[0], b = R2.findNodes(g, '을지로4가역', 3)[0];
+  const found = R2.search({ graph: g, index: idx,
+    fromNodes: R2.nearbyMixed(g.nodes, a.lat, a.lon, 900, 12),
+    toNodes: R2.nearbyMixed(g.nodes, b.lat, b.lon, 900, 12),
+    fromPoint: a, toPoint: b, maxTransfers: 2, walkSpeed: 'normal' });
+  const ctx = { graph: g, congestion: CG, ride: RD, minutes: 480, dayType: 'weekday', alpha: M.ALPHA_DEFAULT };
+  ctx.loadFor = L2.makeLoadFor(ctx);
+  found.forEach(j => R2.evaluate(j, ctx));
+  const ranked = R2.rank(found);
+  assert.ok(ranked.some(j => j.walkOnly),
+    '600m 거리인데 「걸어서」 경로가 목록에 없다 — 차편이 밀어냈다');
+});

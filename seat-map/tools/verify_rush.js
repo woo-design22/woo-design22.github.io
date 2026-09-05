@@ -47,6 +47,7 @@ function flag(kind, msg) { FLAGS.push(kind + ' | ' + msg); }
 /* ── ① 전 역·전 방향 훑기 (평일 08시) ─────────────────────────────────── */
 console.log('① 지하철 전 역 훑기 — 평일 08:00, 한 정거장 타기 기준');
 const ctx8 = ctxAt(8 * 60, 'weekday');
+ctx8.stats = { tier: {} };            // 자료 층 사용률 (D-82)
 let scanned = 0, sureSeats = [];
 for (let ri = 0; ri < index.routes.length; ri++) {
   const route = index.routes[ri];
@@ -69,6 +70,9 @@ for (let ri = 0; ri < index.routes.length; ri++) {
   }
 }
 console.log(`  훑음 ${scanned}곳 · 「탈 때 거의 확실히 앉음(95%+)」 ${sureSeats.length}곳`);
+{ const t = ctx8.stats.tier, tot = Object.values(t).reduce((a, b) => a + b, 0) || 1;
+  console.log('  자료 층 사용률(정거장·구간 단위): '
+    + Object.keys(t).map(k => `${k} ${(100 * t[k] / tot).toFixed(1)}%`).join(' · ')); }
 sureSeats.forEach(s => console.log('   95%+:', s));
 
 /* ── ② 출근 비대칭: 주거지 앵커에서 도심행 ≫ 도심발 ───────────────────── */

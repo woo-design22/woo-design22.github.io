@@ -73,6 +73,7 @@
   function hhmm(minutes) {
     var h = Math.floor(minutes / 60), m = Math.round(minutes % 60);
     if (m === 60) { h += 1; m = 0; }
+    if (h >= 25) h -= 24;                     // 새벽 표현(25~28시)은 시계 표기(01~04시)로 접는다
     return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
   }
   function parseHHMM(s) {

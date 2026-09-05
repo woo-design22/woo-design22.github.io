@@ -692,7 +692,14 @@
     if (sorted.length) sorted[0].badge = M.SORT_BADGE;      // 「서는 시간이 가장 짧음」(문구는 사용자 결정)
     var fastest = sorted.slice().sort(function (a, b) { return a.totalMinutes - b.totalMinutes; })[0];
     if (fastest && fastest !== sorted[0]) fastest.badge = '가장 빨리 가는 길';
-    return sorted.slice(0, MAX_RESULTS);
+    var top = sorted.slice(0, MAX_RESULTS);
+    /* ★ 걷기 경로는 잘라내지 않는다 (D-81) ★ — 600m 거리에서 차편 12개가 「9분 걷기」를
+       밀어냈다. 짧은 거리에서 가장 정직한 답이라, 상한에 걸려도 한 자리를 얹어 준다. */
+    if (!top.some(function (j) { return j.walkOnly; })) {
+      var w = sorted.find(function (j) { return j.walkOnly; });
+      if (w) top.push(w);
+    }
+    return top;
   }
 
   return {

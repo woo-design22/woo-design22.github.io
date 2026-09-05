@@ -316,7 +316,9 @@
   function seatChanceJourney(pSeated) {
     if (pSeated == null || isNaN(pSeated))
       return { tone: 'bad', text: '앉아 가는 시간을 알 수 없음', label: '자료가 없습니다', percent: null };
-    var pct = Math.round(pSeated * 100), l = levelOf(pSeated);
+    /* +1e-9: (40-17)/40 = 0.575 가 이진 소수로는 57.4999…라 57 로 깎인다 —
+       괄호의 정수 검산(2300/40 = 57.5 → 58)과 반 점 경계에서 어긋났다(한 시간 시뮬레이션 적발). */
+    var pct = Math.round(pSeated * 100 + 1e-9), l = levelOf(pSeated);
     /* 0% 는 문장으로 (사용자 지시) — 「타는 시간의 0%는 앉아 갑니다」는 어색하다.
        label 은 비운다 — 붙이면 「…못 앉아 갑니다 · 못 앉습니다」로 같은 말이 두 번이다. */
     if (pct <= 0)

@@ -45,11 +45,23 @@ FIELD_ALIASES = {
     'to_sta_id':    ['to_sta_id', 'toStaId', 'TO_STA_ID'],
     'sta_sn':       ['sta_sn', 'staSn', 'STA_SN', 'seq'],
 }
+# ★ 2026-09-05 실제 응답으로 확인한 이름을 맨 앞에 둔다 ★
+# 사양서 표기를 보고 'max_a18Num08h' 로 짐작했는데 진짜는 **'maxA18Num08h'**(밑줄 없음)였다.
+# 이 하나가 안 맞으면 '최대 재차인원'을 통째로 못 읽고, 그러면 분산 역산이 죽는다 —
+# 정확히 이 API 를 쓰는 이유(차량 간 편차)가 사라진다. 아래 _find_hours 가
+# 대소문자·밑줄을 무시하고 한 번 더 훑으므로 이름이 또 바뀌어도 버틴다.
 HOUR_PATTERNS = {
     'mean':  [r'^a18Num(\d{2})h$', r'^A18_NUM_(\d{2})H$'],
-    'max':   [r'^max_a18Num(\d{2})h$', r'^MAX_A18_NUM_(\d{2})H$'],
+    'max':   [r'^maxA18Num(\d{2})h$', r'^max_a18Num(\d{2})h$', r'^MAX_A18_NUM_(\d{2})H$'],
     'trips': [r'^a18FcntNum(\d{2})h$', r'^A18_FCNT_NUM_(\d{2})H$'],
     'over':  [r'^a18OverCntNum(\d{2})h$', r'^A18_OVER_CNT_NUM_(\d{2})H$'],
+}
+# 이름이 안 맞을 때 마지막으로 기대는 모양 — 밑줄·대소문자를 지우고 비교한다
+HOUR_LOOSE = {
+    'mean':  'a18num%02dh',
+    'max':   'maxa18num%02dh',
+    'trips': 'a18fcntnum%02dh',
+    'over':  'a18overcntnum%02dh',
 }
 
 
@@ -92,6 +104,16 @@ def parse_row(row):
                     hours[h][kind] = _num(val)
                     hit += 1
                 break
+    if not hit:
+        # 이름이 하나도 안 맞았다. 밑줄·대소문자를 지우고 한 번 더 훑는다
+        # (사양서 표기와 실제가 다른 전례가 있다 — max_a18Num08h 가 아니라 maxA18Num08h 였다).
+        flat = {re.sub(r'[^a-z0-9]', '', str(k).lower()): v for k, v in row.items()}
+        for kind, shape in HOUR_LOOSE.items():
+            for h in range(24):
+                v = flat.get(shape % h)
+                if v is not None:
+                    hours[h][kind] = _num(v)
+                    hit += 1
     if not hit:
         return None
     odd = 0

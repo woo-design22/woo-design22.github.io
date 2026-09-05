@@ -256,8 +256,11 @@
      발로 버티기는 매한가지다. 카드 머리기사(D-75)의
      「못 앉는 시간 = 서는 시간 + 걷는 시간」과 같은 잣대로 세운다. */
   function noSitMinutes(j) { return (j.standingMinutes || 0) + (j.walkMinutes || 0); }
-  var SORT_KEY = 'standingMinutes+walkMinutes';   // 배지 문구와의 일치 검사용 표식
-  var SORT_BADGE = '못 앉는 시간이 가장 짧은 길';
+  var SORT_KEY = 'standingMinutes+walkMinutes';
+  /* 배지 문구는 사용자가 정했다 (2026-09-05): 짧고 부드럽게 「서는 시간이 가장 짧음」.
+     정렬 자체는 못 앉는 시간(위) 그대로다 — 정렬의 정확한 문장은 목록 머리의
+     「못 앉는 시간이 짧은 순으로 놓았습니다」가 담당한다. */
+  var SORT_BADGE = '서는 시간이 가장 짧음';
 
   /* 1순위 못 앉는 시간, 동점이면 총 소요시간. */
   function compareRoutes(a, b) {

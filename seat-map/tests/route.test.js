@@ -104,7 +104,7 @@ t('경로 정렬 1순위는 못 앉는 시간(서는+걷는)이다 — 소요시
       `${i}번째(${noSit(got[i]).toFixed(1)}분)가 앞(${noSit(got[i - 1]).toFixed(1)}분)보다 못 앉는 시간이 짧다 — 정렬이 틀렸다`);
   }
   assert.strictEqual(got[0].badge, M.SORT_BADGE);
-  assert.ok(M.SORT_BADGE.includes('못 앉는'));   // D-77 문구
+  assert.strictEqual(M.SORT_BADGE, '서는 시간이 가장 짧음');   // D-78 문구(사용자 결정)
 });
 
 t('06시대는 앉아서 간다 — 08시보다 서서 가는 시간이 짧다 (사양서 M2)', () => {

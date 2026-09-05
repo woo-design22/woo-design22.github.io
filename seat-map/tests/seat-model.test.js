@@ -179,9 +179,9 @@ test('D-77 — 0% 는 「타는 동안 못 앉아 갑니다」 (사용자 지시
   assert.ok(M.seatChanceJourney(0.01).text.includes('1%'), '1% 부터는 숫자로 말한다');
 });
 
-test('버그 ⑤ — 배지 문구가 정렬 키와 어긋나지 않는다 (D-77)', () => {
-  assert.strictEqual(M.SORT_KEY, 'standingMinutes+walkMinutes');   // 정렬 = 못 앉는 시간
-  assert.ok(M.SORT_BADGE.includes('못 앉는'), '정렬은 못 앉는 시간인데 문구에 그 말이 없다');
+test('버그 ⑤/D-78 — 정렬은 못 앉는 시간, 배지는 사용자가 정한 문구', () => {
+  assert.strictEqual(M.SORT_KEY, 'standingMinutes+walkMinutes');   // 정렬 = 못 앉는 시간(D-77)
+  assert.strictEqual(M.SORT_BADGE, '서는 시간이 가장 짧음');       // 문구는 사용자 결정(D-78)
   // 「가장 앉아서 갈 수 있는 길」 류(확률 얘기)로 돌아가면 안 된다 — 시간 얘기만 한다.
   assert.ok(M.SORT_BADGE.includes('시간'), '배지는 확률이 아니라 시간을 말해야 한다');
 });

@@ -107,7 +107,8 @@ test('살펴보기 화면도 같은 검사를 통과한다', () => {
 
 test('가다가 앉는 예측은 100% 라고 쓰지 않고, 몇 정거장·몇 분 뒤인지 말한다 (D-66)', () => {
   // 예측 퍼센트는 전부 pctLater() 를 거쳐야 한다 — 반올림 100 을 99 로 자르는 문
-  assert.ok(/function pctLater\(p\)\{ return Math\.min\(99/.test(SCRIPT), 'pctLater 가 없다');
+  // 상한은 90 — "아무리 확실해도 90% 정도를 한계로"(사용자). 99 로도 되돌리지 말 것
+  assert.ok(/function pctLater\(p\)\{ return Math\.min\(90/.test(SCRIPT), 'pctLater 상한이 90 이 아니다');
   const later = SCRIPT.match(/(그럴 가능성|앉아 갈 가능성|앉게 될 가능성)[^;]{0,120}/g) || [];
   assert.ok(later.length >= 3, `가다가 문구를 ${later.length}곳밖에 못 찾았다`);
   for (const chunk of later)

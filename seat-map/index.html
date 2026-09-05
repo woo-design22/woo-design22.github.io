@@ -375,9 +375,9 @@
   }
   $('bigText').addEventListener('click', function(){ setBig($('bigText').getAttribute('aria-pressed')!=='true'); });
 
-  /* 「가다가 앉는다」는 예측이다 — 예측에 100% 라고 쓰면 그 한 줄이 신뢰를 다 깎아 먹는다.
-     반올림이 100 을 만들면 99 로 자른다(사용자 지시: 백 프로는 절대 쓰지 마라). */
-  function pctLater(p){ return Math.min(99, Math.round(p*100)); }
+  /* 「가다가 앉는다」는 예측이다 — 예측에 100% 는 물론 99% 도 쓰지 않는다.
+     사용자 지시: "아무리 확실해도 90% 정도를 한계로 써라." 반올림 결과를 90 에서 자른다. */
+  function pctLater(p){ return Math.min(90, Math.round(p*100)); }
 
   // ── 시각·요일·걸음속도 ──────────────────────────────────────────────────
   /* ★ 시각은 10분 단위 ★ (2026-09-04 사용자 지시)

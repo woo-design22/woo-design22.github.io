@@ -110,6 +110,7 @@ seat-map/
 | 내리는 역은 bestOffAt 금지 | `loads.js` | 「충무로에서 많이 내립니다」(내가 내리는 역) → D-60 |
 | 여정 문구에 「탈 때」 금지 | `seat-model.js seatChanceJourney` | 여정은 탈 때가 여러 번이다 → D-61 |
 | 승객 가중 재차 ×1.25 (버스만) | `loads.js RIDER_LOAD_FACTOR` | 배차 불규칙 — 승객은 붐비는 차에 몰린다. T-DATA 오면 걷어낸다 → D-62 |
+| 버스 요일·시간 계수는 **버스 실측** | `loads.js busDayFactor` | 지하철 차용은 첨두 ×1.5 과대·일요일 ×0.5 과소였다 → D-64 |
 
 **좌석 54와 정원 160을 따로 고치면 34% 임계값이 깨진다.** 단위 테스트가 이 짝을 검사한다.
 
@@ -158,11 +159,13 @@ cd C:\Claude\seat-map && python pipeline/fetch_open_files.py && python pipeline/
 
 키가 있으면 그 앞에 `python pipeline/fetch_headways.py` 를 한 번 돌린다 — **오늘의 배차간격**을
 받아 두는 것(D-63). 없어도 2024 인가값으로 돌아간다.
+달에 한 번 `python pipeline/fetch_tdata_file.py && node pipeline/build_tdata_calib.js` 로
+버스 요일·시간 계수를 실측으로 다듬는다(D-64, 로그인·키 불필요).
 
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 118개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
+node --test tests/*.test.js          # 119개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)
 python pipeline/collect_subway_daily.py --probe   # 키가 있을 때
 ```

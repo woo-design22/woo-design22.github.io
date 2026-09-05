@@ -228,6 +228,21 @@
     return out;
   }
 
+  /* ── 버스 자신의 실측 계수 (T-DATA, D-64) ─────────────────────────────
+     지하철 차용 계수(D-54)는 버스에 과했다 — T-DATA 구간 실측과 대조하니 첨두 ×1.4~1.6
+     과대, 낮 ×0.7, 일요일 ×0.54 과소였다(구간 상관은 0.84~0.95로 배분 구조 자체는 맞았다).
+     버스는 통근 쏠림이 지하철보다 완만하다. 그래서 T-DATA 재차인원합 실측에서
+     종류×요일×시간 계수를 직접 뽑아(data/bus/tdata-calib.json) 1순위로 쓰고,
+     표본이 얇은 칸(null)만 지하철 차용으로 물러난다. */
+  function busDayFactor(ctx, kind, hour) {
+    var t = ctx.busCalib && ctx.busCalib.factors;
+    var k = t && (t[kind] || t.branch);
+    var row = k && k[ctx.dayType || 'weekday'];
+    var v = row ? row[hour] : undefined;
+    if (v === null || v === undefined) return dayFactor(ctx, hour);
+    return v;
+  }
+
   function dayFactor(ctx, hour) {
     var tb = dayFactors(ctx.ride);
     if (!tb) return 1;
@@ -254,7 +269,7 @@
     }
 
     var hour = Math.max(0, Math.min(23, Math.floor((when % 1440) / 60)));
-    var dayMul = dayFactor(ctx, hour);       // 월 총계에는 요일이 없다 — 실측 비율로 되돌린다
+    var dayMul = busDayFactor(ctx, route.kind, hour);   // 월 총계에는 요일이 없다 — 실측 비율로 되돌린다
     var boardings = [], attract = [], found = 0, k;
     for (k = 0; k < ids.length; k++) {
       var s = byId[ids[k]];
@@ -280,7 +295,8 @@
     /* ★ 캐시 키에 **방향**이 반드시 들어가야 한다 ★
        버스도 왕복을 두 방향으로 가르면서(D-51) 방향마다 정류장 ID 가 달라졌다 —
        방향을 빼면 아침 도심행의 값이 한산한 반대 방향에 그대로 쓰인다. */
-    var ck = (doc.route || '') + '@' + hour + '#' + leg.dirIdx + '/' + ctx.dayType;
+    var ck = (doc.route || '') + '@' + hour + '#' + leg.dirIdx + '/' + ctx.dayType
+           + (ctx.busCalib ? '/c' : '');
     var od;
     if (!busCache[ck]) busCache[ck] = SIM.odLoads({ boardings: boardings, attract: attract,
                                                     decayStops: DECAY_STOPS[route.kind] || 6 });
@@ -303,7 +319,9 @@
     var out = { segments: segs, estimated: true, boardMinutes: when,
                 why: '정류장별 승·하차를 OD 로 배분한 뒤 ' + hwNote + '로 나눈 추정'
                      + (Math.abs(dayMul - 1) > 0.02
-                        ? ' (요일 보정 ×' + dayMul.toFixed(2) + ' — 버스 원천에 요일이 없어 지하철 실측 비율을 썼다)'
+                        ? ' (요일·시간 보정 ×' + dayMul.toFixed(2)
+                          + (ctx.busCalib ? ' — 버스 구간 실측(T-DATA)에서 얻은 비율' : ' — 지하철 실측 비율을 빌려 씀')
+                          + ')'
                         : '') };
     if (route.kind === 'express') {
       // 광역버스는 입석 금지 — 잔여좌석이 곧 탑승 가능 여부다(사양서 5.1)
@@ -323,6 +341,7 @@
          ② `_busById` 를 매번 null 로 지어 넘겨 정류장 색인 memo 가 늘 헛돌았다.
        하나를 만들어 두고 값만 갈아 끼운다. */
     var busCtx = { minutes: ctx.minutes, dayType: ctx.dayType, ride: ctx.ride,
+                   busCalib: ctx.busCalib,          // D-55: 골라 담다 빠뜨리면 조용히 굶는다
                    busRoute: null, _busById: null, _busByIdFor: null };
     return function (leg) {
       var route = ctx.graph.routes[leg.routeIdx];
@@ -335,6 +354,7 @@
         busCtx.minutes = ctx.minutes;      // 부르는 쪽이 시각을 바꿔 쓸 수 있다
         busCtx.dayType = ctx.dayType;
         busCtx.ride = ctx.ride;
+        busCtx.busCalib = ctx.busCalib;
         got = busSegments(busCtx, leg, route);
       }
       if (got) { leg.boardMinutes = got.boardMinutes; leg.outOfRange = got.outOfRange || null; }
@@ -352,7 +372,8 @@
     nightBusRunning: nightBusRunning,
     trainsPerHour: trainsPerHour, busesPerHour: busesPerHour,
     legMinutes: legMinutes, outOfRange: outOfRange, clearCache: clearCache,
-    dayFactors: dayFactors, dayFactor: dayFactor, RIDER_LOAD_FACTOR: RIDER_LOAD_FACTOR,
+    dayFactors: dayFactors, dayFactor: dayFactor, busDayFactor: busDayFactor,
+    RIDER_LOAD_FACTOR: RIDER_LOAD_FACTOR,
     subwaySegments: subwaySegments, busSegments: busSegments,
     makeLoadFor: makeLoadFor
   };

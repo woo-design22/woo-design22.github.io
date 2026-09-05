@@ -209,6 +209,7 @@ def build_bus():
     # 노선 → 정류장ID → {name, ars, on[24], off[24], months}
     routes = {}
     route_names = {}
+    route_types = {}          # 노선번호 → 원천이 말하는 교통수단타입명
     stops = {}
     months = set()
     rows_read = bad = 0
@@ -228,6 +229,14 @@ def build_bus():
             days = days_in_month(ym)
             route = r[1].strip()
             route_names[route] = r[2].strip()
+            # ★ 노선 종류를 이름으로 추측하지 않는다 ★
+            # 원천(OA-12913)의 마지막 열이 「교통수단타입명」이다 — 서울간선버스·서울지선버스·
+            # 서울마을버스·서울광역버스·서울심야버스·서울순환버스를 **원천이 직접 알려 준다.**
+            # 예전에는 번호 자릿수로 추측해 665개 중 44개가 틀렸고, 그 전부가 좌석 수까지 틀렸다
+            # (741번은 4자리지만 간선, 9401-1·서울01출근은 광역인데 마을버스로 봤다).
+            # 좌석 수와 배차 대수가 여기서 갈리므로 앉을 확률이 통째로 달라진다.
+            if len(r) > 55 and r[55].strip():
+                route_types[route] = r[55].strip()
             sid = r[3].strip()
             ars = r[4].strip()
             name = re.sub(r'\(\d+\)$', '', r[5].strip())     # 「종로2가사거리(00089)」 → 「종로2가사거리」
@@ -255,13 +264,15 @@ def build_bus():
         secs.sort(key=lambda s: s['ars'])
         C.save_json(os.path.join(C.DATA, 'bus', 'routes', safe_name(route) + '.json'), {
             'route': route, 'routeName': route_names.get(route, route),
+            'vehicleType': route_types.get(route),      # 원천이 말하는 노선 종류 (추측이 아니다)
             'startMinutes': 0, 'slotMinutes': 60, 'slots': BUS_SLOTS,
             'months': sorted(months),
             'unit': '하루 평균 승객수(명) — 월 총계를 그 달 날짜 수로 나눈 값. '
                     '**요일 구분 없음**(원천이 월 집계라 평일·주말이 섞여 있다)',
             'stops': secs,
         })
-        index_routes.append({'route': route, 'name': route_names.get(route, route), 'stops': len(secs)})
+        index_routes.append({'route': route, 'name': route_names.get(route, route),
+                             'vehicleType': route_types.get(route), 'stops': len(secs)})
 
     index_stops = []
     for sid, st in stops.items():

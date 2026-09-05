@@ -296,7 +296,11 @@
     var outLegs = [], i;
     for (i = 0; i < legs.length; i++) {
       var l = legs[i], route = idx.routes[l.routeIdx];
-      var wait = WAIT_MIN[route.kind] === undefined ? 5 : WAIT_MIN[route.kind];
+      /* 기다림 = 배차간격의 절반. 노선별 인가 배차(headwayMin, D-57)가 있으면 그것을 쓴다 —
+         배차 15분짜리 마을버스를 「7분 기다림」으로 말하면 소요시간이 거짓말이 된다. */
+      var wait = route.headwayMin
+        ? Math.max(2, Math.round(route.headwayMin / 2))
+        : (WAIT_MIN[route.kind] === undefined ? 5 : WAIT_MIN[route.kind]);
       var ride = l.stops * route.minutes;
       if (i > 0) { total += TRANSFER_WALK_MIN; walk += TRANSFER_WALK_MIN; }
       total += wait;
@@ -401,7 +405,8 @@
     journey.pSeated = total > 0 ? wsum / total : 1;
     journey.pLater = total > 0 ? wlater / total : 0;
     journey.pSeatedTime = total > 0 ? 1 - standing / total : 1;
-    journey.seatChance = M.seatChance(journey.knownLegs > 0 ? journey.pSeated : null);
+    // 여정은 「탈 때」가 여러 번이다 — 구간용 문구(탈 때 앉을 확률)를 그대로 붙이면 거짓말이 된다
+    journey.seatChance = M.seatChanceJourney(journey.knownLegs > 0 ? journey.pSeated : null);
     journey.seatPhrase = M.seatPhrase(journey.pSeated);
     return journey;
   }
@@ -587,7 +592,7 @@
       pLater: ride > 0 ? later / ride : 0,
       notRunning: ok.some(function (p) { return p.notRunning; })
     };
-    out.seatChance = M.seatChance(out.pSeated);
+    out.seatChance = M.seatChanceJourney(out.pSeated);   // 경유지를 이은 것도 여정이다
     out.seatPhrase = M.seatPhrase(out.pSeated);
     return out;
   }

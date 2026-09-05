@@ -421,7 +421,12 @@
     journey.pLater = total > 0 ? wlater / total : 0;
     journey.pSeatedTime = total > 0 ? 1 - standing / total : 1;
     // 여정은 「탈 때」가 여러 번이다 — 구간용 문구(탈 때 앉을 확률)를 그대로 붙이면 거짓말이 된다
-    journey.seatChance = M.seatChanceJourney(journey.knownLegs > 0 ? journey.pSeated : null);
+    /* ★ 카드의 큰 퍼센트는 머리기사(서서 N분)와 **같은 잣대**여야 한다 (D-71) ★
+       탈 때 기준 가중평균(pSeated)을 쓰면 「서서 8분」 옆에 「28%만 앉아 감」이 나와
+       한 카드 안에서 산수가 안 맞았다(49분×72% ≠ 8분 — 사용자가 잡아냈다).
+       가다가 앉는 것까지 포함한 시간 비율(pSeatedTime = 1 − 서서/타는)로 말한다.
+       구간별 「탈 때 앉을 확률」(pBoard)은 확률 그대로 남는다 — 확률과 비율을 섞지 않는다. */
+    journey.seatChance = M.seatChanceJourney(journey.knownLegs > 0 ? journey.pSeatedTime : null);
     journey.seatPhrase = M.seatPhrase(journey.pSeated);
     return journey;
   }
@@ -607,7 +612,12 @@
       pLater: ride > 0 ? later / ride : 0,
       notRunning: ok.some(function (p) { return p.notRunning; })
     };
-    out.seatChance = M.seatChanceJourney(out.pSeated);   // 경유지를 이은 것도 여정이다
+    // 경유지를 이은 것도 여정이다 — 같은 잣대(시간 비율, D-71)
+    var rideSum = 0, standSum = 0;
+    ok.forEach(function (p) { rideSum += p.rideMinutes || 0; standSum += p.standingMinutes || 0; });
+    out.rideMinutes = rideSum;
+    out.pSeatedTime = rideSum > 0 ? 1 - standSum / rideSum : 1;
+    out.seatChance = M.seatChanceJourney(out.pSeatedTime);
     out.seatPhrase = M.seatPhrase(out.pSeated);
     return out;
   }

@@ -304,7 +304,11 @@ t('순환선(2호선)도 두 방향이 갈린다 — 상선/하선이 없어도'
     if (gap > maxGap) { maxGap = gap; at = `${nm} 내선 ${a.toFixed(0)}% / 외선 ${b.toFixed(0)}%`; }
   }
   console.log(`    2호선 ${both}개 역 두 방향 다 있음 · ${differ}개가 5%p 이상 다름 · 최대 ${at}`);
-  assert.strictEqual(both, names.length, '두 방향 자료가 없는 역이 있다');
+  // D-79: 성수 「외선」은 원천이 전부 0(빈칸)이라 수집기가 지웠다 — 그 한 곳만 예외.
+  //       엔진은 이웃 역(뚝섬) 값으로 메운다. 그 밖의 역은 두 방향이 다 있어야 한다.
+  assert.strictEqual(CONG.grid['2|성수|weekday|외선'], undefined,
+    '성수 외선이 살아 있다 — 지선(9002) 행이 본선 이름을 차지한 D-79 퇴행');
+  assert.ok(both >= names.length - 1, `두 방향 자료가 없는 역이 ${names.length - both}개`);
   assert.ok(differ > names.length * 0.8, '순환선인데 두 방향 값이 거의 같다 — 방향을 못 가리고 있다');
   assert.ok(maxGap > 50, `최대 차이 ${maxGap.toFixed(0)}%p — 순환선은 방향에 따라 크게 달라야 한다`);
 });

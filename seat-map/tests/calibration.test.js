@@ -177,3 +177,99 @@ t('확률 표기는 90 을 넘지 않는다 — 계산이 97·100 이어도 (D-7
   assert.strictEqual(M.seatChance(1.0).label, '웬만하면 앉아 갑니다', '분류는 원값으로 매겨야 한다');
   assert.strictEqual(M.seatChance(0.68).percent, 68, '상한 아래 값이 왜곡됐다');
 });
+
+/* ── D-79·D-80 (2026-09-05): 출근 상식 전수 훑기(tools/verify_rush.js)로 잡은 것들 ──
+   성수 「앉을 확률 90%」(사용자 실물 검산)에서 시작해 혼잡 원천의 빈 행·동명이역,
+   그래프의 좌표·순서·지선 오류까지 내려간 수술의 회귀 시험이다. */
+test('D-79 — 혼잡 원천의 빈 행·동명이역이 자료를 오염시키지 않는다', (t) => {
+  const CG = load(path.join(D, 'subway', 'congestion.json'));
+  if (!CG) return t.skip('congestion.json 없음');
+  const slot8 = Math.round((8 * 60 - CG.startMinutes) / CG.slotMinutes);
+  // 성수: 본선 외선 행은 원천이 전부 0(빈칸) → 지워야 한다. 내선은 본선(211) 값이어야 한다.
+  assert.strictEqual(CG.grid['2|성수|weekday|외선'], undefined,
+    '지선(9002) 행이 본선 「성수」 이름을 차지했다 — 출근 성수→시청이 90%로 나가는 원인');
+  assert.ok(Math.abs(CG.grid['2|성수|weekday|내선'][slot8] - 42.2) < 3,
+    '성수 내선이 본선(211) 값이 아니다');
+  // 신도림: 지선(9003)의 빈 행이 본선 외선을 덮으면 「열차가 안 다닌다」가 된다.
+  assert.ok(CG.grid['2|신도림|weekday|외선'][slot8] > 30,
+    `신도림 외선 08시 ${CG.grid['2|신도림|weekday|외선'] && CG.grid['2|신도림|weekday|외선'][slot8]} — 빈 행이 덮었다`);
+});
+
+test('D-79 — 성수→시청(외선) 평일 08시는 이웃 값으로 메워 만원이다', (t) => {
+  const NO = load(path.join(D, 'graph', 'nodes.json'));
+  const RO = load(path.join(D, 'graph', 'routes.json'));
+  const CG = load(path.join(D, 'subway', 'congestion.json'));
+  const RD = load(path.join(D, 'subway', 'ride.json'));
+  if (!NO || !RO || !CG) return t.skip('자료 없음');
+  const R2 = require('../engine/route.js'), L2 = require('../engine/loads.js');
+  const g = { nodes: NO.nodes, routes: RO.routes };
+  const idx = R2.buildIndex(g);
+  const ctx = { graph: g, congestion: CG, ride: RD, minutes: 8 * 60, dayType: 'weekday', alpha: M.ALPHA_DEFAULT };
+  ctx.loadFor = L2.makeLoadFor(ctx);
+  function leg(lineName, fromName, toName) {
+    for (let ri = 0; ri < idx.routes.length; ri++) {
+      const route = idx.routes[ri];
+      if (route.kind !== 'subway' || route.name !== lineName) continue;
+      for (let di = 0; di < route.dirs.length; di++) {
+        const st = route.stops[di], p = st.indexOf(fromName);
+        if (p < 0) continue;
+        const q = st.indexOf(toName, p + 1);
+        if (q < 0) continue;
+        return { routeIdx: ri, dirIdx: di, fromPos: p, toPos: q, from: route.dirs[di][p], to: route.dirs[di][q],
+                 stops: q - p, kind: 'subway', vehicle: route.vehicle,
+                 rideMinutes: (q - p) * (route.minutes || 2), offsetMinutes: 0 };
+      }
+    }
+    return null;
+  }
+  const l1 = leg('2호선', '성수', '시청');
+  assert.ok(l1, '성수→시청 leg 를 못 만들었다 — 그래프 확인');
+  const i1 = ctx.loadFor(l1);
+  assert.ok(i1 && !i1.notRunning, '성수→시청이 안 다닌다고 나온다');
+  assert.ok(i1.segments[0].load > 60,
+    `성수 외선 08시 재차 ${i1.segments[0].load.toFixed(0)}명 — 출근 도심행이 이렇게 빌 수 없다(이웃 뚝섬 52%·왕십리 83%)`);
+  const r1 = M.ride({ vehicle: 'subwayCar', alpha: M.ALPHA_DEFAULT, segments: i1.segments, freeSeats: i1.freeSeats });
+  assert.ok(r1.pBoard < 0.3, `성수→시청 08시 탈 때 앉을 확률 ${(r1.pBoard * 100).toFixed(0)}% — 사용자 검산이 잡은 그 90%다`);
+  // 4호선 미아: 방향 차 7배(실측 165 vs 24) — 방향이 뒤집히면 이 비율이 무너진다.
+  const down = ctx.loadFor(leg('4호선', '미아', '동대문'));
+  const up = ctx.loadFor(leg('4호선', '미아', '창동'));
+  assert.ok(down.segments[0].load / up.segments[0].load > 3,
+    `미아 하선/상선 = ${down.segments[0].load.toFixed(0)}/${up.segments[0].load.toFixed(0)} — 출근 비대칭이 사라졌다`);
+});
+
+test('D-80 — 지하철 그래프: 좌표·순서·지선이 실제 선형이다', (t) => {
+  const NO = load(path.join(D, 'graph', 'nodes.json'));
+  const RO = load(path.join(D, 'graph', 'routes.json'));
+  if (!NO || !RO) return t.skip('그래프 없음');
+  const nodes = NO.nodes, routes = RO.routes.filter(r => r.kind === 'subway');
+  const hv = (a, b) => {
+    const rd = x => x * Math.PI / 180, R = 6371e3;
+    const h = Math.sin(rd(b.lat - a.lat) / 2) ** 2
+      + Math.cos(rd(a.lat)) * Math.cos(rd(b.lat)) * Math.sin(rd(b.lon - a.lon) / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+  // ① 인접 역이 3.2km 를 넘으면 이어붙임·좌표 오류다(잠실새내↛종합운동장 16.9km 로 발각).
+  for (const r of routes) for (const d of r.dirs)
+    for (let k = 0; k + 1 < d.length; k++)
+      assert.ok(hv(nodes[d[k]], nodes[d[k + 1]]) <= 3200,
+        `${r.name} ${nodes[d[k]].name}↛${nodes[d[k + 1]].name} — 인접인데 3.2km 초과`);
+  // ② 안양 좌표를 빌렸던 종합운동장은 잠실 곁으로 돌아왔다.
+  const j = nodes.find(n => n.name === '종합운동장역');
+  assert.ok(j && Math.abs(j.lat - 37.511) < 0.012 && Math.abs(j.lon - 127.073) < 0.012,
+    `종합운동장역 ${j && j.lat + ',' + j.lon} — 안양(37.40, 126.95) 좌표다`);
+  // ③ 미아·미아사거리는 딴 역이다(정규화 통이 섞는 함정).
+  assert.ok(nodes.some(n => n.name === '미아역') && nodes.some(n => n.name === '미아사거리역'),
+    '미아역과 미아사거리역 중 하나가 사라졌다 — 한 노드로 뭉쳐진 것');
+  // ④ 지선은 본선이 아니라 제 노선이다. 본선이 지선을 경유하면 없는 선로를 태운다.
+  const main2 = routes.find(r => r.name === '2호선');
+  for (const nm of ['도림천', '신답', '용두', '까치산'])
+    assert.ok(!main2.stops[0].includes(nm), `2호선 본선이 지선 역(${nm})을 경유한다`);
+  for (const want of ['신도림', '성수', '강동']) {
+    assert.ok(routes.some(r => /지선/.test(r.name) && r.stops[0][0] === want),
+      `접속역 ${want}에서 시작하는 지선이 없다`);
+  }
+  // ⑤ 8호선은 지선이 없는 한 줄이고 남위례가 들어 있다.
+  const m8 = routes.filter(r => r.line === '8');
+  assert.strictEqual(m8.length, 1, '8호선이 갈라져 있다');
+  assert.ok(m8[0].stops[0].includes('남위례'), '남위례(2021 신설)가 빠졌다');
+});

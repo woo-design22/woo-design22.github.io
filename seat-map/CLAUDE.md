@@ -111,6 +111,10 @@ seat-map/
 | 여정 문구에 「탈 때」 금지 | `seat-model.js seatChanceJourney` | 여정은 탈 때가 여러 번이다 → D-61 |
 | 승객 가중 재차 ×1.25 (버스만) | `loads.js RIDER_LOAD_FACTOR` | 배차 불규칙 — 승객은 붐비는 차에 몰린다. T-DATA 오면 걷어낸다 → D-62 |
 | 버스 요일·시간 계수는 **버스 실측** | `loads.js busDayFactor` | 지하철 차용은 첨두 ×1.5 과대·일요일 ×0.5 과소였다 → D-64 |
+| 전부 0인 혼잡 행은 버린다 | `build_congestion.py` | 빈칸이다 — 값으로 읽으면 「안 다님」(신도림 외선 실종) → D-79 |
+| 동명이역은 최소 역번호가 주인 | `build_congestion.py` | 지선 성수(9002)가 본선 이름을 차지해 08시 90%가 나갔다 → D-79 |
+| 빠진 방향은 이웃 역으로 메운다(앞쪽 우선) | `loads.js` | 뒤쪽은 지선 이어붙임 경계일 수 있다 → D-79 |
+| 지하철 인접 역 ≤ 3.2km | `build_graph.py`·시험 | 넘으면 좌표·순서·지선 오류다(안양 종합운동장 16.9km) → D-80 |
 
 **좌석 54와 정원 160을 따로 고치면 34% 임계값이 깨진다.** 단위 테스트가 이 짝을 검사한다.
 
@@ -165,7 +169,8 @@ cd C:\Claude\seat-map && python pipeline/fetch_open_files.py && python pipeline/
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 120개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
+node --test tests/*.test.js          # 130개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
+node tools/verify_rush.js            # 출근 상식 전수 훑기 — 큰 수술 뒤엔 꼭 돌린다 (D-80)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)
 python pipeline/collect_subway_daily.py --probe   # 키가 있을 때
 ```

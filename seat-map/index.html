@@ -146,14 +146,8 @@
   [hidden]{display:none !important}
   @media (prefers-reduced-motion: reduce){*{transition:none !important; animation:none !important}}
 
-  /* ── PC 는 PC 답게 (D-69) ──────────────────────────────────────────────
-     휴대폰 폭 한 줄이 기본이고, 넓은 화면에서는 판을 키우고 경로 목록을 두 칸으로. */
-  @media (min-width: 980px){
-    main, footer{max-width:1040px}
-    #results{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start}
-    #results .journey{margin:0}
-    #mapWrap{height:400px}
-  }
+  /* PC 전용 두 칸 배치는 만들었다가 걷어냈다(D-69 철회) — 사용자: "PC 버전 구리다,
+     폰 레이아웃 그대로 하나로 유지해라". 화면 폭과 무관하게 같은 판이다. */
 
   /* ── 지도 (D-68) ──────────────────────────────────────────────────────*/
   #mapWrap{position:relative; height:300px; border:1px solid var(--line); border-radius:12px;

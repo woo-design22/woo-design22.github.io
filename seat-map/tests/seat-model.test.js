@@ -293,3 +293,25 @@ test('보간값에 붙일 출처 문구가 있다 (사양서 3.3 — UI에서 �
   assert.ok(I.noteFor(60).includes('1시간'));
   assert.ok(I.noteFor(30).includes('예상값'));
 });
+
+// ── D-66: 「어디쯤에서 앉게 되는가」 ────────────────────────────────────────
+test('못 앉고 탄 사람이 앉게 되는 중앙값 정거장을 낸다 (D-66)', () => {
+  // 만석으로 타서(재차 60/54석) 두 번째 정거장에서 하차가 쏟아지는 상황
+  const segs = [
+    { load: 60, minutes: 2, alightAtEnd: 1, boardAtEnd: 1 },
+    { load: 60, minutes: 2, alightAtEnd: 30, boardAtEnd: 0 },   // 여기서 대량 하차
+    { load: 30, minutes: 2, alightAtEnd: 2, boardAtEnd: 0 },
+    { load: 28, minutes: 2, alightAtEnd: 2, boardAtEnd: 0 },
+  ];
+  const r = M.ride({ vehicle: 'subwayCar', segments: segs });
+  assert.ok(r.seatAtIdx === 2, `대량 하차 다음 정거장(2)이어야 하는데 ${r.seatAtIdx}`);
+  // 탈 때 바로 앉는 상황에서는 자리 예고가 없어야 한다
+  const easy = M.ride({ vehicle: 'subwayCar', segments: [
+    { load: 10, minutes: 2, alightAtEnd: 1 }, { load: 10, minutes: 2, alightAtEnd: 1 }] });
+  assert.strictEqual(easy.seatAtIdx, null, '거의 다 앉는데 자리 예고가 나왔다');
+  // 끝까지 붐비면(하차 미미) 절반을 못 넘겨 null — 「내릴 때까지 서기 쉬움」으로 말할 근거
+  const packed = M.ride({ vehicle: 'subwayCar', segments: [
+    { load: 150, minutes: 2, alightAtEnd: 2 }, { load: 150, minutes: 2, alightAtEnd: 2 },
+    { load: 150, minutes: 2, alightAtEnd: 2 }] });
+  assert.strictEqual(packed.seatAtIdx, null, '만원 유지인데 자리 예고가 나왔다');
+});

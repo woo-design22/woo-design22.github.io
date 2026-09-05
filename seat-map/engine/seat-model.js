@@ -153,8 +153,18 @@
 
     var pSeated = 1 - standing;
     var pDuring = pb0 >= 1 ? 0 : (pSeated - pb0) / (1 - pb0);   // 못 앉고 탄 조건부
+    /* 「가다가 앉을 가능성 91%」라고만 말하면 못 믿는다 — **어디쯤에서** 앉게 되는지까지
+       말해야 근거가 선다(사용자 요구). 못 앉고 탄 사람이 앉게 되는 정거장의 **중앙값**:
+       서 있을 확률이 처음의 절반 아래로 떨어지는 첫 정거장. 그 정거장 도착이
+       fromPos + i 다. 절반까지 안 떨어지면(내릴 때까지 서기 쉬움) null. */
+    var seatAtIdx = null, s0 = 1 - pb0;
+    if (s0 > 0.02) {
+      for (i = 1; i < per.length; i++) {
+        if (per[i].standingProb <= s0 * 0.5) { seatAtIdx = i; break; }
+      }
+    }
     return {
-      pBoard: pb0, pDuring: pDuring, pSeated: pSeated,
+      pBoard: pb0, pDuring: pDuring, pSeated: pSeated, seatAtIdx: seatAtIdx,
       standingMinutes: standMin, totalMinutes: total,
       boardable: 1, perSegment: per
     };

@@ -382,6 +382,15 @@
       leg.pSeated = r.pBoard;                    // 화면에 쓰는 값
       leg.pAnytime = r.pSeated;                  // 가다가라도 앉을 확률
       leg.pLater = Math.max(0, r.pSeated - r.pBoard);   // 타고 나서 새로 생기는 몫
+      /* 못 앉고 탔을 때의 조건부와 「어디쯤에서 앉게 되는가」 — 고급 표시(D-66)용.
+         이름은 지하철이면 역, 버스면 정류장이다(둘 다 노드 이름). */
+      leg.pLaterCond = r.pDuring || 0;
+      leg.seatAtName = null;
+      if (r.seatAtIdx) {
+        var dirArr = ctx.graph.routes[leg.routeIdx].dirs[leg.dirIdx];
+        var seatNode = ctx.graph.nodes[dirArr[leg.fromPos + r.seatAtIdx]];
+        if (seatNode) leg.seatAtName = seatNode.name;
+      }
       leg.pSeatedTime = leg.rideMinutes > 0 ? 1 - r.standingMinutes / leg.rideMinutes : 1;
       leg.standingMinutes = r.standingMinutes;
       leg.emptySeats = M.emptySeats(info.segments[0].load, veh.seats);

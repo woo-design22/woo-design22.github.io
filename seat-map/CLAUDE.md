@@ -106,7 +106,7 @@ seat-map/
 | 노선 종류는 원천 값으로 | `build_datasets.py` 교통수단타입명 | 이름 추측은 44개가 틀렸다(광역을 마을버스로) → D-56 |
 | 배차는 **노선별 인가값**으로 | `build_graph.py load_headways` | 상수 가정은 서울 버스의 1.8배를 요구했다 → D-57 |
 | OD 감쇠는 실측 보정값(5~6) | `loads.js DECAY_STOPS` | 15는 재차를 40% 부풀린다. 광역만 20 → D-58 |
-| 빈자리는 타는 사람과도 겨룬다 | `seat-model.js pSitAtStop` | 안 겨루면 출근길에 「서서 1분」이 나온다 → D-59 |
+| 자리는 **순하차**(하차−승차)에서만 | `seat-model.js pSitAtStop` | 갈아타기 회전문(길음역)의 하차는 좌석을 안 비운다 → D-72 |
 | 내리는 역은 bestOffAt 금지 | `loads.js` | 「충무로에서 많이 내립니다」(내가 내리는 역) → D-60 |
 | 여정 문구에 「탈 때」 금지 | `seat-model.js seatChanceJourney` | 여정은 탈 때가 여러 번이다 → D-61 |
 | 승객 가중 재차 ×1.25 (버스만) | `loads.js RIDER_LOAD_FACTOR` | 배차 불규칙 — 승객은 붐비는 차에 몰린다. T-DATA 오면 걷어낸다 → D-62 |

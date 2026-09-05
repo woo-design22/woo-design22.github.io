@@ -305,6 +305,7 @@ test('못 앉고 탄 사람이 앉게 되는 중앙값 정거장을 낸다 (D-66
   ];
   const r = M.ride({ vehicle: 'subwayCar', segments: segs });
   assert.ok(r.seatAtIdx === 2, `대량 하차 다음 정거장(2)이어야 하는데 ${r.seatAtIdx}`);
+  assert.strictEqual(r.seatAtMinutes, 4, `거기까지 4분(2+2)이어야 하는데 ${r.seatAtMinutes}`);
   // 탈 때 바로 앉는 상황에서는 자리 예고가 없어야 한다
   const easy = M.ride({ vehicle: 'subwayCar', segments: [
     { load: 10, minutes: 2, alightAtEnd: 1 }, { load: 10, minutes: 2, alightAtEnd: 1 }] });

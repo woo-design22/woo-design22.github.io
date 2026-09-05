@@ -386,10 +386,16 @@
          이름은 지하철이면 역, 버스면 정류장이다(둘 다 노드 이름). */
       leg.pLaterCond = r.pDuring || 0;
       leg.seatAtName = null;
+      leg.seatAtStops = null;          // 타고 몇 정거장째에
+      leg.seatAtMinutes = null;        // 타고 몇 분쯤 뒤에
       if (r.seatAtIdx) {
         var dirArr = ctx.graph.routes[leg.routeIdx].dirs[leg.dirIdx];
         var seatNode = ctx.graph.nodes[dirArr[leg.fromPos + r.seatAtIdx]];
-        if (seatNode) leg.seatAtName = seatNode.name;
+        if (seatNode) {
+          leg.seatAtName = seatNode.name;
+          leg.seatAtStops = r.seatAtIdx;
+          leg.seatAtMinutes = Math.max(1, Math.round(r.seatAtMinutes));
+        }
       }
       leg.pSeatedTime = leg.rideMinutes > 0 ? 1 - r.standingMinutes / leg.rideMinutes : 1;
       leg.standingMinutes = r.standingMinutes;

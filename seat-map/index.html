@@ -348,6 +348,10 @@
   }
   $('bigText').addEventListener('click', function(){ setBig($('bigText').getAttribute('aria-pressed')!=='true'); });
 
+  /* 「가다가 앉는다」는 예측이다 — 예측에 100% 라고 쓰면 그 한 줄이 신뢰를 다 깎아 먹는다.
+     반올림이 100 을 만들면 99 로 자른다(사용자 지시: 백 프로는 절대 쓰지 마라). */
+  function pctLater(p){ return Math.min(99, Math.round(p*100)); }
+
   var ADV = store.get('seat_adv')==='1';          // 「가다가 앉기」 표시 여부 — 기본 꺼짐
   function setAdv(on){
     ADV = !!on;
@@ -829,7 +833,7 @@
         + '</div>'
         + (ADV && !j.walkOnly && j.pLater >= 0.15
             ? '<div class="muted small" style="margin-top:5px">서서 가다가 앉아 갈 가능성 '
-              + Math.round(j.pLater*100) + '%</div>' : '');
+              + pctLater(j.pLater) + '%</div>' : '');
       b.addEventListener('click', function(){ S.picked=j; renderDetail(); nav(4); });
       box.appendChild(b);
     });
@@ -856,7 +860,7 @@
       + esc(j.seatChance.text) + (j.seatChance.label?' · '+esc(j.seatChance.label):'')
       + '</span> <span class="muted small">구간 시간으로 가중평균</span></div>'
       + (ADV && j.pLater >= 0.10 ? '<div class="note">서서 가다가 사람들이 빠지면 앉아 갈 수 있습니다 — '
-          + '그럴 가능성 <b>' + Math.round(j.pLater*100) + '%</b>. '
+          + '그럴 가능성 <b>' + pctLater(j.pLater) + '%</b>. '
           + '위 「서서 가는 시간」에는 이미 그 몫이 들어 있습니다.</div>' : '');
     // 도착지가 그 역 자체면 「충무로역 → 충무로역 0m 걷기」가 나온다. 그런 줄은 안 그린다.
     if (j.startWalkMeters > 25)
@@ -894,16 +898,22 @@
            쉽다」고 말한다. 못 앉고 탄 경우의 조건부(pLaterCond)로 말해야 앞줄의
            「탈 때 앉을 확률」과 앞뒤가 맞는다. */
         if (ADV && l.pBoard !== null && l.pBoard < 0.9 && l.pLaterCond >= 0.05) {
+          /* ★ 예측에 100% 라고 쓰지 않는다 ★ — 99 에서 자른다(pctLater).
+             그리고 「어디」만으로는 부족하다: **몇 정거장째 · 몇 분 뒤**인지 같이 말한다. */
+          var whereAt = l.seatAtName
+            ? '<b>' + esc(l.seatAtName) + '</b><span class="muted">(' + l.seatAtStops + '정거장 · 약 '
+              + l.seatAtMinutes + '분 뒤)</span>'
+            : null;
           var whereTxt;
-          if (l.seatAtName && l.pLaterCond >= 0.5) {
-            whereTxt = '못 앉고 타도 대개 <b>' + esc(l.seatAtName) + '</b>쯤부터는 앉아 갑니다 '
-                     + '<span class="muted">(그럴 가능성 ' + Math.round(l.pLaterCond*100) + '%)</span>';
-          } else if (l.seatAtName) {
-            whereTxt = '가다가 앉게 되면 <b>' + esc(l.seatAtName) + '</b>쯤부터입니다 — '
+          if (whereAt && l.pLaterCond >= 0.5) {
+            whereTxt = '못 앉고 타도 대개 ' + whereAt + '쯤부터는 앉아 갑니다 '
+                     + '<span class="muted">(그럴 가능성 ' + pctLater(l.pLaterCond) + '%)</span>';
+          } else if (whereAt) {
+            whereTxt = '가다가 앉게 되면 ' + whereAt + '쯤부터입니다 — '
                      + '다만 <b>내릴 때까지 서 있기 쉽습니다</b> '
-                     + '<span class="muted">(앉게 될 가능성 ' + Math.round(l.pLaterCond*100) + '%)</span>';
+                     + '<span class="muted">(앉게 될 가능성 ' + pctLater(l.pLaterCond) + '%)</span>';
           } else {
-            whereTxt = '가다가 앉게 될 가능성 ' + Math.round(l.pLaterCond*100) + '% — '
+            whereTxt = '가다가 앉게 될 가능성 ' + pctLater(l.pLaterCond) + '% — '
                      + '<b>내릴 때까지 서 있기 쉽습니다</b>';
           }
           html += '<div class="small" style="margin-top:5px">' + whereTxt + '</div>';

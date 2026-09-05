@@ -59,6 +59,22 @@ def load_headways():
     배차는 개편 없이는 잘 안 바뀌고, 종류별 상수 하나보다 노선별 실측이 훨씬 낫다.
     같은 노선이 넉 달 치 있으므로 기준일이 가장 늦은 행을 쓴다.
     """
+    # 1순위: 오늘의 배차 — 서울시 노선정보조회 API 스냅숏 (fetch_headways.py, D-63).
+    # 키가 있어야 만들어지는 파일이라 없으면 조용히 2024 인가값으로 물러난다.
+    out = {}
+    cur = os.path.join(C.DATA, 'bus', 'headways.json')
+    if os.path.exists(cur):
+        try:
+            with open(cur, encoding='utf-8') as fh:
+                doc = json.load(fh)
+            for nm, rec in (doc.get('routes') or {}).items():
+                hw = rec.get('headwayMin')
+                if hw and 3 <= hw <= 60:
+                    out[str(nm).strip()] = float(hw)
+            C.log('  배차간격(현재, %s): %d개' % (doc.get('fetchedAt', '?'), len(out)))
+        except (ValueError, OSError):
+            pass
+
     hits = glob.glob(os.path.join(C.RAW, 'open', 'routeinfo', '*.xlsx'))
     rows = None
     for f in hits:
@@ -74,7 +90,7 @@ def load_headways():
         if rows:
             break
     if not rows:
-        return {}
+        return out
     head = [str(c).strip() for c in rows[0]]
     i_de, i_nm, i_hw = head.index('STDR_DE'), head.index('ROUTE_NM'), head.index('CARALC')
     latest = {}
@@ -87,7 +103,14 @@ def load_headways():
             continue
         if nm not in latest or de > latest[nm][0]:
             latest[nm] = (de, hw)
-    return {nm: v[1] for nm, v in latest.items()}
+    added = 0
+    for nm, v in latest.items():
+        if nm not in out:                 # 현재값이 있으면 2024값은 덮지 않는다
+            out[nm] = v[1]
+            added += 1
+    if added:
+        C.log('  배차간격(2024 인가로 보충): %d개' % added)
+    return out
 
 
 def load_source_kinds():
@@ -493,7 +516,7 @@ def build():
     src_kinds = load_source_kinds()
     C.log('  노선 종류: 원천이 알려 준 것 %d개 (나머지는 이름으로 추측)' % len(src_kinds))
     headways = load_headways()
-    C.log('  인가 배차간격: %d개 노선 (2024-04 기준 — 최신 판에는 이 열이 없다)' % len(headways))
+    C.log('  배차간격 합계: %d개 노선 (현재 API 우선, 2024 인가값 보충)' % len(headways))
     routes = []
     split_ok = split_no = 0
     guessed = 0

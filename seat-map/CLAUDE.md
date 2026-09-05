@@ -156,6 +156,10 @@ seat-map/
 cd C:\Claude\seat-map && python pipeline/fetch_open_files.py && python pipeline/build_congestion.py && python pipeline/build_datasets.py && python pipeline/build_graph.py
 ```
 
+키가 있으면 그 앞에 `python pipeline/fetch_headways.py` 를 한 번 돌린다 — **오늘의 배차간격**을
+받아 두는 것(D-63). 없어도 2024 인가값으로 돌아간다.
+
+
 ```bash
 cd C:\Claude\seat-map
 node --test tests/*.test.js          # 118개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)

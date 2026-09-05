@@ -190,7 +190,8 @@ t('경로마다 앉을 확률이 퍼센트로 나온다', () => {
     assert.ok(/\d+%|알 수 없음/.test(j.seatChance.text), `"${j.seatChance.text}" — 숫자가 없다`);
     if (j.seatChance.percent !== null) {
       assert.ok(j.seatChance.percent >= 0 && j.seatChance.percent <= 100);
-      assert.ok(Math.abs(j.seatChance.percent / 100 - j.pSeated) < 0.01);
+      // D-71: 카드 퍼센트의 잣대는 pSeatedTime(머리기사와 같은 것)이다
+      assert.ok(Math.abs(j.seatChance.percent / 100 - j.pSeatedTime) < 0.01);
     }
   }
   const top = got[0];
@@ -471,4 +472,16 @@ t('버스에도 요일이 반영된다 (D-54)', () => {
       `${r.name}: 평일 08시(${wd.toFixed(1)}명)가 일요일(${su.toFixed(1)}명)보다 많아야 한다`);
   }
   assert.strictEqual(checked, 5, `요일 보정을 확인할 노선을 ${checked}개밖에 못 찾았다`);
+});
+
+t('카드의 퍼센트와 「서서 N분」이 한 잣대다 — (1−비율)×타는시간 = 서서시간 (D-71)', () => {
+  const ranked = plan('월곡동두산아파트', '중구청', 8 * 60, 'weekday');
+  for (const j of ranked) {
+    if (j.walkOnly || !j.knownLegs) continue;
+    const implied = (1 - j.pSeatedTime) * j.rideMinutes;
+    assert.ok(Math.abs(implied - j.standingMinutes) < 0.51,
+      `${j.legs.map(l => l.routeName).join('→')}: 비율이 말하는 서서 ${implied.toFixed(1)}분 ≠ 머리기사 ${j.standingMinutes.toFixed(1)}분`);
+    assert.strictEqual(j.seatChance.percent, Math.round(j.pSeatedTime * 100),
+      '카드 퍼센트가 pSeatedTime 이 아니다 — 탈때 가중평균으로 되돌아갔다(모순 재발)');
+  }
 });

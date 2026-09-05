@@ -896,9 +896,13 @@
             return '<span class="pill'+(l.kind==='subway'?' subway':'')+'">'+esc(l.routeName)+'</span>';
           }).join('<span class="arrow">→</span>');
       var ph = j.walkOnly ? { tone:'best', text:'걸어서 갑니다', label:'' } : j.seatChance;
+      var waitSum = j.walkOnly ? 0
+        : j.legs.reduce(function(a,l){ return a+(l.waitMinutes||0); }, 0);
       var sub = j.walkOnly
         ? '전체 '+Math.round(j.totalMinutes)+'분 · '+fmtM(j.walkMeters)+' 걷기'
-        : '전체 '+Math.round(j.totalMinutes)+'분 · 환승 '+j.transfers+'회 · 걷기 '+Math.round(j.walkMinutes)+'분';
+        : '전체 '+Math.round(j.totalMinutes)+'분 = 걷기 '+Math.round(j.walkMinutes)
+          +'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '+Math.round(j.rideMinutes)
+          +'분 · 환승 '+j.transfers+'회';
       b.innerHTML =
         (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
         '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)+'</div>' +
@@ -909,6 +913,10 @@
            사양서 6.2-⑤ 가 경고한 「정렬 키와 문구가 어긋나 보이는」 바로 그 자리라 한 줄을 붙인다. */
         '<div style="margin-top:9px"><span class="phrase tone-'+ph.tone+'">● '+esc(ph.text)
         + (ph.label?' · '+esc(ph.label):'') + '</span>'
+        /* 반올림은 **한 번만** — 타는분·서는분을 따로 반올림하면 합이 1분 어긋난다(사용자가 잡았다).
+           앉는분 = 반올림(타는) − 반올림(서서) 로 유도해 머리기사와 항상 합이 맞게 한다. */
+        + (j.walkOnly ? '' : ' <span class="muted small">(타는 '+Math.round(j.rideMinutes)
+          +'분 중 '+Math.max(0,Math.round(j.rideMinutes)-Math.round(j.standingMinutes))+'분)</span>')
         + '</div>'
         ;
       b.addEventListener('click', function(){ S.picked=j; renderDetail(); nav(4); });
@@ -931,11 +939,14 @@
       d.innerHTML=html; showMap(j); return;
     }
 
-    html += '<div class="muted small">전체 '+Math.round(j.totalMinutes)+'분 · 환승 '
-      + j.transfers+'회 · 걷기 '+Math.round(j.walkMinutes)+'분</div>'
+    var waitSum = j.legs.reduce(function(a,l){ return a+(l.waitMinutes||0); }, 0);
+    html += '<div class="muted small">전체 '+Math.round(j.totalMinutes)+'분 = 걷기 '
+      + Math.round(j.walkMinutes)+'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '
+      + Math.round(j.rideMinutes)+'분 · 환승 '+j.transfers+'회</div>'
       + '<div style="margin:8px 0 14px"><span class="phrase tone-'+j.seatChance.tone+'">● '
       + esc(j.seatChance.text) + (j.seatChance.label?' · '+esc(j.seatChance.label):'')
-      + '</span> <span class="muted small">구간 시간으로 가중평균</span></div>'
+      + '</span> <span class="muted small">(타는 '+Math.round(j.rideMinutes)+'분 중 '
+      + Math.max(0,Math.round(j.rideMinutes)-Math.round(j.standingMinutes))+'분 — 가다가 앉는 것까지 셈)</span></div>'
       ;
     // 도착지가 그 역 자체면 「충무로역 → 충무로역 0m 걷기」가 나온다. 그런 줄은 안 그린다.
     if (j.startWalkMeters > 25)

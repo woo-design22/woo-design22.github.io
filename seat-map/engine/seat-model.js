@@ -315,7 +315,10 @@
   function seatChance(pSeated) {
     if (pSeated === null || pSeated === undefined || isNaN(pSeated))
       return { tone: 'bad', text: '탈 때 앉을 확률 알 수 없음', label: '자료가 없습니다', percent: null };
-    var pct = Math.round(pSeated * 100);
+    /* ★ 확률 「표기」의 상한은 90 (D-73, 사용자 지시) ★
+       계산이 97·100 이어도 입 밖으로는 90 까지만 — 예측이 확신을 말하면
+       한 번의 반례로 신뢰가 무너진다. 다섯 단계 분류는 원값으로 매긴다. */
+    var pct = Math.min(90, Math.round(pSeated * 100));
     var l = levelOf(pSeated);
     return { tone: l.tone, text: '탈 때 앉을 확률 ' + pct + '%', label: l.text, percent: pct };
   }

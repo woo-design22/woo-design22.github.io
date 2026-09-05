@@ -803,7 +803,7 @@
         var h=document.createElement('div'); h.className='note small';
         h.innerHTML='<b>'+esc(t)+'</b>'+(sub?'<br>'+esc(sub):''); box.appendChild(h);
       }
-      if(sure.length){ head('여기서 타면 앉습니다', '앉을 확률 95% 이상'); sure.forEach(draw); }
+      if(sure.length){ head('여기서 타면 앉습니다', '거의 확실히 앉는 자리만'); sure.forEach(draw); }
       if(likely.length){ head('거의 앉습니다', '앉을 확률 70% 이상 — 확실하진 않습니다'); likely.forEach(draw); }
       $('seatWhere').innerHTML += ' <span class="small">('+(sure.length+likely.length)+'곳 · '+(Date.now()-t0)+'ms)</span>';
 
@@ -905,7 +905,10 @@
           +'분 · 환승 '+j.transfers+'회';
       b.innerHTML =
         (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
-        '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)+'</div>' +
+        /* 서서 + 걷기 = 「발로 버티는 시간」 전체를 같이 보인다(사용자 지시) */
+        '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)
+        +(j.walkOnly?'':' <span class="muted small" style="font-weight:400">(+ 걷기 '+Math.round(j.walkMinutes)
+        +'분 · 총 '+(Math.round(j.standingMinutes)+Math.round(j.walkMinutes))+'분 걷거나 서 있음)</span>')+'</div>' +
         '<div class="chain">'+chain+'</div>' +
         '<div class="muted small">'+sub+'</div>' +
         /* 「서서 24분」과 「앉을 확률 92%」가 나란히 있으면 모순처럼 읽힌다.
@@ -928,7 +931,9 @@
 
   function renderDetail(){
     var j=S.picked, d=$('detail');
-    var html = '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)+'</div>';
+    var html = '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)
+      +' <span class="muted small" style="font-weight:400">(+ 걷기 '+Math.round(j.walkMinutes)
+      +'분 · 총 '+(Math.round(j.standingMinutes)+Math.round(j.walkMinutes))+'분 걷거나 서 있음)</span></div>';
 
     if(j.walkOnly){
       html += '<div class="muted small" style="margin-bottom:14px">전체 '+Math.round(j.totalMinutes)+'분</div>'

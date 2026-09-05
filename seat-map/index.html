@@ -201,6 +201,25 @@
   .standLine{font-size:1.18em; font-weight:800; line-height:1.55}
   .standLine .sub{font-size:.78em; font-weight:400; color:var(--ink2)}
   .standLine .rule{border-top:1px dashed var(--line); margin:6px 0}
+  /* 경로 유형 (D-83) — 색만으로 가르지 않는다: 글자가 항상 함께 간다 */
+  #typeTabs{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px}
+  #typeTabs button{min-height:44px; padding:8px 14px; border-radius:22px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:.95em}
+  #typeTabs button[aria-selected="true"]{background:var(--ink); color:var(--card);
+    border-color:var(--ink); font-weight:700}
+  .typeTag{display:inline-block; padding:3px 10px; border-radius:8px; font-size:.8em;
+    font-weight:700; margin-bottom:6px}
+  .typeTag.t-sub{background:#e3edff; color:#1d4ed8}
+  .typeTag.t-bus{background:#e2f5e8; color:#15803d}
+  .typeTag.t-mix{background:#f3e8ff; color:#7e22ce}
+  .typeTag.t-walk{background:#f1f0ee; color:#57534e}
+  @media (prefers-color-scheme: dark){
+    .typeTag.t-sub{background:#1e3a8a55; color:#93c5fd}
+    .typeTag.t-bus{background:#14532d55; color:#86efac}
+    .typeTag.t-mix{background:#581c8755; color:#d8b4fe}
+    .typeTag.t-walk{background:#44403c55; color:#d6d3d1}
+  }
+
   .whenSeat{display:inline-block; margin-top:7px; padding:7px 12px; border-radius:9px;
     border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer}
   .whenSeat[aria-expanded="true"]{background:var(--card)}
@@ -294,6 +313,9 @@
       <button class="chip" id="showTotal" aria-pressed="true">이동 시간</button>
     </div>
     <div class="note small" id="listNote"></div>
+    <!-- 유형 필터 (D-83): 네이버 길찾기처럼 지하철/버스/섞어 타기를 한눈에 가르고,
+         탭을 누르면 그 유형만 남긴다. 걷기 카드는 작아서 늘 보여 준다. -->
+    <div id="typeTabs" role="tablist" aria-label="경로 유형 고르기" hidden></div>
     <div id="results"></div>
   </section>
 
@@ -449,6 +471,54 @@
   /* 「가다가 앉는다」는 예측이다 — 예측에 100% 는 물론 99% 도 쓰지 않는다.
      사용자 지시: "아무리 확실해도 90% 정도를 한계로 써라." 반올림 결과를 90 에서 자른다. */
   function pctLater(p){ return Math.min(90, Math.round(p*100)); }
+
+  /* ── 경로 유형 (D-83) ──────────────────────────────────────────────────
+     지하철만 / 버스만 / 지하철+버스 / 걸어서. 카드마다 색+글자 딱지를 붙이고,
+     탭으로 일부 유형을 숨길 수 있다(네이버 길찾기의 탭을 참고, 단일 선택).
+     걷기 카드는 어느 탭에서든 보여 준다 — 짧은 거리의 가장 정직한 답이라서. */
+  var TYPE_DEF = {
+    all:  { label: '전체' },
+    sub:  { label: '지하철',       tag: '🚇 지하철',       cls: 't-sub' },
+    bus:  { label: '버스',         tag: '🚌 버스',         cls: 't-bus' },
+    mix:  { label: '지하철+버스',  tag: '🚇+🚌 지하철+버스', cls: 't-mix' },
+    walk: { label: '걸어서',       tag: '🚶 걸어서',        cls: 't-walk' }
+  };
+  function jType(j){
+    if (j.walkOnly) return 'walk';
+    var sub = false, bus = false;
+    j.legs.forEach(function(l){ if (l.kind === 'subway') sub = true; else bus = true; });
+    return sub && bus ? 'mix' : (sub ? 'sub' : 'bus');
+  }
+  S.typeFilter = store.get('seat_typefilter') || 'all';
+  function typeCounts(){
+    var c = { sub: 0, bus: 0, mix: 0, walk: 0 };
+    (S.list || []).forEach(function(j){ c[jType(j)]++; });
+    return c;
+  }
+  function renderTypeTabs(){
+    var box = $('typeTabs');
+    if (!S.list || !S.list.length){ box.hidden = true; return; }
+    var c = typeCounts();
+    // 실제로 있는 유형만 탭으로 (걷기는 탭이 아니라 늘 표시)
+    var kinds = ['sub', 'bus', 'mix'].filter(function(k){ return c[k] > 0; });
+    if (kinds.length < 2){ box.hidden = true; S.typeFilter = 'all'; return; }
+    if (S.typeFilter !== 'all' && c[S.typeFilter] === 0) S.typeFilter = 'all';
+    var h = '<button role="tab" data-type="all" aria-selected="' + (S.typeFilter === 'all') + '">전체 '
+      + S.list.length + '</button>';
+    kinds.forEach(function(k){
+      h += '<button role="tab" data-type="' + k + '" aria-selected="' + (S.typeFilter === k) + '">'
+        + TYPE_DEF[k].label + ' ' + c[k] + '</button>';
+    });
+    box.innerHTML = h;
+    box.hidden = false;
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('#typeTabs button') : null;
+    if (!b) return;
+    S.typeFilter = b.getAttribute('data-type');
+    store.set('seat_typefilter', S.typeFilter);
+    if (S.list && S.step >= 3) renderList(S.lastMs || 0);
+  });
 
   /* ── 기다림을 서기로 볼 것인가 (D-74) ─────────────────────────────────
      기본은 「기다림 = 서 있음」. 벤치가 있는 정류장이면 사용자가 그 자리에서
@@ -987,8 +1057,13 @@
       + waitBtn('waitSit1')
       + ((S.viaNames && S.viaNames.length) ? ' <b>'+esc(S.viaNames.join(' · '))+'</b> 들렀다 갑니다.' : '')
       + ' <span class="small">(' + S.list.length + '개 · ' + ms + 'ms)</span>';
+    renderTypeTabs();
     var box=$('results'); box.innerHTML='';
+    var shown = 0;
     S.list.forEach(function(j, i){
+      var ty = jType(j);
+      if (S.typeFilter !== 'all' && ty !== S.typeFilter && ty !== 'walk') return;   // 걷기는 늘 보여 준다
+      shown++;
       var b=document.createElement('button');
       b.className='journey' + (i===0?' top':'');
       var chain = j.walkOnly
@@ -1005,6 +1080,7 @@
           +'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '+Math.round(j.rideMinutes)
           +'분 · 환승 '+j.transfers+'회';
       b.innerHTML =
+        '<span class="typeTag ' + TYPE_DEF[ty].cls + '">' + TYPE_DEF[ty].tag + '</span>' +
         (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
         /* 안 다니는 시각의 카드는 맨 위에 크게 알린다 — 상세에만 적으면 목록이 거짓말한다 (D-81) */
         (j.notRunning?'<div class="note warn">그 시각에는 다니지 않는 노선입니다 — 참고용</div>':'') +
@@ -1027,6 +1103,12 @@
       b.addEventListener('click', function(){ S.picked=j; renderDetail(); nav(4); });
       box.appendChild(b);
     });
+    if (!shown){
+      var d = document.createElement('div');
+      d.className = 'card';
+      d.innerHTML = '이 유형의 경로가 없습니다. <b>전체</b> 탭을 눌러 보세요.';
+      box.appendChild(d);
+    }
   }
 
   function walkRow(icon, text){ return '<div class="walkrow"><span>'+icon+'</span><span>'+text+'</span></div>'; }

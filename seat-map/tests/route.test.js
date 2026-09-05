@@ -103,7 +103,7 @@ t('경로 정렬 1순위는 서서 가는 시간이다 (소요시간이 아니�
       `${i}번째가 앞보다 덜 서서 간다 — 정렬이 틀렸다`);
   }
   assert.strictEqual(got[0].badge, M.SORT_BADGE);
-  assert.ok(M.SORT_BADGE.includes('서서'));
+  assert.ok(M.SORT_BADGE.includes('서는'));   // D-74 문구
 });
 
 t('06시대는 앉아서 간다 — 08시보다 서서 가는 시간이 짧다 (사양서 M2)', () => {
@@ -204,8 +204,9 @@ t('여정 확률은 구간을 타는 시간으로 가중평균한 값이다 (202
   for (const j of got) {
     if (j.walkOnly) continue;
     // ① 「앉아 있는 시간 비율」은 헤드라인의 서서 가는 시간과 언제나 맞아떨어진다
-    assert.ok(Math.abs(j.pSeatedTime - (1 - j.standingMinutes / j.rideMinutes)) < 1e-9,
-      '앉아 있는 시간 비율이 서서 가는 시간과 어긋난다');
+    // D-74: standingMinutes 에는 기다림이 든다 — 비율은 차 안 몫(vehicleStandingMinutes)과 짝이다
+    assert.ok(Math.abs(j.pSeatedTime - (1 - j.vehicleStandingMinutes / j.rideMinutes)) < 1e-9,
+      '앉아 있는 시간 비율이 차 안 서는 시간과 어긋난다');
     // 화면에 쓰는 확률은 「탈 때 바로」라 그보다 크지 않다(가다가 앉는 몫이 빠져 있으므로)
     assert.ok(j.pSeated <= j.pSeatedTime + 1e-9,
       '탈 때 바로 앉을 확률이 앉아 있는 시간 비율보다 크다 — 뜻이 뒤집혔다');
@@ -478,10 +479,38 @@ t('카드의 퍼센트와 「서서 N분」이 한 잣대다 — (1−비율)×�
   const ranked = plan('월곡동두산아파트', '중구청', 8 * 60, 'weekday');
   for (const j of ranked) {
     if (j.walkOnly || !j.knownLegs) continue;
+    // D-74 뒤로 standingMinutes 에는 기다림이 든다 — 비율(D-71)은 차 안 몫과 맞아야 한다
     const implied = (1 - j.pSeatedTime) * j.rideMinutes;
-    assert.ok(Math.abs(implied - j.standingMinutes) < 0.51,
-      `${j.legs.map(l => l.routeName).join('→')}: 비율이 말하는 서서 ${implied.toFixed(1)}분 ≠ 머리기사 ${j.standingMinutes.toFixed(1)}분`);
+    assert.ok(Math.abs(implied - j.vehicleStandingMinutes) < 0.51,
+      `${j.legs.map(l => l.routeName).join('→')}: 비율이 말하는 차 안 서기 ${implied.toFixed(1)}분 ≠ ${j.vehicleStandingMinutes.toFixed(1)}분`);
     assert.strictEqual(j.seatChance.percent, Math.round(j.pSeatedTime * 100),
       '카드 퍼센트가 pSeatedTime 이 아니다 — 탈때 가중평균으로 되돌아갔다(모순 재발)');
   }
+});
+
+t('기다림은 기본으로 서는 시간에 든다 — 앉아 기다림 가정이면 빠진다 (D-74)', () => {
+  const A = pick('월곡동두산아파트'), B = pick('중구청');
+  const found = R.search({ graph, index,
+    fromNodes: R.nearbyMixed(graph.nodes, A.lat, A.lon, 900, 12),
+    toNodes: R.nearbyMixed(graph.nodes, B.lat, B.lon, 900, 12),
+    maxTransfers: 2, walkSpeed: 'normal' });
+  const mk = flag => {
+    const c = { graph, congestion: CONG, ride: RIDE, busRouteOf,
+                minutes: 8 * 60, dayType: 'weekday', alpha: M.ALPHA_DEFAULT, waitAsStanding: flag };
+    c.loadFor = L.makeLoadFor(c); return c;
+  };
+  const a = JSON.parse(JSON.stringify(found)), b = JSON.parse(JSON.stringify(found));
+  L.clearCache(); a.forEach(j => R.evaluate(j, mk(true)));
+  L.clearCache(); b.forEach(j => R.evaluate(j, mk(false)));
+  let checked = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].walkOnly || !(a[i].waitMinutes > 0.5)) continue;
+    checked++;
+    assert.ok(Math.abs((a[i].standingMinutes - b[i].standingMinutes) - a[i].waitMinutes) < 0.01,
+      '서는 시간의 차가 기다림과 다르다');
+    assert.ok(Math.abs(a[i].vehicleStandingMinutes - b[i].vehicleStandingMinutes) < 0.01,
+      '차 안 서는 몫이 가정에 흔들렸다');
+    assert.ok(Math.abs(a[i].pSeatedTime - b[i].pSeatedTime) < 1e-9, '비율(D-71)이 가정에 흔들렸다');
+  }
+  assert.ok(checked >= 5, `기다림 있는 경로를 ${checked}개밖에 못 봤다`);
 });

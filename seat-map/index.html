@@ -193,6 +193,14 @@
   #pickCancel{flex:0 0 96px; min-height:56px; border:1px solid var(--line); border-radius:12px;
     background:var(--bg); color:var(--ink); font-size:1em; cursor:pointer}
 
+  /* 머리기사 지표 보기 칩 (D-75) — 끄면 모든 경로 카드에서 함께 사라진다 */
+  #viewChips{margin:0 0 8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  #viewChips .chip{min-height:40px; padding:6px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:.92em}
+  #viewChips .chip[aria-pressed="false"]{opacity:.45; text-decoration:line-through}
+  .standLine{font-size:1.18em; font-weight:800; line-height:1.55}
+  .standLine .sub{font-size:.78em; font-weight:400; color:var(--ink2)}
+  .standLine .rule{border-top:1px dashed var(--line); margin:6px 0}
   .whenSeat{display:inline-block; margin-top:7px; padding:7px 12px; border-radius:9px;
     border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer}
   .whenSeat[aria-expanded="true"]{background:var(--card)}
@@ -281,6 +289,10 @@
       </div>
     </div>
     <div class="tabRow"><button class="seatTab" id="tab3">🪑 앉아 가는 대중교통 위치</button></div>
+    <div id="viewChips" class="small">보기:
+      <button class="chip" id="showNosit" aria-pressed="true">못 앉는 시간</button>
+      <button class="chip" id="showTotal" aria-pressed="true">이동 시간</button>
+    </div>
     <div class="note small" id="listNote"></div>
     <div id="results"></div>
   </section>
@@ -437,6 +449,83 @@
   /* 「가다가 앉는다」는 예측이다 — 예측에 100% 는 물론 99% 도 쓰지 않는다.
      사용자 지시: "아무리 확실해도 90% 정도를 한계로 써라." 반올림 결과를 90 에서 자른다. */
   function pctLater(p){ return Math.min(90, Math.round(p*100)); }
+
+  /* ── 기다림을 서기로 볼 것인가 (D-74) ─────────────────────────────────
+     기본은 「기다림 = 서 있음」. 벤치가 있는 정류장이면 사용자가 그 자리에서
+     「앉아서 기다림」으로 바꿀 수 있다 — 바꾸면 정렬까지 다시 한다(잣대가 바뀌므로). */
+  S.waitSit = store.get('seat_waitsit') === '1';   // 기본: 기다림 = 서 있음
+
+  /* ── 머리기사 네 지표 (D-75) ──────────────────────────────────────────
+     서는 시간(항상) · 걷는 시간 · 못 앉는 시간(=서는+걷는) · 이동 시간(=전체).
+     서는 시간 말고는 칩으로 끌 수 있고, 끄면 모든 카드에서 함께 사라진다. */
+  S.show = { nosit: store.get('seat_show_nosit') !== '0',
+             total: store.get('seat_show_total') !== '0' };
+  /* 확정 레이아웃(사용자 지시):
+       앉는 시간 N분
+       못 앉는 시간 N분 (서는 시간 A분 + 걷는 시간 B분)
+       ------------------------
+       이동시간 N분
+     앉는 시간 = 이동 − 못 앉는 으로 **유도**해 세 줄의 합이 항상 정확히 맞는다(D-71 정신).
+     기다림을 앉아서 본다는 가정이면 그 몫이 자동으로 「앉는 시간」에 들어간다. */
+  function metricsLine(j){
+    var st = Math.round(j.standingMinutes), wk = Math.round(j.walkMinutes);
+    var tot = Math.round(j.totalMinutes);
+    var noSit = st + wk, sit = Math.max(0, tot - noSit);
+    var h = '<div class="standLine">앉는 시간 <b>' + sit + '분</b>';
+    if (S.show.nosit)
+      h += '<br>못 앉는 시간 <b>' + noSit + '분</b> <span class="sub">(서는 시간 ' + st
+         + '분 + 걷는 시간 ' + wk + '분)</span>';
+    if (S.show.total)
+      h += '<div class="rule"></div>이동시간 <b>' + tot + '분</b>';
+    return h + '</div>';
+  }
+  function bindChip(id, key){
+    $(id).setAttribute('aria-pressed', S.show[key] ? 'true' : 'false');
+    return function(){
+      S.show[key] = !S.show[key];
+      store.set('seat_show_' + key, S.show[key] ? '1' : '0');
+      $(id).setAttribute('aria-pressed', S.show[key] ? 'true' : 'false');
+      if (S.list) renderList(S.lastMs || 0);
+      if (S.picked && S.step === 4) renderDetail();
+    };
+  }
+  // 정적 검사(ui.test)가 배선을 눈으로 보게 — 한 줄씩 건다
+  $('showNosit').addEventListener('click', bindChip('showNosit', 'nosit'));
+  $('showTotal').addEventListener('click', bindChip('showTotal', 'total'));
+
+  function waitBtn(id){
+    var sit = S.waitSit;
+    return '<button class="ghost" id="'+id+'" style="font-size:.85em; padding:5px 10px" '
+      + 'title="기다리는 시간을 서기로 칠지 고릅니다">기다릴 때: '+(sit?'앉아 있음':'서 있음')+' ⇄</button>';
+  }
+  function toggleWaitSit(){
+    S.waitSit = !S.waitSit;
+    store.set('seat_waitsit', S.waitSit ? '1' : '0');
+    var picked = S.picked ? S.picked.legs.map(function(l){ return l.routeName+'@'+l.fromPos; }).join('|') : null;
+    findRoutes(function(){
+      if (picked && S.list) {
+        var again = S.list.find(function(j){
+          return !j.walkOnly && j.legs.map(function(l){ return l.routeName+'@'+l.fromPos; }).join('|') === picked;
+        });
+        if (again && S.step === 4) { S.picked = again; renderDetail(); }
+      }
+    });
+  }
+  document.addEventListener('click', function(e){
+    if (e.target && (e.target.id === 'waitSit1' || e.target.id === 'waitSit2')) toggleWaitSit();
+  });
+
+  function standSuffix(j){
+    var wk = Math.round(j.walkMinutes), st = Math.round(j.standingMinutes);
+    var head;
+    if (S.waitSit)
+      head = j.waitMinutes >= 0.5 ? '기다림 ' + Math.round(j.waitMinutes) + '분은 앉는다고 봄 · ' : '';
+    else
+      head = j.waitMinutes >= 0.5
+        ? '차 안 ' + Math.round(j.vehicleStandingMinutes) + '분 + 기다림 ' + Math.round(j.waitMinutes) + '분 · '
+        : '';
+    return head ? '(' + head.replace(/ · $/, '') + ')' : '';
+  }
 
   // ── 시각·요일·걸음속도 ──────────────────────────────────────────────────
   /* ★ 시각은 10분 단위 ★ (2026-09-04 사용자 지시)
@@ -780,7 +869,7 @@
     preloadBus(Object.keys(names)).then(function(){
       if(mine!==seatSeq) return;              // 그 사이 시각·목적지가 바뀌었다
       SeatLoads.clearCache();
-      var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, busRouteOf:function(n){ return busCache[n]||null; },
+      var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, waitAsStanding: !S.waitSit, busRouteOf:function(n){ return busCache[n]||null; },
                 minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
       ctx.loadFor=SeatLoads.makeLoadFor(ctx);
       var t0=Date.now();
@@ -831,7 +920,7 @@
 
   // ── 길찾기 ──────────────────────────────────────────────────────────────
   var findSeq=0;
-  function findRoutes(){
+  function findRoutes(done){
     if(!G || !S.from || !S.to) return;
     var mineF=++findSeq;
     nav(3);
@@ -868,22 +957,24 @@
         j.legs.forEach(function(l){ if(l.kind!=='subway') names[l.routeName]=1; }); }); });
       preloadBus(Object.keys(names)).then(function(){
         if(mineF!==findSeq) return;           // 그 사이 조건이 바뀌었다
-        var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, busRouteOf:function(n){ return busCache[n]||null; },
+        var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, waitAsStanding: !S.waitSit, busRouteOf:function(n){ return busCache[n]||null; },
                   minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
         ctx.loadFor=SeatLoads.makeLoadFor(ctx);
         segs.forEach(function(list){ list.forEach(function(j){ SeatRoute.evaluate(j, ctx); }); });
         var ranked=segs.map(function(list){ return SeatRoute.rank(list); });
         S.list = ranked.length===1 ? ranked[0]
-               : SeatRoute.rank(SeatRoute.combineVia(ranked, 3));
+               : SeatRoute.rank(SeatRoute.combineVia(ranked, 3, {waitAsStanding: !S.waitSit}));
         S.viaNames = S.via.filter(Boolean).map(function(v){ return v.name; });
         renderList(Date.now()-t0);
+      if (typeof done === 'function') done();
       });
     }, 30);
   }
 
   function renderList(ms){
     S.lastMs = ms;
-    $('listNote').innerHTML = '<b>서서 가는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다.'
+    $('listNote').innerHTML = '<b>서는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다. '
+      + waitBtn('waitSit1')
       + ((S.viaNames && S.viaNames.length) ? ' <b>'+esc(S.viaNames.join(' · '))+'</b> 들렀다 갑니다.' : '')
       + ' <span class="small">(' + S.list.length + '개 · ' + ms + 'ms)</span>';
     var box=$('results'); box.innerHTML='';
@@ -900,15 +991,14 @@
         : j.legs.reduce(function(a,l){ return a+(l.waitMinutes||0); }, 0);
       var sub = j.walkOnly
         ? '전체 '+Math.round(j.totalMinutes)+'분 · '+fmtM(j.walkMeters)+' 걷기'
-        : '전체 '+Math.round(j.totalMinutes)+'분 = 걷기 '+Math.round(j.walkMinutes)
+        : '전체 '+Math.round(j.totalMinutes)+'분 = 걷는 시간 '+Math.round(j.walkMinutes)
           +'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '+Math.round(j.rideMinutes)
           +'분 · 환승 '+j.transfers+'회';
       b.innerHTML =
         (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
-        /* 서서 + 걷기 = 「발로 버티는 시간」 전체를 같이 보인다(사용자 지시) */
-        '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)
-        +(j.walkOnly?'':' <span class="muted small" style="font-weight:400">(+ 걷기 '+Math.round(j.walkMinutes)
-        +'분 · 총 '+(Math.round(j.standingMinutes)+Math.round(j.walkMinutes))+'분 걷거나 서 있음)</span>')+'</div>' +
+        /* 네 지표 머리기사 (D-75) + 작은 분해 줄 */
+        metricsLine(j) +
+        (j.walkOnly?'':'<div class="muted small" style="margin-top:2px">'+standSuffix(j)+'</div>') +
         '<div class="chain">'+chain+'</div>' +
         '<div class="muted small">'+sub+'</div>' +
         /* 「서서 24분」과 「앉을 확률 92%」가 나란히 있으면 모순처럼 읽힌다.
@@ -919,7 +1009,7 @@
         /* 반올림은 **한 번만** — 타는분·서는분을 따로 반올림하면 합이 1분 어긋난다(사용자가 잡았다).
            앉는분 = 반올림(타는) − 반올림(서서) 로 유도해 머리기사와 항상 합이 맞게 한다. */
         + (j.walkOnly ? '' : ' <span class="muted small">(타는 '+Math.round(j.rideMinutes)
-          +'분 중 '+Math.max(0,Math.round(j.rideMinutes)-Math.round(j.standingMinutes))+'분)</span>')
+          +'분 중 '+Math.max(0,Math.round(j.rideMinutes)-Math.round(j.vehicleStandingMinutes))+'분)</span>')
         + '</div>'
         ;
       b.addEventListener('click', function(){ S.picked=j; renderDetail(); nav(4); });
@@ -931,9 +1021,8 @@
 
   function renderDetail(){
     var j=S.picked, d=$('detail');
-    var html = '<div class="stand">'+SeatModel.standingPhrase(j.standingMinutes)
-      +' <span class="muted small" style="font-weight:400">(+ 걷기 '+Math.round(j.walkMinutes)
-      +'분 · 총 '+(Math.round(j.standingMinutes)+Math.round(j.walkMinutes))+'분 걷거나 서 있음)</span></div>';
+    var html = metricsLine(j)
+      + '<div class="muted small" style="margin:2px 0 4px">'+standSuffix(j)+' '+waitBtn('waitSit2')+'</div>';
 
     if(j.walkOnly){
       html += '<div class="muted small" style="margin-bottom:14px">전체 '+Math.round(j.totalMinutes)+'분</div>'
@@ -945,13 +1034,13 @@
     }
 
     var waitSum = j.legs.reduce(function(a,l){ return a+(l.waitMinutes||0); }, 0);
-    html += '<div class="muted small">전체 '+Math.round(j.totalMinutes)+'분 = 걷기 '
+    html += '<div class="muted small">전체 '+Math.round(j.totalMinutes)+'분 = 걷는 시간 '
       + Math.round(j.walkMinutes)+'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '
       + Math.round(j.rideMinutes)+'분 · 환승 '+j.transfers+'회</div>'
       + '<div style="margin:8px 0 14px"><span class="phrase tone-'+j.seatChance.tone+'">● '
       + esc(j.seatChance.text) + (j.seatChance.label?' · '+esc(j.seatChance.label):'')
       + '</span> <span class="muted small">(타는 '+Math.round(j.rideMinutes)+'분 중 '
-      + Math.max(0,Math.round(j.rideMinutes)-Math.round(j.standingMinutes))+'분 — 가다가 앉는 것까지 셈)</span></div>'
+      + Math.max(0,Math.round(j.rideMinutes)-Math.round(j.vehicleStandingMinutes))+'분 — 가다가 앉는 것까지 셈)</span></div>'
       ;
     // 도착지가 그 역 자체면 「충무로역 → 충무로역 0m 걷기」가 나온다. 그런 줄은 안 그린다.
     if (j.startWalkMeters > 25)
@@ -981,7 +1070,7 @@
         var p=SeatModel.seatChance(l.pSeated);
         html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)
              + (p.label?' · '+esc(p.label):'')
-             + '</span> <span class="muted small">이 구간 서서 '+Math.round(l.standingMinutes)+'분</span></div>';
+             + '</span> <span class="muted small">이 구간 차 안 서는 시간 '+Math.round(l.standingMinutes)+'분</span></div>';
         /* 탈 때는 못 앉아도 가다가 사람이 많이 빠지면 자리가 난다 — 그것도 알려야 한다
            (2026-09-04 사용자 지시). 「서서 가는 시간」에는 이미 반영돼 있다. */
         /* 「가다가 앉을 가능성 91%」만 던지면 못 믿는다 — **어디쯤에서** 앉게 되는지까지

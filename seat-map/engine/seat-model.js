@@ -252,7 +252,7 @@
      "서서가는시간으로 정렬해 놓고 배지엔 앉는다고 썼다"였다.
      문구를 고치려면 여기를 고치고, 그러면 테스트가 정렬 키와의 일치를 다시 본다. */
   var SORT_KEY = 'standingMinutes';
-  var SORT_BADGE = '가장 적게 서서 가는 길';
+  var SORT_BADGE = '가장 적게 서는 길';
 
   /* 1순위 서서 가는 시간, 동점이면 총 소요시간. */
   function compareRoutes(a, b) {
@@ -326,8 +326,8 @@
   /* "서서 가는 시간 11분". 어르신에게는 확률보다 이 쪽이 와닿는다(사양서 5.4). */
   function standingPhrase(minutes) {
     var m = Math.round(minutes);
-    if (m <= 0) return '서서 가는 시간 없음';
-    return '서서 가는 시간 ' + m + '분';
+    if (m <= 0) return '서는 시간 없음';
+    return '서는 시간 ' + m + '분';
   }
 
   return {

@@ -841,7 +841,12 @@
             ? ' · <b>'+SeatInterp.hhmm(Math.round(l.boardMinutes))+'쯤 탑니다</b>' : '')+'</div>'
         + (l.outOfRange ? '<div class="note warn">'+esc(l.outOfRange)+'</div>' : '');
       if(l.seatText){
-        html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)+'</div>' + seatGrid(l);
+        /* 버스의 좌석 수는 실측이 아니라 추정이다(월 총계 평균 + 배차 가정).
+           「2자리 비어 있습니다」라고 단정했더니 그 숫자 하나로 전체를 못 믿게 됐다 —
+           추정이면 추정이라고 그 자리에 바로 말한다. */
+        html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)
+          + (l.estimated ? ' <span class="muted">— 하루 평균으로 낸 값이라 차마다 다릅니다</span>' : '')
+          + '</div>' + seatGrid(l);
         var p=SeatModel.seatChance(l.pSeated);
         html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)
              + (p.label?' · '+esc(p.label):'')
@@ -867,8 +872,9 @@
 
     html += '<div class="note">지하철 혼잡도는 서울교통공사 실측(30분 단위), 버스는 정류장별 승·하차 실측(1시간 단위)입니다. '
       + '그 사이 값은 부드럽게 이은 예상값입니다. 도보는 직선거리에 ×'+SeatTransfer.WALK_DETOUR+'를 곱해 잡았습니다.';
-    if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 시간당 운행 대수를 실제로 받으려면 '
-      + '열차시간표·T-DATA 인증키가 필요합니다.';
+    if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 버스는 노선별 인가 배차간격'
+      + '(2024년 기준)으로 나눈 값입니다. 같은 시각에도 차마다 붐빔이 다른 것'
+      + '(예: 8대 중 3대만 만원)까지 보려면 T-DATA 인증키가 필요합니다.';
     html += '</div>';
     d.innerHTML=html;
   }

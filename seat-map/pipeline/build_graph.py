@@ -23,6 +23,7 @@
 """
 import argparse
 import glob
+import json
 import math
 import os
 import re
@@ -38,6 +39,78 @@ CLUSTER_M = 150          # 사양서 6.2-②: 반경 150m 안의 정류장·역�
 
 # ── 노선 종류 (서울 버스 번호체계) ────────────────────────────────────────
 # 좌석수와 정거장 소요시간 기본값이 여기서 갈린다(사양서 6.3).
+# 원천(OA-12913)의 「교통수단타입명」 → 우리 종류.
+# **이 표에 있는 노선은 추측하지 않는다.** route_kind() 는 원천에 없는 노선만 맡는다.
+SOURCE_KIND = {
+    '서울간선버스': 'trunk',   '서울지선버스': 'branch',  '서울마을버스': 'village',
+    '서울광역버스': 'express', '서울심야버스': 'night',   '서울순환버스': 'circular',
+    '경기간선버스': 'trunk',   '경기지선버스': 'branch',  '경기마을버스': 'village',
+    '경기광역버스': 'express', '인천간선버스': 'trunk',   '인천지선버스': 'branch',
+    '인천광역버스': 'express', '공항버스': 'express',
+}
+
+
+def load_headways():
+    """노선기본정보(OA-15262)에서 **노선별 평균배차간격(분)** 을 읽는다.
+
+    주의: 이 데이터셋의 최신 판(서울시버스노선ID정보*.xlsx)은 노선명·ID 두 열뿐이다.
+    배차간격(CARALC)·노선유형·기점종점이 실린 마지막 판은 **2024년1~4월 기준** 파일이라
+    그것을 받는다(fetch_open_files.py 의 routeinfo seq 25). 2년 묵은 값이지만
+    배차는 개편 없이는 잘 안 바뀌고, 종류별 상수 하나보다 노선별 실측이 훨씬 낫다.
+    같은 노선이 넉 달 치 있으므로 기준일이 가장 늦은 행을 쓴다.
+    """
+    hits = glob.glob(os.path.join(C.RAW, 'open', 'routeinfo', '*.xlsx'))
+    rows = None
+    for f in hits:
+        try:
+            tabs = C.read_tables(f)
+        except Exception:
+            continue
+        tabs = tabs if isinstance(tabs[0], tuple) else [('?', tabs)]
+        for _nm, data in tabs:
+            if data and 'CARALC' in [str(c).strip() for c in data[0]]:
+                rows = data
+                break
+        if rows:
+            break
+    if not rows:
+        return {}
+    head = [str(c).strip() for c in rows[0]]
+    i_de, i_nm, i_hw = head.index('STDR_DE'), head.index('ROUTE_NM'), head.index('CARALC')
+    latest = {}
+    for r in rows[1:]:
+        try:
+            nm, de, hw = str(r[i_nm]).strip(), str(r[i_de]).strip(), float(r[i_hw])
+        except (ValueError, TypeError, IndexError):
+            continue
+        if not (3 <= hw <= 60):        # 0·빈값·비상식값은 버린다
+            continue
+        if nm not in latest or de > latest[nm][0]:
+            latest[nm] = (de, hw)
+    return {nm: v[1] for nm, v in latest.items()}
+
+
+def load_source_kinds():
+    """버스 승하차 집계본에서 노선별 종류를 읽어 온다(build_datasets.py 가 먼저 돌아야 한다).
+
+    없으면 빈 표를 돌려주고 이름 규칙으로 물러난다 — 자료가 없다고 죽지는 않는다.
+    """
+    p = os.path.join(C.DATA, 'bus', 'index.json')
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p, encoding='utf-8') as fh:      # io 를 import 하지 않는 파일이다
+            doc = json.load(fh)
+    except (ValueError, OSError):
+        return {}
+    out = {}
+    for r in doc.get('routes', []):
+        k = SOURCE_KIND.get((r.get('vehicleType') or '').strip())
+        if k:
+            out[str(r.get('route', '')).strip()] = k
+    return out
+
+
 def route_kind(name):
     n = str(name or '').strip().upper()
     # 「N15」뿐 아니라 「새벽A160」도 심야 전용이다. 이름으로만 알 수 있어 둘 다 잡는다.
@@ -53,12 +126,15 @@ def route_kind(name):
 
 
 KIND_INFO = {
-    'trunk':   {'vehicle': 'busTrunk',   'name': '간선버스', 'minutes': 2.6},
-    'branch':  {'vehicle': 'busBranch',  'name': '지선버스', 'minutes': 2.6},
-    'village': {'vehicle': 'busVillage', 'name': '마을버스', 'minutes': 2.2},
-    'express': {'vehicle': 'busExpress', 'name': '광역버스', 'minutes': 4.2},
-    'night':   {'vehicle': 'busTrunk',   'name': '심야버스', 'minutes': 2.6},
-    'subway':  {'vehicle': 'subwayCar',  'name': '지하철',   'minutes': 2.0},
+    'trunk':    {'vehicle': 'busTrunk',   'name': '간선버스', 'minutes': 2.6},
+    'branch':   {'vehicle': 'busBranch',  'name': '지선버스', 'minutes': 2.6},
+    'village':  {'vehicle': 'busVillage', 'name': '마을버스', 'minutes': 2.2},
+    'express':  {'vehicle': 'busExpress', 'name': '광역버스', 'minutes': 4.2},
+    'night':    {'vehicle': 'busTrunk',   'name': '심야버스', 'minutes': 2.6},
+    # 순환버스(01A·01B 남산순환, 상암A21)는 원천이 마을버스와 따로 세지만
+    # **차는 마을버스급 소형**이다. 좌석은 마을버스와 같이 두고 종류만 구분한다.
+    'circular': {'vehicle': 'busVillage', 'name': '순환버스', 'minutes': 2.2},
+    'subway':   {'vehicle': 'subwayCar',  'name': '지하철',   'minutes': 2.0},
 }
 
 
@@ -414,10 +490,18 @@ def build():
         del nd['_sx'], nd['_sy']
 
     # 노선을 노드 번호의 순서 배열로
+    src_kinds = load_source_kinds()
+    C.log('  노선 종류: 원천이 알려 준 것 %d개 (나머지는 이름으로 추측)' % len(src_kinds))
+    headways = load_headways()
+    C.log('  인가 배차간격: %d개 노선 (2024-04 기준 — 최신 판에는 이 열이 없다)' % len(headways))
     routes = []
     split_ok = split_no = 0
+    guessed = 0
     for rid, rec in sorted(bus_routes.items()):
-        kind = route_kind(rec['name'])
+        kind = src_kinds.get(str(rec['name']).strip())
+        if kind is None:
+            kind = route_kind(rec['name'])       # 원천에 없는 노선만 이름으로 본다
+            guessed += 1
         seqnodes, seqstops, last = [], [], -1
         for _seq, sid in rec['seq']:
             idx = node_of_stop.get(sid)
@@ -440,12 +524,15 @@ def build():
         routes.append({'id': rid, 'name': rec['name'], 'kind': kind,
                        'vehicle': KIND_INFO[kind]['vehicle'],
                        'minutes': KIND_INFO[kind]['minutes'],
+                       # 인가 평균배차간격(분). 없으면 loads.js 가 종류별 중앙값으로 물러난다
+                       'headwayMin': headways.get(str(rec['name']).strip()),
                        # 왕복을 **방향별로** 나눈 두 줄 (순환 노선만 한 줄)
                        'dirs': dirs,
                        # 원래 정류장 ID 도 같이 둔다 — 승하차 자료(NODE_ID 기준)와 이어야 하므로.
                        # 노드 번호만 남기면 「이 자리의 승객 수」를 영영 못 찾는다.
                        'stops': stops})
     C.log('    버스 방향 가르기: 두 방향 %d개 · 한 줄로 둔 것(순환 등) %d개' % (split_ok, split_no))
+    C.log('    노선 종류를 이름으로 추측한 것 %d개' % guessed)
     for rid, rec in sorted(sub_routes.items()):
         order = [node_of_stop[s] for s in rec['order'] if s in node_of_stop]
         if len(order) < 2:

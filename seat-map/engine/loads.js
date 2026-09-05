@@ -23,14 +23,56 @@
     if (h >= 6 && h < 23) return 12;                                  // 평시 약 5분
     return 7;                                                          // 첫·막차 무렵
   }
-  var BUSES_PER_HOUR = { trunk: 10, branch: 8, village: 12, express: 4, night: 3 };
-  function busesPerHour(kind, minutes) {
-    var base = BUSES_PER_HOUR[kind] === undefined ? 8 : BUSES_PER_HOUR[kind];
+  /* ── 시간당 몇 대가 오는가 ────────────────────────────────────────────
+     ★ 이 나누는 수가 두 배 틀리면 앉을 확률이 통째로 뒤집힌다 ★
+     예전에는 종류별 상수(간선 10 × 첨두 1.4 = 14대/시 = 4.3분 배차)를 박아 두었는데,
+     세 갈래 검산이 전부 「과다」를 가리켰다:
+       · 서울시 인가대수(2026-01, 시내 7,383 + 마을 1,626 = 9,009대)로 역산하면
+         옛 가정은 버스 15,972대를 요구한다 — 서울에 있는 것의 1.8배
+       · 노선기본정보(OA-15262, 2024-04 인가) 실측 배차: 간선 중앙값 11분·지선 12분·마을 12분
+         (옛 가정은 각각 6분·7.5분·5분으로 읽고 있었다)
+       · 100번 실측 배차 10분 = 6대/시. 옛 가정 14대/시 → 재차인원이 절반으로 희석되어
+         출근길 간선버스가 「2자리 비어 있습니다 68%」로 나왔다
+     그래서 **노선별 인가 배차간격(route.headwayMin, 그래프에 실려 온다)이 있으면 그것을 쓰고**,
+     없는 노선(2024 이후 신설·맞춤버스)만 아래 종류별 중앙값으로 물러난다.
+     첨두 ×1.25 는 배차표가 출근시간에 압축되는 몫이다 — 1.4 를 곱하면
+     인가대수로 낼 수 있는 상한(간선 8.3대/시)을 넘어 버린다. */
+  var BUSES_PER_HOUR = { trunk: 5.5, branch: 5.0, village: 5.0, express: 4.0,
+                         circular: 5.2, night: 2.5 };
+  function busesPerHour(route, minutes) {
+    var kind = typeof route === 'string' ? route : (route && route.kind);
+    var hw = route && typeof route === 'object' ? route.headwayMin : null;
+    var base = (hw && hw >= 3 && hw <= 60) ? 60 / hw
+             : (BUSES_PER_HOUR[kind] === undefined ? 5 : BUSES_PER_HOUR[kind]);
+    // 심야버스는 밤이 본업이다 — 시간대 배율을 얹으면 새벽 2시에 「거의 안 다닌다」가 된다.
+    // 다니는 시각인지는 nightBusRunning 이 따로 가른다.
+    if (kind === 'night') return base;
     var h = minutes / 60;
-    if ((h >= 7 && h < 9.5) || (h >= 17.5 && h < 19.5)) return base * 1.4;
-    if (h < 6 || h >= 23) return Math.max(1, base * 0.4);
+    if ((h >= 7 && h < 9.5) || (h >= 17.5 && h < 19.5)) return base * 1.25;
+    if (h < 6 || h >= 23) return Math.max(1, base * 0.5);
     return base;
   }
+
+  /* 승객이 평균 몇 정거장을 타는가(OD 감쇠) — **저장소 안 실측으로 보정한 값이다.**
+     버스 자료에는 정류장별 승차와 하차가 둘 다 있으므로, 그대로 누적하면 감쇠 모형 없이
+     재차 곡선이 나온다(승·하차 합이 15% 안에서 맞는 429개 방향, 08시).
+     그 정답지와 대조한 「OD 최대재차 ÷ 실측 최대재차」 중앙값:
+       L=15(옛 값): 간선 1.42 · 지선 1.35 — 재차를 40% 부풀린다
+       L=6        : 간선 1.01 · 지선 1.04 · 마을 1.06 — 맞는다
+     실측 평균 탑승 정거장: 간선 5.6 · 지선 5.2 · 마을 4.4.
+     광역만 다르다 — 멀리 가는 차라 평균 12정거장쯤 타므로 따로 길게 둔다(표본 얇음). */
+  var DECAY_STOPS = { village: 5, branch: 6, trunk: 6, night: 6, circular: 5, express: 20 };
+
+  /* ── 내가 타는 차는 평균 차보다 붐빈다 (대기시간 역설) ───────────────────
+     서울 시내버스는 정체로 배차가 불규칙하다(실사용 후기·나무위키 100번: "배차가 불규칙하며
+     가축수송", "입석은 기본"). 앞차와 3분 벌어진 차는 비고 15분 벌어진 차는 미어터지는데,
+     **승객은 벌어진 틈에 더 많이 쌓이므로 붐비는 차에 탈 확률이 높다.**
+     간격의 변동계수를 CV 라 하면 승객이 겪는 평균 재차는 차량 평균의 (1+CV²)배다 —
+     도심 혼합차로의 CV 0.5 를 잡아 **1.25배**로 둔다(보수적인 쪽 — 실측 CV 는 0.5~0.75).
+     재차·하차·승차에 똑같이 곱한다(「승객이 겪는 그 차」의 세계로 통째로 옮기는 것).
+     지하철에는 안 곱한다 — 열차는 배차가 규칙적이라(CV≈0.1) 이 효과가 거의 없다.
+     이 근사의 정답은 T-DATA 의 차량별 재차인원이다. 키가 나오면 이 상수를 걷어낸다. */
+  var RIDER_LOAD_FACTOR = 1.25;
 
   function gridValue(doc, key, minutes) {
     var g = doc && doc.grid && doc.grid[key];
@@ -103,10 +145,21 @@
            방향을 나눌 근거가 없으므로 절반으로 잡는다. 어림이라 estimated 로 표시한다. */
         alight = offTotal / 2 / per;
         estimated = true;
-        if (alight > bestOff) { bestOff = alight; bestOffAt = next; }
+        /* ★ 내리는 역에서 자리가 나는 것은 나에게 아무 소용이 없다 ★
+           나도 거기서 내린다. 그런데 이 루프는 마지막 바퀴에서 next 가 **목적지 자신**이라
+           「충무로에서 많이 내립니다」처럼 **내가 내릴 역**을 자리 나는 곳으로 안내했다.
+           (확률 계산은 무사하다 — ride() 가 마지막 구간의 alightAtEnd 를 안 쓴다.
+            틀린 것은 화면에 붙는 이름뿐이었지만, 그 한 줄이 숫자 전체를 못 믿게 만든다.)
+           가는 도중의 역만 센다. */
+        if (p + 1 < leg.toPos && alight > bestOff) { bestOff = alight; bestOffAt = next; }
       }
-      segs.push({ load: pct / 100 * cap, minutes: route.minutes || 2, alightAtEnd: alight });
+      segs.push({ load: pct / 100 * cap, minutes: route.minutes || 2, alightAtEnd: alight,
+                  boardAtEnd: 0 });      // 다음 바퀴에서 재차 변화를 보고 채운다
     }
+    /* 그 역에서 몇 명이 탔는지는 승차 자료를 따로 안 봐도 재차인원의 변화로 나온다:
+       탄 사람 = (다음 재차) - (지금 재차) + (내린 사람). 빈자리를 두고 겨룰 사람 수다. */
+    for (var q = 0; q + 1 < segs.length; q++)
+      segs[q].boardAtEnd = Math.max(0, segs[q + 1].load - segs[q].load + (segs[q].alightAtEnd || 0));
     if (!any || !segs.length) return null;
     return { segments: segs, estimated: estimated, direction: usedDir ? side : null,
              bestOffAt: bestOffAt, boardMinutes: minutes,
@@ -229,20 +282,26 @@
        방향을 빼면 아침 도심행의 값이 한산한 반대 방향에 그대로 쓰인다. */
     var ck = (doc.route || '') + '@' + hour + '#' + leg.dirIdx + '/' + ctx.dayType;
     var od;
-    if (!busCache[ck]) busCache[ck] = SIM.odLoads({ boardings: boardings, attract: attract });
+    if (!busCache[ck]) busCache[ck] = SIM.odLoads({ boardings: boardings, attract: attract,
+                                                    decayStops: DECAY_STOPS[route.kind] || 6 });
     od = busCache[ck];
-    var per = busesPerHour(route.kind, when);
+    var per = busesPerHour(route, when);
     var segs = [];
     for (k = leg.fromPos; k < leg.toPos && k < od.loads.length - 1; k++) {
       segs.push({
-        load: od.loads[k] / per,
+        load: od.loads[k] / per * RIDER_LOAD_FACTOR,
         minutes: route.minutes || 2.6,
-        alightAtEnd: (od.alights[k + 1] || 0) / per
+        alightAtEnd: (od.alights[k + 1] || 0) / per * RIDER_LOAD_FACTOR,
+        // 그 정류장에서 타는 사람 — 같은 빈자리를 두고 겨룬다
+        boardAtEnd: (od.boardings[k + 1] || 0) / per * RIDER_LOAD_FACTOR
       });
     }
     if (!segs.length) return null;
+    var hwNote = route.headwayMin
+      ? '배차 ' + route.headwayMin + '분(인가 기준)으로 시간당 ' + per.toFixed(1) + '대'
+      : '배차 자료가 없어 같은 종류의 중앙값으로 시간당 ' + per.toFixed(1) + '대';
     var out = { segments: segs, estimated: true, boardMinutes: when,
-                why: '정류장별 승·하차를 OD 로 배분한 뒤 시간당 ' + per.toFixed(0) + '대로 나눈 추정'
+                why: '정류장별 승·하차를 OD 로 배분한 뒤 ' + hwNote + '로 나눈 추정'
                      + (Math.abs(dayMul - 1) > 0.02
                         ? ' (요일 보정 ×' + dayMul.toFixed(2) + ' — 버스 원천에 요일이 없어 지하철 실측 비율을 썼다)'
                         : '') };
@@ -293,7 +352,7 @@
     nightBusRunning: nightBusRunning,
     trainsPerHour: trainsPerHour, busesPerHour: busesPerHour,
     legMinutes: legMinutes, outOfRange: outOfRange, clearCache: clearCache,
-    dayFactors: dayFactors, dayFactor: dayFactor,
+    dayFactors: dayFactors, dayFactor: dayFactor, RIDER_LOAD_FACTOR: RIDER_LOAD_FACTOR,
     subwaySegments: subwaySegments, busSegments: busSegments,
     makeLoadFor: makeLoadFor
   };

@@ -103,6 +103,13 @@ seat-map/
 | 가장 빠른 길의 **1.6배 / +25분**까지만 | `route.js prune` | 서서 0분이라고 201분짜리를 1위로 놓았다 → D-53 |
 | 버스 요일 계수는 **시간대별** | `loads.js dayFactors` | 하루 평균은 토 0.76인데 08시는 0.43이다 → D-54 |
 | ctx 를 골라 담아 넘기지 않는다 | `loads.js makeLoadFor` | 골라 담으면 나중에 넣는 기능이 조용히 굶는다 → D-55 |
+| 노선 종류는 원천 값으로 | `build_datasets.py` 교통수단타입명 | 이름 추측은 44개가 틀렸다(광역을 마을버스로) → D-56 |
+| 배차는 **노선별 인가값**으로 | `build_graph.py load_headways` | 상수 가정은 서울 버스의 1.8배를 요구했다 → D-57 |
+| OD 감쇠는 실측 보정값(5~6) | `loads.js DECAY_STOPS` | 15는 재차를 40% 부풀린다. 광역만 20 → D-58 |
+| 빈자리는 타는 사람과도 겨룬다 | `seat-model.js pSitAtStop` | 안 겨루면 출근길에 「서서 1분」이 나온다 → D-59 |
+| 내리는 역은 bestOffAt 금지 | `loads.js` | 「충무로에서 많이 내립니다」(내가 내리는 역) → D-60 |
+| 여정 문구에 「탈 때」 금지 | `seat-model.js seatChanceJourney` | 여정은 탈 때가 여러 번이다 → D-61 |
+| 승객 가중 재차 ×1.25 (버스만) | `loads.js RIDER_LOAD_FACTOR` | 배차 불규칙 — 승객은 붐비는 차에 몰린다. T-DATA 오면 걷어낸다 → D-62 |
 
 **좌석 54와 정원 160을 따로 고치면 34% 임계값이 깨진다.** 단위 테스트가 이 짝을 검사한다.
 
@@ -151,7 +158,7 @@ cd C:\Claude\seat-map && python pipeline/fetch_open_files.py && python pipeline/
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 111개 (모델·버그 방지·검증·필터·길찾기·장소 찾기)
+node --test tests/*.test.js          # 118개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)
 python pipeline/collect_subway_daily.py --probe   # 키가 있을 때
 ```

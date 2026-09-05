@@ -74,9 +74,27 @@
   // ── 5.2 가는 도중 착석 확률 ──────────────────────────────────────────────
   /* 한 정거장에서 앉게 될 확률.
      하차인원 × α / 서있는승객수, 상한 0.92. */
-  function pSitAtStop(alight, load, seats, alpha) {
+  function pSitAtStop(alight, load, seats, alpha, boarding) {
     var a = alpha === undefined ? ALPHA_DEFAULT : alpha;
-    return Math.min(P_STOP_CAP, Math.max(0, alight) * a / standingCount(load, seats));
+    /* ★ 자리가 나면 서 있던 사람만 앉는 것이 아니다 ★
+       그 정거장에서 **타는 사람**도 같은 자리를 노린다. 문 옆에 선 사람이 먼저 앉는 일도 흔하다.
+       빼놓았더니 재차인원이 좌석 수 근처로 내려오는 순간 분모가 1~2 로 쪼그라들어
+       확률이 상한 0.92 에 붙었고, 서 있을 확률이 한 정거장에 0.575 → 0.046 으로 무너졌다
+       (6호선 월곡→삼각지 08시 실측 추적). 그래서 「출근시간인데 1분만 서서 간다」가 나왔다.
+
+       고치되 사양서 5.2 의 α(0.55)와 상한(0.92)은 건드리지 않는다 — 분모에 타는 사람을 더할 뿐이다.
+       타는 사람 수를 모르면(boarding 을 안 넘기면) 사양서 그대로 돈다.
+       실측 변화: 6호선 「가다가라도 앉을 확률」 100% → 87%, 4호선 91% → 72%. */
+    /* ★ 그리고 「내가 서 있다」는 것 자체가 정보다 ★
+       재차인원은 여러 대의 평균이다. 재차 25명/좌석 23이면 평균으로는 2명만 서 있지만,
+       **못 앉고 탄 사람은 평균보다 붐비는 차에 탄 것**이다 — 안 그러면 앉았을 테니까.
+       평균 재차로 분모를 잡으면 「서 있는 사람이 나 하나뿐이라 다음 정거장에 바로 앉는다」는
+       모순이 된다(pBoard 는 69%가 서서 탄다면서, pSitAtStop 은 서 있는 사람이 2명이라 한다).
+       조건부 재차는 pBoard 가 이미 들고 있는 차간 편차 척도 k(=좌석×0.11)만큼 올려 잡는다 —
+       새 상수가 아니라 pBoard 와 같은 k 다. 만원 구간(재차≫좌석)에서는 티가 안 나고,
+       좌석 언저리에서만 작동한다 — 정확히 모순이 살던 자리다. */
+    var rivals = standingCount(load + seats * K_RATIO, seats) + Math.max(0, boarding || 0);
+    return Math.min(P_STOP_CAP, Math.max(0, alight) * a / rivals);
   }
 
   /* 한 번의 승차(환승 없는 한 구간 전체)를 계산한다.
@@ -126,7 +144,8 @@
 
     for (i = 1; i < segs.length; i++) {
       // 구간 i 를 시작하는 정거장 = 구간 i-1 이 끝나는 정거장. 거기서 사람이 내린다.
-      var q = pSitAtStop(segs[i - 1].alightAtEnd || 0, segs[i - 1].load, seats, alpha);
+      var q = pSitAtStop(segs[i - 1].alightAtEnd || 0, segs[i - 1].load, seats, alpha,
+                         segs[i - 1].boardAtEnd || 0);
       standing *= (1 - q);
       standMin += standing * segs[i].minutes;
       per.push({ minutes: segs[i].minutes, standingProb: standing });
@@ -267,6 +286,17 @@
   /* 이름에 「탈 때」를 넣는다. 밖에서 꼬리말로 붙였더니
      「앉을 확률 0% · 못 앉습니다  탈 때 바로」 뒤에 「가다가…」가 이어져
      **「탈때바로가다가」** 로 읽혔다. 뜻이 이름 안에 있어야 한 줄로 읽힌다. */
+  /* 여정(경로 전체)용 문구. 구간과 다르다 — 여정은 「탈 때」가 여러 번이라
+     「탈 때 앉을 확률 75%」라고 쓰면 거짓말이 된다(구간마다 100%와 68%였다).
+     이 값의 정체는 **타자마자 앉은 채로 가는 시간의 비율(기댓값)** 이므로 그렇게 말한다.
+     다섯 단계 분류(SEAT_LEVELS)와 퍼센트 표기는 그대로다. */
+  function seatChanceJourney(pSeated) {
+    if (pSeated == null || isNaN(pSeated))
+      return { tone: 'bad', text: '앉아 가는 시간을 알 수 없음', label: '자료가 없습니다', percent: null };
+    var pct = Math.round(pSeated * 100), l = levelOf(pSeated);
+    return { tone: l.tone, text: '타는 시간의 ' + pct + '%는 앉아 갑니다', label: l.text, percent: pct };
+  }
+
   function seatChance(pSeated) {
     if (pSeated === null || pSeated === undefined || isNaN(pSeated))
       return { tone: 'bad', text: '탈 때 앉을 확률 알 수 없음', label: '자료가 없습니다', percent: null };
@@ -294,6 +324,7 @@
     SORT_KEY: SORT_KEY, SORT_BADGE: SORT_BADGE,
     compareRoutes: compareRoutes, sortRoutes: sortRoutes,
     describeSeats: describeSeats, SEAT_LEVELS: SEAT_LEVELS, levelOf: levelOf, toneOf: toneOf,
-    seatPhrase: seatPhrase, seatChance: seatChance, standingPhrase: standingPhrase
+    seatPhrase: seatPhrase, seatChance: seatChance,
+    seatChanceJourney: seatChanceJourney, standingPhrase: standingPhrase
   };
 });

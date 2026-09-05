@@ -313,6 +313,8 @@ def load_subway(bus_stops):
         by_exact.setdefault(re.sub(r'\s+', '', s['name']), []).append(s)
 
     lines, missing = {}, []
+    seen_pairs = {}          # (호선, 이름) → 번호들 / (호선, 번호) → 원래 이름들 — 접점 힌트용
+    junction_hint = {}       # 호선 → {접점역 이름}
     for r in rows[1:]:
         if len(r) <= max(i_l, i_no, i_nm):
             continue
@@ -320,13 +322,52 @@ def load_subway(bus_stops):
             no = int(float(r[i_no]))
         except (ValueError, TypeError):
             continue
-        if no >= 9000:
-            continue          # 9000번대는 지선·순환 표시(응암S·성수E) — 본선만 쓴다
         ln = re.sub(r'[^0-9]', '', str(r[i_l]))
-        nm = re.sub(r'\s*\([^)]*\)\s*$', '', str(r[i_nm]).strip())
+        raw_nm = str(r[i_nm]).strip()
+        nm = re.sub(r'\s*\([^)]*\)\s*$', '', raw_nm)
+        # ★ 접점 힌트 ★ — 지선이 갈라지는 역은 원천에 두 번 나온다:
+        #   같은 이름이 딴 번호로(성수 211/9002, 신도림 234/9003 — 9000번대 포함해 본다),
+        #   또는 같은 번호에 딴 원래 이름으로(강동 2549 = 「강동」과 「강동(하남검단산)」).
+        base_nm = re.sub(r'E$|S$', '', nm)
+        k1 = (ln, base_nm)
+        seen_pairs.setdefault(k1, set()).add(no)
+        if len(seen_pairs[k1]) > 1:
+            junction_hint.setdefault(ln, set()).add(base_nm)
+        k2 = (ln, no)
+        seen_pairs.setdefault(k2, set()).add(raw_nm)
+        if len(seen_pairs[k2]) > 1:
+            junction_hint.setdefault(ln, set()).add(base_nm)
+        if no >= 9000:
+            continue          # 9000번대는 지선·순환 표시(응암S·성수E) — 본선 배열에는 안 넣는다
         lines.setdefault(ln, {})[no] = nm
 
-    stations = {}
+    # ★ 좌표 빌리기의 세 가지 함정 (D-80, 2026-09-05 전수 훑기로 발견) ★
+    #   ① 동명 정류장이 딴 도시에 있다 — 「종합운동장역」 정류장은 **안양**에 있어
+    #      2호선 종합운동장이 16.9km 밖으로 날아갔다(잠실새내↛종합운동장 인접거리로 발각).
+    #      → 후보를 무리 지어 **호선 중심에 가장 가까운 무리**만 쓴다.
+    #   ② 빌릴 정류장이 없는 역(여의나루)은 통째로 사라졌다 → 번호 이웃으로 **보간**한다.
+    #   ③ 역번호 순서가 지리 순서가 아니다 — 나중에 생긴 역(동묘앞 159, 남위례)은 큰 번호를
+    #      받아 배열 끝으로 가고, 지선(신정·성수·마천)은 본선 뒤에 이어붙는다. 그대로 두면
+    #      길찾기가 **없는 선로**(신답→강남 22정거장)를 태운다 → 기하로 수리하고 지선은 자른다.
+    def hav(a, b):
+        from math import radians, sin, cos, asin, sqrt
+        la1, lo1, la2, lo2 = map(radians, (a[0], a[1], b[0], b[1]))
+        h = sin((la2 - la1) / 2) ** 2 + cos(la1) * cos(la2) * sin((lo2 - lo1) / 2) ** 2
+        return 2 * 6371000 * asin(sqrt(h))
+
+    def clusters(cands):
+        """후보 정류장을 400m 무리로 묶는다 -> [(lat, lon, n)]."""
+        out = []
+        for c in cands:
+            for cl in out:
+                if hav((c['lat'], c['lon']), (cl[0] / cl[2], cl[1] / cl[2])) < 400:
+                    cl[0] += c['lat']; cl[1] += c['lon']; cl[2] += 1
+                    break
+            else:
+                out.append([c['lat'], c['lon'], 1])
+        return [(la / n, lo / n, n) for la, lo, n in out]
+
+    stations, pending = {}, []
     for ln, by_no in lines.items():
         for no, nm in by_no.items():
             sid = 'S%s-%d' % (ln, no)
@@ -335,20 +376,242 @@ def load_subway(bus_stops):
             cands = (by_exact.get(nm + '역') or by_exact.get(nm)
                      or by_name.get(canon_name(nm)) or by_name.get(canon_name(nm + '역')) or [])
             if not cands:
-                missing.append(ln + '/' + nm)
+                pending.append((ln, no, nm))          # ② 나중에 보간
                 continue
-            lat = sum(c['lat'] for c in cands) / len(cands)
-            lon = sum(c['lon'] for c in cands) / len(cands)
-            stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역', 'lat': lat, 'lon': lon,
-                             'kind': 'subway', 'line': ln, 'no': no}
+            cls = clusters(cands)
+            stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역',
+                             'lat': cls[0][0], 'lon': cls[0][1],
+                             'kind': 'subway', 'line': ln, 'no': no,
+                             '_cls': cls, '_amb': cls if len(cls) > 1 else None}
+    # 무리가 여럿인 역 고르기 — 두 단계, 두 번 돈다(이웃도 지금 고쳐지는 중이라).
+    #   ① **번호 이웃 가운데**에서 2km 안인 무리가 있으면 그것 (제일 강한 근거).
+    #      「미아역」이라는 정류장은 없다 — 정규화 통(canon 「미아」)에 미아역앞·미아사거리
+    #      정류장이 섞여 오는데, 옛 평균은 우연히 그 사이에 떨어져 들키지 않았고
+    #      무리 하나만 고르면 미아가 미아사거리 위에 앉아 두 역이 한 노드로 뭉쳐졌다.
+    #   ② 그런 무리가 없으면 호선 중심에 가까운 무리 (안양 종합운동장 같은 딴 도시 걸러내기).
+    for _amb_pass in range(2):
+        for ln, by_no in lines.items():
+            sure = [(s2['lat'], s2['lon']) for s2 in stations.values()
+                    if s2['line'] == ln and s2.get('_amb') is None]
+            if not sure:
+                continue
+            ctr = (sum(a for a, _ in sure) / len(sure), sum(b for _, b in sure) / len(sure))
+            nos = sorted(n for n in by_no if ('S%s-%d' % (ln, n)) in stations)
+            for k, no in enumerate(nos):
+                s2 = stations['S%s-%d' % (ln, no)]
+                if s2.get('_amb') is None:
+                    continue
+                best = None
+                if 0 < k < len(nos) - 1:
+                    a2 = stations['S%s-%d' % (ln, nos[k - 1])]
+                    b2 = stations['S%s-%d' % (ln, nos[k + 1])]
+                    if hav((a2['lat'], a2['lon']), (b2['lat'], b2['lon'])) <= 4200:
+                        mid = ((a2['lat'] + b2['lat']) / 2, (a2['lon'] + b2['lon']) / 2)
+                        near = [cl for cl in s2['_amb'] if hav((cl[0], cl[1]), mid) < 2000]
+                        if near:
+                            best = min(near, key=lambda cl: hav((cl[0], cl[1]), mid))
+                if best is None:
+                    best = min(s2['_amb'], key=lambda cl: hav((cl[0], cl[1]), ctr))
+                if _amb_pass and hav((s2['lat'], s2['lon']), (best[0], best[1])) > 700:
+                    C.log('    좌표 판정: %s호선 %s — 동명 정류장 무리 %d개 중 이웃·호선에 맞는 쪽 채택'
+                          % (ln, s2['name'], len(s2['_amb'])))
+                s2['lat'], s2['lon'] = best[0], best[1]
+    for s2 in stations.values():
+        s2.pop('_amb', None)
 
+    # ★ 좌표 의심 확인 ★ — 번호 이웃 사이의 「가운데」에서 2.5km 넘게 벗어난 역은
+    # 빌린 좌표가 틀린 것이다. 실제 사례 셋:
+    #   종합운동장 — 「종합운동장역」 정류장이 전부 **안양**에 있었다(16.9km).
+    #   용두 — 번호 이웃(신정네거리·까치산)이 딴 지선이라 가운데가 거짓말 → 호선 곁 무리를 믿는다.
+    #   남한산성입구 — 산 입구 등산 정류장(4.4km 북쪽)을 빌렸고, 그 오염이 산성 보간까지
+    #   번졌다 → **보간 전에**, 좌표 없는 이웃은 건너뛰고, 고칠 때마다 다시 검사한다(3회).
+    for _sus in range(3):
+        fixed_any = False
+        for ln, by_no in lines.items():
+            nos = sorted(n for n in by_no if ('S%s-%d' % (ln, n)) in stations)
+            for k in range(len(nos)):
+                m = stations['S%s-%d' % (ln, nos[k])]
+                if k == 0 or k == len(nos) - 1:
+                    continue
+                a2 = stations['S%s-%d' % (ln, nos[k - 1])]
+                b2 = stations['S%s-%d' % (ln, nos[k + 1])]
+                ab = hav((a2['lat'], a2['lon']), (b2['lat'], b2['lon']))
+                if ab > 4200:
+                    continue
+                mid = ((a2['lat'] + b2['lat']) / 2, (a2['lon'] + b2['lon']) / 2)
+                if hav((m['lat'], m['lon']), mid) <= 2500:
+                    continue
+                near = [cl for cl in m.get('_cls', []) if hav((cl[0], cl[1]), mid) < 2000]
+                others = [(s3['lat'], s3['lon']) for s3 in stations.values()
+                          if s3['line'] == ln and s3['id'] != m['id']]
+                on_line = [cl for cl in m.get('_cls', [])
+                           if any(hav((cl[0], cl[1]), o) < 2500 for o in others)]
+                if near:
+                    m['lat'], m['lon'] = near[0][0], near[0][1]
+                    C.log('    좌표 의심 → 무리 재선택: %s호선 %s' % (ln, m['name']))
+                elif on_line:
+                    m['lat'], m['lon'] = on_line[0][0], on_line[0][1]
+                    C.log('    좌표 의심 → 호선 곁 무리 채택: %s호선 %s (번호 이웃이 딴 지선이었다)'
+                          % (ln, m['name']))
+                else:
+                    m['lat'], m['lon'] = mid
+                    C.log('    좌표 의심 → 이웃 가운데로: %s호선 %s (빌린 정류장이 동명 딴 곳이었다)'
+                          % (ln, m['name']))
+                fixed_any = True
+        if not fixed_any:
+            break
+    for s2 in stations.values():
+        s2.pop('_cls', None)
+
+    for ln, no, nm in pending:                          # ② 번호 이웃 보간
+        by_no = lines[ln]
+        lo_ = max((n for n in by_no if n < no and ('S%s-%d' % (ln, n)) in stations), default=None)
+        hi_ = min((n for n in by_no if n > no and ('S%s-%d' % (ln, n)) in stations), default=None)
+        if lo_ is None or hi_ is None:
+            missing.append(ln + '/' + nm)
+            continue
+        a, b = stations['S%s-%d' % (ln, lo_)], stations['S%s-%d' % (ln, hi_)]
+        # ★ 이웃 번호가 지리로도 이웃일 때만 보간한다 ★ — 2호선 용답의 번호 이웃은
+        # 충정로(본선 끝)와 신답이라 그 「가운데」는 도심 한복판이고, 그 가짜 좌표가
+        # 본선을 두 동강 냈다. 문턱 4.2km: 사이에 새 역이 하나 끼어 이웃이 두 정거장
+        # 거리인 경우(산성 3.6km — 남위례가 새 번호를 받아 번호상 이웃이 아니다)와
+        # 강 건너(여의나루 2.9km)는 살리고, 딴 동네(용답 7.5km)는 거부한다.
+        if hav((a['lat'], a['lon']), (b['lat'], b['lon'])) > 4200:
+            missing.append(ln + '/' + nm + '(보간 불가 — 번호 이웃이 지리 이웃이 아님)')
+            C.log('    좌표 보간 포기: %s호선 %s — 번호 이웃(%s·%s)이 서로 멀다' % (ln, nm, a['name'], b['name']))
+            continue
+        sid = 'S%s-%d' % (ln, no)
+        stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역',
+                         'lat': (a['lat'] + b['lat']) / 2, 'lon': (a['lon'] + b['lon']) / 2,
+                         'kind': 'subway', 'line': ln, 'no': no}
+        C.log('    좌표 보간: %s호선 %s — 정류장이 없어 이웃(%s·%s) 가운데로' % (ln, nm, a['name'], b['name']))
+
+    def dist(x, y):
+        return hav((stations[x]['lat'], stations[x]['lon']), (stations[y]['lat'], stations[y]['lon']))
+
+    CUT, INSERT_MAX, ATTACH = 3200.0, 2500.0, 3000.0
     routes = {}
     for ln, by_no in lines.items():
         order = [('S%s-%d' % (ln, no)) for no in sorted(by_no) if ('S%s-%d' % (ln, no)) in stations]
         if len(order) < 2:
             continue
-        routes['S' + ln] = {'routeId': 'S' + ln, 'name': ln + '호선', 'kind': 'subway',
-                            'order': order}
+        # ③-1 번호순 배열을 큰 틈(3.2km)에서 자른다. 가장 긴 토막이 본선.
+        #     (역번호는 개통 순서라 지리 순서가 아니다 — 지선·신설역이 뒤에 이어붙는다.)
+        segs, cur = [], [order[0]]
+        for k in range(1, len(order)):
+            if dist(order[k - 1], order[k]) > CUT:
+                segs.append(cur); cur = [order[k]]
+            else:
+                cur.append(order[k])
+        segs.append(cur)
+        segs.sort(key=len, reverse=True)
+        main = segs[0]
+        pool = [st for sg in segs[1:] for st in sg]
+        # ③-2 본선 안 홑 꼬임 수리(동묘앞 159: 번호가 커서 맨끝에 갔다) —
+        #     양옆을 크게 우회시키는 역을 가장 덜 늘어나는 틈에 다시 꽂는다.
+        for _pass in range(3):
+            moved = False
+            i = 0
+            while i < len(main):
+                prev = main[i - 1] if i > 0 else None
+                nxt = main[i + 1] if i + 1 < len(main) else None
+                if prev and nxt:
+                    detour = dist(prev, main[i]) + dist(main[i], nxt) - dist(prev, nxt)
+                    limit = 3000.0
+                else:
+                    detour = dist(prev, main[i]) if prev else dist(main[i], nxt)
+                    limit = 2200.0   # 끝점은 우회가 아니라 「맨끝이 멀다」 — 문턱을 낮춘다
+                if detour <= limit:
+                    i += 1
+                    continue
+                cand = main[:i] + main[i + 1:]
+                best_j, best_add = None, None
+                for j in range(1, len(cand)):
+                    add = dist(cand[j - 1], main[i]) + dist(main[i], cand[j]) - dist(cand[j - 1], cand[j])
+                    if best_add is None or add < best_add:
+                        best_j, best_add = j, add
+                if best_add is not None and best_add < detour - 1500:
+                    st = main[i]
+                    C.log('    순서 수리: %s호선 %s — 번호 순서가 지리와 달라 %s 뒤로 옮김'
+                          % (ln, stations[st]['name'], stations[cand[best_j - 1]]['name']))
+                    main = cand[:best_j] + [st] + cand[best_j:]
+                    moved = True
+                    i = 0
+                else:
+                    i += 1
+            if not moved:
+                break
+        # ③-3 남은 역들을 **최근접 사슬**로 먼저 엮는다(번호가 두 지선을 섞어 놓으므로 —
+        #     2호선 용두는 250번이라 신정지선 번호 사이에 있다). 그 다음:
+        #       홑 사슬(새로 생겨 큰 번호를 받은 본선 역 — 남위례 2828, 강일 2562)은 본선의
+        #       가장 싼 틈(2.5km 안 추가)에 꽂고, 두 역 이상 사슬은 지선으로 등록한다.
+        #     덩어리를 낱개로 흡수하면 본선이 지선을 경유해 버린다(실제로 5호선이 마천지선을 삼켰다).
+        chains = []
+        left = list(pool)
+        while left:
+            head = min(left, key=lambda st: min(dist(st, m) for m in main))
+            chain = [head]
+            left.remove(head)
+            while left:
+                nxt = min(left, key=lambda st: dist(chain[-1], st))
+                if dist(chain[-1], nxt) > CUT:
+                    break
+                chain.append(nxt)
+                left.remove(nxt)
+            chains.append(chain)
+        kept_chains = []
+        for chain in chains:
+            if len(chain) == 1:
+                st = chain[0]
+                best_j, best_add = None, None
+                for j in range(len(main) + 1):
+                    if j == 0:
+                        add = dist(st, main[0])
+                    elif j == len(main):
+                        add = dist(main[-1], st)
+                    else:
+                        add = dist(main[j - 1], st) + dist(st, main[j]) - dist(main[j - 1], main[j])
+                    if best_add is None or add < best_add:
+                        best_j, best_add = j, add
+                if best_add is not None and best_add <= INSERT_MAX:
+                    C.log('    본선 복귀: %s호선 %s — %s 자리로'
+                          % (ln, stations[st]['name'],
+                             ('맨 앞' if best_j == 0 else stations[main[best_j - 1]]['name'] + ' 뒤')))
+                    main = main[:best_j] + [st] + main[best_j:]
+                    continue
+            kept_chains.append(chain)
+        routes['S' + ln] = {'routeId': 'S' + ln, 'name': ln + '호선', 'kind': 'subway', 'order': main}
+        # ③-4 지선 등록: 접속역은 원천의 접점 힌트(두 번 적힌 역 — 강동·성수·신도림)가 우선.
+        #     기하만으로는 못 가린다 — 둔촌동은 실제 접점 강동보다 길동에 더 가깝다.
+        bi = 0
+        for chain in kept_chains:
+            hints = junction_hint.get(ln, set())
+            best = None
+            for flip in (False, True):
+                sq = list(reversed(chain)) if flip else list(chain)
+                for m in main:
+                    d0 = dist(sq[0], m)
+                    if d0 > ATTACH:
+                        continue
+                    d = d0 + dist(sq[1] if len(sq) > 1 else sq[0], m)
+                    hinted = stations[m]['name'].replace('역', '') in hints
+                    key = (0 if hinted else 1, d)
+                    if best is None or key < best[0]:
+                        best = (key, m, flip)
+            if best:
+                if best[2]:
+                    chain = list(reversed(chain))
+                chain = [best[1]] + chain
+            if len(chain) < 2:
+                C.log('    지선 버림: %s호선 외톨이 %s' % (ln, stations[chain[0]]['name']))
+                continue
+            bi += 1
+            nm0 = stations[chain[0]]['name'].replace('역', '')
+            nm1 = stations[chain[-1]]['name'].replace('역', '')
+            C.log('    지선 분리: %s호선 %s~%s (%d역)' % (ln, nm0, nm1, len(chain)))
+            routes['S%s-b%d' % (ln, bi)] = {'routeId': 'S%s-b%d' % (ln, bi),
+                                            'name': '%s호선 지선(%s~%s)' % (ln, nm0, nm1),
+                                            'kind': 'subway', 'order': chain}
     return routes, stations, missing
 
 
@@ -567,7 +830,7 @@ def build():
         # (4호선 서울역 08시 하선 실제 30.8% → 노선 피크 131.4% 로 읽어 「앉을 확률 0%」).
         names = [re.sub(r'역$', '', sub_stations[s]['name'])
                  for s in rec['order'] if s in node_of_stop]
-        line_no = rec['name'].replace('호선', '')
+        line_no = re.sub(r'[^0-9]', '', rec['name'].split('호선')[0])   # 지선 이름에서도 호선 숫자만
         dir_labels, why = detect_directions(line_no, names)
         C.log('    %s 방향 판정: %s' % (rec['name'], why if dir_labels else '실패 — ' + why))
         routes.append({'id': rid, 'name': rec['name'], 'kind': 'subway',

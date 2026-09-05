@@ -131,6 +131,22 @@
       var t = minutes + (p - leg.fromPos) * (route.minutes || 2);
       var pct = gridValue(ctx.congestion, line + '|' + here + '|' + day + '|' + side, t);
       if (pct !== null) usedDir = true;
+      /* ★ 이웃 메우기 (D-79) ★
+         지선 접점(성수·신도림)은 원천에 그 방향 줄이 아예 없다(전부 0이라 수집기가 버린다).
+         혼잡은 한 역 사이에 확 안 바뀌므로 **같은 방향** 이웃 역 값으로 메운다.
+         ★ 앞(가는 방향)부터 본다 ★ — 뒤는 노선표에서 지선이 이어붙는 경계일 수 있어
+         (2호선 배열: …신답 | 성수 | 뚝섬…) 딴 선로의 값을 집는다. 앞쪽은 이 leg 가
+         실제로 달리는 선로라 안전하다. 어림이므로 estimated. */
+      if (pct === null) {
+        for (var nb = 1; nb <= 3 && pct === null; nb++) {
+          var cand = null;
+          if (names[p + nb] !== undefined)
+            cand = gridValue(ctx.congestion, line + '|' + names[p + nb] + '|' + day + '|' + side, t);
+          if (cand === null && names[p - nb] !== undefined)
+            cand = gridValue(ctx.congestion, line + '|' + names[p - nb] + '|' + day + '|' + side, t);
+          if (cand !== null) { pct = cand; usedDir = true; estimated = true; }
+        }
+      }
       if (pct === null) pct = gridValue(ctx.congestion, line + '|' + here + '|' + day, t);
       if (pct === null) pct = gridValue(ctx.congestion, line + '|전체|' + day, t);
       if (pct === null) continue;

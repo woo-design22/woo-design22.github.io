@@ -41,6 +41,8 @@ COL_ALIASES = {
     '역명': ['출발역', '역명'],
     '상하구분': ['상하구분', '상하선구분'],
 }
+# 역번호는 동명이역(지선 접점)을 가를 때만 쓴다 — 없어도 죽지 않는다.
+STNUM_ALIASES = ['역번호']
 TIME_PATTERNS = [
     r'^\s*(\d{1,2})시\s*(\d{1,2})분\s*$',          # 5시30분
     r'^\s*(\d{1,2}):(\d{2})\s*~',                   # 05:30~06:00
@@ -137,10 +139,12 @@ def _load_sheet(path, sheet_name, rows):
             skipped += 1
             continue
         line = re.sub(r'[^0-9]', '', str(r[idx['호선']])) or str(r[idx['호선']]).strip()
+        snum_i = next((seen[nm] for nm in STNUM_ALIASES if nm in seen), None)
         out.append({
             'day': day,
             'line': line,
             'station': canon_station(r[idx['역명']]),
+            'stnum': str(r[snum_i]).strip() if snum_i is not None else '',
             'dir': str(r[idx['상하구분']]).strip(),
             'values': [num(r[tcol + i]) for i in range(n)],
         })
@@ -158,11 +162,42 @@ def build(files):
             C.log('  ! %s 는 시각 격자가 다르다(%d분 시작 %d칸) — 건너뛴다'
                   % (os.path.basename(path), d['start'], d['n']))
             continue
-        meta_src.append({'file': os.path.basename(path), 'rows': len(d['rows']), 'skipped': d['skipped']})
-        C.log('  %s — %d행%s' % (os.path.basename(path), len(d['rows']),
-                                 ', 건너뜀 %d행' % d['skipped'] if d['skipped'] else ''))
+        # ★ 전부 0인 행은 값이 아니라 빈칸이다 (D-79) ★
+        # 종점의 「없는 방향」과 지선 접점(성수·신도림)의 비어 있는 방향이 전부 0으로 온다.
+        # 이걸 값으로 쓰면 「그 시각에는 열차가 다니지 않는다」가 되어 노선이 통째로 사라진다.
+        rows_kept = [r for r in d['rows'] if any(v > 0 for v in r['values'])]
+        zero_n = len(d['rows']) - len(rows_kept)
+        # ★ 같은 이름의 두 역(지선 접점) — 이름의 주인을 역번호로 「한 번만」 정한다 (D-79) ★
+        # 원천에 「성수」가 본선(211)과 지선(9002)으로 두 번 있다. 처음엔 행 단위로 덮어써
+        # 내선 42.2 → 0 이 됐고(실화면: 출근 성수→시청이 「앉을 확률 90%」), 행 단위로만 겨루면
+        # 본선의 그 방향 행이 빈 경우(성수 외선) 지선 행이 이름을 차지한다.
+        # 그래서 (호선, 역이름)마다 가장 작은 역번호 = 본선으로 정하고, 다른 역번호의 행은
+        # 방향·요일 불문 전부 버린다. 지선 값이 필요한 역은 제 이름(용두·신답…)으로 남아 있다.
+        def stnum_val(r):
+            digits = re.sub(r'\D', '', r.get('stnum', ''))
+            return int(digits) if digits else 10 ** 9
+        owner = {}
+        for r in rows_kept:
+            k = (r['line'], r['station'])
+            if k not in owner or stnum_val(r) < owner[k]:
+                owner[k] = stnum_val(r)
+        dup_dropped = []
+        rows_final = []
+        for r in rows_kept:
+            if stnum_val(r) == owner[(r['line'], r['station'])]:
+                rows_final.append(r)
+            else:
+                dup_dropped.append('%s호선 %s(%s) %s %s' % (r['line'], r['station'], r.get('stnum', '?'), r['day'], r['dir']))
+        meta_src.append({'file': os.path.basename(path), 'rows': len(rows_final),
+                         'zeroRows': zero_n, 'dupDropped': len(dup_dropped),
+                         'skipped': d['skipped']})
+        C.log('  %s — %d행 (전부0 %d행 버림, 동명이역 %d행 버림)%s'
+              % (os.path.basename(path), len(rows_final), zero_n, len(dup_dropped),
+                 ', 건너뜀 %d행' % d['skipped'] if d['skipped'] else ''))
+        for msg in dup_dropped:
+            C.log('    동명이역 버림: %s' % msg)
 
-        for r in d['rows']:
+        for r in rows_final:
             base = '%s|%s|%s' % (r['line'], r['station'], r['day'])
             grid['%s|%s' % (base, r['dir'])] = r['values']
             # 두 방향 중 더 붐비는 쪽. 방향을 모르는 화면(경로 목록 요약)이 이걸 쓴다.

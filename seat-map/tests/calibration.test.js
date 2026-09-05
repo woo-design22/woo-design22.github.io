@@ -101,16 +101,18 @@ t('여정 문구에는 「탈 때」가 없다 — 여정은 탈 때가 여러 �
   assert.ok(leg.text.indexOf('탈 때') >= 0, '구간 문구는 「탈 때 앉을 확률」이어야 한다 (D-33)');
 });
 
-t('못 앉고 탄 사람은 평균보다 붐비는 차에 탄 것이다 (D-59)', () => {
-  /* 재차 25/좌석 23 — 평균으로는 2명만 서 있지만, 못 앉은 사람의 차는 더 붐빈다.
-     조건부 보정(k=좌석×0.11)이 빠지면 분모가 2로 쪼그라들어 「다음 정거장에 바로 앉는다」가 된다. */
+t('자리는 차가 비워질 때 난다 — 회전문 정거장에서는 안 난다 (D-72)', () => {
+  /* 실사용 후기가 잡아낸 규칙(나무위키 100번: "동소문로 입석 기본"):
+     길음역처럼 내린 만큼 새로 타는 곳(갈아타기 회전문)에서는 하차가 커도 좌석이 안 빈다. */
+  const churn = M.pSitAtStop(5, 130, 54, M.ALPHA_DEFAULT, 5);   // 하차 5 = 승차 5
+  assert.strictEqual(churn, 0, `회전문인데 자리 확률이 ${churn} — 하차를 그대로 자리로 셌다`);
+  const empty = M.pSitAtStop(5, 130, 54, M.ALPHA_DEFAULT, 0);   // 진짜 비워짐
+  assert.ok(empty > 0, '비워지는 정거장에서 자리 확률이 0이다');
+  assert.ok(empty > M.pSitAtStop(5, 130, 54, M.ALPHA_DEFAULT, 3), '승차가 늘면 자리 확률이 줄어야 한다');
+  // 조건부 재차(D-59의 살아남는 절반): 못 앉고 탄 사람의 차는 평균보다 붐빈다 — 분모가 1~2 로 안 쪼그라든다
+  const nearSeat = M.pSitAtStop(3, 25, 23, M.ALPHA_DEFAULT, 0);
   const naive = Math.min(M.P_STOP_CAP, 3 * M.ALPHA_DEFAULT / Math.max(1, 25 - 23));
-  const got = M.pSitAtStop(3, 25, 23, M.ALPHA_DEFAULT, 2);
-  assert.ok(got < naive - 0.05, `조건부 보정이 사라졌다: ${got.toFixed(2)} (소박한 값 ${naive.toFixed(2)})`);
-  // 만원 구간에서는 보정이 티가 안 나야 한다 — 깊은 만원의 성질을 바꾸면 안 된다
-  const packed = M.pSitAtStop(5, 130, 54, M.ALPHA_DEFAULT, 5);
-  const packedNaive = Math.min(M.P_STOP_CAP, 5 * M.ALPHA_DEFAULT / (130 - 54 + 5));
-  assert.ok(Math.abs(packed - packedNaive) < 0.01, '만원 구간에서 보정이 과하게 작동한다');
+  assert.ok(nearSeat < naive - 0.05, `조건부 보정이 사라졌다: ${nearSeat.toFixed(2)} (소박한 값 ${naive.toFixed(2)})`);
 });
 
 t('내리는 역에서 자리 나는 것은 안내하지 않는다 (D-60)', () => {

@@ -165,7 +165,7 @@ cd C:\Claude\seat-map && python pipeline/fetch_open_files.py && python pipeline/
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 119개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
+node --test tests/*.test.js          # 120개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)
 python pipeline/collect_subway_daily.py --probe   # 키가 있을 때
 ```

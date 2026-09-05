@@ -154,12 +154,36 @@
     overflow:hidden; margin:0 0 14px; background:#e9e7e2; touch-action:none}
   #map{width:100%; height:100%; display:block; cursor:grab}
   #map:active{cursor:grabbing}
-  .mapBtns{position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:6px}
+  .mapBtns{position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:6px; z-index:2}
   .mapBtns button{width:44px; height:44px; border-radius:10px; border:1px solid var(--line);
     background:var(--card); font-size:1.3em; font-weight:700; color:var(--ink); cursor:pointer}
   #mapNote{position:absolute; left:8px; bottom:6px; font-size:.72em; color:#666;
     background:rgba(255,255,255,.82); padding:2px 7px; border-radius:7px}
   /* 구간 줄의 「언제쯤 앉게 되나요?」 — 그 자리에서 펼친다 */
+  /* 지도에서 고르기 (D-70) — 네이버·카카오처럼 지도를 움직여 가운데 핀에 맞춘다 */
+  .mapSel{flex:0 0 auto; min-width:58px; border:1px solid var(--line); border-radius:10px;
+    background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer; padding:0 10px}
+  #mapPickWrap{position:fixed; inset:0; z-index:60; background:var(--bg);
+    display:flex; flex-direction:column}
+  #mapPickHead{background:var(--card); border-bottom:1px solid var(--line);
+    padding:12px 14px; font-weight:700}
+  #mapPickBody{position:relative; flex:1; min-height:0; touch-action:none}
+  #pickMap{width:100%; height:100%; display:block; cursor:grab; background:#e9e7e2}
+  #pickMap:active{cursor:grabbing}
+  #pickPin{position:absolute; left:50%; top:50%; transform:translate(-50%,-100%);
+    font-size:2.4em; pointer-events:none; text-shadow:0 2px 3px rgba(0,0,0,.25)}
+  #mapPickBody .mapBtns{position:absolute; right:10px; top:10px;
+    display:flex; flex-direction:column; gap:6px}
+  #mapPickBody .mapNote{position:absolute; left:8px; bottom:6px; font-size:.72em; color:#666;
+    background:rgba(255,255,255,.82); padding:2px 7px; border-radius:7px}
+  #mapPickBar{background:var(--card); border-top:1px solid var(--line); padding:12px 14px}
+  #pickAddr{font-weight:700; margin-bottom:10px; min-height:1.3em}
+  #mapPickBar .row{display:flex; gap:10px}
+  #pickOk{flex:1; min-height:56px; border:none; border-radius:12px; background:var(--accent,#2a5bd7);
+    color:#fff; font-size:1.06em; font-weight:700; cursor:pointer}
+  #pickCancel{flex:0 0 96px; min-height:56px; border:1px solid var(--line); border-radius:12px;
+    background:var(--bg); color:var(--ink); font-size:1em; cursor:pointer}
+
   .whenSeat{display:inline-block; margin-top:7px; padding:7px 12px; border-radius:9px;
     border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer}
   .whenSeat[aria-expanded="true"]{background:var(--card)}
@@ -183,12 +207,16 @@
         <div class="withBtn">
           <input type="text" id="fromQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
           <button id="here" title="지금 있는 곳" aria-label="지금 있는 곳으로 넣기">◎</button>
+          <button id="mapFrom" class="mapSel" aria-label="출발지를 지도에서 고르기">지도</button>
         </div>
         <div class="list" id="fromList" hidden></div>
       </div>
       <div class="box" style="margin-bottom:0">
         <label for="toQ">어디로 가세요?</label>
-        <input type="text" id="toQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
+        <div class="withBtn">
+          <input type="text" id="toQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
+          <button id="mapTo" class="mapSel" aria-label="도착지를 지도에서 고르기">지도</button>
+        </div>
         <div class="list" id="toList" hidden></div>
       </div>
       <div class="note" id="places" hidden></div>
@@ -268,6 +296,28 @@
   </section>
 
   <!-- ④ 상세 -->
+  <!-- 지도에서 고르기 (D-70): 지도를 움직여 가운데 📍 자리에 맞추고 「이 위치로」.
+       탭으로 콕 찍기보다 손이 떨려도 되는 방식이라 어르신에게 맞다. -->
+  <div id="mapPickWrap" hidden>
+    <div id="mapPickHead">지도를 움직여 <span aria-hidden="true">📍</span> 자리에 맞추세요</div>
+    <div id="mapPickBody">
+      <canvas id="pickMap" tabindex="0" aria-label="지도 — 끌어서 위치를 맞추세요"></canvas>
+      <div id="pickPin" aria-hidden="true">📍</div>
+      <div class="mapBtns">
+        <button id="pickIn"  aria-label="지도 확대">＋</button>
+        <button id="pickOut" aria-label="지도 축소">－</button>
+      </div>
+      <div class="mapNote">© OpenStreetMap 기여자</div>
+    </div>
+    <div id="mapPickBar">
+      <div id="pickAddr">…</div>
+      <div class="row">
+        <button id="pickOk">이 위치로 정하기</button>
+        <button id="pickCancel">취소</button>
+      </div>
+    </div>
+  </div>
+
   <section id="step4" hidden>
     <!-- 지도: 경로를 눈으로. 서서 가는 구간은 주황, 앉아 가는 구간은 초록,
          「여기서부터 앉을 듯」 지점에 시각을 단다(D-68). 끌기·확대·축소 전부
@@ -531,6 +581,7 @@
     go(step);
   }
   window.addEventListener('popstate', function(e){
+    if (!$('mapPickWrap').hidden){ PICK.pushed = false; closeMapPick(true); return; }
     var to = (e.state && e.state.s) || 1;
     if (to === 4 && !S.picked) to = 3;
     if (to === 3 && !S.list) to = 1;
@@ -964,99 +1015,141 @@
     return s+'</div>';
   }
 
-  // ── 경로 지도 (D-68) ────────────────────────────────────────────────────
-  /* 라이브러리 없이 그리는 타일 지도. shade-map 과 같은 CARTO 무료 타일을 쓴다
-     (출처 표기는 지도 위 #mapNote — 이용약관 사항, 지우지 말 것).
-     초록 = 앉아 가는 구간, 주황 = 서서 가는 구간, 점선 = 걷기.
-     「여기서부터 앉을 듯」 지점에는 시각을 단다. 타일이 안 오면(오프라인·file://)
-     회색 바탕에 선만 — 앱은 계속 돈다. 조작: 끌기(마우스·터치)·＋－ 단추·휠·화살표 키. */
-  var MAP = { lat:37.55, lon:126.99, z:12, geo:null, tiles:{}, drag:null, raf:0 };
-  var MCV = $('map'), MCX = MCV.getContext('2d');
-
-  function m_xy(lat, lon){        // 웹 메르카토르 (타일 단위, z 기준 아님)
-    var x=(lon+180)/360;
-    var r=lat*Math.PI/180;
-    var y=(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2;
-    return {x:x, y:y};
-  }
-  function m_px(lat, lon){        // 화면 픽셀
-    var sc=256*Math.pow(2,MAP.z), c=m_xy(MAP.lat,MAP.lon), p=m_xy(lat,lon);
-    return { x: MCV.width/2 +(p.x-c.x)*sc, y: MCV.height/2+(p.y-c.y)*sc };
-  }
-  function m_size(){
-    var r=$('mapWrap').getBoundingClientRect();
-    var d=Math.min(2, window.devicePixelRatio||1);
-    MCV.width=Math.round(r.width*d); MCV.height=Math.round(r.height*d);
-    MCV.style.width=r.width+'px'; MCV.style.height=r.height+'px';
-    MCX.setTransform(1,0,0,1,0,0);
-  }
-  function m_tile(z,x,y){
-    var n=Math.pow(2,z); x=((x%n)+n)%n;
-    if(y<0||y>=n) return null;
-    var k=z+'/'+x+'/'+y, t=MAP.tiles[k];
-    if(t) return t.ok?t.img:null;
-    var img=new Image();
-    t=MAP.tiles[k]={img:img, ok:false};
-    img.onload=function(){ t.ok=true; m_req(); };
-    img.onerror=function(){ t.ok=false; };
-    /* CARTO 무료 타일은 이제 키 없이는 「API KEY REQUIRED」 무늬가 찍힌다(실측).
-       OSM 표준 타일로 간다 — 키가 없고, 출처 표기(#mapNote)가 이용약관이다. 가볍게 쓸 것. */
-    img.src='https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
+  // ── 지도 (D-68·D-70) ────────────────────────────────────────────────────
+  /* 라이브러리 없이 그리는 타일 지도. 같은 부품(makeSlippy)을 두 군데가 쓴다 —
+     ① 상세 화면의 경로 지도 ② 첫 화면의 「지도에서 고르기」(가운데 📍에 맞추는 방식).
+     타일: OSM 표준(키 불필요, 출처 표기는 이용약관 — 지우지 말 것). CARTO 는 이제
+     키 없이는 「API KEY REQUIRED」 무늬가 찍힌다(실측). 오프라인이면 회색 바탕 —
+     앱은 계속 돈다. 조작: 끌기(포인터 = 마우스·터치 공용)·＋－·휠·화살표 키. */
+  var TILES = {}, SLIPPYS = [];
+  function tileGet(z, x, y){
+    var n = Math.pow(2, z); x = ((x % n) + n) % n;
+    if (y < 0 || y >= n) return null;
+    var k = z + '/' + x + '/' + y, t = TILES[k];
+    if (t) return t.ok ? t.img : null;
+    var img = new Image();
+    t = TILES[k] = { img: img, ok: false };
+    img.onload = function(){ t.ok = true; SLIPPYS.forEach(function(o){ o.req(); }); };
+    img.onerror = function(){ t.ok = false; };
+    img.src = 'https://tile.openstreetmap.org/' + z + '/' + x + '/' + y + '.png';
     return null;
   }
-  function m_req(){ if(!MAP.raf) MAP.raf=requestAnimationFrame(function(){ MAP.raf=0; m_draw(); }); }
-
-  function m_label(x,y,text,fill){
-    MCX.font=(12*Math.min(2,window.devicePixelRatio||1))+'px "Segoe UI",Pretendard,sans-serif';
-    var w=MCX.measureText(text).width, h=18*Math.min(2,window.devicePixelRatio||1);
-    var pad=6*Math.min(2,window.devicePixelRatio||1);
-    MCX.fillStyle='rgba(255,255,255,.93)';
-    MCX.strokeStyle=fill; MCX.lineWidth=1.4;
-    MCX.beginPath();
-    if(MCX.roundRect) MCX.roundRect(x-w/2-pad, y-h-10, w+pad*2, h, 6);
-    else MCX.rect(x-w/2-pad, y-h-10, w+pad*2, h);
-    MCX.fill(); MCX.stroke();
-    MCX.fillStyle='#15171c'; MCX.textAlign='center'; MCX.textBaseline='middle';
-    MCX.fillText(text, x, y-10-h/2+1);
-  }
-  function m_dot(x,y,color,rr){
-    MCX.beginPath(); MCX.arc(x,y,rr,0,Math.PI*2);
-    MCX.fillStyle=color; MCX.fill();
-    MCX.lineWidth=2.4; MCX.strokeStyle='#fff'; MCX.stroke();
-  }
-  function m_draw(){
-    if(!MAP.geo) return;
-    var d=Math.min(2,window.devicePixelRatio||1);
-    MCX.fillStyle='#e9e7e2'; MCX.fillRect(0,0,MCV.width,MCV.height);
-    // 타일
-    var sc=256*Math.pow(2,MAP.z), c=m_xy(MAP.lat,MAP.lon);
-    var ts=256*d;                                   // 화면에 그릴 타일 크기
-    var scale=sc*d/Math.pow(2,MAP.z)/256;           // =d
-    var cxp=c.x*sc, cyp=c.y*sc;                     // 중심의 세계 픽셀
-    var x0=Math.floor((cxp-MCV.width/2/d)/256), x1=Math.floor((cxp+MCV.width/2/d)/256);
-    var y0=Math.floor((cyp-MCV.height/2/d)/256), y1=Math.floor((cyp+MCV.height/2/d)/256);
-    for(var ty=y0; ty<=y1; ty++) for(var tx=x0; tx<=x1; tx++){
-      var img=m_tile(MAP.z,tx,ty);
-      var px=(tx*256-cxp)*d+MCV.width/2, py=(ty*256-cyp)*d+MCV.height/2;
-      if(img) MCX.drawImage(img,px,py,ts,ts);
+  function makeSlippy(cv, wrap){
+    var cx = cv.getContext('2d');
+    var o = { lat: 37.5665, lon: 126.978, z: 12, geo: { paths: [], marks: [] },
+              raf: 0, drag: null, onMove: null };
+    function dpr(){ return Math.min(2, window.devicePixelRatio || 1); }
+    function merc(lat, lon){
+      var r = lat * Math.PI / 180;
+      return { x: (lon + 180) / 360,
+               y: (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 };
     }
-    // 선
-    MAP.geo.paths.forEach(function(p){
-      if(p.pts.length<2) return;
-      MCX.beginPath();
-      p.pts.forEach(function(pt,i){ var q=m_px(pt[0],pt[1]); if(i)MCX.lineTo(q.x,q.y); else MCX.moveTo(q.x,q.y); });
-      MCX.lineWidth=(p.walk?3:5)*d; MCX.lineCap='round'; MCX.lineJoin='round';
-      MCX.setLineDash(p.walk?[6*d,7*d]:[]);
-      MCX.strokeStyle=p.color; MCX.stroke(); MCX.setLineDash([]);
+    o.px = function(lat, lon){
+      var sc = 256 * Math.pow(2, o.z) * dpr(), c = merc(o.lat, o.lon), p = merc(lat, lon);
+      return { x: cv.width / 2 + (p.x - c.x) * sc, y: cv.height / 2 + (p.y - c.y) * sc };
+    };
+    o.size = function(){
+      var r = wrap.getBoundingClientRect(), d = dpr();
+      cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d);
+      cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+    };
+    o.req = function(){ if (!o.raf) o.raf = requestAnimationFrame(function(){ o.raf = 0; o.draw(); }); };
+    function label(x, y, text, color){
+      var d = dpr();
+      cx.font = (12 * d) + 'px "Segoe UI",Pretendard,sans-serif';
+      var w = cx.measureText(text).width, h = 18 * d, pad = 6 * d;
+      cx.fillStyle = 'rgba(255,255,255,.93)'; cx.strokeStyle = color; cx.lineWidth = 1.4;
+      cx.beginPath();
+      if (cx.roundRect) cx.roundRect(x - w / 2 - pad, y - h - 10, w + pad * 2, h, 6);
+      else cx.rect(x - w / 2 - pad, y - h - 10, w + pad * 2, h);
+      cx.fill(); cx.stroke();
+      cx.fillStyle = '#15171c'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      cx.fillText(text, x, y - 10 - h / 2 + 1);
+    }
+    o.draw = function(){
+      var d = dpr();
+      cx.setTransform(1, 0, 0, 1, 0, 0);
+      cx.fillStyle = '#e9e7e2'; cx.fillRect(0, 0, cv.width, cv.height);
+      var sc = 256 * Math.pow(2, o.z), c = merc(o.lat, o.lon);
+      var cxp = c.x * sc, cyp = c.y * sc, ts = 256 * d;
+      var x0 = Math.floor((cxp - cv.width / 2 / d) / 256), x1 = Math.floor((cxp + cv.width / 2 / d) / 256);
+      var y0 = Math.floor((cyp - cv.height / 2 / d) / 256), y1 = Math.floor((cyp + cv.height / 2 / d) / 256);
+      for (var ty = y0; ty <= y1; ty++) for (var tx = x0; tx <= x1; tx++){
+        var img = tileGet(o.z, tx, ty);
+        if (img) cx.drawImage(img, (tx * 256 - cxp) * d + cv.width / 2,
+                                   (ty * 256 - cyp) * d + cv.height / 2, ts, ts);
+      }
+      o.geo.paths.forEach(function(p){
+        if (p.pts.length < 2) return;
+        cx.beginPath();
+        p.pts.forEach(function(pt, i){ var q = o.px(pt[0], pt[1]); if (i) cx.lineTo(q.x, q.y); else cx.moveTo(q.x, q.y); });
+        cx.lineWidth = (p.walk ? 3 : 5) * d; cx.lineCap = 'round'; cx.lineJoin = 'round';
+        cx.setLineDash(p.walk ? [6 * d, 7 * d] : []);
+        cx.strokeStyle = p.color; cx.stroke(); cx.setLineDash([]);
+      });
+      o.geo.marks.forEach(function(mk){
+        var q = o.px(mk.lat, mk.lon);
+        cx.beginPath(); cx.arc(q.x, q.y, (mk.big ? 7 : 5) * d, 0, Math.PI * 2);
+        cx.fillStyle = mk.color; cx.fill();
+        cx.lineWidth = 2.4; cx.strokeStyle = '#fff'; cx.stroke();
+      });
+      o.geo.marks.forEach(function(mk){
+        if (mk.label){ var q = o.px(mk.lat, mk.lon); label(q.x, q.y, mk.label, mk.color); }
+      });
+    };
+    o.fit = function(){
+      var la = [], lo = [];
+      o.geo.paths.forEach(function(p){ p.pts.forEach(function(q){ la.push(q[0]); lo.push(q[1]); }); });
+      if (!la.length) return;
+      var la1 = Math.min.apply(null, la), la2 = Math.max.apply(null, la);
+      var lo1 = Math.min.apply(null, lo), lo2 = Math.max.apply(null, lo);
+      o.lat = (la1 + la2) / 2; o.lon = (lo1 + lo2) / 2;
+      var d = dpr();
+      for (var z = 15; z >= 9; z--){
+        o.z = z; var p1 = o.px(la2, lo1), p2 = o.px(la1, lo2);
+        if (p2.x - p1.x < cv.width - 70 * d && p2.y - p1.y < cv.height - 70 * d) break;
+      }
+    };
+    o.zoom = function(dz){ o.z = Math.max(9, Math.min(18, o.z + dz)); o.req(); if (o.onMove) o.onMove(); };
+    // 조작 — 마우스와 손가락이 같은 길(pointer)을 탄다
+    cv.addEventListener('pointerdown', function(e){
+      o.drag = { x: e.clientX, y: e.clientY, lat: o.lat, lon: o.lon };
+      cv.setPointerCapture(e.pointerId);
     });
-    // 점·이름표 (겹침을 줄이려고 점 먼저, 이름표 나중)
-    MAP.geo.marks.forEach(function(mk){ var q=m_px(mk.lat,mk.lon); m_dot(q.x,q.y,mk.color,(mk.big?7:5)*d); });
-    MAP.geo.marks.forEach(function(mk){ if(mk.label){ var q=m_px(mk.lat,mk.lon); m_label(q.x,q.y,mk.label,mk.color); } });
+    cv.addEventListener('pointermove', function(e){
+      if (!o.drag) return;
+      var sc = 256 * Math.pow(2, o.z), c = merc(o.drag.lat, o.drag.lon);
+      var nx = c.x - (e.clientX - o.drag.x) / sc, ny = c.y - (e.clientY - o.drag.y) / sc;
+      o.lon = nx * 360 - 180;
+      o.lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ny))) * 180 / Math.PI;
+      o.req(); if (o.onMove) o.onMove();
+    });
+    cv.addEventListener('pointerup', function(){ o.drag = null; });
+    cv.addEventListener('pointercancel', function(){ o.drag = null; });
+    cv.addEventListener('wheel', function(e){ e.preventDefault(); o.zoom(e.deltaY < 0 ? 1 : -1); }, { passive: false });
+    cv.addEventListener('keydown', function(e){
+      var st = 40 / (256 * Math.pow(2, o.z));
+      if (e.key === 'ArrowLeft'){ o.lon -= st * 360; }
+      else if (e.key === 'ArrowRight'){ o.lon += st * 360; }
+      else if (e.key === 'ArrowUp'){ o.lat += st * 170; }
+      else if (e.key === 'ArrowDown'){ o.lat -= st * 170; }
+      else if (e.key === '+' || e.key === '='){ o.zoom(1); return e.preventDefault(); }
+      else if (e.key === '-'){ o.zoom(-1); return e.preventDefault(); }
+      else return;
+      o.req(); if (o.onMove) o.onMove(); e.preventDefault();
+    });
+    SLIPPYS.push(o);
+    return o;
   }
 
-  /* 여정 → 선·점. 색은 「그 구간을 서서 가느냐」로 정한다:
+  // ── ① 상세 화면의 경로 지도 ─────────────────────────────────────────────
+  var DMAP = makeSlippy($('map'), $('mapWrap'));
+  $('mapIn').addEventListener('click', function(){ DMAP.zoom(1); });
+  $('mapOut').addEventListener('click', function(){ DMAP.zoom(-1); });
+
+  /* 여정 → 선·점. 색이 곧 내용이다:
      탈 때 절반 넘게 앉으면 초록, 아니면 「앉게 되는 정거장」까지 주황 → 그 뒤 초록,
-     그마저 없으면 끝까지 주황. */
+     그마저 없으면 끝까지 주황. 점선은 걷기. */
   function m_geo(j){
     var GREEN='#1a7f4e', ORANGE='#e07b2a', GRAY='#8a8f98';
     var paths=[], marks=[];
@@ -1093,54 +1186,88 @@
     }
     return {paths:paths, marks:marks};
   }
-  function m_fit(){
-    var la=[], lo=[];
-    MAP.geo.paths.forEach(function(p){ p.pts.forEach(function(q){ la.push(q[0]); lo.push(q[1]); }); });
-    if(!la.length) return;
-    var la1=Math.min.apply(null,la), la2=Math.max.apply(null,la);
-    var lo1=Math.min.apply(null,lo), lo2=Math.max.apply(null,lo);
-    MAP.lat=(la1+la2)/2; MAP.lon=(lo1+lo2)/2;
-    var d=Math.min(2,window.devicePixelRatio||1);
-    for(var z=15; z>=9; z--){
-      MAP.z=z; var a=m_px(la2,lo1), b=m_px(la1,lo2);
-      if(b.x-a.x < MCV.width-70*d && b.y-a.y < MCV.height-70*d) break;
+  function showMap(j){ DMAP.size(); DMAP.geo=m_geo(j); DMAP.fit(); DMAP.draw(); }
+  window.addEventListener('resize', function(){ if(S.step===4){ DMAP.size(); DMAP.draw(); } });
+
+  // ── ② 지도에서 고르기 (D-70) ───────────────────────────────────────────
+  /* 콕 찍는 대신 **지도를 움직여 가운데 📍에 맞춘다** — 손이 떨려도 되는 방식.
+     이름은 두 겹으로 짓는다: 근처 정류장·역(우리 자료, 오프라인에도 됨)을 즉시 보여 주고,
+     주소(Nominatim 역검색)가 도착하면 그걸로 바꾼다. 좌표는 브라우저가 OSM 서버에
+     직접 묻는다 — 우리 서버로는 아무것도 안 간다(주소 검색과 같은 구조·같은 출처 표기). */
+  var PMAP = makeSlippy($('pickMap'), $('mapPickBody'));
+  var PICK = { key: null, name: '', detail: '', seq: 0, timer: 0, pushed: false };
+  $('pickIn').addEventListener('click', function(){ PMAP.zoom(1); });
+  $('pickOut').addEventListener('click', function(){ PMAP.zoom(-1); });
+
+  function pickLabelLocal(){
+    if (!G) return '지도에서 고른 곳';
+    var near = SeatRoute.nearby(G.nodes, PMAP.lat, PMAP.lon, 500, 1)[0];
+    return near ? G.nodes[near.node].name + ' 부근' : '지도에서 고른 곳';
+  }
+  function pickUpdateAddr(){
+    var localName = pickLabelLocal();
+    PICK.name = localName; PICK.detail = '지도에서 고름';
+    $('pickAddr').textContent = localName;
+    var seq = ++PICK.seq;
+    // 주소는 보태 주는 것 — 못 받아도(오프라인) 위 이름으로 충분히 동작한다
+    var u = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=ko&zoom=17'
+          + '&lat=' + PMAP.lat.toFixed(6) + '&lon=' + PMAP.lon.toFixed(6);
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    if (ctl) setTimeout(function(){ ctl.abort(); }, 3000);
+    fetch(u, ctl ? { signal: ctl.signal } : undefined)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (seq !== PICK.seq) return;                 // 그 사이 또 움직였다
+        var ad = d.address || {};
+        var road = ad.road || ad.pedestrian || '';
+        var name = d.name || (road ? road + (ad.house_number ? ' ' + ad.house_number : '')
+                    : (ad.neighbourhood || ad.suburb || ad.quarter || ''));
+        if (name){
+          PICK.name = name; PICK.detail = localName;
+          $('pickAddr').textContent = name + '  ·  ' + localName;
+        }
+      })
+      .catch(function(){});
+  }
+  PMAP.onMove = function(){
+    $('pickAddr').textContent = '…';
+    clearTimeout(PICK.timer);
+    PICK.timer = setTimeout(pickUpdateAddr, 350);     // 손을 뗀 뒤에 한 번만 묻는다
+  };
+  function openMapPick(key){
+    PICK.key = key;
+    var at = S[key] || S[key === 'from' ? 'to' : 'from'];
+    PMAP.lat = at ? at.lat : 37.5665;                 // 아무것도 없으면 서울 복판
+    PMAP.lon = at ? at.lon : 126.978;
+    PMAP.z = at ? 16 : 12;
+    $('mapPickHead').innerHTML = (key === 'from' ? '<b>출발지</b>' : '<b>도착지</b>')
+      + ' — 지도를 움직여 <span aria-hidden="true">📍</span> 자리에 맞추세요';
+    $('mapPickWrap').hidden = false;
+    document.body.style.overflow = 'hidden';
+    PMAP.size(); PMAP.draw(); pickUpdateAddr();
+    try { history.pushState({ s: S.step, pk: 1 }, ''); PICK.pushed = true; } catch(e){ PICK.pushed = false; }
+  }
+  function closeMapPick(viaHistory){
+    $('mapPickWrap').hidden = true;
+    document.body.style.overflow = '';
+    if (PICK.pushed && !viaHistory){ PICK.pushed = false; try { history.back(); } catch(e){} }
+    PICK.pushed = false;
+  }
+  $('mapFrom').addEventListener('click', function(){ openMapPick('from'); });
+  $('mapTo').addEventListener('click', function(){ openMapPick('to'); });
+  $('pickCancel').addEventListener('click', function(){ closeMapPick(false); });
+  $('pickOk').addEventListener('click', function(){
+    if (!SeatGeo.inSeoul(PMAP.lat, PMAP.lon)){
+      alert('서울 밖이라 이 서비스가 답할 수 없습니다. 지도를 서울 안으로 옮겨 주세요.');
+      return;
     }
-  }
-  function showMap(j){
-    m_size(); MAP.geo=m_geo(j); m_fit(); m_draw();
-  }
-  // 조작 — 끌기(포인터: 마우스·터치 공용), ＋－, 휠, 화살표 키
-  MCV.addEventListener('pointerdown', function(e){
-    MAP.drag={x:e.clientX, y:e.clientY, lat:MAP.lat, lon:MAP.lon};
-    MCV.setPointerCapture(e.pointerId);
+    var key = PICK.key;
+    S[key] = { name: PICK.name, detail: PICK.detail, lat: PMAP.lat, lon: PMAP.lon };
+    $(key === 'from' ? 'fromQ' : 'toQ').value = PICK.name;
+    $(key === 'from' ? 'fromList' : 'toList').hidden = true;
+    save(); refreshNext(); showPlaces();
+    closeMapPick(false);
   });
-  MCV.addEventListener('pointermove', function(e){
-    if(!MAP.drag) return;
-    var sc=256*Math.pow(2,MAP.z);
-    var c=m_xy(MAP.drag.lat, MAP.drag.lon);
-    var nx=c.x-(e.clientX-MAP.drag.x)/sc, ny=c.y-(e.clientY-MAP.drag.y)/sc;
-    MAP.lon=nx*360-180;
-    MAP.lat=Math.atan(Math.sinh(Math.PI*(1-2*ny)))*180/Math.PI;
-    m_req();
-  });
-  MCV.addEventListener('pointerup', function(){ MAP.drag=null; });
-  MCV.addEventListener('pointercancel', function(){ MAP.drag=null; });
-  function m_zoom(dz){ MAP.z=Math.max(9, Math.min(17, MAP.z+dz)); m_req(); }
-  $('mapIn').addEventListener('click', function(){ m_zoom(1); });
-  $('mapOut').addEventListener('click', function(){ m_zoom(-1); });
-  MCV.addEventListener('wheel', function(e){ e.preventDefault(); m_zoom(e.deltaY<0?1:-1); }, {passive:false});
-  MCV.addEventListener('keydown', function(e){
-    var st=40/(256*Math.pow(2,MAP.z));
-    if(e.key==='ArrowLeft'){ MAP.lon-=st*360; m_req(); }
-    else if(e.key==='ArrowRight'){ MAP.lon+=st*360; m_req(); }
-    else if(e.key==='ArrowUp'){ MAP.lat+=st*170; m_req(); }
-    else if(e.key==='ArrowDown'){ MAP.lat-=st*170; m_req(); }
-    else if(e.key==='+'||e.key==='='){ m_zoom(1); }
-    else if(e.key==='-'){ m_zoom(-1); }
-    else return;
-    e.preventDefault();
-  });
-  window.addEventListener('resize', function(){ if(S.step===4){ m_size(); m_draw(); } });
 
   // 「언제쯤 앉게 되나요?」 — 상세가 다시 그려져도 살아 있게 위임으로 건다
   $('detail').addEventListener('click', function(e){

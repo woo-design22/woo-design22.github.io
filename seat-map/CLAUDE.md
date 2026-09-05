@@ -115,6 +115,9 @@ seat-map/
 | 동명이역은 최소 역번호가 주인 | `build_congestion.py` | 지선 성수(9002)가 본선 이름을 차지해 08시 90%가 나갔다 → D-79 |
 | 빠진 방향은 이웃 역으로 메운다(앞쪽 우선) | `loads.js` | 뒤쪽은 지선 이어붙임 경계일 수 있다 → D-79 |
 | 지하철 인접 역 ≤ 3.2km | `build_graph.py`·시험 | 넘으면 좌표·순서·지선 오류다(안양 종합운동장 16.9km) → D-80 |
+| 혼잡 자료 범위 = 운행 시간 | `loads.js subwaySegments` | 40분 밖은 안 다님(02시 지하철 부활 금지), 자정 직후는 하루 연장 → D-81 |
+| 심야버스는 「승객<1」 면제(제 시간대) | `loads.js busSegments` | 표본 얇은 N15·N16이 제 시간대에 죽었다 → D-81 |
+| 걷기 경로는 잘라내지 않는다 | `route.js rank` | 600m에서 차편 12개가 「9분 걷기」를 밀어냈다 → D-81 |
 
 **좌석 54와 정원 160을 따로 고치면 34% 임계값이 깨진다.** 단위 테스트가 이 짝을 검사한다.
 
@@ -171,6 +174,7 @@ cd C:\Claude\seat-map && python pipeline/fetch_open_files.py && python pipeline/
 cd C:\Claude\seat-map
 node --test tests/*.test.js          # 130개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정)
 node tools/verify_rush.js            # 출근 상식 전수 훑기 — 큰 수술 뒤엔 꼭 돌린다 (D-80)
+node tools/verify_deep.js            # 심층판: 퇴근·심야·무작위 1,135여정·몬테카를로 (D-81)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)
 python pipeline/collect_subway_daily.py --probe   # 키가 있을 때
 ```

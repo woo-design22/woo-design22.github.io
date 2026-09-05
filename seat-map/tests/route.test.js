@@ -190,8 +190,8 @@ t('경로마다 앉을 확률이 퍼센트로 나온다', () => {
     assert.ok(/\d+%|알 수 없음/.test(j.seatChance.text), `"${j.seatChance.text}" — 숫자가 없다`);
     if (j.seatChance.percent !== null) {
       assert.ok(j.seatChance.percent >= 0 && j.seatChance.percent <= 100);
-      // D-71: 카드 퍼센트의 잣대는 pSeatedTime(머리기사와 같은 것)이다
-      assert.ok(Math.abs(j.seatChance.percent / 100 - j.pSeatedTime) < 0.01);
+      // D-76: 카드 퍼센트는 화면의 분(반올림 유도)에서 다시 계산한 값이다
+      assert.ok(Math.abs(j.seatChance.percent / 100 - j.pSeatedShown) < 0.01);
     }
   }
   const top = got[0];
@@ -483,8 +483,10 @@ t('카드의 퍼센트와 「서서 N분」이 한 잣대다 — (1−비율)×�
     const implied = (1 - j.pSeatedTime) * j.rideMinutes;
     assert.ok(Math.abs(implied - j.vehicleStandingMinutes) < 0.51,
       `${j.legs.map(l => l.routeName).join('→')}: 비율이 말하는 차 안 서기 ${implied.toFixed(1)}분 ≠ ${j.vehicleStandingMinutes.toFixed(1)}분`);
-    assert.strictEqual(j.seatChance.percent, Math.round(j.pSeatedTime * 100),
-      '카드 퍼센트가 pSeatedTime 이 아니다 — 탈때 가중평균으로 되돌아갔다(모순 재발)');
+    // D-76 불변식: 퍼센트 = 괄호의 분에서 계산한 값 — 「18분 중 14분」과 75% 가 딴소리 못 하게
+    const rs = Math.round(j.rideMinutes), vs = Math.round(j.vehicleStandingMinutes);
+    assert.strictEqual(j.seatChance.percent, rs > 0 ? Math.round(100 * Math.max(0, rs - vs) / rs) : 100,
+      `퍼센트(${j.seatChance.percent})가 괄호의 분(${rs}분 중 ${rs - vs}분)과 딴소리를 한다`);
   }
 });
 

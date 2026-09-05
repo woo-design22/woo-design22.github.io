@@ -198,8 +198,9 @@
   #viewChips .chip{min-height:40px; padding:6px 12px; border-radius:999px; cursor:pointer;
     border:1px solid var(--line); background:var(--card); color:var(--ink); font-size:.92em}
   #viewChips .chip[aria-pressed="false"]{opacity:.45; text-decoration:line-through}
-  .standLine{font-size:1.25em; font-weight:800; line-height:1.5}
-  .standLine .mSep{color:var(--ink2); font-weight:400; margin:0 6px}
+  .standLine{font-size:1.18em; font-weight:800; line-height:1.55}
+  .standLine .sub{font-size:.78em; font-weight:400; color:var(--ink2)}
+  .standLine .rule{border-top:1px dashed var(--line); margin:6px 0}
   .whenSeat{display:inline-block; margin-top:7px; padding:7px 12px; border-radius:9px;
     border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer}
   .whenSeat[aria-expanded="true"]{background:var(--card)}
@@ -289,7 +290,6 @@
     </div>
     <div class="tabRow"><button class="seatTab" id="tab3">🪑 앉아 가는 대중교통 위치</button></div>
     <div id="viewChips" class="small">보기:
-      <button class="chip" id="showWalk"  aria-pressed="true">걷는 시간</button>
       <button class="chip" id="showNosit" aria-pressed="true">못 앉는 시간</button>
       <button class="chip" id="showTotal" aria-pressed="true">이동 시간</button>
     </div>
@@ -458,16 +458,26 @@
   /* ── 머리기사 네 지표 (D-75) ──────────────────────────────────────────
      서는 시간(항상) · 걷는 시간 · 못 앉는 시간(=서는+걷는) · 이동 시간(=전체).
      서는 시간 말고는 칩으로 끌 수 있고, 끄면 모든 카드에서 함께 사라진다. */
-  S.show = { walk:  store.get('seat_show_walk')  !== '0',
-             nosit: store.get('seat_show_nosit') !== '0',
+  S.show = { nosit: store.get('seat_show_nosit') !== '0',
              total: store.get('seat_show_total') !== '0' };
+  /* 확정 레이아웃(사용자 지시):
+       앉는 시간 N분
+       못 앉는 시간 N분 (서는 시간 A분 + 걷는 시간 B분)
+       ------------------------
+       이동시간 N분
+     앉는 시간 = 이동 − 못 앉는 으로 **유도**해 세 줄의 합이 항상 정확히 맞는다(D-71 정신).
+     기다림을 앉아서 본다는 가정이면 그 몫이 자동으로 「앉는 시간」에 들어간다. */
   function metricsLine(j){
     var st = Math.round(j.standingMinutes), wk = Math.round(j.walkMinutes);
-    var parts = ['서는 시간 <b>' + st + '분</b>'];
-    if (S.show.walk)  parts.push('걷는 시간 <b>' + wk + '분</b>');
-    if (S.show.nosit) parts.push('못 앉는 시간 <b>' + (st + wk) + '분</b>');
-    if (S.show.total) parts.push('이동 시간 <b>' + Math.round(j.totalMinutes) + '분</b>');
-    return '<div class="standLine">' + parts.join('<span class="mSep">·</span>') + '</div>';
+    var tot = Math.round(j.totalMinutes);
+    var noSit = st + wk, sit = Math.max(0, tot - noSit);
+    var h = '<div class="standLine">앉는 시간 <b>' + sit + '분</b>';
+    if (S.show.nosit)
+      h += '<br>못 앉는 시간 <b>' + noSit + '분</b> <span class="sub">(서는 시간 ' + st
+         + '분 + 걷는 시간 ' + wk + '분)</span>';
+    if (S.show.total)
+      h += '<div class="rule"></div>이동시간 <b>' + tot + '분</b>';
+    return h + '</div>';
   }
   function bindChip(id, key){
     $(id).setAttribute('aria-pressed', S.show[key] ? 'true' : 'false');
@@ -479,8 +489,7 @@
       if (S.picked && S.step === 4) renderDetail();
     };
   }
-  // 정적 검사(ui.test)가 배선을 눈으로 보게 — 반복문으로 감지 말고 한 줄씩 건다
-  $('showWalk').addEventListener('click', bindChip('showWalk', 'walk'));
+  // 정적 검사(ui.test)가 배선을 눈으로 보게 — 한 줄씩 건다
   $('showNosit').addEventListener('click', bindChip('showNosit', 'nosit'));
   $('showTotal').addEventListener('click', bindChip('showTotal', 'total'));
 

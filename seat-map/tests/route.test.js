@@ -252,7 +252,8 @@ t('만원 열차에서는 「탈 때 바로 앉을 확률」이 0에 가깝다 (
 });
 
 t('호선마다 방향 라벨을 자료로 판정해 저장해 둔다 (규칙을 박지 않는다)', () => {
-  const subs = graph.routes.filter(r => r.kind === 'subway');
+  // 광역(wide)은 혼잡도 원천이 없어 라벨 판정이 불가능하다 — 1~8호선 계열만 본다 (D-85)
+  const subs = graph.routes.filter(r => r.kind === 'subway' && !r.wide);
   const rows = subs.map(r => `${r.name}=${(r.dirLabels || ['?', '?'])[0]}`);
   console.log('    번호 증가 방향: ' + rows.join(' · '));
   for (const r of subs) {

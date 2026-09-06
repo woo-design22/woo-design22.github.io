@@ -248,11 +248,12 @@ test('D-80 — 지하철 그래프: 좌표·순서·지선이 실제 선형이�
       + Math.cos(rd(a.lat)) * Math.cos(rd(b.lat)) * Math.sin(rd(b.lon - a.lon) / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(h));
   };
-  // ① 인접 역이 3.2km 를 넘으면 이어붙임·좌표 오류다(잠실새내↛종합운동장 16.9km 로 발각).
+  // ① 인접 역 거리 상한 — 도시철도(1~8호선 계열)는 3.2km, 광역(wide)은 12km
+  //    (실제 인접 최대: 공항철도 청라~영종 10.1km. 초과 = 이어붙임·좌표 오류 — D-80·D-85).
   for (const r of routes) for (const d of r.dirs)
     for (let k = 0; k + 1 < d.length; k++)
-      assert.ok(hv(nodes[d[k]], nodes[d[k + 1]]) <= 3200,
-        `${r.name} ${nodes[d[k]].name}↛${nodes[d[k + 1]].name} — 인접인데 3.2km 초과`);
+      assert.ok(hv(nodes[d[k]], nodes[d[k + 1]]) <= (r.wide ? 12000 : 3200),
+        `${r.name} ${nodes[d[k]].name}↛${nodes[d[k + 1]].name} — 인접 상한 초과`);
   // ② 안양 좌표를 빌렸던 종합운동장은 잠실 곁으로 돌아왔다.
   const j = nodes.find(n => n.name === '종합운동장역');
   assert.ok(j && Math.abs(j.lat - 37.511) < 0.012 && Math.abs(j.lon - 127.073) < 0.012,
@@ -317,4 +318,17 @@ test('D-81 — 걷기 경로는 상위 잘라내기에서 살아남는다 (600m�
   const ranked = R2.rank(found);
   assert.ok(ranked.some(j => j.walkOnly),
     '600m 거리인데 「걸어서」 경로가 목록에 없다 — 차편이 밀어냈다');
+});
+
+test('D-85 — 수도권 확장: 신분당·9호선·경의중앙·인천이 그래프에 있다', (t) => {
+  const RO = load(path.join(D, 'graph', 'routes.json'));
+  if (!RO) return t.skip('그래프 없음');
+  const names = RO.routes.filter(r => r.kind === 'subway').map(r => r.name);
+  for (const want of ['신분당선', '9호선', '분당선', '경의중앙선', '경인선', '인천지하철 1호선', '김포도시철도'])
+    assert.ok(names.includes(want), `${want}이 그래프에 없다`);
+  const sbd = RO.routes.find(r => r.name === '신분당선');
+  assert.ok(sbd.wide && sbd.stops[0].includes('정자') && sbd.stops[0].includes('강남'),
+    '신분당선에 정자·강남이 없다');
+  // 광역은 혼잡 자료가 없다 — 모르면 서서(D-25)로 흐르는 line 키인지 확인
+  assert.ok(!/^[0-9]+$/.test(String(sbd.line)), '신분당선 line 이 숫자면 1~8호선 혼잡도를 훔쳐 읽는다');
 });

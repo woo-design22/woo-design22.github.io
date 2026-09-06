@@ -223,10 +223,23 @@
     }
 
     // 2회 환승 — 첫 구간 끝에서 한 번 더 타고, 거기서 도착지로
-    if (maxT >= 2 && journeys.length < 60) {
+    /* 관문 60 → 150 (D-85): 60은 「이미 충분하면 생략」이라는 뜻이었는데, 수도권 확장 뒤
+       외곽에서는 버스 1환승 조합만으로 원시 88개가 차서(주엽→시청 실측) 지하철 등뼈
+       (일산선→3호선→2호선, 2환승)가 통째로 생략됐다 — 그 결과가 「버스 130분」 1위였다.
+       도심 밀집 OD는 원시 수백 개라 여전히 건너뛴다. */
+    if (maxT >= 2 && journeys.length < 150) {
       var seen2 = Object.create(null);
-      for (i = 0; i < firstLegs.length && journeys.length < 200; i++) {
-        var a2 = firstLegs[i];
+      /* 지하철 등뼈부터 (D-85): 200 한도를 버스 잔가지가 먼저 채우면 정작
+         일산선→3호선→2호선 같은 사슬이 차례도 못 받는다(주엽→시청 실측 — 버스 130분이
+         1위였다). 지하철 먼저, 그 안에서는 길게 타는 것부터 돌린다. */
+      var order2 = firstLegs.slice().sort(function (x, y) {
+        var xs = idx.routes[x.routeIdx].kind === 'subway' ? 1 : 0;
+        var ys = idx.routes[y.routeIdx].kind === 'subway' ? 1 : 0;
+        if (xs !== ys) return ys - xs;
+        return y.stops - x.stops;
+      });
+      for (i = 0; i < order2.length && journeys.length < 200; i++) {
+        var a2 = order2[i];
         var mid = ridesFrom(idx, a2.to, idx.routes[a2.routeIdx].id);
         for (var m = 0; m < mid.length; m++) {
           var b2 = mid[m];

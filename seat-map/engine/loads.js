@@ -295,7 +295,25 @@
     if (route.kind !== 'night' && (when % 1440) >= 90 && (when % 1440) < 240)
       return { notRunning: true, why: '그 시각에는 이 버스가 다니지 않는다' };
     var doc = ctx.busRoute;                     // data/bus/routes/<노선명>.json
-    if (!doc || !doc.stops || !doc.stops.length) return null;
+    if (!doc || !doc.stops || !doc.stops.length) {
+      /* ★ 종류 평균 어림 (D-86, 사용자 지시) ★
+         승하차 자료가 없는 노선(일부 마을버스, 앞으로의 경기 버스)을 「알 수 없음」으로만
+         두지 말고 같은 종류 버스들의 같은 시간대 평균 재차로 어림한다. 요일 계수와
+         승객 가중(×1.25)은 자료 있는 노선과 똑같이 얹는다. 어림은 어림이라고 밝힌다. */
+      var kl = ctx.kindLoad && ctx.kindLoad.kinds && ctx.kindLoad.kinds[route.kind];
+      if (!kl) return null;
+      var hh = Math.max(0, Math.min(23, Math.floor((when % 1440) / 60)));
+      var base = kl[hh];
+      if (!(base > 0)) return null;
+      var lv = base * busDayFactor(ctx, route.kind, hh) * RIDER_LOAD_FACTOR;
+      var nseg = Math.max(1, leg.stops);
+      var flat = [];
+      for (var fi = 0; fi < nseg; fi++)
+        flat.push({ load: lv, minutes: route.minutes || 2, alightAtEnd: 0, boardAtEnd: 0 });
+      return { segments: flat, estimated: true, direction: null,
+               bestOffAt: null, boardMinutes: when,
+               why: '이 노선의 승하차 자료가 없어 같은 종류 버스들의 시간대 평균으로 어림' };
+    }
     var ids = route.stops && route.stops[leg.dirIdx];
     if (!ids) return null;
 

@@ -968,7 +968,6 @@
       }
       if(sure.length){ head('여기서 타면 앉습니다', '거의 확실히 앉는 자리만'); sure.forEach(draw); }
       if(likely.length){ head('거의 앉습니다', '앉을 확률 70% 이상 — 확실하진 않습니다'); likely.forEach(draw); }
-      $('seatWhere').innerHTML += ' <span class="small">('+(sure.length+likely.length)+'곳 · '+(Date.now()-t0)+'ms)</span>';
 
       function draw(r){
         var ch=SeatModel.seatChance(r.pBoard);
@@ -1053,10 +1052,9 @@
       && S.list.some(function(j){ return j.notRunning; });
     $('listNote').innerHTML = (allDead
         ? '<b>이 시각에 다니는 차를 못 찾았습니다.</b> 아래 경로는 다니는 시간이 아니라 <b>참고용</b>입니다. '
-        : '<b>못 앉는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다. ')
+        : '<b>서는 시간이 짧은 순</b>으로 놓았습니다. 빠른 순이 아닙니다. ')
       + waitBtn('waitSit1')
-      + ((S.viaNames && S.viaNames.length) ? ' <b>'+esc(S.viaNames.join(' · '))+'</b> 들렀다 갑니다.' : '')
-      + ' <span class="small">(' + S.list.length + '개 · ' + ms + 'ms)</span>';
+      + ((S.viaNames && S.viaNames.length) ? ' <b>'+esc(S.viaNames.join(' · '))+'</b> 들렀다 갑니다.' : '');
     renderTypeTabs();
     var box=$('results'); box.innerHTML='';
     var shown = 0;

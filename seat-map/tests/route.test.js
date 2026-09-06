@@ -524,3 +524,14 @@ t('기다림은 기본으로 서는 시간에 든다 — 앉아 기다림 가정
   }
   assert.ok(checked >= 5, `기다림 있는 경로를 ${checked}개밖에 못 봤다`);
 });
+
+t('빠른 순 상위 5는 목록에서 잘리지 않는다 (D-89)', () => {
+  const got = plan('서울대입구역', '월곡동두산아파트', 21 * 60 + 40, 'sunday');
+  const live = got.filter(j => !j.notRunning);
+  const fastest5 = [...live].sort((a, b) => a.totalMinutes - b.totalMinutes).slice(0, 5)
+    .map(j => Math.round(j.totalMinutes));
+  // 실측(2026-09-06): 87분(우이신설 경유)·88분(5호선 경유)이 서는 시간 동률에 밀려 탈락했었다
+  for (const j of [...live].sort((a, b) => a.totalMinutes - b.totalMinutes).slice(0, 5)) {
+    assert.ok(got.includes(j), `빠른 길 ${Math.round(j.totalMinutes)}분이 목록에 없다 (빠른5=${fastest5})`);
+  }
+});

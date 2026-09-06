@@ -712,6 +712,16 @@
       var w = sorted.find(function (j) { return j.walkOnly; });
       if (w) top.push(w);
     }
+    /* ★ 빠른 순 상위 5도 잘라내지 않는다 (D-89, 사용자 지시) ★
+       정렬은 서는 시간이지만, 「네이버라면 상위였을 빠른 길」이 서는 시간 동률에 밀려
+       목록 밖으로 떨어지는 일이 실측됐다(서울대입구→월곡 일 21:40 — 87·88분짜리 둘 탈락).
+       빠른 순 5위 안은 상한에 걸려도 뒤에 얹는다. 정렬 순서 자체는 건드리지 않는다. */
+    var live = sorted.filter(function (j) { return !j.notRunning; })
+      .slice().sort(function (a, b) { return a.totalMinutes - b.totalMinutes; })
+      .slice(0, 5);
+    for (var fi = 0; fi < live.length; fi++) {
+      if (top.indexOf(live[fi]) < 0) top.push(live[fi]);
+    }
     return top;
   }
 

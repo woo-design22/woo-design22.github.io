@@ -276,3 +276,13 @@ schtasks /Create /TN "seat-map-subway" /TR "python C:\Claude\seat-map\pipeline\c
 
 버스 노선정보조회(getBusRouteList)의 firstBusTm/lastBusTm 은 **000000(미제공)** —
 출근전용 맞춤버스(8101)의 운행시간대는 이 API 로는 알 수 없다.
+
+## 실시간·칸별 혼잡도 — SK오픈API 「퍼즐(PUZZLE)」 (2026-09-06 조사, D-87)
+
+「지하철종결자」류 앱의 실시간 혼잡도 출처: ① 통계는 우리와 같은 서울교통공사
+OA-12928, ② **실시간·칸별은 SK오픈API 퍼즐** — 서울교통공사 실시간 열차 위치 +
+SKT T-WiFi·기지국 통신 이력을 결합해 만든다(2호선 실측 중심 + 나머지는 예측).
+10분 단위, 진입역 기준 칸별, 05:30~23:50. 문서: openapi.sk.com 「실시간 열차/칸 혼잡도」,
+transit.tmapmobility.com/docs/puzzle/car. **개발자 가입·키 필요(무료 쿼터 있음)** —
+붙이려면 사용자가 SK오픈API 계정을 만들어야 한다. 우리 쓰임새: 앉는 자리 화면 실측 대조,
+금요일 재보정 검증, (장기) 실시간 안내.

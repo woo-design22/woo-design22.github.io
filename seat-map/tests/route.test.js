@@ -261,7 +261,8 @@ t('호선마다 방향 라벨을 자료로 판정해 저장해 둔다 (규칙을
     assert.notStrictEqual(r.dirLabels[0], r.dirLabels[1]);
   }
   // 일반 규칙(번호 증가=하선)을 그대로 박았다면 틀렸을 두 호선
-  const l1 = subs.find(r => r.line === '1');
+  // (1호선은 직결 통합(D-87)으로 wide 가 됐다 — 전체에서 찾는다)
+  const l1 = graph.routes.find(r => r.kind === 'subway' && r.line === '1' && r.dirLabels);
   assert.strictEqual(l1.dirLabels[0], '상선',
     '1호선은 번호 증가가 상선이다 — 일반 규칙과 반대다');
   const l2 = subs.find(r => r.line === '2');

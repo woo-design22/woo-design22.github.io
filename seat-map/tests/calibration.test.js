@@ -324,8 +324,14 @@ test('D-85 — 수도권 확장: 신분당·9호선·경의중앙·인천이 그
   const RO = load(path.join(D, 'graph', 'routes.json'));
   if (!RO) return t.skip('그래프 없음');
   const names = RO.routes.filter(r => r.kind === 'subway').map(r => r.name);
-  for (const want of ['신분당선', '9호선', '분당선', '경의중앙선', '경인선', '인천지하철 1호선', '김포도시철도'])
+  for (const want of ['신분당선', '9호선', '수인분당선', '경의중앙선', '1호선(인천 방면)', '인천지하철 1호선', '김포도시철도'])
     assert.ok(names.includes(want), `${want}이 그래프에 없다`);
+  // D-87 직결 통합: 4호선 한 줄에 산본이, 3호선 한 줄에 대화가 들어 있다
+  const l4 = RO.routes.find(r => r.kind === 'subway' && r.name === '4호선');
+  assert.ok(l4.stops[0].includes('산본') && l4.stops[0].includes('미아사거리'),
+    '4호선 직결(진접~오이도)에 산본·미아사거리가 없다');
+  const l3 = RO.routes.find(r => r.kind === 'subway' && r.name === '3호선');
+  assert.ok(l3.stops[0].includes('대화'), '3호선 직결에 일산(대화)이 없다');
   const sbd = RO.routes.find(r => r.name === '신분당선');
   assert.ok(sbd.wide && sbd.stops[0].includes('정자') && sbd.stops[0].includes('강남'),
     '신분당선에 정자·강남이 없다');

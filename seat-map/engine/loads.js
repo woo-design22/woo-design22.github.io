@@ -119,6 +119,17 @@
     var line = route.line || String(route.id).replace(/^S/, '');
     var names = route.stops && route.stops[leg.dirIdx];
     if (!names) return null;
+    /* 직결 통합 노선(D-87)의 코레일 구간엔 혼잡도 원천이 없다 — 그 역이 낀 구간은
+       호선피크로 물러나지 말고 통째로 「모름 = 서서」(D-25)로 둔다. 산본 낮 시간에
+       4호선 피크값을 씌우면 없는 만원을 지어내는 셈이다. */
+    if (route.noCong) {
+      if (!route._noCongSet) {
+        route._noCongSet = {};
+        for (var nq = 0; nq < route.noCong.length; nq++) route._noCongSet[route.noCong[nq]] = 1;
+      }
+      for (var np = leg.fromPos; np <= leg.toPos; np++)
+        if (route._noCongSet[names[np]]) return null;
+    }
     var cap = 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
     /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★
        혼잡도는 첫차(05:30)부터 막차 언저리(자정 넘어 24:30)까지만 있다 — 그건 공백이

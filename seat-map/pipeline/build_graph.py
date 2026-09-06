@@ -761,7 +761,9 @@ def load_subway(bus_stops):
                             lim2 = 5000.0
                         else:
                             d2 = dist(pv, order2[i2]) if pv else dist(order2[i2], nx)
-                            lim2 = 8000.0
+                            # 끝점 3.2km: 일산선 머리에 원흥이 서 있으면(실제는 삼송~지축 사이)
+                            # 직결 이음매가 끝끼리 못 만난다 — 광역 실측 끝 간격은 2.4km 이하다.
+                            lim2 = 3200.0
                         if d2 <= lim2:
                             i2 += 1
                             continue
@@ -831,6 +833,83 @@ def load_subway(bus_stops):
                                                      'kind': 'subway', 'order': ch, 'wide': True}
             C.log('    수도권 확장: 노선 %d개 · 역 %d개 (표준데이터 %s)'
                   % (added, sum(len(v) for v in grp.values()), os.path.basename(files2[-1])))
+    # ★ 직결 통합 (D-87, 사용자: 「미아사거리에서 산본 가는 게 표시 안 됨」) ★
+    # 표준데이터는 운영사 경계로 노선을 가르지만 열차는 한 줄로 달린다 — 승객에게
+    # 「4호선→안산과천선 환승」이라고 말하면 틀린 안내다. 공지된 직결 계통만 손으로 적는다
+    # (방향 라벨과 달리 수십 년 안 바뀌는 공지 사실이라 표가 정당하다):
+    #   4호선 = 진접선+4호선+안산과천선(진접~오이도) · 3호선 = 일산선+3호선(대화~오금)
+    #   수인분당선 = 분당선+수인선(왕십리~인천) · 1호선 = 경원선+1호선+경부선+장항선(소요산~신창)
+    #   경인선은 구로에서 갈라지는 1호선 계통 — 이름만 「1호선(인천 방면)」으로.
+    # 코레일 구간엔 혼잡도 원천이 없다 — 그 역이 낀 구간은 「모름 = 서서」(D-25)를 지키도록
+    # noCong(그 역 이름 표)를 노선에 실어 엔진이 호선피크로 물러나지 못하게 막는다.
+    THROUGH = [
+        ('4호선', ['진접선', '안산과천선'], '4'),
+        ('3호선', ['일산선'], '3'),
+        ('수인분당선', ['분당선', '수인선', '수인선(달월~고색)'], None),
+        ('1호선', ['경원선', '경부선', '장항선'], '1'),
+    ]
+    def _rid_of(name):
+        for k, v in routes.items():
+            if v['name'] == name:
+                return k
+        return None
+    def _dist_ids(x, y):
+        return hav((stations[x]['lat'], stations[x]['lon']), (stations[y]['lat'], stations[y]['lon']))
+    for disp, parts, line_digit in THROUGH:
+        seed_key = _rid_of(disp) if disp != '수인분당선' else _rid_of('분당선')
+        if not seed_key:
+            continue
+        chain = list(routes[seed_key]['order'])
+        no_cong = set()
+        if routes[seed_key].get('wide'):
+            no_cong |= set(stations[x].get('key') or stations[x]['name'] for x in chain)
+        merged_keys = []
+        rest = [k for k in (_rid_of(nm) for nm in parts if nm != disp) if k]
+        while rest:
+            best2 = None
+            for k in rest:
+                seg = routes[k]['order']
+                for flip in (False, True):
+                    sq = list(reversed(seg)) if flip else seg
+                    for head in (True, False):
+                        d0 = _dist_ids(chain[0], sq[-1]) if head else _dist_ids(chain[-1], sq[0])
+                        if best2 is None or d0 < best2[0]:
+                            best2 = (d0, k, flip, head)
+            d0, k, flip, head = best2
+            # 3.8km: 진접선 직결(당고개~별내별가람 3.3km)·수인분당(매교~고색 3.6km, 수원역은
+            # 경부선 소속이라 사슬에 못 실림)이 실제 한 열차 구간이다.
+            if d0 > 3800:
+                # 3km 넘으면 직결 이음매가 아니다(당고개~진접선 3.3km는 자료 공백) —
+                # 못 이은 조각은 지우지 말고 제 노선으로 남긴다.
+                for k2 in rest:
+                    C.log('    직결 보류: %s ← %s (이음매 %.1fkm)' % (disp, routes[k2]['name'], d0 / 1000))
+                break
+            seg = routes[k]['order']
+            sq = list(reversed(seg)) if flip else list(seg)
+            if routes[k].get('wide'):
+                no_cong |= set(stations[x].get('key') or stations[x]['name'] for x in sq)
+            chain = (sq + chain) if head else (chain + sq)
+            merged_keys.append(k)
+            rest.remove(k)
+        if not merged_keys:
+            continue
+        dedup = []
+        for x in chain:
+            if dedup and (stations[x]['name'] == stations[dedup[-1]]['name']):
+                continue
+            dedup.append(x)
+        for k in merged_keys:
+            del routes[k]
+        routes[seed_key] = {'routeId': seed_key, 'name': disp, 'kind': 'subway',
+                            'order': dedup, 'wide': True,
+                            'lineDigit': line_digit,
+                            'noCong': sorted(no_cong)}
+        C.log('    직결 통합: %s — 조각 %d개 흡수 → %d역 (혼잡 모름 %d역)'
+              % (disp, len(merged_keys), len(dedup), len(no_cong)))
+    ki = _rid_of('경인선')
+    if ki:
+        routes[ki]['name'] = '1호선(인천 방면)'
+        C.log('    직결 이름: 경인선 → 1호선(인천 방면)')
     return routes, stations, missing
 
 
@@ -1120,7 +1199,7 @@ def build():
                  for s in rec['order'] if s in node_of_stop]
         # 혼잡도 키의 호선 번호 — 1~8호선(과 그 지선)만 숫자가 있고, 광역·경전철은
         # 혼잡도 원천이 없으므로 노선명 그대로 둔다(키가 안 맞아 「모름」으로 흐른다 — 의도).
-        line_no = re.sub(r'[^0-9]', '', rec['name'].split('호선')[0]) if '호선' in rec['name'] and not rec.get('wide') else rec['name']
+        line_no = rec.get('lineDigit') or (re.sub(r'[^0-9]', '', rec['name'].split('호선')[0]) if '호선' in rec['name'] and not rec.get('wide') else rec['name'])
         dir_labels, why = detect_directions(line_no, names)
         C.log('    %s 방향 판정: %s' % (rec['name'], why if dir_labels else '실패 — ' + why))
         # 광역은 역간 거리가 길다 — 좌표 인접거리 평균을 표정속도 34km/h 로 나눠
@@ -1134,6 +1213,7 @@ def build():
         routes.append({'id': rid, 'name': rec['name'], 'kind': 'subway',
                        'vehicle': 'subwayCar', 'minutes': mins,
                        'line': line_no, 'wide': bool(rec.get('wide')),
+                       'noCong': rec.get('noCong') or None,
                        'dirs': [order, list(reversed(order))],       # 상·하행 두 줄
                        # 혼잡도 자료에서 이 방향을 가리키는 라벨. **자료로 판정한 값이다**
                        # (1호선은 번호 증가 = 상선, 2호선은 내선/외선 — 일반 규칙과 다르다)

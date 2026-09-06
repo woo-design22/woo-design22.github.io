@@ -119,6 +119,18 @@
     var line = route.line || String(route.id).replace(/^S/, '');
     var names = route.stops && route.stops[leg.dirIdx];
     if (!names) return null;
+    var cap = 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
+    /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★ — ★ 반드시 noCong(D-87)보다 먼저 ★
+       noCong 이 먼저 null 을 돌려주면 「모름 = 서서」로 살아나 심야 게이트를 건너뛴다.
+       직결 병합 뒤 5분 시뮬레이션에서 02~04시에 1·3호선이 산 채로 나왔다 — 이 순서가 근거다.
+       규칙 자체(D-81): 혼잡도 범위(05:30~24:30) 40분 밖 = 안 다님, 자정 직후는 하루의 연장. */
+    if (ctx.congestion && ctx.congestion.startMinutes !== undefined) {
+      var svc0 = ctx.congestion.startMinutes;
+      var svc1 = svc0 + ((ctx.congestion.slots || 39) - 1) * (ctx.congestion.slotMinutes || 30);
+      var effMin = minutes < 180 ? minutes + 1440 : minutes;
+      if (effMin < svc0 - 40 || effMin > svc1 + 40)
+        return { notRunning: true, why: '그 시각에는 지하철이 다니지 않는다' };
+    }
     /* 직결 통합 노선(D-87)의 코레일 구간엔 혼잡도 원천이 없다 — 그 역이 낀 구간은
        호선피크로 물러나지 말고 통째로 「모름 = 서서」(D-25)로 둔다. 산본 낮 시간에
        4호선 피크값을 씌우면 없는 만원을 지어내는 셈이다. */
@@ -129,19 +141,6 @@
       }
       for (var np = leg.fromPos; np <= leg.toPos; np++)
         if (route._noCongSet[names[np]]) return null;
-    }
-    var cap = 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
-    /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★
-       혼잡도는 첫차(05:30)부터 막차 언저리(자정 넘어 24:30)까지만 있다 — 그건 공백이
-       아니라 그 밖에는 열차가 없다는 뜻이다. 40분 넘게 벗어나면 안 다닌다고 말한다.
-       (02시 검색에 지하철 넷이 「첫차가 없을 수 있습니다」 딱지로 나오던 것을 끊는다.
-        자정 직후 00~03시는 하루의 연장으로 계산한다 — 00:30 막차 시간대는 살아 있어야 한다.) */
-    if (ctx.congestion && ctx.congestion.startMinutes !== undefined) {
-      var svc0 = ctx.congestion.startMinutes;
-      var svc1 = svc0 + ((ctx.congestion.slots || 39) - 1) * (ctx.congestion.slotMinutes || 30);
-      var effMin = minutes < 180 ? minutes + 1440 : minutes;
-      if (effMin < svc0 - 40 || effMin > svc1 + 40)
-        return { notRunning: true, why: '그 시각에는 지하철이 다니지 않는다' };
     }
     var oor = outOfRange(ctx.congestion, minutes);
     var per = trainsPerHour(minutes) * SUBWAY_CARS;

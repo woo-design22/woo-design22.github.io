@@ -26,6 +26,7 @@ const ROUTES = load(path.join(D, 'graph', 'routes.json'));
 const CONG = load(path.join(D, 'subway', 'congestion.json'));
 const RIDE = load(path.join(D, 'subway', 'ride.json'));
 const CALIB = load(path.join(D, 'bus', 'tdata-calib.json'));
+const KINDLOAD = load(path.join(D, 'bus', 'kind-load.json'));
 if (!NODES || !ROUTES || !CONG) { console.error('자료가 없다'); process.exit(1); }
 const graph = { nodes: NODES.nodes, routes: ROUTES.routes };
 const index = R.buildIndex(graph);
@@ -36,7 +37,7 @@ function busRouteOf(name) {
   return (busCache[name] = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null);
 }
 function ctxAt(minutes, dayType) {
-  const ctx = { graph, congestion: CONG, ride: RIDE, busCalib: CALIB, busRouteOf,
+  const ctx = { graph, congestion: CONG, ride: RIDE, busCalib: CALIB, kindLoad: KINDLOAD, busRouteOf,
                 minutes, dayType, alpha: M.ALPHA_DEFAULT };
   ctx.loadFor = L.makeLoadFor(ctx);
   return ctx;

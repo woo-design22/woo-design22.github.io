@@ -379,7 +379,10 @@ def load_subway(bus_stops):
                 pending.append((ln, no, nm))          # ② 나중에 보간
                 continue
             cls = clusters(cands)
-            stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역',
+            # 혼잡도 원천의 역명은 대개 「월곡」인데 「서울역」만 역이 붙어 있다 —
+            # 표시명은 역을 한 번만 붙이고, 혼잡도 키용 원명은 key 에 따로 둔다(D-86).
+            disp = nm if nm.endswith('역') else nm + '역'
+            stations[sid] = {'id': sid, 'ars': '', 'name': disp, 'key': nm,
                              'lat': cls[0][0], 'lon': cls[0][1],
                              'kind': 'subway', 'line': ln, 'no': no,
                              '_cls': cls, '_amb': cls if len(cls) > 1 else None}
@@ -499,7 +502,8 @@ def load_subway(bus_stops):
         if (ln, nm) in std_coord:
             lat3, lon3 = std_coord[(ln, nm)]
             sid = 'S%s-%d' % (ln, no)
-            stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역', 'lat': lat3, 'lon': lon3,
+            stations[sid] = {'id': sid, 'ars': '', 'name': (nm if nm.endswith('역') else nm + '역'),
+                             'key': nm, 'lat': lat3, 'lon': lon3,
                              'kind': 'subway', 'line': ln, 'no': no}
             C.log('    좌표 구제(표준데이터): %s호선 %s' % (ln, nm))
         else:
@@ -524,7 +528,8 @@ def load_subway(bus_stops):
             C.log('    좌표 보간 포기: %s호선 %s — 번호 이웃(%s·%s)이 서로 멀다' % (ln, nm, a['name'], b['name']))
             continue
         sid = 'S%s-%d' % (ln, no)
-        stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역',
+        stations[sid] = {'id': sid, 'ars': '', 'name': (nm if nm.endswith('역') else nm + '역'),
+                         'key': nm,
                          'lat': (a['lat'] + b['lat']) / 2, 'lon': (a['lon'] + b['lon']) / 2,
                          'kind': 'subway', 'line': ln, 'no': no}
         C.log('    좌표 보간: %s호선 %s — 정류장이 없어 이웃(%s·%s) 가운데로' % (ln, nm, a['name'], b['name']))
@@ -682,7 +687,7 @@ def load_subway(bus_stops):
             # 노선명 정규화 — 접두를 떼고, 같은 노선의 두 표기를 하나로.
             # (「서울 도시철도 9호선」과 「수도권 도시철도 9호선」은 운영사가 다른 같은 9호선이다)
             def canon_line(nm):
-                t = str(nm).strip()
+                t = re.sub(r'\s+', ' ', str(nm).strip())   # 「수도권  도시철도」의 겹공백
                 for pre in ('서울 도시철도 ', '수도권 도시철도 ', '수도권 광역철도 ',
                             '수도권 경량도시철도 ', '도시철도 '):
                     if t.startswith(pre):
@@ -740,7 +745,7 @@ def load_subway(bus_stops):
                 order2 = []
                 for k2, (no2, nm2v, lat2, lon2) in enumerate(seq):
                     sid = '%s-%03d' % (rid, k2)
-                    stations[sid] = {'id': sid, 'ars': '', 'name': nm2v + '역',
+                    stations[sid] = {'id': sid, 'ars': '', 'name': nm2v + '역', 'key': nm2v,
                                      'lat': lat2, 'lon': lon2, 'kind': 'subway',
                                      'line': ln2, 'no': k2}
                     order2.append(sid)
@@ -989,6 +994,75 @@ def build():
         nd['lon'] = round(nd['_sx'] / k, 6); nd['lat'] = round(nd['_sy'] / k, 6)
         del nd['_sx'], nd['_sy']
 
+    # ★ 광역 끝점 접속 (D-86) ★ — 표준데이터는 직결 구간을 노선별로 갈라 놓는다:
+    # 안산과천선이 선바위부터라 4호선(남태령)과 안 이어지고, 경인선은 구로 없이 개봉부터,
+    # 경의중앙 끝 「서울」과 1호선 「서울역」은 좌표가 180m 어긋나 클러스터(150m)를 턱걸이로
+    # 놓친다. 실측: 월곡→산본이 지하철 등뼈를 못 찾아 버스 213분이 1위였다.
+    # 규칙: 지하철 노선의 양 끝 노드를 딴 지하철 노선이 안 나누면, 1.5km 안에서 가장 가까운
+    # 딴 노선의 역 노드를 끝에 이어붙인다(그 자리가 갈아타는 자리가 된다).
+    def _attach_wide_ends(routes_list):
+        node_lines = {}
+        for r0 in routes_list:
+            if r0['kind'] != 'subway':
+                continue
+            for n0 in r0['dirs'][0]:
+                node_lines.setdefault(n0, set()).add(r0['name'])
+        sub_nodes = sorted(node_lines.keys())
+        joined = 0
+        for r0 in routes_list:
+            if r0['kind'] != 'subway':
+                continue
+            for endpos in (0, -1):
+                end = r0['dirs'][0][endpos]
+                others = node_lines[end] - {r0['name']}
+                if others:
+                    continue
+                cands0 = []
+                own = set(r0['dirs'][0])
+                # 이 노선이 이미 어딘가에서 만나는 노선들 — 그 무리를 끝에 또 붙일 이유가 없다
+                # (4호선은 사당에서 2호선을 만나는데 방배를 또 붙였고, 경인선은 온수에서
+                #  7호선을 만나는데 광명사거리가 자리를 차지해 정작 구로(경부선)가 밀렸다).
+                met = set()
+                for n0 in own:
+                    met |= (node_lines.get(n0) or set()) - {r0['name']}
+                for n0 in sub_nodes:
+                    if n0 in own:
+                        continue          # 이미 이 노선에 있는 역(사당 등)을 끝에 또 붙이면 배열이 꼬인다
+                    oth = node_lines[n0] - {r0['name']}
+                    if not oth or oth <= met:
+                        continue          # 새로 만나는 노선이 없는 무리는 접속 후보가 아니다
+                    d0 = haversine(nodes[end]['lat'], nodes[end]['lon'],
+                                   nodes[n0]['lat'], nodes[n0]['lon'])
+                    # 2.1km: 직결 경계가 한 구간 거리다 — 선바위~남태령 1.97km, 개봉~구로 1.7km,
+                    # 별내선~구리 1.8km. 딴 동네(2.2km+)는 잇지 않는다.
+                    if d0 <= 2400:   # 개봉~구로 직결 2.27km 까지
+                        cands0.append((d0, n0, frozenset(oth)))
+                cands0.sort()
+                # 서로 다른 노선 무리로 최대 2곳 — 개봉은 광명사거리(7호선)와 구로(경부선)
+                # 둘 다 이어야 인천행이 산다. 같은 노선 무리는 가까운 한 곳이면 된다.
+                picked, seenL = [], set()
+                for d0, n0, oth in cands0:
+                    if oth & seenL:
+                        continue
+                    picked.append((d0, n0))
+                    seenL |= oth
+                    if len(picked) >= 2:
+                        break
+                for d0, n0 in picked:
+                    nm0 = re.sub(r'역$', '', nodes[n0]['name'])
+                    if endpos == 0:
+                        r0['dirs'][0].insert(0, n0); r0['dirs'][1].append(n0)
+                        r0['stops'][0].insert(0, nm0); r0['stops'][1].append(nm0)
+                    else:
+                        r0['dirs'][0].append(n0); r0['dirs'][1].insert(0, n0)
+                        r0['stops'][0].append(nm0); r0['stops'][1].insert(0, nm0)
+                    node_lines[n0].add(r0['name'])
+                    joined += 1
+                    C.log('    끝점 접속: %s %s ← %s (%.0fm, %s)'
+                          % (r0['name'], nodes[end]['name'], nodes[n0]['name'], d0,
+                             '·'.join(sorted(node_lines[n0] - {r0['name']}))[:30]))
+        C.log('    끝점 접속 %d곳' % joined)
+
     # 노선을 노드 번호의 순서 배열로
     src_kinds = load_source_kinds()
     C.log('  노선 종류: 원천이 알려 준 것 %d개 (나머지는 이름으로 추측)' % len(src_kinds))
@@ -1042,7 +1116,7 @@ def build():
         # 역 이름에 '역' 을 붙여 두었으므로 서울역은 '서울역역' 이 되고, rstrip 은 '서울' 까지 깎는다.
         # 그러면 혼잡도 키('4|서울역|…')를 못 찾아 **호선 전체 최댓값**으로 물러났다
         # (4호선 서울역 08시 하선 실제 30.8% → 노선 피크 131.4% 로 읽어 「앉을 확률 0%」).
-        names = [re.sub(r'역$', '', sub_stations[s]['name'])
+        names = [sub_stations[s].get('key') or re.sub(r'역$', '', sub_stations[s]['name'])
                  for s in rec['order'] if s in node_of_stop]
         # 혼잡도 키의 호선 번호 — 1~8호선(과 그 지선)만 숫자가 있고, 광역·경전철은
         # 혼잡도 원천이 없으므로 노선명 그대로 둔다(키가 안 맞아 「모름」으로 흐른다 — 의도).
@@ -1066,6 +1140,8 @@ def build():
                        'dirLabels': dir_labels,
                        # 혼잡도·승하차 자료의 키가 되는 역 이름(부역명 뗀 것)
                        'stops': [names, list(reversed(names))]})
+
+    _attach_wide_ends(routes)
 
     os.makedirs(OUT, exist_ok=True)
     C.save_json(os.path.join(OUT, 'nodes.json'), {

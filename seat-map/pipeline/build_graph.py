@@ -463,6 +463,49 @@ def load_subway(bus_stops):
     for s2 in stations.values():
         s2.pop('_cls', None)
 
+    # ★ 표준데이터 좌표 구제 (D-85) ★ — 「◯◯역」 정류장이 없어 못 찾던 역
+    # (지축·용답·여의나루·하남 연장 4역…)을 국가철도공단 표준데이터의 실좌표로 채운다.
+    # 지축이 살아나야 일산선이 3호선과 클러스터로 이어진다(안 살리면 주엽→시청이 버스 130분).
+    std_coord = {}
+    try:
+        _mfiles = sorted(glob.glob(os.path.join(C.RAW, 'open', 'metro', '*역사정보*.xlsx')))
+        if _mfiles:
+            _rows = []
+            for _nm, _sh in C.read_tables(_mfiles[-1]):
+                _rows.extend(_sh)
+            _h = [str(c).strip() for c in _rows[0]]
+            _i = {k: (_h.index(k) if k in _h else None)
+                  for k in ('역번호', '역사명', '노선명', '역위도', '역경도')}
+            if None not in _i.values():
+                for _r in _rows[1:]:
+                    if len(_r) <= max(v for v in _i.values()):
+                        continue
+                    _lnm = str(_r[_i['노선명']]).strip()
+                    _m2 = re.match(r'^(?:서울 도시철도 |수도권 도시철도 |수도권 광역철도 )?([1-8])호선$', _lnm)
+                    if not _m2:
+                        continue
+                    _snm = re.sub(r'\s*\([^)]*\)\s*$', '', str(_r[_i['역사명']]).strip())
+                    if len(_snm) > 1 and _snm.endswith('역'):
+                        _snm = _snm[:-1]
+                    try:
+                        std_coord[(_m2.group(1), _snm)] = (float(_r[_i['역위도']]), float(_r[_i['역경도']]))
+                    except (TypeError, ValueError):
+                        pass
+    except Exception as _e:
+        C.log('    표준데이터 좌표 사전 실패(무시): %s' % _e)
+
+    still = []
+    for ln, no, nm in pending:
+        if (ln, nm) in std_coord:
+            lat3, lon3 = std_coord[(ln, nm)]
+            sid = 'S%s-%d' % (ln, no)
+            stations[sid] = {'id': sid, 'ars': '', 'name': nm + '역', 'lat': lat3, 'lon': lon3,
+                             'kind': 'subway', 'line': ln, 'no': no}
+            C.log('    좌표 구제(표준데이터): %s호선 %s' % (ln, nm))
+        else:
+            still.append((ln, no, nm))
+    pending = still
+
     for ln, no, nm in pending:                          # ② 번호 이웃 보간
         by_no = lines[ln]
         lo_ = max((n for n in by_no if n < no and ('S%s-%d' % (ln, n)) in stations), default=None)
@@ -612,6 +655,177 @@ def load_subway(bus_stops):
             routes['S%s-b%d' % (ln, bi)] = {'routeId': 'S%s-b%d' % (ln, bi),
                                             'name': '%s호선 지선(%s~%s)' % (ln, nm0, nm1),
                                             'kind': 'subway', 'order': chain}
+    # ★ 수도권 확장 (D-85, 2026-09-06 사용자 요청 「경기도까지 대중교통 더 필요해」) ★
+    # 전국도시철도역사정보 표준데이터(국가철도공단, KRIC 레일포털 직다운·키 불필요)로
+    # 서울교통공사 1~8호선 밖의 수도권 전철을 더한다 — 신분당·분당·수인·경의중앙·경춘·
+    # 경강·서해·경부·경인·경원·안산과천·일산·공항철도·9호선·김포·신림·우이신설·의정부·에버라인.
+    #   - 좌표·환승이 파일에 직접 있어 정류장 빌리기(D-80의 함정)가 필요 없다.
+    #   - 역번호가 노선 내 순번이다(신분당 D004→D005→D006 실측). 문자가 섞여 자연 정렬로 세운다.
+    #   - 혼잡도 자료가 없는 노선은 집 규칙(D-25) 그대로 「모름 = 서서 간다」로 계산되고
+    #     화면이 「혼잡 자료가 없어 알 수 없습니다」라고 밝힌다. 승하차·혼잡 연결은 다음 단계.
+    #   - 광역은 역간 3.2km 초과가 정상(경춘선 등)이라 지선 자르기를 하지 않는다 —
+    #     표준데이터는 지선을 애초에 딴 노선명으로 갖는다.
+    metro = os.path.join(C.RAW, 'open', 'metro')
+    files2 = sorted(glob.glob(os.path.join(metro, '*역사정보*.xlsx')))
+    if files2:
+        rows2 = []
+        for nm2, sheet in C.read_tables(files2[-1]):
+            rows2.extend(sheet)
+        head2 = [str(c).strip() for c in rows2[0]]
+        def col2(nm):
+            return head2.index(nm) if nm in head2 else None
+        i_no2, i_nm2, i_ln2 = col2('역번호'), col2('역사명'), col2('노선명')
+        i_lat, i_lon = col2('역위도'), col2('역경도')
+        if None in (i_no2, i_nm2, i_ln2, i_lat, i_lon):
+            C.log('    수도권 확장: 표준데이터 머리글이 달라 건너뜀 — %s' % head2[:6])
+        else:
+            # 노선명 정규화 — 접두를 떼고, 같은 노선의 두 표기를 하나로.
+            # (「서울 도시철도 9호선」과 「수도권 도시철도 9호선」은 운영사가 다른 같은 9호선이다)
+            def canon_line(nm):
+                t = str(nm).strip()
+                for pre in ('서울 도시철도 ', '수도권 도시철도 ', '수도권 광역철도 ',
+                            '수도권 경량도시철도 ', '도시철도 '):
+                    if t.startswith(pre):
+                        t = t[len(pre):]
+                return t.strip()
+            SKIP_WORDS = ('부산', '대구', '광주', '대전', '김해', '대경', '동해', '에버라인아님')
+            HAVE_LINES = set('%d호선' % i for i in range(1, 9))   # 혼잡도 원천이 이미 담당
+            grp = {}
+            for r in rows2[1:]:
+                if len(r) <= max(i_no2, i_nm2, i_ln2, i_lat, i_lon):
+                    continue
+                ln2 = canon_line(r[i_ln2])
+                if not ln2 or any(w in str(r[i_ln2]) for w in SKIP_WORDS):
+                    continue
+                try:
+                    lat2, lon2 = float(r[i_lat]), float(r[i_lon])
+                except (TypeError, ValueError):
+                    continue
+                # 수도권 상자: 1호선 신창(36.77)~소요산·경춘 춘천(127.73)까지
+                if not (36.6 <= lat2 <= 38.4 and 126.3 <= lon2 <= 127.95):
+                    continue
+                nm2v = re.sub(r'\s*\([^)]*\)\s*$', '', str(r[i_nm2]).strip())
+                # 코레일 행은 역명에 「역」이 이미 붙어 온다(성남역·독산역) — 떼고 통일한다.
+                # 「서울역」은 떼도 다시 붙여 같아진다.
+                if len(nm2v) > 1 and nm2v.endswith('역'):
+                    nm2v = nm2v[:-1]
+                no2 = str(r[i_no2]).strip()
+                if ln2 in HAVE_LINES:
+                    # 1~8호선의 연장 구간(별내·인천 7호선 등)은 이미 있는 역이면 버리고,
+                    # 없는 역만 「N호선(연장)」이라는 딴 노선으로 둔다 — 직결이지만 환승으로 이어진다.
+                    ln2 = ln2 + '(연장)'
+                grp.setdefault(ln2, []).append((no2, nm2v, lat2, lon2))
+            def natkey(no):
+                m2 = re.findall(r'\d+', no)
+                return (re.sub(r'\d+', '', no), int(m2[0]) if m2 else 0, no)
+            added = 0
+            for ln2, items in sorted(grp.items()):
+                # 같은 번호 중복(운영사 겹침) 제거, 자연 정렬 = 노선 순번
+                seen2, seq = set(), []
+                for no2, nm2v, lat2, lon2 in sorted(items, key=lambda x: natkey(x[0])):
+                    if no2 in seen2 or nm2v in [q[1] for q in seq]:
+                        continue
+                    seen2.add(no2)
+                    seq.append((no2, nm2v, lat2, lon2))
+                if len(seq) < 2:
+                    continue
+                if ln2.endswith('(연장)'):
+                    base = ln2[:-4]
+                    have_names = set(stations[k]['name'] for k in stations
+                                     if stations[k]['line'] == re.sub(r'[^0-9]', '', base))
+                    seq = [q for q in seq if (q[1] + '역') not in have_names]
+                    if len(seq) < 2:
+                        continue
+                rid = 'SX-' + re.sub(r'[^0-9A-Za-z가-힣]', '', ln2)
+                order2 = []
+                for k2, (no2, nm2v, lat2, lon2) in enumerate(seq):
+                    sid = '%s-%03d' % (rid, k2)
+                    stations[sid] = {'id': sid, 'ars': '', 'name': nm2v + '역',
+                                     'lat': lat2, 'lon': lon2, 'kind': 'subway',
+                                     'line': ln2, 'no': k2}
+                    order2.append(sid)
+                # 순번이 지리와 어긋난 낱개(신설역 등)만 기하로 다시 꽂는다 — 자르기는 안 한다.
+                for _p2 in range(2):
+                    moved2 = False
+                    i2 = 0
+                    while i2 < len(order2):
+                        pv = order2[i2 - 1] if i2 > 0 else None
+                        nx = order2[i2 + 1] if i2 + 1 < len(order2) else None
+                        if pv and nx:
+                            d2 = dist(pv, order2[i2]) + dist(order2[i2], nx) - dist(pv, nx)
+                            lim2 = 5000.0
+                        else:
+                            d2 = dist(pv, order2[i2]) if pv else dist(order2[i2], nx)
+                            lim2 = 8000.0
+                        if d2 <= lim2:
+                            i2 += 1
+                            continue
+                        cand2 = order2[:i2] + order2[i2 + 1:]
+                        bj, ba = None, None
+                        for j2 in range(1, len(cand2)):
+                            add2 = dist(cand2[j2 - 1], order2[i2]) + dist(order2[i2], cand2[j2]) - dist(cand2[j2 - 1], cand2[j2])
+                            if ba is None or add2 < ba:
+                                bj, ba = j2, add2
+                        if ba is not None and ba < d2 - 2000:
+                            st2 = order2[i2]
+                            C.log('    순서 수리(광역): %s %s' % (ln2, stations[st2]['name']))
+                            order2 = cand2[:bj] + [st2] + cand2[bj:]
+                            moved2 = True
+                            i2 = 0
+                        else:
+                            i2 += 1
+                    if not moved2:
+                        break
+                # 큰 틈(12km 초과 — 실제 인접 최대는 공항철도 청라~영종 10.1km)은 번호
+                # 체계가 딴 계통(경의중앙의 서울역 지선, 수인선 꼬임)이라는 뜻이다.
+                # 잘라서 가장 긴 토막을 본선으로, 나머지는 최근접 사슬로 다시 엮어
+                # 접속역을 붙인 별도 노선으로 둔다(딴 계통 = 갈아타는 관계).
+                segs2, cur2 = [], [order2[0]]
+                for k2 in range(1, len(order2)):
+                    if dist(order2[k2 - 1], order2[k2]) > 12000:
+                        segs2.append(cur2); cur2 = [order2[k2]]
+                    else:
+                        cur2.append(order2[k2])
+                segs2.append(cur2)
+                segs2.sort(key=len, reverse=True)
+                main2, pool2 = segs2[0], [st for sg in segs2[1:] for st in sg]
+                routes[rid] = {'routeId': rid, 'name': ln2, 'kind': 'subway', 'order': main2,
+                               'wide': True}   # 광역 표지 — 역간 시간·위생 문턱이 다르다
+                added += 1
+                bi2 = 0
+                left2 = list(pool2)
+                while left2:
+                    head2 = min(left2, key=lambda st: min(dist(st, m) for m in main2))
+                    ch = [head2]; left2.remove(head2)
+                    while left2:
+                        nx2 = min(left2, key=lambda st: dist(ch[-1], st))
+                        if dist(ch[-1], nx2) > 12000:
+                            break
+                        ch.append(nx2); left2.remove(nx2)
+                    # 접속역: 사슬 머리(양끝 다 재 본다)에 가장 가까운 본선 역
+                    best2 = None
+                    for flip2 in (False, True):
+                        sq2 = list(reversed(ch)) if flip2 else list(ch)
+                        for m in main2:
+                            d0 = dist(sq2[0], m)
+                            if best2 is None or d0 < best2[0]:
+                                best2 = (d0, m, flip2)
+                    if best2 and best2[0] <= 4000:
+                        if best2[2]:
+                            ch = list(reversed(ch))
+                        ch = [best2[1]] + ch
+                    if len(ch) < 2:
+                        C.log('    광역 외톨이 버림: %s %s' % (ln2, stations[ch[0]]['name']))
+                        continue
+                    bi2 += 1
+                    nmA = stations[ch[0]]['name'].replace('역', '')
+                    nmB = stations[ch[-1]]['name'].replace('역', '')
+                    C.log('    광역 계통 분리: %s → %s(%s~%s) %d역' % (ln2, ln2, nmA, nmB, len(ch)))
+                    routes['%s-b%d' % (rid, bi2)] = {'routeId': '%s-b%d' % (rid, bi2),
+                                                     'name': '%s(%s~%s)' % (ln2, nmA, nmB),
+                                                     'kind': 'subway', 'order': ch, 'wide': True}
+            C.log('    수도권 확장: 노선 %d개 · 역 %d개 (표준데이터 %s)'
+                  % (added, sum(len(v) for v in grp.values()), os.path.basename(files2[-1])))
     return routes, stations, missing
 
 
@@ -830,12 +1044,22 @@ def build():
         # (4호선 서울역 08시 하선 실제 30.8% → 노선 피크 131.4% 로 읽어 「앉을 확률 0%」).
         names = [re.sub(r'역$', '', sub_stations[s]['name'])
                  for s in rec['order'] if s in node_of_stop]
-        line_no = re.sub(r'[^0-9]', '', rec['name'].split('호선')[0])   # 지선 이름에서도 호선 숫자만
+        # 혼잡도 키의 호선 번호 — 1~8호선(과 그 지선)만 숫자가 있고, 광역·경전철은
+        # 혼잡도 원천이 없으므로 노선명 그대로 둔다(키가 안 맞아 「모름」으로 흐른다 — 의도).
+        line_no = re.sub(r'[^0-9]', '', rec['name'].split('호선')[0]) if '호선' in rec['name'] and not rec.get('wide') else rec['name']
         dir_labels, why = detect_directions(line_no, names)
         C.log('    %s 방향 판정: %s' % (rec['name'], why if dir_labels else '실패 — ' + why))
+        # 광역은 역간 거리가 길다 — 좌표 인접거리 평균을 표정속도 34km/h 로 나눠
+        # 노선별 역간 시간을 만든다(도시철도는 기존 상수 2.0분 유지).
+        mins = KIND_INFO['subway']['minutes']
+        if rec.get('wide') and len(order) > 2:
+            total_m = sum(haversine(sub_stations[rec['order'][k]]['lat'], sub_stations[rec['order'][k]]['lon'],
+                                    sub_stations[rec['order'][k + 1]]['lat'], sub_stations[rec['order'][k + 1]]['lon'])
+                          for k in range(len(rec['order']) - 1))
+            mins = max(1.6, min(6.0, round((total_m / (len(rec['order']) - 1)) / 1000 / 34 * 60, 1)))
         routes.append({'id': rid, 'name': rec['name'], 'kind': 'subway',
-                       'vehicle': 'subwayCar', 'minutes': KIND_INFO['subway']['minutes'],
-                       'line': line_no,
+                       'vehicle': 'subwayCar', 'minutes': mins,
+                       'line': line_no, 'wide': bool(rec.get('wide')),
                        'dirs': [order, list(reversed(order))],       # 상·하행 두 줄
                        # 혼잡도 자료에서 이 방향을 가리키는 라벨. **자료로 판정한 값이다**
                        # (1호선은 번호 증가 = 상선, 2호선은 내선/외선 — 일반 규칙과 다르다)

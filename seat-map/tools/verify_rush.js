@@ -66,7 +66,9 @@ for (let ri = 0; ri < index.routes.length; ri++) {
       if (r.pBoard >= 0.95)
         sureSeats.push(`${route.name} ${stops[p]}→${stops[Math.min(p + 3, stops.length - 1)]} [${info.direction || '?'}] load=${info.segments[0].load.toFixed(0)}`);
     }
-    if (!ranAny) flag('빈방향', `${route.name} dir${di}(${stops[0]}→${stops[stops.length - 1]}) 전 구간 계산 불능`);
+    // 광역(wide)은 혼잡도 원천이 아직 없어 「모름 = 서서」로 흐른다(D-85) — 빈 게 정상이다.
+    if (!ranAny && !route.wide)
+      flag('빈방향', `${route.name} dir${di}(${stops[0]}→${stops[stops.length - 1]}) 전 구간 계산 불능`);
   }
 }
 console.log(`  훑음 ${scanned}곳 · 「탈 때 거의 확실히 앉음(95%+)」 ${sureSeats.length}곳`);

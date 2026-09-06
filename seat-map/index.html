@@ -492,7 +492,10 @@
     '경강선':'#003DA5','서해선':'#8FC31F','김포도시철도':'#AD8605',
     '신림선':'#6789CA','우이신설선':'#B0CE18','의정부':'#FDA600',
     '에버라인':'#56AB2D','인천지하철 1호선':'#7CA8D5','인천지하철 2호선':'#ED8B00',
-    '자기부상철도':'#FFB300','진접선':'#00A5DE'
+    '자기부상철도':'#FFB300','진접선':'#00A5DE',
+    '부산 1호선':'#F06A00','부산 2호선':'#81BF48','부산 3호선':'#BB8C00','부산 4호선':'#217DCB',
+    '부산김해경전철':'#8652A1','동해선':'#0054A6','대구 1호선':'#D93F5C','대구 2호선':'#00AA80',
+    '대구 3호선':'#FFB100','대경선':'#0066B3','광주 1호선':'#009088','대전 1호선':'#007448'
   };
   function lineColor(name){
     if (LINE_COLORS[name]) return LINE_COLORS[name];
@@ -812,7 +815,7 @@
     navigator.geolocation.getCurrentPosition(function(pos){
       $('here').textContent='◎';
       var lat=pos.coords.latitude, lon=pos.coords.longitude;
-      if(!SeatGeo.inSeoul(lat,lon)){ alert('서울 밖이라 이 서비스가 답할 수 없습니다.'); return; }
+      if(!SeatGeo.inSeoul(lat,lon)){ alert('서비스 지역(수도권·부산·대구·광주·대전) 밖이라 답할 수 없습니다.'); return; }
       S.from={name:'지금 있는 곳', detail:'내 위치', lat:lat, lon:lon};
       $('fromQ').value='지금 있는 곳'; $('fromList').hidden=true;
       save(); refreshNext(); showPlaces();
@@ -1570,7 +1573,7 @@
   $('pickCancel').addEventListener('click', function(){ closeMapPick(false); });
   $('pickOk').addEventListener('click', function(){
     if (!SeatGeo.inSeoul(PMAP.lat, PMAP.lon)){
-      alert('서울 밖이라 이 서비스가 답할 수 없습니다. 지도를 서울 안으로 옮겨 주세요.');
+      alert('서비스 지역(수도권·부산·대구·광주·대전) 밖입니다. 지도를 서비스 지역 안으로 옮겨 주세요.');
       return;
     }
     var key = PICK.key;

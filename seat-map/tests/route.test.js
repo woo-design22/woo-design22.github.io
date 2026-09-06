@@ -386,13 +386,13 @@ t('빽빽한 정류장 틈에서도 지하철역이 후보에 남는다 (D-52)',
 });
 
 t('지하철이 실제 경로 후보에 오른다', () => {
-  const ranked = plan('월곡동두산아파트', '중구청', 8 * 60, 'weekday');
+  const ranked = plan('월곡동두산아파트', '퇴계로5가.중구청', 8 * 60, 'weekday');
   assert.ok(ranked.some(j => j.legs.some(l => l.kind === 'subway')),
     '월곡→중구청인데 지하철을 쓰는 경로가 하나도 없다');
 });
 
 t('앉는다고 세 배 돌아가는 길을 1위로 놓지 않는다 (D-53)', () => {
-  const ranked = plan('월곡동두산아파트', '중구청', 8 * 60, 'weekday');
+  const ranked = plan('월곡동두산아파트', '퇴계로5가.중구청', 8 * 60, 'weekday');
   const fastest = Math.min.apply(null, ranked.map(j => j.totalMinutes));
   const cap = Math.max(fastest * 1.6, fastest + 25);
   ranked.forEach(j => assert.ok(j.totalMinutes <= cap + 0.5,
@@ -402,9 +402,9 @@ t('앉는다고 세 배 돌아가는 길을 1위로 놓지 않는다 (D-53)', ()
 
 t('출근시간이 한산한 시각·요일과 분명히 다르다', () => {
   const avg = list => list.reduce((s, j) => s + j.pSeated, 0) / list.length;
-  const rush = plan('월곡동두산아파트', '중구청', 8 * 60, 'weekday');
-  const noon = plan('월곡동두산아파트', '중구청', 14 * 60, 'weekday');
-  const sun = plan('월곡동두산아파트', '중구청', 8 * 60, 'sunday');
+  const rush = plan('월곡동두산아파트', '퇴계로5가.중구청', 8 * 60, 'weekday');
+  const noon = plan('월곡동두산아파트', '퇴계로5가.중구청', 14 * 60, 'weekday');
+  const sun = plan('월곡동두산아파트', '퇴계로5가.중구청', 8 * 60, 'sunday');
   assert.ok(avg(rush) < avg(noon) - 0.1, `평일 08시(${avg(rush).toFixed(2)})가 평일 14시(${avg(noon).toFixed(2)})보다 낮아야 한다`);
   assert.ok(avg(rush) < avg(sun) - 0.1, `평일 08시(${avg(rush).toFixed(2)})가 일요일 08시(${avg(sun).toFixed(2)})보다 낮아야 한다`);
   // 열두 개가 전부 100% 이던 증상 — 값이 갈리는지 본다
@@ -484,7 +484,7 @@ t('버스에도 요일이 반영된다 (D-54)', () => {
 });
 
 t('카드의 퍼센트와 「서서 N분」이 한 잣대다 — (1−비율)×타는시간 = 서서시간 (D-71)', () => {
-  const ranked = plan('월곡동두산아파트', '중구청', 8 * 60, 'weekday');
+  const ranked = plan('월곡동두산아파트', '퇴계로5가.중구청', 8 * 60, 'weekday');
   for (const j of ranked) {
     if (j.walkOnly || !j.knownLegs) continue;
     // D-74 뒤로 standingMinutes 에는 기다림이 든다 — 비율(D-71)은 차 안 몫과 맞아야 한다
@@ -499,7 +499,7 @@ t('카드의 퍼센트와 「서서 N분」이 한 잣대다 — (1−비율)×�
 });
 
 t('기다림은 기본으로 서는 시간에 든다 — 앉아 기다림 가정이면 빠진다 (D-74)', () => {
-  const A = pick('월곡동두산아파트'), B = pick('중구청');
+  const A = pick('월곡동두산아파트'), B = pick('퇴계로5가.중구청');
   const found = R.search({ graph, index,
     fromNodes: R.nearbyMixed(graph.nodes, A.lat, A.lon, 900, 12),
     toNodes: R.nearbyMixed(graph.nodes, B.lat, B.lon, 900, 12),

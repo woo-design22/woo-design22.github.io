@@ -688,26 +688,34 @@ def load_subway(bus_stops):
             # (「서울 도시철도 9호선」과 「수도권 도시철도 9호선」은 운영사가 다른 같은 9호선이다)
             def canon_line(nm):
                 t = re.sub(r'\s+', ' ', str(nm).strip())   # 「수도권  도시철도」의 겹공백
+                # 지역 노선 이름 짧게 (D-88): 「부산 도시철도 1호선」 → 「부산 1호선」
+                t = t.replace('부산 경량도시철도 ', '부산 ').replace('부산 도시철도 ', '부산 ')
+                t = t.replace('대구 도시철도 ', '대구 ').replace('대전 도시철도 ', '대전 ')
+                t = t.replace('광주도시철도 ', '광주 ')
                 for pre in ('서울 도시철도 ', '수도권 도시철도 ', '수도권 광역철도 ',
                             '수도권 경량도시철도 ', '도시철도 '):
                     if t.startswith(pre):
                         t = t[len(pre):]
                 return t.strip()
-            SKIP_WORDS = ('부산', '대구', '광주', '대전', '김해', '대경', '동해', '에버라인아님')
+            # 광역시 확장(D-88): 더는 이름으로 거르지 않는다 — 서비스권 상자로 거른다.
+            AREAS2 = [(36.70, 38.35, 126.35, 127.95),   # 수도권
+                      (35.00, 35.65, 128.75, 129.45),   # 부산·울산·김해
+                      (35.60, 36.25, 128.25, 128.95),   # 대구·경산·구미
+                      (35.05, 35.25, 126.70, 127.00),   # 광주
+                      (36.20, 36.50, 127.25, 127.55)]   # 대전
             HAVE_LINES = set('%d호선' % i for i in range(1, 9))   # 혼잡도 원천이 이미 담당
             grp = {}
             for r in rows2[1:]:
                 if len(r) <= max(i_no2, i_nm2, i_ln2, i_lat, i_lon):
                     continue
                 ln2 = canon_line(r[i_ln2])
-                if not ln2 or any(w in str(r[i_ln2]) for w in SKIP_WORDS):
+                if not ln2:
                     continue
                 try:
                     lat2, lon2 = float(r[i_lat]), float(r[i_lon])
                 except (TypeError, ValueError):
                     continue
-                # 수도권 상자: 1호선 신창(36.77)~소요산·경춘 춘천(127.73)까지
-                if not (36.6 <= lat2 <= 38.4 and 126.3 <= lon2 <= 127.95):
+                if not any(a0 <= lat2 <= a1 and b0 <= lon2 <= b1 for a0, a1, b0, b1 in AREAS2):
                     continue
                 nm2v = re.sub(r'\s*\([^)]*\)\s*$', '', str(r[i_nm2]).strip())
                 # 코레일 행은 역명에 「역」이 이미 붙어 온다(성남역·독산역) — 떼고 통일한다.

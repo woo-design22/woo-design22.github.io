@@ -27,21 +27,37 @@
 })(typeof self !== 'undefined' ? self : this, function (R, T) {
   'use strict';
 
-  // 서울 대략 범위. 밖으로 나가면 이 서비스가 답할 수 없다.
-  var SEOUL = { minLat: 37.40, maxLat: 37.72, minLon: 126.76, maxLon: 127.19 };
+  /* 서비스권 상자 (D-88) — 서울 상자 하나는 경기 확장(D-85) 때 이미 거짓말이 됐다
+     (산본·정자를 「서울 밖」이라 했다). 전철망이 있는 권역만 상자로 연다. */
+  var AREAS = [
+    { name: '수도권',        minLat: 36.70, maxLat: 38.35, minLon: 126.35, maxLon: 127.95 },
+    { name: '부산·울산·김해', minLat: 35.00, maxLat: 35.65, minLon: 128.75, maxLon: 129.45 },
+    { name: '대구·경산·구미', minLat: 35.60, maxLat: 36.25, minLon: 128.25, maxLon: 128.95 },
+    { name: '광주',          minLat: 35.05, maxLat: 35.25, minLon: 126.70, maxLon: 127.00 },
+    { name: '대전',          minLat: 36.20, maxLat: 36.50, minLon: 127.25, maxLon: 127.55 }
+  ];
   var CENTER = { lat: 37.5665, lon: 126.9780 };
 
-  function inSeoul(lat, lon) {
-    return lat >= SEOUL.minLat && lat <= SEOUL.maxLat && lon >= SEOUL.minLon && lon <= SEOUL.maxLon;
+  function areaOf(lat, lon) {
+    for (var i = 0; i < AREAS.length; i++) {
+      var a = AREAS[i];
+      if (lat >= a.minLat && lat <= a.maxLat && lon >= a.minLon && lon <= a.maxLon) return a.name;
+    }
+    return null;
   }
+  // 이름은 역사적으로 inSeoul 이지만 뜻은 「서비스권 안」이다 — 부르는 곳이 많아 이름을 남긴다.
+  function inSeoul(lat, lon) { return areaOf(lat, lon) !== null; }
 
   // ── ① 로컬 (정류장·역) ──────────────────────────────────────────────────
   function local(graph, q, limit) {
     return R.findNodes(graph, q, limit || 8).map(function (h) {
+      var base = h.kinds.indexOf('subway') >= 0
+        ? (h.kinds.length > 1 ? '지하철역 · 버스정류장' : '지하철역') : '버스정류장';
+      // 동명 지명(중구청은 서울 정류장이자 대전 지하철역이다) — 지방이면 권역을 밝힌다 (D-88)
+      var area = areaOf(h.lat, h.lon);
       return {
         name: h.name,
-        detail: h.kinds.indexOf('subway') >= 0
-          ? (h.kinds.length > 1 ? '지하철역 · 버스정류장' : '지하철역') : '버스정류장',
+        detail: base + (area && area !== '수도권' ? ' · ' + area : ''),
         lat: h.lat, lon: h.lon, node: h.node, source: 'local'
       };
     });
@@ -157,15 +173,16 @@
   }
 
   function reason(graph, place) {
-    if (!inSeoul(place.lat, place.lon)) return '서울 밖이라 이 서비스가 답할 수 없습니다.';
+    if (!inSeoul(place.lat, place.lon))
+      return '서비스 지역(수도권·부산·대구·광주·대전) 밖이라 답할 수 없습니다.';
     if (!accessPoints(graph, place, 1200, 1).length)
       return '1.2km 안에 정류장이나 역이 없습니다.';
     return null;
   }
 
   return {
-    SEOUL: SEOUL, CENTER: CENTER, ATTRIBUTION: ATTRIBUTION,
-    inSeoul: inSeoul, local: local,
+    CENTER: CENTER, ATTRIBUTION: ATTRIBUTION,
+    inSeoul: inSeoul, areaOf: areaOf, AREAS: AREAS, local: local,
     photonUrl: photonUrl, nominatimUrl: nominatimUrl,
     fromPhoton: fromPhoton, fromNominatim: fromNominatim,
     merge: merge, accessPoints: accessPoints, reason: reason

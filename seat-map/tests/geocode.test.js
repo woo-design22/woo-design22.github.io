@@ -24,12 +24,12 @@ const PHOTON_SAMPLE = {
     { properties: { name: '혜조약국', street: '종암로21길', housenumber: '128', district: '돈암1동' },
       geometry: { coordinates: [127.03048, 37.60351] } },
     { properties: { name: '부산어딘가', street: '어딘가로', housenumber: '1', city: '부산' },
-      geometry: { coordinates: [129.0756, 35.1796] } }        // 서울 밖 — 걸러져야 한다
+      geometry: { coordinates: [126.5312, 33.4996] } }        // 제주 — 서비스권(D-88) 밖이라 걸러져야 한다
   ]
 };
 const NOMINATIM_SAMPLE = [
   { lat: '37.6044400', lon: '127.0376400', display_name: '하월곡동, 월곡2동, 성북구, 서울특별시, 02740, 대한민국' },
-  { lat: '35.1796', lon: '129.0756', display_name: '부산광역시, 대한민국' }
+  { lat: '33.4996', lon: '126.5312', display_name: '제주시, 대한민국' }   // 서비스권 밖(D-88)
 ];
 
 // ── 온라인 응답 정규화 ────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ test('번지가 있으면 주소를 제목으로 올린다', () => {
   assert.ok(got[0].detail.includes('탕화쿵푸'), '가게 이름은 부연으로 남아야 한다');
 });
 
-test('Nominatim 응답도 같은 모양으로 바뀌고 서울 밖은 빠진다', () => {
+test('Nominatim 응답도 같은 모양으로 바뀌고 서비스권 밖은 빠진다', () => {
   const got = Geo.fromNominatim(NOMINATIM_SAMPLE);
   assert.strictEqual(got.length, 1);
   assert.strictEqual(got[0].name, '하월곡동');
@@ -120,9 +120,12 @@ t('인터넷이 죽어도 로컬만으로 답이 나온다', () => {
 });
 
 // ── 갈 수 있는 곳인가 ─────────────────────────────────────────────────────
-t('서울 밖이면 이유를 말해 준다', () => {
+t('서비스권 밖이면 이유를 말해 준다 (부산은 이제 안이다 — D-88)', () => {
+  const jeju = { lat: 33.4996, lon: 126.5312 };
+  assert.ok((Geo.reason(graph, jeju) || '').includes('서비스 지역'));
+  // 부산은 광역시 확장으로 서비스권 — 「밖」 이유가 나오면 안 된다(정류장 유무 이유는 허용).
   const busan = { lat: 35.1796, lon: 129.0756 };
-  assert.ok((Geo.reason(graph, busan) || '').includes('서울 밖'));
+  assert.ok(!(Geo.reason(graph, busan) || '').includes('서비스 지역'));
   assert.strictEqual(Geo.reason(graph, Geo.local(graph, '월곡', 1)[0]), null);
 });
 

@@ -292,6 +292,17 @@ test('D-81 — 심야 02시: 지하철·낮버스는 안 다니고, 심야버스
                 stops: 3, kind: 'subway', vehicle: route.vehicle, rideMinutes: 6, offsetMinutes: 0 };
   // 02시: 자료 범위(05:30~24:30) 40분 밖 = 운행 종료. 「첫차가 없을 수 있습니다」 딱지로 살아 나오면 안 된다.
   assert.ok(at(2 * 60).loadFor(leg).notRunning, '02시에 지하철이 산 채로 나온다');
+  // D-87 회귀: 직결 병합 노선의 코레일 구간(noCong)이 낀 구간도 심야엔 죽어야 한다 —
+  // noCong 이 심야 게이트보다 먼저 「모름」을 돌려주면 02시에 4호선이 살아난다(5분 시뮬 적발).
+  const r4 = idx.routes.findIndex(r => r.kind === 'subway' && r.name === '4호선');
+  const s4 = idx.routes[r4].stops[0];
+  const pS = s4.indexOf('산본');
+  assert.ok(pS > 0, '4호선 직결에 산본이 없다');
+  const legW = { routeIdx: r4, dirIdx: 0, fromPos: Math.max(0, pS - 3), toPos: pS,
+                 from: idx.routes[r4].dirs[0][Math.max(0, pS - 3)], to: idx.routes[r4].dirs[0][pS],
+                 stops: 3, kind: 'subway', vehicle: idx.routes[r4].vehicle, rideMinutes: 9, offsetMinutes: 0 };
+  assert.ok(at(2 * 60).loadFor(legW).notRunning, '02시에 직결 4호선(산본 구간)이 「모름」으로 살아난다');
+  assert.ok(at(14 * 60).loadFor(legW) === null, '낮의 코레일 구간은 「모름」(null)이어야 한다 — 호선피크 금지');
   // 00:30: 막차 시간대 — 하루의 연장으로 보고 살아 있어야 한다.
   assert.ok(!at(30).loadFor(leg).notRunning, '00:30 막차 시간대 지하철이 죽었다');
   // 04:30: 첫차(05:30) 40분 전 — 아직 없다.

@@ -52,7 +52,70 @@
         }
       }
     }
-    return { byNode: byNode, nodes: graph.nodes, routes: graph.routes };
+    /* 근처 도보 환승용 공간 격자 (D-90) — 클러스터(150m) 밖 이웃 정류장을 찾으려면
+       좌표 색인이 필요하다. 노선이 지나는 노드만 넣는다(환승 대상이 아니면 소용없다). */
+    var cells = Object.create(null);
+    for (i = 0; i < graph.nodes.length; i++) {
+      if (!byNode[i]) continue;
+      var nd0 = graph.nodes[i];
+      var ck = Math.floor(nd0.lat / NEAR_CELL) + ',' + Math.floor(nd0.lon / NEAR_CELL);
+      (cells[ck] || (cells[ck] = [])).push(i);
+    }
+    return { byNode: byNode, nodes: graph.nodes, routes: graph.routes,
+             cells: cells, near: Object.create(null) };
+  }
+
+  /* ★ 근처 도보 환승 (D-90, 사용자 지시) ★
+     갈아타기가 「같은 노드(150m 클러스터)」에서만 되던 탓에, 95m 떨어진 이웃 정류장으로
+     갈아타는 길이 통째로 사라졌다 — 실측: 미아사거리역 ↔ 롯데백화점미아점(성북10) 95m.
+     혜화→월곡두산에서 「4호선 + 성북10」이 안 나온 이유가 이것이다.
+     이제 환승 자리에서 NEAR_WALK_M 안의 이웃 노드도 후보로 본다(가까운 순 NEAR_LIMIT 개).
+     탐색 폭발은 ① 거리·개수 상한 ② 기존 여정 수 상한 ③ 같은 노선 조합 하나만 남기기가 막는다. */
+  var NEAR_CELL = 0.005;        // 격자 한 칸 ≈ 위도 555m
+  var NEAR_WALK_M = 400;        // 갈아타려고 걸을 만한 거리
+  var NEAR_LIMIT = 6;
+
+  function nearNodes(idx, node) {
+    if (!idx.cells) return [];
+    if (idx.near[node]) return idx.near[node];
+    var nd = idx.nodes[node];
+    var gx = Math.floor(nd.lat / NEAR_CELL), gy = Math.floor(nd.lon / NEAR_CELL);
+    var out = [];
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        var list = idx.cells[(gx + dx) + ',' + (gy + dy)];
+        if (!list) continue;
+        for (var k = 0; k < list.length; k++) {
+          if (list[k] === node) continue;
+          var m = T.haversine(nd, idx.nodes[list[k]]);
+          if (m <= NEAR_WALK_M) out.push({ node: list[k], meters: m });
+        }
+      }
+    }
+    out.sort(function (a, b) { return a.meters - b.meters; });
+    out = out.slice(0, NEAR_LIMIT);
+    return (idx.near[node] = out);
+  }
+
+  /* 이 자리에서 갈 수 있는 다음 구간들 — 같은 노드 먼저, 그 다음 가까운 이웃 순.
+     tableOrFn: back 표(객체) 또는 ridesFrom 처럼 노드를 받는 함수. */
+  function hopsAt(idx, node, table, excludeRouteId, nearMax) {
+    var out = [], i;
+    function push(list, walkM) {
+      if (!list) return;
+      for (var k = 0; k < list.length; k++) {
+        var b = list[k];
+        out.push({ routeIdx: b.routeIdx, dirIdx: b.dirIdx, fromPos: b.fromPos, toPos: b.toPos,
+                   from: b.from, to: b.to, stops: b.stops, walkFromPrev: walkM || 0 });
+      }
+    }
+    push(typeof table === 'function' ? table(idx, node, excludeRouteId) : table[node], 0);
+    var near = nearNodes(idx, node);
+    var lim = nearMax === undefined ? near.length : Math.min(nearMax, near.length);
+    for (i = 0; i < lim; i++)
+      push(typeof table === 'function' ? table(idx, near[i].node, excludeRouteId) : table[near[i].node],
+           near[i].meters);
+    return out;
   }
 
   // ── 걸어서 닿는 곳 ──────────────────────────────────────────────────────
@@ -98,7 +161,10 @@
      실제로 그렇게 골라져서 엉뚱한 곳에서 길을 찾았다.
      그래서 점수를 매긴다 — 정확히 같은 이름 → 「역」만 뺀 이름 → 앞에서 시작 → 그냥 포함.
      같은 점수면 지하철역을, 그 다음엔 이름이 짧은 쪽을 먼저 준다. */
-  function findNodes(graph, q, limit) {
+  /* near 를 주면 **같은 매칭 등급 안에서** 가까운 쪽을 먼저 준다 (D-90).
+     실사용 사고: 서울에서 「중구청」을 치면 대전 중구청역이 1위였다(정확일치 + 역 가산점).
+     매칭 등급 자체는 안 흔든다 — 이름이 정확히 맞는 것이 여전히 먼저다. */
+  function findNodes(graph, q, limit, near) {
     var text = String(q || '').replace(/\s+/g, '');
     if (!text) return [];
     var bare = text.replace(/역$/, '');
@@ -114,7 +180,12 @@
       else if (nm.indexOf(text) >= 0) s = 4;
       else continue;
       if (graph.nodes[i].kinds.indexOf('subway') >= 0) s -= 0.5;   // 같은 점수면 역이 먼저
-      scored.push([s, nm.length, i]);
+      var far = 0;
+      if (near) {
+        var km = T.haversine(near, graph.nodes[i]) / 1000;
+        far = km > 40 ? 2 : (km > 15 ? 1 : 0);   // 딴 권역(40km+)은 등급을 뒤로 민다
+      }
+      scored.push([s + far, nm.length, i]);
     }
     scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
     return scored.slice(0, limit || 30).map(function (x) {
@@ -210,13 +281,13 @@
     var seenPair = Object.create(null);
     for (i = 0; i < firstLegs.length && journeys.length < 400; i++) {
       var a = firstLegs[i];
-      var opts = back[a.to];
-      if (!opts) continue;
+      var opts = hopsAt(idx, a.to, back);       // 같은 노드 + 근처 도보 (D-90)
+      if (!opts.length) continue;
       for (var j = 0; j < opts.length; j++) {
         var b = opts[j];
         if (idx.routes[b.routeIdx].id === idx.routes[a.routeIdx].id) continue;
         var key = a.routeIdx + ':' + a.to + ':' + b.routeIdx;
-        if (seenPair[key]) continue;
+        if (seenPair[key]) continue;    // 가까운 것부터 오므로 덜 걷는 쪽이 남는다
         seenPair[key] = 1;
         add([a, b]);
       }
@@ -240,11 +311,11 @@
       });
       for (i = 0; i < order2.length && journeys.length < 200; i++) {
         var a2 = order2[i];
-        var mid = ridesFrom(idx, a2.to, idx.routes[a2.routeIdx].id);
+        var mid = hopsAt(idx, a2.to, ridesFrom, idx.routes[a2.routeIdx].id, 3);
         for (var m = 0; m < mid.length; m++) {
           var b2 = mid[m];
-          var opts2 = back[b2.to];
-          if (!opts2) continue;
+          var opts2 = hopsAt(idx, b2.to, back, undefined, 3);
+          if (!opts2.length) continue;
           for (var k = 0; k < opts2.length; k++) {
             var c2 = opts2[k];
             var ids = [idx.routes[a2.routeIdx].id, idx.routes[b2.routeIdx].id, idx.routes[c2.routeIdx].id];
@@ -315,7 +386,14 @@
         ? Math.max(2, Math.round(route.headwayMin / 2))
         : (WAIT_MIN[route.kind] === undefined ? 5 : WAIT_MIN[route.kind]);
       var ride = l.stops * route.minutes;
-      if (i > 0) { total += TRANSFER_WALK_MIN; walk += TRANSFER_WALK_MIN; }
+      /* 환승 도보 (D-90): 같은 역 안이면 기본 5분, 근처 정류장으로 걸어 가면 그 거리로 잰다
+         (역을 빠져나오는 시간이 있으므로 기본값보다 짧아지지는 않는다). */
+      if (i > 0) {
+        var tw = l.walkFromPrev
+          ? Math.max(TRANSFER_WALK_MIN, T.walkMinutes(l.walkFromPrev, speed))
+          : TRANSFER_WALK_MIN;
+        total += tw; walk += tw;
+      }
       total += wait;
       /* ★ 구간마다 **실제로 타는 시각**이 다르다 ★
          출발 시각 하나를 모든 구간에 쓰면, 걷고 갈아타고 한 시간 뒤에 타는 지하철도
@@ -330,7 +408,8 @@
         fromName: idx.nodes[l.from].name, toName: idx.nodes[l.to].name,
         // 방향 라벨은 배열 끝에서 파생한다 — 저장하면 뒤집힌다(사양서 6.2-④)
         headsign: idx.nodes[route.dirs[l.dirIdx][route.dirs[l.dirIdx].length - 1]].name + ' 방면',
-        stops: l.stops, rideMinutes: ride, waitMinutes: wait, offsetMinutes: offset
+        stops: l.stops, rideMinutes: ride, waitMinutes: wait, offsetMinutes: offset,
+        walkFromPrev: l.walkFromPrev || 0
       });
     }
     total += T.walkMinutes(endWalkM, speed);
@@ -708,10 +787,29 @@
     var top = sorted.slice(0, MAX_RESULTS);
     /* ★ 걷기 경로는 잘라내지 않는다 (D-81) ★ — 600m 거리에서 차편 12개가 「9분 걷기」를
        밀어냈다. 짧은 거리에서 가장 정직한 답이라, 상한에 걸려도 한 자리를 얹어 준다. */
-    if (!top.some(function (j) { return j.walkOnly; })) {
-      var w = sorted.find(function (j) { return j.walkOnly; });
-      if (w) top.push(w);
+    /* 뒤에 얹는 카드에는 표지를 단다 (D-90) — 목록은 「서는 시간 짧은 순」이라고 말하는데
+       보강 카드가 그 순서를 깨므로, 화면과 검증기 모두 「왜 여기 있는지」를 알아야 한다. */
+    function appendExtra(j, why) {
+      if (!j || top.indexOf(j) >= 0) return;
+      j.appended = why;
+      top.push(j);
     }
+    if (!top.some(function (j) { return j.walkOnly; }))
+      appendExtra(sorted.find(function (j) { return j.walkOnly; }), 'walk');
+    /* ★ 출발·도착이 지하철역이면 그 노선을 타는 길을 꼭 남긴다 (D-90, 사용자 지시) ★
+       혜화역에서 4호선을 타는 길(39분)이 서는 시간 순 15위라 목록 밖으로 떨어졌다.
+       역을 찍은 사람은 그 노선이 목록에 있기를 기대한다 — 노선마다 가장 좋은 하나를 얹는다. */
+    var anchored = Object.create(null), akeys = [];
+    for (var ai = 0; ai < sorted.length; ai++) {
+      var j2 = sorted[ai];
+      if (j2.walkOnly || !j2.legs || !j2.legs.length || j2.notRunning) continue;
+      var first = j2.legs[0], last = j2.legs[j2.legs.length - 1];
+      var k1 = 's' + first.routeId, k2 = 'e' + last.routeId;
+      if (first.kind === 'subway' && j2.startWalkMeters <= 300 && !anchored[k1]) { anchored[k1] = j2; akeys.push(k1); }
+      if (last.kind === 'subway' && j2.endWalkMeters <= 300 && !anchored[k2]) { anchored[k2] = j2; akeys.push(k2); }
+    }
+    for (var ak = 0; ak < akeys.length && ak < 4; ak++) appendExtra(anchored[akeys[ak]], 'line');
+
     /* ★ 빠른 순 상위 5도 잘라내지 않는다 (D-89, 사용자 지시) ★
        정렬은 서는 시간이지만, 「네이버라면 상위였을 빠른 길」이 서는 시간 동률에 밀려
        목록 밖으로 떨어지는 일이 실측됐다(서울대입구→월곡 일 21:40 — 87·88분짜리 둘 탈락).
@@ -719,9 +817,7 @@
     var live = sorted.filter(function (j) { return !j.notRunning; })
       .slice().sort(function (a, b) { return a.totalMinutes - b.totalMinutes; })
       .slice(0, 5);
-    for (var fi = 0; fi < live.length; fi++) {
-      if (top.indexOf(live[fi]) < 0) top.push(live[fi]);
-    }
+    for (var fi = 0; fi < live.length; fi++) appendExtra(live[fi], 'fast');
     return top;
   }
 

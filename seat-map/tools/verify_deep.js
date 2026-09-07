@@ -158,7 +158,8 @@ while (pairs < 40) {
       const j = got[i]; journeys++;
       const bad = m => { viol++; flag('D불변식', `${a.name}→${b.name} ${Math.round(mins / 60)}시 #${i + 1}: ${m}`); };
       // 정렬: 못 앉는 시간 오름차순 (D-77)
-      if (i > 0 && noSit(j) < noSit(got[i - 1]) - 1e-6) bad('정렬이 못 앉는 시간 순이 아니다');
+      // 보강 카드(빠른 길·역 노선·걷기, D-89·D-90)는 순서 밖에 얹은 것이라 정렬 검사에서 뺀다
+    if (i > 0 && !j.appended && !got[i - 1].appended && noSit(j) < noSit(got[i - 1]) - 1e-6) bad('정렬이 못 앉는 시간 순이 아니다');
       // 퍼센트 ≡ 괄호 (D-76)
       if (!j.walkOnly && j.knownLegs > 0 && j.seatChance && j.seatChance.percent !== null) {
         const rs = Math.round(j.rideMinutes), vs = Math.round(j.vehicleStandingMinutes);

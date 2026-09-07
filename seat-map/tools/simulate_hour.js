@@ -86,7 +86,8 @@ function checkJourneys(tag, got, minutes) {
   for (let i = 0; i < got.length; i++) {
     const j = got[i]; STAT.journeys++;
     const bad = m => flag('불변식', `${tag} #${i + 1}: ${m}`);
-    if (i > 0 && noSit(j) < noSit(got[i - 1]) - 1e-6 && !j.walkOnly && !got[i - 1].walkOnly
+    // 보강 카드(빠른 길·역 노선·걷기, D-89·D-90)는 순서 밖에 얹은 것이라 정렬 검사에서 뺀다
+    if (i > 0 && !j.appended && !got[i - 1].appended && noSit(j) < noSit(got[i - 1]) - 1e-6 && !j.walkOnly && !got[i - 1].walkOnly
         && !j.notRunning && !got[i - 1].notRunning) bad('정렬');
     if (!j.walkOnly && j.knownLegs > 0 && j.seatChance && j.seatChance.percent !== null) {
       const rs = Math.round(j.rideMinutes), vs = Math.round(j.vehicleStandingMinutes);

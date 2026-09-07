@@ -752,7 +752,7 @@
 
   /* 입력칸 하나에 「로컬 즉시 + 주소 나중」 검색을 붙인다.
      결과창의 편집 바도 같은 함수를 쓴다 — 두 벌로 두면 한쪽만 고치게 된다. */
-  function attachSearch(inp, box, onPick){
+  function attachSearch(inp, box, onPick, nearOf){
     var timer=null, seq=0;
 
     function draw(items, loading){
@@ -780,7 +780,8 @@
     inp.addEventListener('input', function(){
       var q=inp.value.trim();
       if(!G || q.length<1){ box.hidden=true; box.innerHTML=''; return; }
-      var localHits=SeatGeo.local(G, q, 6);
+      // 반대편(이미 고른 출발·도착)을 기준으로 같은 이름 중 가까운 쪽을 먼저 (D-90)
+      var localHits=SeatGeo.local(G, q, 6, nearOf && nearOf());
       draw(localHits, q.length>=2);
       if(q.length<2) return;
       clearTimeout(timer);
@@ -802,7 +803,7 @@
     attachSearch(inp, $(listId), function(h){
       S[key]={name:h.name, detail:h.detail, lat:h.lat, lon:h.lon};
       inp.value=h.name; save(); refreshNext(); showPlaces();
-    });
+    }, function(){ return S[key === 'from' ? 'to' : 'from'] || null; });
     inp.addEventListener('input', function(){ S[key]=null; refreshNext(); showPlaces(); });
   }
   hookSearch('fromQ','fromList','from');
@@ -1173,6 +1174,10 @@
           +'분 · 환승 '+j.transfers+'회';
       b.innerHTML =
         '<span class="typeTag ' + TYPE_DEF[ty].cls + '">' + TYPE_DEF[ty].tag + '</span>' +
+        /* 목록 순서 밖에서 얹은 카드는 이유를 밝힌다 (D-90) — 「서는 시간 순」이라 말해 놓고
+           슬쩍 끼워 넣으면 목록을 못 믿게 된다. */
+        (j.appended === 'fast' ? '<span class="typeTag t-walk">⚡ 빠른 길</span>'
+         : j.appended === 'line' ? '<span class="typeTag t-walk">🚉 이 역 노선</span>' : '') +
         (j.badge?'<div class="badge">'+esc(j.badge)+'</div>':'') +
         /* 안 다니는 시각의 카드는 맨 위에 크게 알린다 — 상세에만 적으면 목록이 거짓말한다 (D-81) */
         (j.notRunning?'<div class="note warn">그 시각에는 다니지 않는 노선입니다 — 참고용</div>':'') +
@@ -1237,7 +1242,12 @@
     j.legs.forEach(function(l, i){
       if(l.estimated) anyEstimate=true;
       if(l.afterVia) html += walkRow('📍', '<b>경유지에 들렀다 다시 탑니다</b>');
-      else if(i>0) html += walkRow('🚶', '갈아타기 · 약 '+SeatRoute.TRANSFER_WALK_MIN+'분 걷기');
+      else if(i>0) html += walkRow('🚶', l.walkFromPrev > 60
+        /* 근처 정류장으로 걸어서 갈아타는 경우(D-90) — 거리를 밝힌다. 「같은 역 안」과 다르다. */
+        ? '<b>'+esc(l.fromName)+'</b> 까지 '+fmtM(SeatTransfer.walkDistance(l.walkFromPrev))
+          +' 걸어서 갈아타기 · 약 '+Math.max(SeatRoute.TRANSFER_WALK_MIN,
+            Math.round(SeatTransfer.walkMinutes(l.walkFromPrev, S.walk)))+'분'
+        : '갈아타기 · 약 '+SeatRoute.TRANSFER_WALK_MIN+'분 걷기');
       html += '<div class="leg'+(l.kind==='subway'?' subway':'')+'">'
         + '<h3>'+esc(l.routeName)+' <span class="tag">'+esc(l.headsign)+'</span>'
         + (l.direction?'<span class="tag">'+esc(l.direction)+'</span>':'')+'</h3>'

@@ -818,6 +818,31 @@
       .slice().sort(function (a, b) { return a.totalMinutes - b.totalMinutes; })
       .slice(0, 5);
     for (var fi = 0; fi < live.length; fi++) appendExtra(live[fi], 'fast');
+
+    /* ★ 찍은 역의 노선은 맨 위로 (D-91, 사용자 지시) ★
+       「서는 시간 가장 짧음」 **바로 다음 자리**에 올린다. 목록 끝에 얹었더니 13~15위라
+       사람이 스크롤로는 못 봤다(혜화역→월곡두산 실측 — 4호선 세 카드가 전부 바닥에).
+       50m 안이면 「그 역을 찍은 것」으로 본다(사용자가 정한 값). 1위 자리는 안 건드린다. */
+    var pins = [], pinSeen = Object.create(null);
+    for (var pi = 0; pi < sorted.length && pins.length < 4; pi++) {
+      var j3 = sorted[pi];
+      if (j3.walkOnly || !j3.legs || !j3.legs.length || j3.notRunning) continue;
+      var f3 = j3.legs[0], l3 = j3.legs[j3.legs.length - 1];
+      var atStart = f3.kind === 'subway' && j3.startWalkMeters <= 50;
+      var atEnd = l3.kind === 'subway' && j3.endWalkMeters <= 50;
+      if (!atStart && !atEnd) continue;
+      var pk = (atStart ? 's' + f3.routeId : '') + '|' + (atEnd ? 'e' + l3.routeId : '');
+      if (pinSeen[pk]) continue;
+      pinSeen[pk] = 1;
+      pins.push(j3);
+    }
+    if (pins.length) {
+      var head0 = top[0];
+      var moved = pins.filter(function (j) { return j !== head0; });
+      moved.forEach(function (j) { if (!j.appended) j.appended = 'line'; });
+      var rest0 = top.filter(function (j) { return j !== head0 && moved.indexOf(j) < 0; });
+      top = (head0 ? [head0] : []).concat(moved, rest0);
+    }
     return top;
   }
 

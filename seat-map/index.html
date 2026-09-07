@@ -130,7 +130,14 @@
   #edPick, #sPick{margin:0 0 10px 46px}   /* 고치는 칸과 같은 들여쓰기 */
   .farBadge{display:inline-block; font-size:.8em; font-weight:700; padding:3px 10px;
     border-radius:999px; background:var(--bg); color:var(--ink2); margin-bottom:6px}
-  #viaAdd{display:flex; margin:0 0 8px 46px}
+  /* 출발↔도착 바꾸기 (D-92) — 두 칸 사이에 두어야 무엇이 바뀌는지 한눈에 보인다 */
+  #swapRow{display:flex; justify-content:flex-end; margin:-2px 0 8px}
+  .swapBtn{min-width:44px; min-height:44px; padding:0 12px; border:1px solid var(--line);
+    border-radius:999px; background:var(--card); color:var(--ink); cursor:pointer;
+    font-size:1.05em; display:inline-flex; align-items:center; gap:6px}
+  .swapBtn:hover{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft)}
+  .swapBtn .lbl{font-size:.82em; color:var(--ink2)}
+  #viaAdd{display:flex; gap:8px; align-items:center; margin:0 0 8px 46px}
   #addVia{width:34px; height:34px; min-height:34px; padding:0; line-height:1;
     border:1px solid var(--line); border-radius:50%; background:var(--card);
     cursor:pointer; color:var(--ink2); font-size:1.05em}
@@ -254,6 +261,10 @@
         </div>
         <div class="list" id="fromList" hidden></div>
       </div>
+      <div id="swapRow">
+        <button class="swapBtn" id="swapFT" title="출발지와 도착지를 서로 바꿉니다"
+                aria-label="출발지와 도착지 바꾸기">⇅ <span class="lbl">바꾸기</span></button>
+      </div>
       <div class="box" style="margin-bottom:0">
         <label for="toQ">어디로 가세요?</label>
         <div class="withBtn">
@@ -301,7 +312,9 @@
       <div class="slot" id="slotFrom"><span class="tagname">출발</span>
         <button class="val" id="edFrom" aria-expanded="false"></button></div>
       <div id="viaSlots"></div>
-      <div id="viaAdd"><button id="addVia" aria-label="경유지 추가" title="경유지 추가">＋</button></div>
+      <div id="viaAdd"><button id="addVia" aria-label="경유지 추가" title="경유지 추가">＋</button>
+        <button class="swapBtn" id="swapBar" title="출발지와 도착지를 서로 바꿉니다"
+                aria-label="출발지와 도착지 바꾸기">⇅ <span class="lbl">바꾸기</span></button></div>
       <div class="slot" id="slotTo"><span class="tagname">도착</span>
         <button class="val" id="edTo" aria-expanded="false"></button></div>
       <div class="box" id="edPick" hidden>
@@ -878,6 +891,23 @@
   });
   $('next1').addEventListener('click', function(){ nav(2); });
   $('next2').addEventListener('click', function(){ findRoutes(); });
+  $('swapBar').addEventListener('click', function(){ closePick(); swapFromTo(true); });
+
+  /* ── 출발↔도착 바꾸기 (D-92, 사용자 요청) ──────────────────────────────
+     오는 길을 보고 나서 가는 길을 보는 것이 흔한 일이라, 두 칸을 다시 타자 치지 않게 한다.
+     경유지가 있으면 **순서도 뒤집는다** — A→v1→v2→B 를 뒤집으면 B→v2→v1→A 다.
+     첫 화면에서는 입력칸 글자까지 바꾸고, 결과창에서는 바로 다시 찾는다. */
+  function swapFromTo(reroute){
+    if(!S.from && !S.to) return;
+    var t=S.from; S.from=S.to; S.to=t;
+    if(S.via && S.via.length>1) S.via.reverse();
+    $('fromQ').value = S.from ? S.from.name : '';
+    $('toQ').value   = S.to   ? S.to.name   : '';
+    $('fromList').hidden=true; $('toList').hidden=true;
+    save(); refreshNext(); showPlaces();
+    if(reroute){ renderEditBar(); findRoutes(); }
+  }
+  $('swapFT').addEventListener('click', function(){ swapFromTo(false); });
 
   // ── 결과창 편집 바 (출발·경유·도착·시각을 결과를 보면서 바로 고친다) ────
   var edTarget=null;              // 지금 고치는 자리: 'from' | 'to' | {via:i}

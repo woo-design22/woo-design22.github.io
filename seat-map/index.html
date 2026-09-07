@@ -1387,7 +1387,8 @@
         + fmtM(j.endWalkWalked)+' · '+Math.round(SeatTransfer.walkMinutes(j.endWalkMeters,S.walk))+'분 걷기');
 
     html += '<div class="note">지하철 혼잡도는 서울교통공사 실측(30분 단위), 버스는 정류장별 승·하차 실측(1시간 단위)입니다. '
-      + '그 사이 값은 부드럽게 이은 예상값입니다. 도보는 직선거리에 ×'+SeatTransfer.WALK_DETOUR+'를 곱해 잡았습니다.';
+      + '그 사이 값은 부드럽게 이은 예상값입니다. 도보는 직선거리에 ×'+SeatTransfer.WALK_DETOUR+'를 곱해 잡았습니다. '
+      + '지도의 걷는 길과 버스 길은 실제 도로를 따라 그립니다(지하철은 선로라 역 사이를 곧게 잇습니다).';
     if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 노선별 인가 배차간격으로 나누고, '
       + '요일·시간대 쏠림은 버스 구간 실측(T-DATA 재차인원)으로 맞춘 값입니다. '
       + '같은 시각에도 차마다 붐빔이 다른 것(예: 8대 중 3대만 만원)은 아직 공개 자료가 없어 근사로 담았습니다.';
@@ -1584,6 +1585,45 @@
       .catch(function(){ WALKPATH[key] = null; });
   }
 
+  /* ── 버스는 차도로 (D-96, 사용자 지적) ─────────────────────────────────
+     정류장 점을 바로 이었더니 선이 건물을 뚫고 갔다. 도보(D-95)와 같은 방법으로
+     OSRM 의 **자동차 경로**를 받아 실제 도로를 따라 그린다.
+     ★ 지하철은 부르지 않는다 ★ — 선로는 도로가 아니다. 차도를 따라 그리면 없는 길을
+     그리는 셈이라 더 큰 거짓말이 된다(역 사이 직선으로 두고 화면에 그렇게 밝힌다).
+     시간·좌석 계산에는 아무 영향이 없다 — 그림만 바꾼다. */
+  var ROADPATH = {};
+  function realRoad(map, path, coords, key){
+    if (coords.length < 2) return;
+    if (ROADPATH[key]){ path.pts = ROADPATH[key]; return; }
+    if (ROADPATH[key] === null) return;                 // 앞서 실패한 구간
+    /* 좌표가 많으면 공용 서버가 버거워한다 — 사이를 솎아도 도로를 따라가는 모양은 유지된다
+       (양 끝은 반드시 남긴다). */
+    var pts = coords;
+    if (pts.length > 24){
+      var step = Math.ceil(pts.length / 24), t = [pts[0]];
+      for (var i = step; i < pts.length - 1; i += step) t.push(pts[i]);
+      t.push(pts[pts.length - 1]);
+      pts = t;
+    }
+    var q = pts.map(function(pt){ return pt[1] + ',' + pt[0]; }).join(';');
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + q
+            + '?overview=full&geometries=geojson';
+    var ctl = window.AbortController ? new AbortController() : null;
+    if (ctl) setTimeout(function(){ ctl.abort(); }, 5000);
+    fetch(url, ctl ? { signal: ctl.signal } : undefined)
+      .then(function(r){ return r.json(); })
+      .then(function(o){
+        var c = o && o.routes && o.routes[0] && o.routes[0].geometry
+              && o.routes[0].geometry.coordinates;
+        if (!c || c.length < 2) throw new Error('no route');
+        var line = c.map(function(pt){ return [pt[1], pt[0]]; });
+        ROADPATH[key] = line;
+        path.pts = line;
+        map.draw();
+      })
+      .catch(function(){ ROADPATH[key] = null; });
+  }
+
   function m_geo(j){
     var GREEN='#1a7f4e', ORANGE='#e07b2a', GRAY='#8a8f98';
     var paths=[], marks=[];
@@ -1602,18 +1642,27 @@
       var pts=[]; for(var p=l.fromPos;p<=l.toPos;p++){ var nd=node(arr[p]); pts.push([nd.lat,nd.lon]); }
       var a=node(arr[l.fromPos]), b=node(arr[l.toPos]);
       walkPath(prev, a); prev={lat:b.lat, lon:b.lon};
+      /* 버스 구간은 차도를 따라 다시 그린다(D-96). 색이 둘로 갈리는 구간은 따로 받는다 —
+         「여기서부터 앉을 듯」 지점에서 선 색이 바뀌어야 하기 때문이다. */
+      var road = function(pth, sub, tag){
+        if (l.kind === 'subway') return;                // 선로는 도로가 아니다
+        realRoad(DMAP, pth, sub, l.routeId+'|'+l.dirIdx+'|'+l.fromPos+'-'+l.toPos+'|'+tag);
+      };
       var sitFromBoard = l.pBoard !== null && l.pBoard >= 0.5;
       if(sitFromBoard){
-        paths.push({pts:pts, color:GREEN});
+        var pAll={pts:pts, color:GREEN}; paths.push(pAll); road(pAll, pts, 'all');
       } else if(l.seatAtStops){
-        paths.push({pts:pts.slice(0, l.seatAtStops+1), color:ORANGE});
-        paths.push({pts:pts.slice(l.seatAtStops), color:GREEN});
+        var pA={pts:pts.slice(0, l.seatAtStops+1), color:ORANGE};
+        var pB={pts:pts.slice(l.seatAtStops), color:GREEN};
+        paths.push(pA); paths.push(pB);
+        road(pA, pA.pts, 'a'); road(pB, pB.pts, 'b');
         var sn=node(arr[l.fromPos+l.seatAtStops]);
         if(sn && typeof l.boardMinutes==='number')
           marks.push({lat:sn.lat, lon:sn.lon, color:GREEN,
                       label:SeatInterp.hhmm(Math.round(l.boardMinutes+l.seatAtMinutes))+'쯤부터 앉을 듯'});
       } else {
-        paths.push({pts:pts, color: l.pBoard===null ? GRAY : ORANGE});
+        var pOne={pts:pts, color: l.pBoard===null ? GRAY : ORANGE};
+        paths.push(pOne); road(pOne, pts, 'all');
       }
       marks.push({lat:a.lat, lon:a.lon, color:'#2a5bd7',
                   label:l.routeName+(typeof l.boardMinutes==='number'?' '+SeatInterp.hhmm(Math.round(l.boardMinutes))+' 탑승':'')});

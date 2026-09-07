@@ -130,8 +130,14 @@
   #edPick, #sPick{margin:0 0 10px 46px}   /* 고치는 칸과 같은 들여쓰기 */
   .farBadge{display:inline-block; font-size:.8em; font-weight:700; padding:3px 10px;
     border-radius:999px; background:var(--bg); color:var(--ink2); margin-bottom:6px}
-  /* 출발↔도착 바꾸기 (D-92) — 두 칸 사이에 두어야 무엇이 바뀌는지 한눈에 보인다 */
-  #swapRow{display:flex; justify-content:flex-end; margin:-2px 0 8px}
+  /* 출발↔도착 바꾸기 (D-92) — 첫 화면에서는 **줄을 새로 만들지 않는다**.
+     두 칸 사이에 한 줄을 넣었더니 출발·도착이 멀어져 한 쌍으로 안 읽혔다(사용자 지적).
+     라벨 줄 오른쪽에 작게 붙인다 — 결과창 편집바에는 큰 단추를 그대로 둔다. */
+  .labelRow{display:flex; align-items:center; justify-content:space-between; gap:8px}
+  .labelRow label{margin:0}
+  .swapMini{min-height:36px; padding:5px 11px; border:1px solid var(--line); border-radius:999px;
+    background:var(--card); color:var(--ink2); cursor:pointer; font-size:.85em; white-space:nowrap}
+  .swapMini:hover{border-color:var(--accent); color:var(--accent-ink); background:var(--accent-soft)}
   .swapBtn{min-width:44px; min-height:44px; padding:0 12px; border:1px solid var(--line);
     border-radius:999px; background:var(--card); color:var(--ink); cursor:pointer;
     font-size:1.05em; display:inline-flex; align-items:center; gap:6px}
@@ -253,17 +259,17 @@
   <section id="step1">
     <div class="card">
       <div class="box">
-        <label for="fromQ">어디서 출발하세요?</label>
+        <div class="labelRow">
+          <label for="fromQ">어디서 출발하세요?</label>
+          <button class="swapMini" id="swapFT" title="출발지와 도착지를 서로 바꿉니다"
+                  aria-label="출발지와 도착지 바꾸기">⇅ 바꾸기</button>
+        </div>
         <div class="withBtn">
           <input type="text" id="fromQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
           <button id="here" title="지금 있는 곳" aria-label="지금 있는 곳으로 넣기">◎</button>
           <button id="mapFrom" class="mapSel" aria-label="출발지를 지도에서 고르기">지도</button>
         </div>
         <div class="list" id="fromList" hidden></div>
-      </div>
-      <div id="swapRow">
-        <button class="swapBtn" id="swapFT" title="출발지와 도착지를 서로 바꿉니다"
-                aria-label="출발지와 도착지 바꾸기">⇅ <span class="lbl">바꾸기</span></button>
       </div>
       <div class="box" style="margin-bottom:0">
         <label for="toQ">어디로 가세요?</label>

@@ -65,6 +65,40 @@
              cells: cells, near: Object.create(null) };
   }
 
+  /* ★ 조금 더 걸어서 다른 노선 타기 (D-94, 사용자 요청) ★
+     「목적지 근처나 출발지 근처 역까지 20분쯤 걷는 게 더 나을 수도 있다」 —
+     900m 안에서만 차를 찾으면 조금 더 걸어가면 앉아 갈 수 있는 노선이 아예 안 보인다.
+     기본 후보(900m·12곳)에 **그 안에 없는 노선을 새로 물어오는** 먼 정류장을
+     1.6km 까지 몇 곳 더 붙인다. 걷는 시간은 「서는 시간」에 그대로 들어가므로(D-77)
+     헛되이 먼 곳은 정렬이 알아서 밑으로 내린다 — 후보만 늘리고 판단은 안 바꾼다. */
+  function nearbyPlus(nodes, lat, lon, idx, opt) {
+    opt = opt || {};
+    var core = nearbyMixed(nodes, lat, lon, opt.coreM || 900, opt.coreN || 12);
+    if (!idx || !idx.byNode) return core;
+    var have = Object.create(null), inCore = Object.create(null), i, k;
+    for (i = 0; i < core.length; i++) {
+      inCore[core[i].node] = 1;
+      var at0 = idx.byNode[core[i].node] || [];
+      for (k = 0; k < at0.length; k++) have[idx.routes[at0[k][0]].id] = 1;
+    }
+    var far = nearby(nodes, lat, lon, opt.farM || 1600, 80);
+    var out = core.slice(), added = 0, cap = opt.farN || 4;
+    for (i = 0; i < far.length && added < cap; i++) {
+      if (inCore[far[i].node]) continue;
+      var at = idx.byNode[far[i].node];
+      if (!at) continue;
+      var news = false;
+      for (k = 0; k < at.length; k++) {
+        if (!have[idx.routes[at[k][0]].id]) { news = true; break; }
+      }
+      if (!news) continue;                       // 새 노선을 안 물어오면 더 걸을 이유가 없다
+      for (k = 0; k < at.length; k++) have[idx.routes[at[k][0]].id] = 1;
+      out.push(far[i]);
+      added++;
+    }
+    return out;
+  }
+
   /* ★ 근처 도보 환승 (D-90, 사용자 지시) ★
      갈아타기가 「같은 노드(150m 클러스터)」에서만 되던 탓에, 95m 떨어진 이웃 정류장으로
      갈아타는 길이 통째로 사라졌다 — 실측: 미아사거리역 ↔ 롯데백화점미아점(성북10) 95m.
@@ -849,7 +883,7 @@
   return {
     WALK_RADIUS_M: WALK_RADIUS_M, TRANSFER_WALK_MIN: TRANSFER_WALK_MIN, WAIT_MIN: WAIT_MIN,
     WALK_ONLY_MAX_M: WALK_ONLY_MAX_M, WALK_ONLY_MAX_MIN: WALK_ONLY_MAX_MIN,
-    buildIndex: buildIndex, nearby: nearby, nearbyMixed: nearbyMixed,
+    buildIndex: buildIndex, nearby: nearby, nearbyMixed: nearbyMixed, nearbyPlus: nearbyPlus,
     prune: prune, findNodes: findNodes,
     joinJourneys: joinJourneys, combineVia: combineVia, seatableRoutes: seatableRoutes,
     boardingPointsTo: boardingPointsTo,

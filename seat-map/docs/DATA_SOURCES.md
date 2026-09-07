@@ -286,3 +286,11 @@ SKT T-WiFi·기지국 통신 이력을 결합해 만든다(2호선 실측 중심
 transit.tmapmobility.com/docs/puzzle/car. **개발자 가입·키 필요(무료 쿼터 있음)** —
 붙이려면 사용자가 SK오픈API 계정을 만들어야 한다. 우리 쓰임새: 앉는 자리 화면 실측 대조,
 금요일 재보정 검증, (장기) 실시간 안내.
+
+## 도보 경로 — OSRM foot (2026-09-07, D-95)
+
+`https://router.project-osrm.org/route/v1/foot/{lon},{lat};{lon},{lat}?overview=full&geometries=geojson`
+— **인증키 불필요**, CORS 허용(브라우저에서 직접 부름), OpenStreetMap 자료.
+지도의 걷는 선을 실제 길로 그리는 데만 쓴다(시간 계산은 여전히 직선×1.3, D-29).
+공용 데모 서버라 느리거나 막힐 수 있어 4초 시한 + 조용한 직선 폴백. 출처 표기 필수.
+대안(확인함): Valhalla `https://valhalla1.openstreetmap.de/route` (POST, costing=pedestrian).

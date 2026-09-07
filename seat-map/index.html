@@ -183,8 +183,27 @@
   /* 지도에서 고르기 (D-70) — 네이버·카카오처럼 지도를 움직여 가운데 핀에 맞춘다 */
   .mapSel{flex:0 0 auto; min-width:58px; border:1px solid var(--line); border-radius:10px;
     background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer; padding:0 10px}
-  #mapPickWrap{position:fixed; inset:0; z-index:60; background:var(--bg);
-    display:flex; flex-direction:column}
+  /* 전체 화면 창 — 크기를 **명시**한다. inset:0 만 주었더니 실측에서 0×0 으로 잡혀
+     캔버스가 통째로 안 그려졌다(D-93). 100dvh 는 폰 주소창 높이 변화까지 따라간다. */
+  #mapPickWrap, #lineMapWrap{position:fixed; top:0; left:0; width:100%; height:100vh;
+    height:100dvh; z-index:60; background:var(--bg); display:flex; flex-direction:column}
+  /* 노선도 창 (D-93) — 버스 번호·노선 이름을 누르면 그 노선의 시점~종점을 통째로 보여 준다 */
+  #lineMapHead{background:var(--card); border-bottom:1px solid var(--line); padding:12px 14px}
+  #lineMapHead .t{font-weight:700; font-size:1.05em}
+  #lineMapHead .s{color:var(--ink2); font-size:.88em; margin-top:3px}
+  #lineMapBody{position:relative; flex:1; min-height:0; touch-action:none}
+  #lineMap{width:100%; height:100%; display:block; cursor:grab; background:#e9e7e2}
+  #lineMap:active{cursor:grabbing}
+  #lineMapBody .mapBtns{position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:6px}
+  #lineMapBody .mapNote{position:absolute; left:8px; bottom:6px; font-size:.72em; color:#666;
+    background:rgba(255,255,255,.82); padding:2px 7px; border-radius:7px}
+  #lineMapBar{background:var(--card); border-top:1px solid var(--line); padding:12px 14px}
+  #lineClose{width:100%; min-height:56px; border:1px solid var(--line); border-radius:12px;
+    background:var(--bg); color:var(--ink); font-size:1.02em; cursor:pointer}
+  /* 상세 화면에서 노선 이름을 누를 수 있게 (D-93) */
+  .lineBtn{border:none; background:none; padding:0; font:inherit; color:inherit; cursor:pointer;
+    text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px}
+  .lineBtn .mapIco{font-size:.82em; margin-left:4px; text-decoration:none; display:inline-block}
   #mapPickHead{background:var(--card); border-bottom:1px solid var(--line);
     padding:12px 14px; font-weight:700}
   #mapPickBody{position:relative; flex:1; min-height:0; touch-action:none}
@@ -387,6 +406,21 @@
     </div>
   </div>
 
+  <!-- 노선도 창 (D-93): 검색 결과에서 노선 이름을 누르면 그 노선 전체(시점~종점)를 본다.
+       내가 타는 구간은 진하게, 나머지는 흐리게 — 「이 차가 어디서 어디로 가는 차인가」가 질문이다. -->
+  <div id="lineMapWrap" hidden>
+    <div id="lineMapHead"><div class="t" id="lineMapTitle"></div><div class="s" id="lineMapSub"></div></div>
+    <div id="lineMapBody">
+      <canvas id="lineMap" tabindex="0" aria-label="노선도 — 끌어서 움직이세요"></canvas>
+      <div class="mapBtns">
+        <button id="lineIn"  aria-label="지도 확대">＋</button>
+        <button id="lineOut" aria-label="지도 축소">－</button>
+      </div>
+      <div class="mapNote">© OpenStreetMap 기여자</div>
+    </div>
+    <div id="lineMapBar"><button id="lineClose">닫기</button></div>
+  </div>
+
   <section id="step4" hidden>
     <!-- 지도: 경로를 눈으로. 서서 가는 구간은 주황, 앉아 가는 구간은 초록,
          「여기서부터 앉을 듯」 지점에 시각을 단다(D-68). 끌기·확대·축소 전부
@@ -404,7 +438,8 @@
 </main>
 
 <footer>
-  <span id="attrib"></span> · 대중교통 자료 © 서울교통공사 · 서울특별시 (서울 열린데이터광장) ·
+  <span id="attrib"></span> · 도보 경로 © OSRM (OpenStreetMap 자료) ·
+  대중교통 자료 © 서울교통공사 · 서울특별시 (서울 열린데이터광장) ·
   <a href="explore.html">자료 살펴보기</a>
 </footer>
 
@@ -867,6 +902,7 @@
     go(step);
   }
   window.addEventListener('popstate', function(e){
+    if (!$('lineMapWrap').hidden){ LINEP.pushed = false; closeLineMap(true); return; }
     if (!$('mapPickWrap').hidden){ PICK.pushed = false; closeMapPick(true); return; }
     var to = (e.state && e.state.s) || 1;
     if (to === 4 && !S.picked) to = 3;
@@ -1142,8 +1178,9 @@
         segs.push(SeatRoute.search({
           graph:G, index:IDX,
           fromPoint:pts[i], toPoint:pts[i+1],
-          fromNodes:SeatRoute.nearbyMixed(G.nodes, pts[i].lat, pts[i].lon, 900, 12),
-          toNodes:SeatRoute.nearbyMixed(G.nodes, pts[i+1].lat, pts[i+1].lon, 900, 12),
+          // 조금 더 걸어서 다른 노선을 타는 선택지까지 (D-94) — 걷는 시간은 정렬이 셈한다
+          fromNodes:SeatRoute.nearbyPlus(G.nodes, pts[i].lat, pts[i].lon, IDX),
+          toNodes:SeatRoute.nearbyPlus(G.nodes, pts[i+1].lat, pts[i+1].lon, IDX),
           maxTransfers:2, walkSpeed:S.walk
         }));
       }
@@ -1285,7 +1322,11 @@
             Math.round(SeatTransfer.walkMinutes(l.walkFromPrev, S.walk)))+'분'
         : '갈아타기 · 약 '+SeatRoute.TRANSFER_WALK_MIN+'분 걷기');
       html += '<div class="leg'+(l.kind==='subway'?' subway':'')+'">'
-        + '<h3>'+esc(l.routeName)+' <span class="tag">'+esc(l.headsign)+'</span>'
+        + '<h3><button class="lineBtn" data-ri="'+l.routeIdx+'" data-di="'+l.dirIdx+'"'
+        + ' data-fp="'+l.fromPos+'" data-tp="'+l.toPos+'"'
+        + ' title="이 노선의 시점~종점을 지도로 봅니다">'+esc(l.routeName)
+        + '<span class="mapIco" aria-hidden="true">🗺</span></button>'
+        + ' <span class="tag">'+esc(l.headsign)+'</span>'
         + (l.direction?'<span class="tag">'+esc(l.direction)+'</span>':'')+'</h3>'
         + '<div class="muted small">'+esc(l.fromName)+' → '+esc(l.toName)+' · '+l.stops+'정거장 · '
         + Math.round(l.rideMinutes)+'분 (기다림 '+l.waitMinutes+'분)'
@@ -1511,11 +1552,48 @@
   /* 여정 → 선·점. 색이 곧 내용이다:
      탈 때 절반 넘게 앉으면 초록, 아니면 「앉게 되는 정거장」까지 주황 → 그 뒤 초록,
      그마저 없으면 끝까지 주황. 점선은 걷기. */
+  /* ── 걷는 길을 실제 길로 (D-95, 사용자 지시) ────────────────────────────
+     지도의 도보 구간이 직선이라 「저기로 어떻게 가라는 거냐」가 된다. OSRM 의 보행 경로
+     (키 불필요, OpenStreetMap 자료)로 실제 길을 받아 선을 갈아 끼운다.
+     ★ 그림만 바꾼다 ★ — 걷는 **시간**은 여전히 직선×1.3(D-29)이다. 시간이 뒤늦게 바뀌면
+     정렬(서는 시간)이 화면을 다 그린 뒤에 흔들려 목록이 춤춘다. 실측 대조는 다음 일.
+     실패하면 조용히 직선으로 둔다 — 인터넷이 없어도 앱은 죽지 않는다(집 규칙). */
+  var WALKPATH = {};                 // 좌표쌍 → 폴리라인 (메모리 캐시)
+  function realWalk(map, path, a, b){
+    if (!a || !b) return;
+    var key = a.lat.toFixed(5)+','+a.lon.toFixed(5)+'>'+b.lat.toFixed(5)+','+b.lon.toFixed(5);
+    if (WALKPATH[key]){ path.pts = WALKPATH[key]; return; }
+    if (WALKPATH[key] === null) return;                    // 앞서 실패한 구간
+    if (SeatTransfer.haversine(a, b) < 60) return;         // 코앞은 직선으로 충분하다
+    var url = 'https://router.project-osrm.org/route/v1/foot/'
+            + a.lon + ',' + a.lat + ';' + b.lon + ',' + b.lat
+            + '?overview=full&geometries=geojson';
+    var ctl = window.AbortController ? new AbortController() : null;
+    if (ctl) setTimeout(function(){ ctl.abort(); }, 4000);
+    fetch(url, ctl ? { signal: ctl.signal } : undefined)
+      .then(function(r){ return r.json(); })
+      .then(function(o){
+        var c = o && o.routes && o.routes[0] && o.routes[0].geometry
+              && o.routes[0].geometry.coordinates;
+        if (!c || c.length < 2) throw new Error('no route');
+        var pts = c.map(function(p){ return [p[1], p[0]]; });
+        WALKPATH[key] = pts;
+        path.pts = pts;
+        map.draw();
+      })
+      .catch(function(){ WALKPATH[key] = null; });
+  }
+
   function m_geo(j){
     var GREEN='#1a7f4e', ORANGE='#e07b2a', GRAY='#8a8f98';
     var paths=[], marks=[];
     function node(i){ return G.nodes[i]; }
-    function walkPath(a,b){ if(a&&b) paths.push({pts:[[a.lat,a.lon],[b.lat,b.lon]], color:GRAY, walk:true}); }
+    function walkPath(a,b){
+      if(!a||!b) return;
+      var pth={pts:[[a.lat,a.lon],[b.lat,b.lon]], color:GRAY, walk:true};
+      paths.push(pth);
+      realWalk(DMAP, pth, a, b);        // 실제 보행 경로로 갈아 끼운다(D-95)
+    }
     var prev = S.from ? {lat:S.from.lat, lon:S.from.lon} : null;
     if(prev) marks.push({lat:prev.lat, lon:prev.lon, color:'#20242c', big:true,
                          label:'출발 '+SeatInterp.hhmm(S.minutes)});
@@ -1595,6 +1673,69 @@
     clearTimeout(PICK.timer);
     PICK.timer = setTimeout(pickUpdateAddr, 350);     // 손을 뗀 뒤에 한 번만 묻는다
   };
+  /* ── 노선도 (D-93, 사용자 요청) ─────────────────────────────────────────
+     「이 버스가 어디서 어디로 가는 차인가」는 타기 전에 늘 궁금한 것이라, 노선 이름을
+     누르면 시점~종점 전체를 지도에 그린다. 내가 타는 구간만 진하게, 나머지는 흐리게.
+     좌표는 정류장 점을 이은 것이라 실제 도로 모양은 아니다 — 화면에 그렇게 밝힌다. */
+  var LMAP = makeSlippy($('lineMap'), $('lineMapBody')), LINEP = { pushed: false };
+  $('lineIn').addEventListener('click', function(){ LMAP.zoom(1); });
+  $('lineOut').addEventListener('click', function(){ LMAP.zoom(-1); });
+  $('lineClose').addEventListener('click', function(){ closeLineMap(false); });
+
+  function openLineMap(ri, di, fp, tp){
+    var route = G.routes[ri], arr = route.dirs[di];
+    if (!arr || !arr.length) return;
+    var pts = arr.map(function(n){ return [G.nodes[n].lat, G.nodes[n].lon]; });
+    var A = G.nodes[arr[0]], B = G.nodes[arr[arr.length-1]];
+    var paths = [{ pts: pts, color: '#b9bfc9' }];       // 노선 전체 — 흐리게
+    var marks = [{ lat: A.lat, lon: A.lon, color: '#20242c', label: '시점 ' + A.name },
+                 { lat: B.lat, lon: B.lon, color: '#20242c', label: '종점 ' + B.name }];
+    if (typeof fp === 'number' && typeof tp === 'number' && tp > fp) {
+      var mine = pts.slice(fp, tp + 1);
+      paths.push({ pts: mine, color: route.kind === 'subway' ? lineColor(route.name) : '#2a5bd7' });
+      var a = G.nodes[arr[fp]], b = G.nodes[arr[tp]];
+      marks.push({ lat: a.lat, lon: a.lon, color: '#2a5bd7', big: true, label: '타는 곳 ' + a.name });
+      marks.push({ lat: b.lat, lon: b.lon, color: '#1a7f4e', big: true, label: '내리는 곳 ' + b.name });
+    }
+    $('lineMapTitle').innerHTML = (route.kind === 'subway' ? subwayPill(route.name) : busPill(route.name, route.kind))
+      + ' <span class="muted small">' + esc(A.name) + ' → ' + esc(B.name) + '</span>';
+    $('lineMapSub').textContent = '정류장 ' + arr.length + '곳 · 진한 선이 내가 타는 구간입니다'
+      + ' (정류장을 이은 선이라 실제 도로 모양과는 다릅니다)';
+    $('lineMapWrap').hidden = false;
+    document.body.style.overflow = 'hidden';
+    LMAP.geo = { paths: paths, marks: marks };
+    /* 창을 막 띄운 프레임에서는 캔버스가 0×0 으로 잡힌다(실측) — 한 프레임 뒤에 크기를 잰다.
+       상세 지도(D-68)가 숨은 채로 0×0 이 됐던 것과 같은 함정이다. */
+    function sizeDraw(){
+      LMAP.size();
+      if (!$('lineMap').width) {                 // 그래도 0 이면 화면 크기로 (D-93 안전망)
+        var d = Math.min(2, window.devicePixelRatio || 1);
+        var h = window.innerHeight - $('lineMapHead').offsetHeight - $('lineMapBar').offsetHeight;
+        $('lineMap').width = Math.round(window.innerWidth * d);
+        $('lineMap').height = Math.round(Math.max(200, h) * d);
+        $('lineMap').style.width = window.innerWidth + 'px';
+        $('lineMap').style.height = Math.max(200, h) + 'px';
+      }
+      LMAP.fit(); LMAP.draw();
+    }
+    sizeDraw();
+    requestAnimationFrame(function(){ requestAnimationFrame(sizeDraw); });
+    try { history.pushState({ s: S.step, lm: 1 }, ''); LINEP.pushed = true; } catch(e){ LINEP.pushed = false; }
+  }
+  function closeLineMap(viaHistory){
+    $('lineMapWrap').hidden = true;
+    document.body.style.overflow = '';
+    if (LINEP.pushed && !viaHistory){ LINEP.pushed = false; try { history.back(); } catch(e){} }
+    LINEP.pushed = false;
+  }
+  // 상세 화면은 다시 그려지므로 위임으로 한 번만 건다
+  document.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.lineBtn') : null;
+    if (!b) return;
+    openLineMap(+b.getAttribute('data-ri'), +b.getAttribute('data-di'),
+                +b.getAttribute('data-fp'), +b.getAttribute('data-tp'));
+  });
+
   function openMapPick(key){
     PICK.key = key;
     var at = S[key] || S[key === 'from' ? 'to' : 'from'];
@@ -1642,7 +1783,9 @@
 
   go(1);
   if(location.search.indexOf('debug=1')>=0)
-    window.SM={ S:S, get graph(){return G;}, get index(){return IDX;}, find:findRoutes, geo:SeatGeo };
+    window.SM={ S:S, get graph(){return G;}, get index(){return IDX;}, find:findRoutes, geo:SeatGeo,
+              LMAP:LMAP, openLineMap:openLineMap,      // 노선도 검증용(D-93)
+              DMAP:DMAP, walkCache:function(){ return WALKPATH; } };   // 도보 경로 검증용(D-95)
 })();
 </script>
 </body>

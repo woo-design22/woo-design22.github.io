@@ -49,8 +49,8 @@
   function inSeoul(lat, lon) { return areaOf(lat, lon) !== null; }
 
   // ── ① 로컬 (정류장·역) ──────────────────────────────────────────────────
-  function local(graph, q, limit) {
-    return R.findNodes(graph, q, limit || 8).map(function (h) {
+  function local(graph, q, limit, near) {
+    return R.findNodes(graph, q, limit || 8, near).map(function (h) {
       var base = h.kinds.indexOf('subway') >= 0
         ? (h.kinds.length > 1 ? '지하철역 · 버스정류장' : '지하철역') : '버스정류장';
       // 동명 지명(중구청은 서울 정류장이자 대전 지하철역이다) — 지방이면 권역을 밝힌다 (D-88)

@@ -21,14 +21,18 @@
   // capacity = 혼잡도 100% 의 기준이 되는 정원, standing = 입석 가능 여부.
   // 지하철은 54/160 = 33.75% ≈ 34% 라 사양서 4.1 의 "좌석이 모두 찬 상태가 34%"와 맞는다.
   // 이 두 값을 따로 고치면 34% 임계값이 깨진다 — 반드시 같이 본다.
-  /* ★ 부산은 차가 작다 ★ 서울 대형전동차(20m)는 1칸 정원 160·좌석 54인데
-     부산 1~3호선은 17.5m 중형이라 정원 118·좌석 44, 4호선은 9.1m 경전철이라
-     정원 53·좌석 21뿐이다(부산교통공사 「전동차 주요제원」). 서울 값을 그대로 쓰면
-     같은 혼잡도에서 앉을 확률이 통째로 틀린다 — 좌석 대비 재차의 비가 달라지기 때문. */
+  /* ★ 서울 밖은 차가 작다 ★ 서울 대형전동차(20m)는 1칸 정원 160·좌석 54인데,
+     지방 도시철도는 중형(17.5~18m)이라 정원 118~120·좌석 44~46이고 경전철·모노레일은
+     그보다 훨씬 작다. 서울 값을 그대로 쓰면 같은 혼잡도에서 앉을 확률이 통째로 틀린다 —
+     좌석 대비 재차의 비가 달라지기 때문이다(부산 44/118 = 37%, 서울 54/160 = 34%).
+     출처는 각 교통공사 공표 제원. pipeline/city_spec.py 의 VEHICLES 와 짝이니 같이 고친다. */
   var VEHICLES = {
     subwayCar:  { name: '지하철 1칸', seats: 54, capacity: 160, standing: true },
     subwayBusan:      { name: '부산 지하철 1칸', seats: 44, capacity: 118, standing: true },
     subwayBusanLight: { name: '부산 경전철 1칸', seats: 21, capacity: 53,  standing: true },
+    subwayMid:        { name: '지하철 1칸', seats: 46, capacity: 120, standing: true },   // 대구1·2·대전1·광주1·인천1
+    subwayMonorail:   { name: '모노레일 1칸', seats: 30, capacity: 88, standing: true },  // 대구 3호선
+    subwayLightAGT:   { name: '경전철 1칸', seats: 29, capacity: 103, standing: true },   // 인천 2호선
     busTrunk:   { name: '간선버스',   seats: 23, capacity: 45,  standing: true },
     busBranch:  { name: '지선버스',   seats: 23, capacity: 45,  standing: true },
     busVillage: { name: '마을버스',   seats: 15, capacity: 30,  standing: true },

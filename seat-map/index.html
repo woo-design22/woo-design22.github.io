@@ -482,11 +482,13 @@
     getJSON('data/graph/nodes.json'), getJSON('data/graph/routes.json'),
     getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json'),
     getJSON('data/bus/tdata-calib.json'),    // 없으면 null — 지하철 차용 계수로 물러난다
-    getJSON('data/bus/kind-load.json')       // 없으면 null — 자료 없는 노선은 「알 수 없음」으로
+    getJSON('data/bus/kind-load.json'),      // 없으면 null — 자료 없는 노선은 「알 수 없음」으로
+    getJSON('data/poi/poi.json').catch(function(){ return null; })   // 상호 검색용(D-99, 선택)
   ]).then(function(v){
     G={ nodes:v[0].nodes, routes:v[1].routes };
     IDX=SeatRoute.buildIndex(G);
     CONG=v[2]; RIDE=v[3]; CALIB=v[4]||null; KINDLOAD=v[5]||null;
+    if (v[6]) SeatGeo.setPoi(v[6]);
     $('bootNote').textContent = '역·정류장 ' + G.nodes.length.toLocaleString('ko-KR')
       + '곳, 노선 ' + G.routes.length + '개. 주소·건물 이름도 넣을 수 있습니다.';
     restore(); refreshNext();
@@ -835,7 +837,10 @@
       var q=inp.value.trim();
       if(!G || q.length<1){ box.hidden=true; box.innerHTML=''; return; }
       // 반대편(이미 고른 출발·도착)을 기준으로 같은 이름 중 가까운 쪽을 먼저 (D-90)
-      var localHits=SeatGeo.local(G, q, 6, nearOf && nearOf());
+      var nearPt = nearOf && nearOf();
+      /* 정류장·역 먼저, 그 다음 장소(병의원·약국 이름) — 「미아동 내과」처럼 상호로 찾는 길(D-99).
+         장소 목록이 없으면(파일 미배포·아직 못 받음) 이 줄은 아무 일도 하지 않는다. */
+      var localHits=SeatGeo.local(G, q, 6, nearPt).concat(SeatGeo.poiSearch(q, 4, nearPt));
       draw(localHits, q.length>=2);
       if(q.length<2) return;
       clearTimeout(timer);

@@ -48,6 +48,57 @@
   // 이름은 역사적으로 inSeoul 이지만 뜻은 「서비스권 안」이다 — 부르는 곳이 많아 이름을 남긴다.
   function inSeoul(lat, lon) { return areaOf(lat, lon) !== null; }
 
+  /* ── ①-2 장소 목록 (상호로 찾기, D-99) ────────────────────────────────
+     OSM 계열 검색은 한국 상호를 모르고 지번주소를 못 읽는다(D-98 실측). 그래서
+     심평원 병의원·약국 목록을 우리가 들고 다니며 **이름과 지번주소로** 찾는다.
+     자료는 앱이 넣어 준다(engine 은 그물을 모른다) — 없으면 그냥 안 쓴다. */
+  var POI = null;                       // [[이름, 위도, 경도, 지번주소, 종류], ...]
+  function setPoi(list) { POI = (list && list.items) || list || null; }
+
+  function tokens(q) {
+    return String(q || '').split(/\s+/).map(function (t) { return t.trim(); })
+      .filter(function (t) { return t.length > 0; });
+  }
+  /* 「미아동 내과」처럼 **동 이름 + 업종**으로 찾는 것이 사람의 말버릇이다.
+     낱말을 다 만족하면(이름이든 주소든) 맞은 것으로 본다 — 순서는 안 따진다. */
+  function poiSearch(q, limit, near) {
+    if (!POI || !POI.length) return [];
+    var ts = tokens(q);
+    if (!ts.length) return [];
+    var flat = String(q).replace(/\s+/g, '');
+    var out = [];
+    for (var i = 0; i < POI.length; i++) {
+      var it = POI[i], nm = it[0] || '', ad = it[3] || '';
+      var nmFlat = nm.replace(/\s+/g, ''), adFlat = ad.replace(/\s+/g, '');
+      var score = null;
+      if (nmFlat === flat) score = 0;
+      else if (nmFlat.indexOf(flat) === 0) score = 1;
+      else if (nmFlat.indexOf(flat) >= 0) score = 2;
+      else {
+        var all = true, inName = false;
+        for (var k = 0; k < ts.length; k++) {
+          var t = ts[k].replace(/\s+/g, '');
+          var hitN = nmFlat.indexOf(t) >= 0, hitA = adFlat.indexOf(t) >= 0;
+          if (hitN) inName = true;
+          if (!hitN && !hitA) { all = false; break; }
+        }
+        if (all) score = inName ? 3 : 4;     // 이름에도 걸리면 앞으로
+      }
+      if (score === null) continue;
+      var far = 0;
+      if (near) {
+        var km = T.haversine(near, { lat: it[1], lon: it[2] }) / 1000;
+        far = km > 40 ? 2 : (km > 15 ? 1 : 0);
+      }
+      out.push({ s: score + far, n: nmFlat.length, it: it });
+    }
+    out.sort(function (a, b) { return a.s - b.s || a.n - b.n; });
+    return out.slice(0, limit || 6).map(function (x) {
+      return { name: x.it[0], detail: (x.it[4] || '장소') + (x.it[3] ? ' · ' + x.it[3] : ''),
+               lat: x.it[1], lon: x.it[2], source: 'poi' };
+    });
+  }
+
   // ── ① 로컬 (정류장·역) ──────────────────────────────────────────────────
   function local(graph, q, limit, near) {
     return R.findNodes(graph, q, limit || 8, near).map(function (h) {
@@ -144,6 +195,19 @@
     var on = onlineHits || [];
     var out = [], used = {}, i, j;
     var want = canonQ(q);
+    /* ★ 「◯◯동」을 넣어 찾았는데 그 동이 결과에 없으면 엉뚱한 곳이다 (D-99) ★
+       실측: 「미아동 202-11」 → 삼양로27길 95(삼각산동). OSM 은 지번을 못 읽어 비슷한
+       것을 집어 온다. 지우지는 않는다(맞을 때도 있다) — **맨 뒤로 민다.** */
+    var dong = (String(q || '').match(/([가-힣]{2,10}동)(?![가-힣])/) || [])[1];
+    var onBad = [];
+    if (dong) {
+      var keep = [];
+      for (i = 0; i < on.length; i++) {
+        var txt = (on[i].name || '') + ' ' + (on[i].detail || '');
+        (txt.indexOf(dong) >= 0 ? keep : onBad).push(on[i]);
+      }
+      on = keep;
+    }
 
     // ① 친 이름과 정확히 맞는 로컬부터
     if (want) {
@@ -161,8 +225,10 @@
           out.some(function (o) { return canonQ(o.name) === want; })) continue;   // ①과 겹치면 생략
       out.push(swapped || on[i]);
     }
-    // ③ 나머지 정류장·역
+    // ③ 나머지 정류장·역·장소
     for (j = 0; j < loc.length; j++) if (!used[j]) out.push(loc[j]);
+    // ④ 동 이름이 어긋난 온라인 주소는 맨 뒤 (지우지 않는다)
+    for (i = 0; i < onBad.length; i++) out.push(onBad[i]);
     return out.slice(0, limit || 12);
   }
 
@@ -183,6 +249,7 @@
   return {
     CENTER: CENTER, ATTRIBUTION: ATTRIBUTION,
     inSeoul: inSeoul, areaOf: areaOf, AREAS: AREAS, local: local,
+    setPoi: setPoi, poiSearch: poiSearch,
     photonUrl: photonUrl, nominatimUrl: nominatimUrl,
     fromPhoton: fromPhoton, fromNominatim: fromNominatim,
     merge: merge, accessPoints: accessPoints, reason: reason

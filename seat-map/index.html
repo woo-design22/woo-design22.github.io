@@ -439,7 +439,9 @@
 
 <footer>
   <span id="attrib"></span> · 도보 경로 © OSRM (OpenStreetMap 자료) ·
+  <!-- 출처 표시는 이용약관 사항이다. 자료를 늘리면 여기도 함께 늘린다 — 지우지 말 것. -->
   대중교통 자료 © 서울교통공사 · 서울특별시 (서울 열린데이터광장) ·
+  부산교통공사 (공공데이터포털) ·
   <a href="explore.html">자료 살펴보기</a>
 </footer>
 
@@ -483,11 +485,24 @@
     getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json'),
     getJSON('data/bus/tdata-calib.json'),    // 없으면 null — 지하철 차용 계수로 물러난다
     getJSON('data/bus/kind-load.json'),      // 없으면 null — 자료 없는 노선은 「알 수 없음」으로
-    getJSON('data/bus/load-calib.json').catch(function(){ return null; })   // 실측 여유 비율(D-101)
+    getJSON('data/bus/load-calib.json').catch(function(){ return null; }),  // 실측 여유 비율(D-101)
+    getJSON('data/subway/busan.json').catch(function(){ return null; })     // 부산 추정 혼잡도(D-103)
   ]).then(function(v){
     G={ nodes:v[0].nodes, routes:v[1].routes };
     IDX=SeatRoute.buildIndex(G);
     CONG=v[2]; RIDE=v[3]; CALIB=v[4]||null; KINDLOAD=v[5]||null; LOADCAL=v[6]||null;
+    /* 부산은 원천이 달라(승하차뿐) 파일이 따로다. 격자 모양은 같게 만들어 두었으므로
+       칸만 합친다 — 없으면 부산 노선이 「모름 = 서서」로 남을 뿐 앱은 그대로 돈다.
+       ★ 서울 자료를 덮어쓰지 않도록 부산 키만 넣는다(키에 호선 이름이 들어 있다). */
+    if (v[7] && v[7].congestion && v[7].ride) {
+      var bc=v[7].congestion, br=v[7].ride, k;
+      if (bc.slotMinutes===CONG.slotMinutes && bc.startMinutes===CONG.startMinutes)
+        for (k in bc.grid) if (!(k in CONG.grid)) CONG.grid[k]=bc.grid[k];
+      if (br.slotMinutes===RIDE.slotMinutes && br.startMinutes===RIDE.startMinutes)
+        for (k in br.grid) if (!(k in RIDE.grid)) RIDE.grid[k]=br.grid[k];
+      CONG.estimatedLines=(CONG.estimatedLines||[]).concat(v[7].estimatedLines||[]);
+      if (v[7].modelErrorPct) CONG.modelErrorPct=v[7].modelErrorPct;
+    }
     $('bootNote').textContent = '역·정류장 ' + G.nodes.length.toLocaleString('ko-KR')
       + '곳, 노선 ' + G.routes.length + '개. 주소·건물 이름도 넣을 수 있습니다.';
     restore(); refreshNext();
@@ -1356,7 +1371,9 @@
            「2자리 비어 있습니다」라고 단정했더니 그 숫자 하나로 전체를 못 믿게 됐다 —
            추정이면 추정이라고 그 자리에 바로 말한다. */
         html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)
-          + (l.estimated ? ' <span class="muted">— 하루 평균으로 낸 값이라 차마다 다릅니다</span>' : '')
+          + (l.estimated ? ' <span class="muted">— '
+              + esc(/되짚/.test(l.why||'') ? '이 지역은 혼잡도 실측이 없어 승하차 인원에서 되짚은 값입니다'
+                                           : '하루 평균으로 낸 값이라 차마다 다릅니다') + '</span>' : '')
           + '</div>' + seatGrid(l);
         var p=SeatModel.seatChance(l.pSeated);
         html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)

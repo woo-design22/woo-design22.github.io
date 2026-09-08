@@ -21,8 +21,14 @@
   // capacity = 혼잡도 100% 의 기준이 되는 정원, standing = 입석 가능 여부.
   // 지하철은 54/160 = 33.75% ≈ 34% 라 사양서 4.1 의 "좌석이 모두 찬 상태가 34%"와 맞는다.
   // 이 두 값을 따로 고치면 34% 임계값이 깨진다 — 반드시 같이 본다.
+  /* ★ 부산은 차가 작다 ★ 서울 대형전동차(20m)는 1칸 정원 160·좌석 54인데
+     부산 1~3호선은 17.5m 중형이라 정원 118·좌석 44, 4호선은 9.1m 경전철이라
+     정원 53·좌석 21뿐이다(부산교통공사 「전동차 주요제원」). 서울 값을 그대로 쓰면
+     같은 혼잡도에서 앉을 확률이 통째로 틀린다 — 좌석 대비 재차의 비가 달라지기 때문. */
   var VEHICLES = {
     subwayCar:  { name: '지하철 1칸', seats: 54, capacity: 160, standing: true },
+    subwayBusan:      { name: '부산 지하철 1칸', seats: 44, capacity: 118, standing: true },
+    subwayBusanLight: { name: '부산 경전철 1칸', seats: 21, capacity: 53,  standing: true },
     busTrunk:   { name: '간선버스',   seats: 23, capacity: 45,  standing: true },
     busBranch:  { name: '지선버스',   seats: 23, capacity: 45,  standing: true },
     busVillage: { name: '마을버스',   seats: 15, capacity: 30,  standing: true },
@@ -60,6 +66,22 @@
     var k = seats * (kRatio === undefined ? K_RATIO : kRatio);
     if (k <= 0) return load < seats ? 1 : 0;
     return 1 / (1 + Math.exp((load - seats) / k));
+  }
+
+  /* ★ 추정으로 센 재차라면 확률도 그만큼 무뎌야 한다 ★ (D-104)
+     서울은 혼잡도가 실측이라 재차인원을 거의 그대로 안다. 부산은 다르다 —
+     승하차에서 되짚은 추정이고, 1호선 실측과 맞대 본 오차가 평균 8%p(한 칸 9~10명)다.
+     그 오차를 무시하고 로지스틱에 넣으면 「앉을 확률 3%」 같은 확신이 나온다.
+     좌석 44석이면 k 가 4.8명뿐이라 **열 명만 틀려도 답이 뒤집히는** 가파른 곡선이기 때문이다.
+     그러니 오차를 곡선에 합쳐 둔다(로지스틱 ≈ 정규분포, 표준편차 = 1.814k):
+        k_eff = √(k² + (σ/1.814)²)
+     σ=0(실측)이면 k 그대로다 — 서울 계산은 한 자리도 안 바뀐다.
+     이건 「1%와 99%는 유의하라」(D-101)를 자료의 불확실성에서 다시 지키는 것이다. */
+  function kRatioFor(seats, sigma, kRatio) {
+    var base = kRatio === undefined ? K_RATIO : kRatio;
+    if (!sigma || !(seats > 0)) return base;
+    var k = seats * base, s = sigma / 1.814;
+    return Math.sqrt(k * k + s * s) / seats;
   }
 
   /* 광역버스는 입석 금지라 잔여좌석 유무가 곧 탑승 가능 여부다 (사양서 5.1).
@@ -154,7 +176,8 @@
       return { pBoard: 1, pDuring: 0, pSeated: 1, standingMinutes: 0, totalMinutes: 0, boardable: 1, perSegment: [] };
     }
 
-    var pb0 = blendBase(pBoard(segs[0].load, seats), opt.seatBase);
+    var kR = kRatioFor(seats, opt.loadSigma);
+    var pb0 = blendBase(pBoard(segs[0].load, seats, kR), opt.seatBase);
     var standing = 1 - pb0;          // 아직 서 있을 확률
     var standMin = standing * segs[0].minutes;
     var per = [{ minutes: segs[0].minutes, standingProb: standing }];
@@ -247,7 +270,10 @@
           alightAtEnd: s.alightAtEnd
         };
       });
-      var r = ride({ vehicle: opt.vehicle, alpha: opt.alpha, segments: shifted, freeSeats: opt.freeSeats });
+      /* ★ 옵션을 골라 담지 말 것 ★ seatBase(D-101)·loadSigma(D-104)를 안 넘기면
+         분산 자료가 있는 노선에서만 그 기능이 조용히 죽는다 — D-55 와 같은 함정이다. */
+      var r = ride({ vehicle: opt.vehicle, alpha: opt.alpha, segments: shifted,
+                     freeSeats: opt.freeSeats, seatBase: opt.seatBase, loadSigma: opt.loadSigma });
       if (!acc) {
         acc = { pBoard: 0, pDuring: 0, pSeated: 0, standingMinutes: 0, totalMinutes: r.totalMinutes,
                 boardable: 0, perSegment: r.perSegment.map(function (p) { return { minutes: p.minutes, standingProb: 0 }; }) };
@@ -369,6 +395,7 @@
   return {
     VEHICLES: VEHICLES, SEAT_RATIO_SUBWAY: SEAT_RATIO_SUBWAY,
     ALPHA_DEFAULT: ALPHA_DEFAULT, K_RATIO: K_RATIO, P_STOP_CAP: P_STOP_CAP, blendBase: blendBase,
+    kRatioFor: kRatioFor,
     vehicleOf: vehicleOf,
     loadFromCongestion: loadFromCongestion, congestionFromLoad: congestionFromLoad,
     emptySeats: emptySeats, standingCount: standingCount,

@@ -492,9 +492,11 @@
       known++;
       var r = info.sd
         ? M.rideSpread({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments,
-                         freeSeats: info.freeSeats, seatBase: info.seatBase })
+                         freeSeats: info.freeSeats, seatBase: info.seatBase,
+                         loadSigma: info.loadSigma })
         : M.ride({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments,
-                   freeSeats: info.freeSeats, seatBase: info.seatBase });
+                   freeSeats: info.freeSeats, seatBase: info.seatBase,
+                   loadSigma: info.loadSigma });
       /* ★ 「앉을 확률」 = 그 역에서 **탈 때 바로** 앉을 확률 ★
          (2026-09-04 사용자 지시: 「타자마자 앉을 확률을 말한다.
           중간에 가다가 누가 내려서 그 자리에 앉을 확률이 아니라」)
@@ -530,6 +532,12 @@
       leg.emptySeats = M.emptySeats(info.segments[0].load, veh.seats);
       leg.seats = veh.seats;
       leg.seatText = M.describeSeats(info.segments[0].load, veh.seats);
+      /* ★ 추정이면 추정이라고 화면까지 가져간다 ★ 여기서 안 실으면 상세 화면의
+         「추정입니다」 줄이 영영 안 뜬다 — 실제로 그동안 안 떴다(D-104에서 발견).
+         사유(why)도 함께 보낸다: 버스의 「하루 평균」과 부산의 「승하차에서 되짚음」은
+         같은 「추정」이 아니라서 한 문구로 뭉뚱그리면 안 된다. */
+      leg.estimated = !!info.estimated;
+      leg.why = info.why || '';
       standing += r.standingMinutes;
     }
     /* ★ 기다림도 서 있는 것이다 (D-74, 사용자 지시) ★
@@ -619,7 +627,7 @@
           if (!info || info.notRunning || !info.segments || !info.segments.length) continue;
           var r = M.ride({ vehicle: route.vehicle, alpha: opt.alpha,
                            segments: info.segments, freeSeats: info.freeSeats,
-                           seatBase: info.seatBase });
+                           seatBase: info.seatBase, loadSigma: info.loadSigma });
           if (r.pBoard < minP) continue;
           if (leg.rideMinutes > maxRide) continue;
           /* 한두 정거장 타려고 자리를 찾아 가는 것은 뜻이 없다 — 그 거리면 걸어간다.
@@ -686,7 +694,7 @@
         if (!info || info.notRunning || !info.segments || !info.segments.length) continue;
         var r = M.ride({ vehicle: route.vehicle, alpha: opt.alpha,
                          segments: info.segments, freeSeats: info.freeSeats,
-                         seatBase: info.seatBase });
+                         seatBase: info.seatBase, loadSigma: info.loadSigma });
         if (r.pBoard < (opt.minP === undefined ? 0.5 : opt.minP)) continue;
         seen[key] = 1;
         var veh = M.VEHICLES[route.vehicle];

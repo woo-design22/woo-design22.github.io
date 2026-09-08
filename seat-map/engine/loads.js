@@ -17,12 +17,20 @@
 
   // ── 시간당 운행 대수 (추정) ──────────────────────────────────────────────
   var SUBWAY_CARS = 8;            // 서울 1~8호선은 대개 8칸(2·5호선 10칸 구간도 있다)
-  function trainsPerHour(minutes) {
+  /* ★ 서울 값을 전국에 쓰지 말 것 ★ 아래 상수는 서울 배차다. 부산은 1호선이 출근 4분·
+     평시 6분이라 다르고 편성도 4~8량으로 제각각이다. 노선에 `tph`(24칸 표)와 `cars` 가
+     적혀 있으면 그것을 먼저 읽는다 — 없을 때만 서울 값으로 물러난다(D-103). */
+  function trainsPerHour(minutes, route) {
     var h = minutes / 60;
+    if (route && route.tph && route.tph.length === 24) {
+      var v = route.tph[Math.max(0, Math.min(23, Math.floor((minutes % 1440) / 60)))];
+      if (v > 0) return v;
+    }
     if ((h >= 7 && h < 9.5) || (h >= 17.5 && h < 19.5)) return 20;   // 출퇴근 배차 약 3분
     if (h >= 6 && h < 23) return 12;                                  // 평시 약 5분
     return 7;                                                          // 첫·막차 무렵
   }
+  function carsOf(route) { return (route && route.cars) || SUBWAY_CARS; }
   /* ── 시간당 몇 대가 오는가 ────────────────────────────────────────────
      ★ 이 나누는 수가 두 배 틀리면 앉을 확률이 통째로 뒤집힌다 ★
      예전에는 종류별 상수(간선 10 × 첨두 1.4 = 14대/시 = 4.3분 배차)를 박아 두었는데,
@@ -119,7 +127,8 @@
     var line = route.line || String(route.id).replace(/^S/, '');
     var names = route.stops && route.stops[leg.dirIdx];
     if (!names) return null;
-    var cap = 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
+    /* 1칸 정원. 노선에 적혀 있으면 그것이 옳다(부산 중형 118 · 경전철 53). 서울은 160. */
+    var cap = route.capacity || 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
     /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★ — ★ 반드시 noCong(D-87)보다 먼저 ★
        noCong 이 먼저 null 을 돌려주면 「모름 = 서서」로 살아나 심야 게이트를 건너뛴다.
        직결 병합 뒤 5분 시뮬레이션에서 02~04시에 1·3호선이 산 채로 나왔다 — 이 순서가 근거다.
@@ -143,7 +152,11 @@
         if (route._noCongSet[names[np]]) return null;
     }
     var oor = outOfRange(ctx.congestion, minutes);
-    var per = trainsPerHour(minutes) * SUBWAY_CARS;
+    var per = trainsPerHour(minutes, route) * carsOf(route);
+    /* 승하차 자료에서 되짚은 혼잡도인 노선(부산)은 실측이 아니다. 화면이 그대로
+       밝히도록 여기서 표시를 켠다 — 추정을 숨기면 사양서 3.3 위반이다. */
+    var modeled = !!(ctx.congestion && ctx.congestion.estimatedLines
+                     && ctx.congestion.estimatedLines.indexOf(line) >= 0);
     var side = dirName(route, leg.dirIdx);
     var segs = [], estimated = false, any = false, usedDir = false;
     var bestOff = -1, bestOffAt = null;
@@ -203,13 +216,17 @@
     for (var q = 0; q + 1 < segs.length; q++)
       segs[q].boardAtEnd = Math.max(0, segs[q + 1].load - segs[q].load + (segs[q].alightAtEnd || 0));
     if (!any || !segs.length) return null;
-    return { segments: segs, estimated: estimated, direction: usedDir ? side : null,
+    return { segments: segs, estimated: estimated || modeled, direction: usedDir ? side : null,
              bestOffAt: bestOffAt, boardMinutes: minutes,
+             /* 되짚은 혼잡도의 오차 폭(한 칸 몇 명). 확률 곡선을 그만큼 무디게 한다(D-104).
+                실측 노선은 0 이라 아무 일도 일어나지 않는다. */
+             loadSigma: modeled ? (ctx.congestion.modelErrorPct || 8) / 100 * cap : 0,
              outOfRange: oor ? (oor.before
                  ? '그 시각엔 아직 첫차가 없을 수 있습니다 — 자료가 ' + I.hhmm(oor.at) + '부터라 그 값으로 봤습니다'
                  : '그 시각엔 이미 막차가 끊겼을 수 있습니다 — 자료가 ' + I.hhmm(oor.at) + '까지라 그 값으로 봤습니다') : null,
-             why: estimated ? '하차 인원을 양방향 절반 · 시간당 열차 ' + trainsPerHour(minutes)
-                            + '대 × ' + SUBWAY_CARS + '칸으로 나눈 추정' : '' };
+             why: modeled ? '이 지역은 혼잡도 실측이 없어 승하차 인원에서 되짚은 추정'
+                 : (estimated ? '하차 인원을 양방향 절반 · 시간당 열차 ' + trainsPerHour(minutes, route)
+                                + '대 × ' + carsOf(route) + '칸으로 나눈 추정' : '') };
   }
 
   // ── 버스 ────────────────────────────────────────────────────────────────

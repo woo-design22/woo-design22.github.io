@@ -113,6 +113,21 @@
        pSeated         이 여정에서 언젠가 앉을 확률 = 1 - (1-pBoard)·∏(1-q)
        standingMinutes 서서 가는 시간 (사양서 5.4 — 경로 정렬의 1순위 키)
        perSegment      구간별 [{minutes, standingProb}] — 상세 화면용 */
+  /* ★ 실측 기준값으로 당긴다 (D-101, 사용자 지적) ★
+     「141번 탈 때 앉을 확률 1%가 맞냐 — 1%와 99%는 유의하라」.
+     우리 실시간 수집(간선 4만여 대)을 보면 15시에 **4대 중 3대가 「여유」**(좌석 앉을 수 있음)다.
+     그런데 모형은 인기 정류장 하나에서 1%를 뱉었다. 모형의 per-정류장 추정은 신호 하나일 뿐이고,
+     그 시각 그 종류 버스의 **실측 여유 비율**이 강한 사전값이다. 로그오즈에서 둘을 섞는다
+     (같은 무게) — 정류장별 차이(우리 자산)는 남고 극단만 사라진다. 자료가 없으면 안 섞는다. */
+  function blendBase(p, base, w) {
+    if (base === undefined || base === null || isNaN(base)) return p;
+    var W = w === undefined ? 0.5 : w;
+    var lo = 1e-4, hi = 1 - 1e-4;
+    var a = Math.min(hi, Math.max(lo, p)), b = Math.min(hi, Math.max(lo, base));
+    var z = W * Math.log(a / (1 - a)) + (1 - W) * Math.log(b / (1 - b));
+    return 1 / (1 + Math.exp(-z));
+  }
+
   function ride(opt) {
     var veh = vehicleOf(opt.vehicle);
     var seats = veh.seats;
@@ -139,7 +154,7 @@
       return { pBoard: 1, pDuring: 0, pSeated: 1, standingMinutes: 0, totalMinutes: 0, boardable: 1, perSegment: [] };
     }
 
-    var pb0 = pBoard(segs[0].load, seats);
+    var pb0 = blendBase(pBoard(segs[0].load, seats), opt.seatBase);
     var standing = 1 - pb0;          // 아직 서 있을 확률
     var standMin = standing * segs[0].minutes;
     var per = [{ minutes: segs[0].minutes, standingProb: standing }];
@@ -337,7 +352,9 @@
     /* ★ 확률 「표기」의 상한은 90 (D-73, 사용자 지시) ★
        계산이 97·100 이어도 입 밖으로는 90 까지만 — 예측이 확신을 말하면
        한 번의 반례로 신뢰가 무너진다. 다섯 단계 분류는 원값으로 매긴다. */
-    var pct = Math.min(90, Math.round(pSeated * 100));
+    /* 표기 상한 90(D-73)과 **하한 5**(D-101) — 「1%」는 우리가 가진 자료로 뒷받침되지 않는
+       확신이다(같은 시각 같은 노선에서도 차마다 여유·보통·혼잡이 섞인다). 분류는 원값으로. */
+    var pct = Math.min(90, Math.max(5, Math.round(pSeated * 100)));
     var l = levelOf(pSeated);
     return { tone: l.tone, text: '탈 때 앉을 확률 ' + pct + '%', label: l.text, percent: pct };
   }
@@ -351,7 +368,7 @@
 
   return {
     VEHICLES: VEHICLES, SEAT_RATIO_SUBWAY: SEAT_RATIO_SUBWAY,
-    ALPHA_DEFAULT: ALPHA_DEFAULT, K_RATIO: K_RATIO, P_STOP_CAP: P_STOP_CAP,
+    ALPHA_DEFAULT: ALPHA_DEFAULT, K_RATIO: K_RATIO, P_STOP_CAP: P_STOP_CAP, blendBase: blendBase,
     vehicleOf: vehicleOf,
     loadFromCongestion: loadFromCongestion, congestionFromLoad: congestionFromLoad,
     emptySeats: emptySeats, standingCount: standingCount,

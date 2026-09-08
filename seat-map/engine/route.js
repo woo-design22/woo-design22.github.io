@@ -491,8 +491,10 @@
       }
       known++;
       var r = info.sd
-        ? M.rideSpread({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments, freeSeats: info.freeSeats })
-        : M.ride({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments, freeSeats: info.freeSeats });
+        ? M.rideSpread({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments,
+                         freeSeats: info.freeSeats, seatBase: info.seatBase })
+        : M.ride({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments,
+                   freeSeats: info.freeSeats, seatBase: info.seatBase });
       /* ★ 「앉을 확률」 = 그 역에서 **탈 때 바로** 앉을 확률 ★
          (2026-09-04 사용자 지시: 「타자마자 앉을 확률을 말한다.
           중간에 가다가 누가 내려서 그 자리에 앉을 확률이 아니라」)
@@ -616,7 +618,8 @@
           var info = opt.loadFor ? opt.loadFor(leg) : null;
           if (!info || info.notRunning || !info.segments || !info.segments.length) continue;
           var r = M.ride({ vehicle: route.vehicle, alpha: opt.alpha,
-                           segments: info.segments, freeSeats: info.freeSeats });
+                           segments: info.segments, freeSeats: info.freeSeats,
+                           seatBase: info.seatBase });
           if (r.pBoard < minP) continue;
           if (leg.rideMinutes > maxRide) continue;
           /* 한두 정거장 타려고 자리를 찾아 가는 것은 뜻이 없다 — 그 거리면 걸어간다.
@@ -682,7 +685,8 @@
         var info = opt.loadFor ? opt.loadFor(leg) : null;
         if (!info || info.notRunning || !info.segments || !info.segments.length) continue;
         var r = M.ride({ vehicle: route.vehicle, alpha: opt.alpha,
-                         segments: info.segments, freeSeats: info.freeSeats });
+                         segments: info.segments, freeSeats: info.freeSeats,
+                         seatBase: info.seatBase });
         if (r.pBoard < (opt.minP === undefined ? 0.5 : opt.minP)) continue;
         seen[key] = 1;
         var veh = M.VEHICLES[route.vehicle];
@@ -856,14 +860,17 @@
     /* ★ 찍은 역의 노선은 맨 위로 (D-91, 사용자 지시) ★
        「서는 시간 가장 짧음」 **바로 다음 자리**에 올린다. 목록 끝에 얹었더니 13~15위라
        사람이 스크롤로는 못 봤다(혜화역→월곡두산 실측 — 4호선 세 카드가 전부 바닥에).
-       50m 안이면 「그 역을 찍은 것」으로 본다(사용자가 정한 값). 1위 자리는 안 건드린다. */
+       ★ 문턱 50m → 300m (D-102) ★ — 유상호정형외과는 언주역에서 **77m** 인데 50m 를 못 넘어
+       9호선 경로가 5위에 묻혔다(사용자: 「역 바로 옆이면 그 역 경유 경로를 무조건 넣어라」).
+       사람이 「역 옆」이라고 느끼는 거리는 몇십 미터가 아니라 걸어서 3~4분까지다.
+       D-90 의 「목록에 넣기」와 같은 300m 로 맞춘다. 1위 자리는 여전히 안 건드린다. */
     var pins = [], pinSeen = Object.create(null);
     for (var pi = 0; pi < sorted.length && pins.length < 4; pi++) {
       var j3 = sorted[pi];
       if (j3.walkOnly || !j3.legs || !j3.legs.length || j3.notRunning) continue;
       var f3 = j3.legs[0], l3 = j3.legs[j3.legs.length - 1];
-      var atStart = f3.kind === 'subway' && j3.startWalkMeters <= 50;
-      var atEnd = l3.kind === 'subway' && j3.endWalkMeters <= 50;
+      var atStart = f3.kind === 'subway' && j3.startWalkMeters <= 300;
+      var atEnd = l3.kind === 'subway' && j3.endWalkMeters <= 300;
       if (!atStart && !atEnd) continue;
       var pk = (atStart ? 's' + f3.routeId : '') + '|' + (atEnd ? 'e' + l3.routeId : '');
       if (pinSeen[pk]) continue;

@@ -294,6 +294,15 @@
     return row ? row[i] : 1;
   }
 
+  /* 그 시각 그 종류 버스의 실측 「여유」 비율 — 없으면 undefined(안 섞는다). D-101 */
+  function seatBaseOf(ctx, kind, minutes) {
+    var b = ctx.loadCalib && ctx.loadCalib.base;
+    if (!b) return undefined;
+    var h = Math.max(0, Math.min(23, Math.floor((minutes % 1440) / 60)));
+    var v = b[kind + '|' + h];
+    return typeof v === 'number' ? v : undefined;
+  }
+
   function busSegments(ctx, leg, route) {
     var when = legMinutes(ctx, leg);
     if (route.kind === 'night' && !nightBusRunning(when))
@@ -321,7 +330,7 @@
       for (var fi = 0; fi < nseg; fi++)
         flat.push({ load: lv, minutes: route.minutes || 2, alightAtEnd: 0, boardAtEnd: 0 });
       return { segments: flat, estimated: true, direction: null,
-               bestOffAt: null, boardMinutes: when,
+               bestOffAt: null, boardMinutes: when, seatBase: seatBaseOf(ctx, route.kind, when),
                why: '이 노선의 승하차 자료가 없어 같은 종류 버스들의 시간대 평균으로 어림' };
     }
     var ids = route.stops && route.stops[leg.dirIdx];
@@ -397,6 +406,7 @@
       // 광역버스는 입석 금지 — 잔여좌석이 곧 탑승 가능 여부다(사양서 5.1)
       out.freeSeats = Math.max(0, 41 - segs[0].load);
     }
+    out.seatBase = seatBaseOf(ctx, route.kind, when);   // 실측 여유 비율(D-101)
     return out;
   }
 
@@ -410,8 +420,11 @@
             화면에서 일요일을 골라도 버스 숫자가 평일과 똑같았다.
          ② `_busById` 를 매번 null 로 지어 넘겨 정류장 색인 memo 가 늘 헛돌았다.
        하나를 만들어 두고 값만 갈아 끼운다. */
+    /* D-55 의 함정이 D-101 에서 그대로 재발했다 — 새 자료(kindLoad·loadCalib)를 ctx 에만
+       넣고 여기 안 옮겨서 **두 기능이 조용히 굶고 있었다**(종류 평균 어림, 실측 기준값).
+       골라 담는 목록은 늘어날 수밖에 없으니, 새 자료를 ctx 에 넣을 때 **여기도 함께** 고친다. */
     var busCtx = { minutes: ctx.minutes, dayType: ctx.dayType, ride: ctx.ride,
-                   busCalib: ctx.busCalib,          // D-55: 골라 담다 빠뜨리면 조용히 굶는다
+                   busCalib: ctx.busCalib, kindLoad: ctx.kindLoad, loadCalib: ctx.loadCalib,
                    busRoute: null, _busById: null, _busByIdFor: null };
     return function (leg) {
       var route = ctx.graph.routes[leg.routeIdx];
@@ -425,6 +438,8 @@
         busCtx.dayType = ctx.dayType;
         busCtx.ride = ctx.ride;
         busCtx.busCalib = ctx.busCalib;
+        busCtx.kindLoad = ctx.kindLoad;
+        busCtx.loadCalib = ctx.loadCalib;
         got = busSegments(busCtx, leg, route);
       }
       if (got) { leg.boardMinutes = got.boardMinutes; leg.outOfRange = got.outOfRange || null; }

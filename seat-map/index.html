@@ -1458,18 +1458,24 @@
       var d = dpr();
       cx.setTransform(1, 0, 0, 1, 0, 0);
       cx.fillStyle = '#e9e7e2'; cx.fillRect(0, 0, cv.width, cv.height);
-      var sc = 256 * Math.pow(2, o.z), c = merc(o.lat, o.lon);
-      var cxp = c.x * sc, cyp = c.y * sc, ts = 256 * d;
-      var x0 = Math.floor((cxp - cv.width / 2 / d) / 256), x1 = Math.floor((cxp + cv.width / 2 / d) / 256);
-      var y0 = Math.floor((cyp - cv.height / 2 / d) / 256), y1 = Math.floor((cyp + cv.height / 2 / d) / 256);
+      /* 타일 번호는 정수 배율에만 있다 — 두 손가락 확대(D-97)로 배율이 소수가 되면
+         가장 가까운 정수 타일을 가져와 그 차이만큼 **늘려서** 그린다.
+         선·이름표는 o.px 가 소수 배율을 그대로 쓰므로 손댈 것이 없다. */
+      var tz = Math.max(9, Math.min(18, Math.round(o.z)));
+      var k = Math.pow(2, o.z - tz);                 // 타일을 늘리는 배율
+      var sc = 256 * Math.pow(2, tz), c = merc(o.lat, o.lon);
+      var cxp = c.x * sc, cyp = c.y * sc, ts = 256 * d * k;
+      var halfW = cv.width / 2 / d / k, halfH = cv.height / 2 / d / k;
+      var x0 = Math.floor((cxp - halfW) / 256), x1 = Math.floor((cxp + halfW) / 256);
+      var y0 = Math.floor((cyp - halfH) / 256), y1 = Math.floor((cyp + halfH) / 256);
       /* OSM 기본 타일은 노랑·주황이 강해 촌스럽다(사용자: "구리다").
          키 없이 깨끗한 스타일(CARTO·Stadia)은 전부 막혀서, 그리는 순간 채도를 눌러
          네이버풍 연한 바탕으로 만든다. filter 를 모르는 브라우저면 원색 그대로 — 죽지 않는다. */
       if ('filter' in cx) cx.filter = 'saturate(0.45) brightness(1.07) contrast(0.96)';
       for (var ty = y0; ty <= y1; ty++) for (var tx = x0; tx <= x1; tx++){
-        var img = tileGet(o.z, tx, ty);
-        if (img) cx.drawImage(img, (tx * 256 - cxp) * d + cv.width / 2,
-                                   (ty * 256 - cyp) * d + cv.height / 2, ts, ts);
+        var img = tileGet(tz, tx, ty);
+        if (img) cx.drawImage(img, (tx * 256 - cxp) * d * k + cv.width / 2,
+                                   (ty * 256 - cyp) * d * k + cv.height / 2, ts, ts);
       }
       if ('filter' in cx) cx.filter = 'none';
       /* 네이버·카카오 선의 비밀은 **흰 테두리**다 — 밑에 흰 굵은 선, 위에 색 선. */
@@ -1514,12 +1520,50 @@
       }
     };
     o.zoom = function(dz){ o.z = Math.max(9, Math.min(18, o.z + dz)); o.req(); if (o.onMove) o.onMove(); };
+    /* 화면의 한 점 ↔ 위경도 — 두 손가락 사이의 지점을 붙잡아 두려면 둘 다 필요하다(D-97). */
+    function localXY(e){ var r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+    o.geoAt = function(sx, sy){
+      var d = dpr(), sc = 256 * Math.pow(2, o.z) * d, c = merc(o.lat, o.lon);
+      var x = c.x + (sx * d - cv.width / 2) / sc, y = c.y + (sy * d - cv.height / 2) / sc;
+      return { lat: Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI, lon: x * 360 - 180 };
+    };
+    o.centerOn = function(g, sx, sy){
+      var d = dpr(), sc = 256 * Math.pow(2, o.z) * d, pm = merc(g.lat, g.lon);
+      var nx = pm.x - (sx * d - cv.width / 2) / sc, ny = pm.y - (sy * d - cv.height / 2) / sc;
+      o.lon = nx * 360 - 180;
+      o.lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ny))) * 180 / Math.PI;
+    };
+    /* ★ 두 손가락 확대·축소 (D-97, 사용자 요청) ★
+       ＋－ 단추만으로는 불편하다. 손가락 둘을 각각 기억해 두고, 사이 거리의 비율로 배율을
+       정한다(log₂). 두 손가락 **가운데 있던 지점**이 그 자리에 머물도록 지도를 옮긴다 —
+       안 그러면 확대할 때마다 보던 곳이 화면 밖으로 달아난다. */
+    var PT = {}, pinch = null;
+    function pts(){ return Object.keys(PT).map(function(k){ return PT[k]; }); }
+    function dist(a, b){ return Math.hypot(a.x - b.x, a.y - b.y); }
     // 조작 — 마우스와 손가락이 같은 길(pointer)을 탄다
     cv.addEventListener('pointerdown', function(e){
-      o.drag = { x: e.clientX, y: e.clientY, lat: o.lat, lon: o.lon };
+      PT[e.pointerId] = localXY(e);
+      var q = pts();
+      if (q.length === 2){
+        var mid = { x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 };
+        pinch = { d0: Math.max(1, dist(q[0], q[1])), z0: o.z, geo: o.geoAt(mid.x, mid.y) };
+        o.drag = null;                       // 두 손가락일 때는 끌기를 멈춘다
+      } else {
+        o.drag = { x: e.clientX, y: e.clientY, lat: o.lat, lon: o.lon };
+      }
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener('pointermove', function(e){
+      if (PT[e.pointerId]) PT[e.pointerId] = localXY(e);
+      var q = pts();
+      if (pinch && q.length === 2){
+        var mid = { x: (q[0].x + q[1].x) / 2, y: (q[0].y + q[1].y) / 2 };
+        var r = Math.max(1, dist(q[0], q[1])) / pinch.d0;
+        o.z = Math.max(9, Math.min(18, pinch.z0 + Math.log(r) / Math.LN2));
+        o.centerOn(pinch.geo, mid.x, mid.y);
+        o.req(); if (o.onMove) o.onMove();
+        return;
+      }
       if (!o.drag) return;
       var sc = 256 * Math.pow(2, o.z), c = merc(o.drag.lat, o.drag.lon);
       var nx = c.x - (e.clientX - o.drag.x) / sc, ny = c.y - (e.clientY - o.drag.y) / sc;
@@ -1527,8 +1571,20 @@
       o.lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * ny))) * 180 / Math.PI;
       o.req(); if (o.onMove) o.onMove();
     });
-    cv.addEventListener('pointerup', function(){ o.drag = null; });
-    cv.addEventListener('pointercancel', function(){ o.drag = null; });
+    function lift(e){
+      delete PT[e.pointerId];
+      var q = pts();
+      if (q.length < 2) pinch = null;
+      // 손가락 하나가 남으면 그 자리에서 끌기를 이어 간다(안 그러면 지도가 튄다)
+      o.drag = q.length === 1 ? { x: e.clientX, y: e.clientY, lat: o.lat, lon: o.lon } : null;
+      if (q.length === 1){
+        var only = Object.keys(PT)[0];
+        var r = cv.getBoundingClientRect();
+        o.drag = { x: PT[only].x + r.left, y: PT[only].y + r.top, lat: o.lat, lon: o.lon };
+      }
+    }
+    cv.addEventListener('pointerup', lift);
+    cv.addEventListener('pointercancel', lift);
     cv.addEventListener('wheel', function(e){ e.preventDefault(); o.zoom(e.deltaY < 0 ? 1 : -1); }, { passive: false });
     cv.addEventListener('keydown', function(e){
       var st = 40 / (256 * Math.pow(2, o.z));

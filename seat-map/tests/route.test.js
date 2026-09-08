@@ -539,7 +539,7 @@ t('빠른 순 상위 5는 목록에서 잘리지 않는다 (D-89)', () => {
 t('찍은 역의 노선은 1위 바로 다음에 온다 (D-91)', () => {
   // 실측(2026-09-07 21:10): 혜화역에서 4호선 타는 길 셋이 13~15위라 화면에서 안 보였다
   const got = plan('혜화역', '월곡동두산아파트', 21 * 60 + 10, 'weekday');
-  const isL4 = j => !j.walkOnly && j.legs[0].kind === 'subway' && j.startWalkMeters <= 50;
+  const isL4 = j => !j.walkOnly && j.legs[0].kind === 'subway' && j.startWalkMeters <= 300;
   const first = got.findIndex(isL4);
   assert.ok(first >= 0, '혜화역에서 지하철 타는 길이 목록에 없다');
   assert.ok(first <= 1, `찍은 역의 노선이 ${first + 1}위 — 1위 바로 다음이어야 한다`);

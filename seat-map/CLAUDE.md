@@ -120,6 +120,9 @@ seat-map/
 | 걷기 경로는 잘라내지 않는다 | `route.js rank` | 600m에서 차편 12개가 「9분 걷기」를 밀어냈다 → D-81 |
 | 끝점 접속은 「새로 만나는 무리」만 | `build_graph.py _attach_wide_ends` | 이미 만나는 노선을 또 붙이면 배열이 꼬인다(사당·광명사거리) → D-86 |
 | 자료 없는 버스 = 종류 평균 어림 | `loads.js`·`build_kind_load.js` | 「알 수 없음」 방치 금지(사용자 지시), 어림 표기 필수 → D-86 |
+| 확률 표기는 5~90% 안에서 | `seat-model.js seatChance` | 1%·99%는 우리 자료가 못 받치는 확신이다 → D-101 |
+| 버스 확률은 실측 여유 비율과 섞는다 | `seat-model.js blendBase` | 15시 실측 여유 76%인데 모형이 1%를 뱉었다 → D-101 |
+| ctx 에 자료를 더하면 busCtx 도 고친다 | `loads.js makeLoadFor` | 안 옮기면 그 기능이 조용히 굶는다(D-55 재발) → D-101 |
 | 환승은 400m 이웃까지 | `route.js nearNodes`·`hopsAt` | 95m 밖 정류장이라 가장 빠른 길이 지워졌다 → D-90 |
 | 목록에 얹은 카드엔 표지 | `route.js rank` `j.appended` | 「서는 시간 순」이라 말해 놓고 몰래 끼우면 목록을 못 믿는다 → D-90 |
 

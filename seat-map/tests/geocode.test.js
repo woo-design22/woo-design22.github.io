@@ -147,3 +147,33 @@ test('도보 시간은 직선거리가 아니라 실제로 도는 거리로 잡�
   assert.ok(normal > 8 && normal < 10, `${normal.toFixed(1)}분 — 상식 범위를 벗어났다`);
   assert.ok(slow > normal * 1.9, '아주 느린 걸음은 두 배 가까이 걸려야 한다');
 });
+
+// ── 상호로 찾기 (D-99) ────────────────────────────────────────────────────
+test('상호 + 동 이름으로 찾는다 (「미아동 내과」)', () => {
+  Geo.setPoi([
+    ['미아연세내과의원', 37.6265, 127.0256, '서울특별시 강북구 미아동 202-11', '병의원'],
+    ['강남정형외과의원', 37.4980, 127.0276, '서울특별시 강남구 역삼동 1-1', '병의원'],
+    ['미아온누리약국', 37.6260, 127.0250, '서울특별시 강북구 미아동 300', '약국']
+  ]);
+  const got = Geo.poiSearch('미아동 내과', 5);
+  assert.ok(got.length >= 1, '「미아동 내과」로 아무것도 못 찾았다');
+  assert.strictEqual(got[0].name, '미아연세내과의원');
+  // 지번주소로도 찾힌다 — OSM 이 못 하던 바로 그 일(D-98)
+  const addr = Geo.poiSearch('미아동 202-11', 5);
+  assert.strictEqual(addr[0].name, '미아연세내과의원');
+  // 딴 동네 같은 업종은 안 나온다
+  assert.ok(!got.some(x => x.name === '강남정형외과의원'));
+  // 목록이 없으면 조용히 빈 손 (자료 미배포 상태에서도 앱은 돈다)
+  Geo.setPoi(null);
+  assert.deepStrictEqual(Geo.poiSearch('미아동 내과', 5), []);
+});
+
+test('동 이름이 어긋난 온라인 주소는 뒤로 민다 (D-99)', () => {
+  const loc = [{ name: '미아연세내과의원', detail: '병의원 · 서울특별시 강북구 미아동 202-11',
+                 lat: 37.6265, lon: 127.0256, source: 'poi' }];
+  const on = [{ name: '삼양로27길 95', detail: '202 · 삼각산동', lat: 37.6136, lon: 127.0299, source: 'online' },
+              { name: '삼양로27길 19', detail: '202 · 삼각산동', lat: 37.6151, lon: 127.0298, source: 'online' }];
+  const got = Geo.merge(loc, on, 12, '미아동 202-11');
+  assert.strictEqual(got[0].name, '미아연세내과의원', '지번을 아는 장소가 먼저 와야 한다');
+  assert.strictEqual(got.length, 3, '어긋난 주소도 지우지는 않는다');
+});

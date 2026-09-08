@@ -45,6 +45,25 @@ def num(v):
         return None
 
 
+def store_rows(path):
+    """소상공인 상가업소정보 → 같은 다섯 칸 (D-100). 업종명을 종류로 쓴다."""
+    try:
+        raw = json.load(io.open(path, encoding='utf-8'))
+    except Exception as e:
+        C.log('  store.json 못 읽음 — %s' % str(e)[:50])
+        return []
+    out = []
+    for it in raw:
+        name = str(it.get('bizesNm') or '').strip()
+        lat, lon = num(it.get('lat')), num(it.get('lon'))
+        if not name or lat is None or lon is None or not in_area(lat, lon):
+            continue
+        addr = str(it.get('lnoAdr') or it.get('rdnmAdr') or '').strip()
+        kind = str(it.get('indsSclsNm') or it.get('indsMclsNm') or it.get('indsLclsNm') or '가게').strip()
+        out.append([name, round(lat, 5), round(lon, 5), addr, kind])
+    return out
+
+
 def rows_from(path, kind):
     try:
         raw = json.load(io.open(path, encoding='utf-8'))
@@ -68,12 +87,13 @@ def main():
     if not os.path.isdir(SRC_DIR):
         C.die('%s 가 없다. 먼저 `python pipeline/fetch_poi.py` 를 돌린다.' % SRC_DIR)
     items, seen = [], set()
-    for fn, kind in (('hosp.json', '병의원'), ('pharm.json', '약국')):
+    sources = [('hosp.json', '병의원'), ('pharm.json', '약국'), ('store.json', None)]
+    for fn, kind in sources:
         p = os.path.join(SRC_DIR, fn)
         if not os.path.exists(p):
             C.log('  %s 없음 — 건너뜀' % fn)
             continue
-        got = rows_from(p, kind)
+        got = store_rows(p) if kind is None else rows_from(p, kind)
         for r in got:
             key = r[0] + '|' + str(r[1]) + '|' + str(r[2])
             if key in seen:

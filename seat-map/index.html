@@ -450,6 +450,7 @@
 <script src="engine/interp.js"></script>
 <script src="engine/seat-model.js"></script>
 <script src="engine/transfer.js"></script>
+<script src="engine/fare.js"></script>
 <script src="engine/sim-seoul.js"></script>
 <script src="engine/route.js"></script>
 <script src="engine/loads.js"></script>
@@ -1299,11 +1300,13 @@
       var ph = j.walkOnly ? { tone:'best', text:'걸어서 갑니다', label:'' } : j.seatChance;
       var waitSum = j.walkOnly ? 0
         : j.legs.reduce(function(a,l){ return a+(l.waitMinutes||0); }, 0);
+      var fareShort = (!j.walkOnly && window.SeatFare && j.fare && j.fare.total != null)
+        ? ' · 💳 ' + (j.fare.approx ? '약 ' : '') + j.fare.total.toLocaleString('ko-KR') + '원' : '';
       var sub = j.walkOnly
         ? '전체 '+Math.round(j.totalMinutes)+'분 · '+fmtM(j.walkMeters)+' 걷기'
         : '전체 '+Math.round(j.totalMinutes)+'분 = 걷는 시간 '+Math.round(j.walkMinutes)
           +'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '+Math.round(j.rideMinutes)
-          +'분 · 환승 '+j.transfers+'회';
+          +'분 · 환승 '+j.transfers+'회'+fareShort;
       b.innerHTML =
         '<span class="typeTag ' + TYPE_DEF[ty].cls + '">' + TYPE_DEF[ty].tag + '</span>' +
         /* 목록 순서 밖에서 얹은 카드는 이유를 밝힌다 (D-90) — 「서는 시간 순」이라 말해 놓고
@@ -1357,9 +1360,12 @@
     }
 
     var waitSum = j.legs.reduce(function(a,l){ return a+(l.waitMinutes||0); }, 0);
+    /* 요금(D-111) — 대략값이라 「약」을 붙인다(fareText 가 붙여 준다). 못 구하면 줄을 안 넣는다. */
+    var fareLine = (window.SeatFare && j.fare) ? SeatFare.fareText(j.fare) : null;
     html += '<div class="muted small">전체 '+Math.round(j.totalMinutes)+'분 = 걷는 시간 '
       + Math.round(j.walkMinutes)+'분 + 기다림 '+Math.round(waitSum)+'분 + 타기 '
-      + Math.round(j.rideMinutes)+'분 · 환승 '+j.transfers+'회</div>'
+      + Math.round(j.rideMinutes)+'분 · 환승 '+j.transfers+'회'
+      + (fareLine ? ' · 💳 '+fareLine : '')+'</div>'
       + '<div style="margin:8px 0 14px"><span class="phrase tone-'+j.seatChance.tone+'">● '
       + esc(j.seatChance.text) + (j.seatChance.label?' · '+esc(j.seatChance.label):'')
       + '</span> <span class="muted small">(타는 '+Math.round(j.rideMinutes)+'분 중 '

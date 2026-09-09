@@ -132,8 +132,14 @@
     border-radius:999px; background:var(--bg); color:var(--ink2); margin-bottom:6px}
   /* 출발↔도착 바꾸기 (D-92) — 첫 화면에서는 **줄을 새로 만들지 않는다**.
      두 칸 사이에 한 줄을 넣었더니 출발·도착이 멀어져 한 쌍으로 안 읽혔다(사용자 지적).
-     라벨 줄 오른쪽에 작게 붙인다 — 결과창 편집바에는 큰 단추를 그대로 둔다. */
-  .labelRow{display:flex; align-items:center; justify-content:space-between; gap:8px}
+     그래서 라벨 줄 오른쪽에 작게 붙인다 — 결과창 편집바에는 큰 단추를 그대로 둔다.
+     ★ 어느 라벨 줄이냐 ★ 출발 라벨 줄에 뒀더니 두 칸보다 **위**에 떠서 무엇을 바꾸는지가
+     안 읽혔다(사용자 지적). 도착 라벨 줄로 내리면 두 「지도」 단추 **사이**에 놓여
+     위아래를 맞바꾼다는 뜻이 그림으로 읽힌다. 오른쪽 끝에 맞춰 지도 단추와 한 줄로 세운다. */
+  /* 라벨의 아래 여백(5px)을 label{margin:0} 으로 지우므로 줄 쪽에 돌려준다 —
+     안 그러면 바꾸기 단추 밑이 아래 「지도」 단추와 맞닿는다(실측 235px 에서 붙었다). */
+  .labelRow{display:flex; align-items:center; justify-content:space-between; gap:8px;
+    margin-bottom:5px}
   .labelRow label{margin:0}
   .swapMini{min-height:36px; padding:5px 11px; border:1px solid var(--line); border-radius:999px;
     background:var(--card); color:var(--ink2); cursor:pointer; font-size:.85em; white-space:nowrap}
@@ -280,11 +286,7 @@
   <section id="step1">
     <div class="card">
       <div class="box">
-        <div class="labelRow">
-          <label for="fromQ">어디서 출발하세요?</label>
-          <button class="swapMini" id="swapFT" title="출발지와 도착지를 서로 바꿉니다"
-                  aria-label="출발지와 도착지 바꾸기">⇅ 바꾸기</button>
-        </div>
+        <label for="fromQ">어디서 출발하세요?</label>
         <div class="withBtn">
           <input type="text" id="fromQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
           <button id="here" title="지금 있는 곳" aria-label="지금 있는 곳으로 넣기">◎</button>
@@ -293,7 +295,11 @@
         <div class="list" id="fromList" hidden></div>
       </div>
       <div class="box" style="margin-bottom:0">
-        <label for="toQ">어디로 가세요?</label>
+        <div class="labelRow">
+          <label for="toQ">어디로 가세요?</label>
+          <button class="swapMini" id="swapFT" title="출발지와 도착지를 서로 바꿉니다"
+                  aria-label="출발지와 도착지 바꾸기">⇅ 바꾸기</button>
+        </div>
         <div class="withBtn">
           <input type="text" id="toQ" placeholder="주소·건물·역·정류장 아무거나" autocomplete="off" enterkeyhint="search">
           <button id="mapTo" class="mapSel" aria-label="도착지를 지도에서 고르기">지도</button>

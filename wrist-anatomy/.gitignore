@@ -1,0 +1,9 @@
+# Z-Anatomy 원본 (CC BY-SA 4.0, 85MB) — 커밋하지 않는다. 없으면 다시 받는다:
+#   mkdir -p source && curl -sL -o source/Z-Anatomy.zip \
+#     https://raw.githubusercontent.com/Z-Anatomy/Models-of-human-anatomy/master/Z-Anatomy.zip
+#   unzip -q source/Z-Anatomy.zip -d source/
+source/
+# 중간 산출물 — index.html 에 이미 심겨 있어 게시에 필요 없다
+data/
+# 렌더 결과물(프레임 600장, 영상)
+out/

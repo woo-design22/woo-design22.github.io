@@ -16,9 +16,9 @@
      교집합을 본다. 양쪽에서 좁히지 않으면 2회 환승에서 경우의 수가 터진다. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports)
-    module.exports = factory(require('./seat-model.js'), require('./transfer.js'));
-  else root.SeatRoute = factory(root.SeatModel, root.SeatTransfer);
-})(typeof self !== 'undefined' ? self : this, function (M, T) {
+    module.exports = factory(require('./seat-model.js'), require('./transfer.js'), require('./fare.js'));
+  else root.SeatRoute = factory(root.SeatModel, root.SeatTransfer, root.SeatFare);
+})(typeof self !== 'undefined' ? self : this, function (M, T, F) {
   'use strict';
 
   var WALK_RADIUS_M = 700;      // 출발·도착 지점에서 걸어갈 만한 거리
@@ -614,6 +614,10 @@
     journey.pSeatedShown = rideShown > 0 ? Math.max(0, rideShown - vehShown) / rideShown : 1;
     journey.seatChance = M.seatChanceJourney(journey.knownLegs > 0 ? journey.pSeatedShown : null);
     journey.seatPhrase = M.seatPhrase(journey.pSeated);
+    /* 요금(D-111) — 여정 전체를 묶어 통합환승할인으로 계산한다(순수함수 SeatFare).
+       ctx.graph 로 노드·노선 좌표를 준다. 라이브러리가 없으면(구버전) 건너뛴다. */
+    if (F && F.journeyFare && ctx.graph)
+      journey.fare = F.journeyFare(legs, ctx.graph.nodes, ctx.graph.routes);
     return journey;
   }
 

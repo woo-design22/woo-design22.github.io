@@ -856,6 +856,22 @@ var MOVE={
 };
 var IDENT=[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 var ANIM={on:false, u:0, last:0};
+var TEAR_MM=2.6;   // 갈라져 보이게 하는 최대 벌어짐. 크게 잡으면 만화가 된다.
+
+// 부하가 가장 큰 순간에만, 그것도 크게 다치는 구조에만 갈라짐을 보인다.
+// **연출이다.** 실제 파열의 모양이나 크기를 재현한 것이 아니다.
+function tearFor(i, rot){
+  if(!rot || FOCUS<0) return null;
+  var p=parts[i];
+  if(p.gi!==FOCUS) return null;
+  if((MOT.load[i]||0) < 3) return null;          // 3단계(큰 부하)만
+  var mv=rot.mv, u=ANIM.u;
+  var k = mv.osc ? Math.abs(Math.sin(u*Math.PI*2)) : (1-Math.cos(u*Math.PI*2))/2;
+  var t = (k-0.72)/0.28;                          // 최정점 부근에서만 벌어진다
+  if(t <= 0) return null;
+  t = Math.min(1, t);
+  return {n:mv.ax, amt:TEAR_MM*t*t, c:groupCenter(FOCUS)};
+}
 
 // 축 하나를 중심으로 도는 행렬. 피벗을 지나는 축이라 T(p)·R·T(-p) 다.
 function rotAbout(ax, ang, piv){
@@ -898,8 +914,14 @@ function skinFor(i, rot){
   if(!rot) return [0,0,0];
   var p=parts[i], mv=rot.mv, bn=baseName(p.name);
   if(p.layer===BONE_LAYER){
-    if(bn==='Ulna') return [0,0,0];                       // 척골은 두 동작 모두 축이다
-    if(bn==='Radius') return [mv.set==='fore'?1:0,0,0];   // 아래팔 회전에서만 요골이 돈다
+    if(bn==='Ulna') return [0,0,0];                    // 척골은 두 동작 모두 축이다
+    if(bn==='Radius'){
+      // 아래팔 회전에서 요골을 통째로 돌리면 주변 근육을 뚫고 나온다.
+      // 실제로도 통째로 돌지 않는다 — 손목 쪽은 크게 휘돌고 팔꿈치 쪽 머리는 제자리에서 돈다.
+      if(mv.set!=='fore') return [0,0,0];
+      var b0=mv.blend||BLEND_WRIST;
+      return [2, b0[0], b0[1]];
+    }
     return [p.cen[1] < 50 ? 1 : 0, 0, 0];
   }
   var b = mv.blend || BLEND_WRIST;
@@ -937,6 +959,9 @@ var VS=
 'uniform mat4 uMVP; uniform mat4 uMV; uniform mat3 uNM;\n'+
 'uniform vec3 uLo, uSpan; uniform mat4 uModel;\n'+
 'uniform vec3 uSkin;   // x: 0 고정 / 1 전부 따라감 / 2 높이로 섞기, y: 관절 높이, z: 섞이는 폭\n'+
+'uniform vec4 uTear;   // xyz: 갈라지는 면의 법선, w: 벌어지는 정도(mm)\n'+
+'uniform vec3 uTearC;  // 그 구조의 무게중심\n'+
+'out float vTear;\n'+
 'out vec3 vN; out vec3 vP;\n'+
 'void main(){\n'+
 '  vec3 p0 = uLo + (vec3(aQ)/65535.0)*uSpan;\n'+
@@ -944,6 +969,12 @@ var VS=
 '  if(uSkin.x > 1.5)\n'+
 '    w = smoothstep(uSkin.y + uSkin.z, uSkin.y - uSkin.z, p0.y);\n'+
 '  vec4 p = mix(vec4(p0,1.0), uModel*vec4(p0,1.0), w);\n'+
+'  vTear = 0.0;\n'+
+'  if(uTear.w > 0.0){\n'+
+'    float sd = dot(p0 - uTearC, uTear.xyz);\n'+
+'    p.xyz += uTear.xyz * sign(sd) * uTear.w;\n'+
+'    vTear = uTear.w;\n'+
+'  }\n'+
 '  vN = normalize(uNM*mix(aN, mat3(uModel)*aN, w));\n'+
 '  vP = (uMV*p).xyz;\n'+
 '  gl_Position = uMVP*p;\n'+
@@ -952,7 +983,7 @@ var VS=
 // 반구광 + 정면광. 해부 그림은 대비가 너무 세면 형태가 뭉개진다.
 var FS=
 '#version 300 es\nprecision highp float;\n'+
-'in vec3 vN; in vec3 vP;\n'+
+'in vec3 vN; in vec3 vP; in float vTear;\n'+
 'uniform vec3 uCol; uniform float uAlpha;\n'+
 'uniform float uFade; uniform vec3 uGlow; uniform float uEmph;\n'+
 'out vec4 o;\n'+
@@ -969,12 +1000,14 @@ var FS=
 '  vec3 c = uCol*(amb + d*0.78) + spec + rim;\n'+
 '  c *= uFade;\n'+
 '  c = mix(c, uGlow, uEmph);\n'+
+'  if(vTear > 0.0) c = mix(c, vec3(1.0,0.13,0.10), clamp(vTear*0.45,0.0,0.85));\n'+
 '  o = vec4(c, uAlpha);\n'+
 '}';
 
 // 고르기용. 부위 번호를 색으로 칠해 한 픽셀만 읽는다.
 var PFS=
 '#version 300 es\nprecision highp float;\n'+
+'in float vTear;\n'+
 'uniform vec3 uId;\nout vec4 o;\n'+
 'void main(){ o = vec4(uId,1.0); }';
 
@@ -1146,6 +1179,8 @@ function draw(){
   gl.uniform3fv(A.u.uSpan,new Float32Array(META.quant.span));
   gl.uniformMatrix4fv(A.u.uModel,false,new Float32Array(IDENT));
   gl.uniform3f(A.u.uSkin,0,0,0);
+  gl.uniform4f(A.u.uTear,0,0,0,0);
+  gl.uniform3f(A.u.uTearC,0,0,0);
 
   // 동작이 켜져 있으면 부하 받는 곳만 빛나고 나머지는 흐려진다.
   var pulse=MOT.m ? (0.5+0.5*Math.sin(Date.now()/300)) : 0;
@@ -1173,6 +1208,11 @@ function draw(){
     if(FOCUS>=0 && p.gi!==FOCUS) al=Math.min(al, 0.13);
     gl.uniformMatrix4fv(A.u.uModel,false,new Float32Array(ROT?ROT.m:IDENT));
     var sk=skinFor(i,ROT); gl.uniform3f(A.u.uSkin,sk[0],sk[1],sk[2]);
+    var tr=tearFor(i,ROT);
+    if(tr){
+      gl.uniform4f(A.u.uTear,tr.n[0],tr.n[1],tr.n[2],tr.amt);
+      gl.uniform3f(A.u.uTearC,tr.c[0],tr.c[1],tr.c[2]);
+    } else gl.uniform4f(A.u.uTear,0,0,0,0);
     gl.uniform3f(A.u.uCol,c[0],c[1],c[2]);
     gl.uniform1f(A.u.uAlpha,al);
     gl.uniform1f(A.u.uFade,fade);
@@ -1262,12 +1302,15 @@ function pick(sx,sy){
   gl.uniform3fv(K.u.uSpan,new Float32Array(META.quant.span));
   gl.uniformMatrix4fv(K.u.uModel,false,new Float32Array(IDENT));
   gl.uniform3f(K.u.uSkin,0,0,0);
+  gl.uniform4f(K.u.uTear,0,0,0,0);
+  gl.uniform3f(K.u.uTearC,0,0,0);
   for(var i=0;i<parts.length;i++){
     var p=parts[i]; if(!visible(p)) continue;
     var id=p.id;
     var kr=animRot();
     gl.uniformMatrix4fv(K.u.uModel,false,new Float32Array(kr?kr.m:IDENT));
     var ks=skinFor(i,kr); gl.uniform3f(K.u.uSkin,ks[0],ks[1],ks[2]);
+    gl.uniform4f(K.u.uTear,0,0,0,0);
     gl.uniform3f(K.u.uId,(id&255)/255,((id>>8)&255)/255,((id>>16)&255)/255);
     gl.bindVertexArray(p.vao);
     gl.drawElements(gl.TRIANGLES,p.n,p.type,0);
@@ -1345,7 +1388,8 @@ function show(i){
   [].forEach.call(document.querySelectorAll('#i-body .hm'), function(b){
     b.onclick=function(){
       var m=MOTIONS.filter(function(x){return x.id===b.dataset.m;})[0];
-      if(m){ clearFocus(); setMotion(m); }
+      // 찾아 놓은 구조는 그대로 둔다 — TFCC 를 보러 왔는데 사라지면 헛일이다
+      if(m){ setMotion(m); }
     };
   });
   info.classList.add('on');
@@ -1606,8 +1650,9 @@ function setMotion(m){
   if(mv){
     pl.classList.add('on');
     document.getElementById('mwhy').innerHTML=
-      mv.note+' · <b style="color:#8e9aa6">뼈는 그대로 돌고 인대·힘줄·근육은 늘어납니다. '+
-      '다만 힘줄이 집 안에서 미끄러지는 것이나 근육이 불룩해지는 것까지는 흉내 내지 못합니다</b>';
+      mv.note+' · <b style="color:#8e9aa6">뼈는 돌고 인대·힘줄·근육은 늘어납니다. '+
+      '찾아 놓은 구조가 큰 부하를 받으면 <span style="color:#ff8a7a">가장 힘든 순간에 갈라져 보입니다</span> — '+
+      '이것은 연출이지 실제 파열의 모양을 잰 것이 아닙니다</b>';
   } else pl.classList.remove('on');
 
   var hit=0; for(var q in MOT.load) hit++;
@@ -1845,7 +1890,7 @@ function boot(){
       groups:GROUPS,motions:MOTIONS,mot:MOT,setMotion:setMotion,
       anim:anim,record:record,shoot:shoot,
       anim2:ANIM,move:MOVE,toggleAnim:toggleAnim,rotAbout:rotAbout,
-      animRot:animRot,skinFor:skinFor,
+      animRot:animRot,skinFor:skinFor,tearFor:tearFor,
       hurtBy:motionsHurtBy,
       search:search,goto:gotoGroup,focus:function(){return FOCUS;},
       clearFocus:clearFocus,center:groupCenter,

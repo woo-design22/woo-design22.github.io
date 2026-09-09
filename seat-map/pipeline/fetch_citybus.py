@@ -47,18 +47,32 @@ def key():
     return urllib.parse.unquote(k)
 
 
-def call(op, k, tries=3, **kw):
+# ★ 유량 제한(429)을 조심한다 ★ 간격 없이 때리면 TAGO 가 429 Too Many Requests 로
+# 막는다 — 실측(2026-09-10) 전국 수집이 분당 100회쯤에서 걸려 13분간 89번 헛돌았다.
+# 그래서 ① 호출 사이 최소 간격을 두고 ② 429 는 다른 오류보다 훨씬 길게 쉰다.
+# 429 는 「잠깐 쉬라」는 뜻이라 1.5초 재시도로는 계속 맞는다.
+MIN_GAP_SEC = 0.15
+_last_call = [0.0]
+
+
+def call(op, k, tries=4, **kw):
     p = {'serviceKey': k, '_type': 'json', 'numOfRows': 500, 'pageNo': 1}
     p.update(kw)
     url = BASE + '/' + op + '?' + urllib.parse.urlencode(p)
     last = None
     for i in range(tries):
+        gap = MIN_GAP_SEC - (time.time() - _last_call[0])
+        if gap > 0:
+            time.sleep(gap)
         try:
             raw = urllib.request.urlopen(url, timeout=120).read().decode('utf-8', 'replace')
+            _last_call[0] = time.time()
             return json.loads(raw)
         except Exception as e:
+            _last_call[0] = time.time()
             last = e
-            time.sleep(1.5 * (i + 1))
+            over = getattr(e, 'code', None) == 429
+            time.sleep((20.0 * (i + 1)) if over else 1.5 * (i + 1))
     raise last
 
 

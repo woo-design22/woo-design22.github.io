@@ -107,7 +107,11 @@ for (const [ln, res, cbd] of ANCHORS) {
 
 /* ── ③ 통근 경로 수십 쌍 — 실제 길찾기 결과를 상식과 대조 ─────────────── */
 console.log('\n③ 통근 경로 길찾기 — 평일 08시 (역방향·이른 시각과 비교)');
-function pick(name) { const h = R.findNodes(graph, name, 5); return h.length ? h[0] : null; }
+/* 이 훑기는 **서울 통근 경로**를 본다. 전국 정류장이 들어온 뒤로 「시청역」은 서울·부산·
+   대전 셋에 있으므로, 기준점을 안 주면 딴 도시 역을 집어 「경로 없음」이 된다(D-106).
+   서울시청을 기준으로 준다 — 무엇을 보는 도구인지 밝히는 것이지 봐주는 것이 아니다. */
+const SEOUL = { lat: 37.5665, lon: 126.9780 };
+function pick(name) { const h = R.findNodes(graph, name, 5, SEOUL); return h.length ? h[0] : null; }
 function plan(fromName, toName, minutes, dayType) {
   const a = pick(fromName), b = pick(toName);
   if (!a || !b) return null;

@@ -129,6 +129,9 @@ seat-map/
 | OD 감쇠 10 · 환승벌점 4 | `city_spec.py` | 부산 1호선 실측과 상관 0.976으로 고른 값 → D-103·D-105 |
 | 방향 = 색인 증가가 하선 | `build_city_congestion.py` | 뒤집으면 상관 0.95 → 0.59. 시험이 지킨다 → D-103 |
 | 추정 자료는 확률 곡선을 무디게 | `seat-model.js kRatioFor` | 오차 8%p 를 무시하면 「3%」 같은 확신이 나온다 → D-104 |
+| 지방 버스 이름엔 도시를 붙인다 | `build_citybus.py` | 「101」이 서울·대구에 다 있다. 겹치면 남의 승하차 파일을 읽는다 → D-106 |
+| 이름이 같은 역은 기준점으로 가린다 | `route.js findNodes` | 「시청역」이 서울·부산·대전 셋. 기준점 없이 고르면 서울 경로가 통째로 사라졌다 → D-106 |
+| 방향값 없는 노선은 회차점으로 가른다 | `build_citybus.py split_round_trip` | 광주는 356개 전부 방향이 없다. 한 줄로 두면 그 방향이 사라진다 → D-51·D-106 |
 | 환승은 400m 이웃까지 | `route.js nearNodes`·`hopsAt` | 95m 밖 정류장이라 가장 빠른 길이 지워졌다 → D-90 |
 | 목록에 얹은 카드엔 표지 | `route.js rank` `j.appended` | 「서는 시간 순」이라 말해 놓고 몰래 끼우면 목록을 못 믿는다 → D-90 |
 
@@ -191,6 +194,17 @@ cd C:\Claude\seat-map && python pipeline/fetch_city.py --truth && python pipelin
 모형이나 자료를 고친 뒤에는 반드시 이것을 돌려 통과한 것만 내보낸다.
 **`build_graph.py` 를 다시 돌리면 노선의 편성·배차가 지워지므로 이 세 줄을 다시 돌린다.**
 
+광역시 **시내버스**까지 넣으려면 두 줄을 더 돌린다(TAGO — `DATA_GO_KR_KEY` 필요, D-106).
+노선 1,394개를 한 번씩 부르므로 개발계정 하루 상한에 걸릴 수 있다 — 걸리면 남은 수를 말하고
+멈추므로 다음 날 그대로 다시 돌리면 이어 받는다:
+
+```bash
+cd C:\Claude\seat-map && python pipeline/fetch_citybus.py && python pipeline/build_citybus.py
+```
+
+`build_citybus.py` 는 **다시 돌려도 같은 결과**가 나온다(앞서 붙인 노선·정류장을 먼저 걷어낸다).
+`build_graph.py` 를 다시 돌리면 시내버스가 통째로 사라지므로 이 두 줄도 다시 돌린다.
+
 키가 있으면 그 앞에 `python pipeline/fetch_headways.py` 를 한 번 돌린다 — **오늘의 배차간격**을
 받아 두는 것(D-63). 없어도 2024 인가값으로 돌아간다.
 달에 한 번 `python pipeline/fetch_tdata_file.py && node pipeline/build_tdata_calib.js` 로
@@ -199,7 +213,7 @@ cd C:\Claude\seat-map && python pipeline/fetch_city.py --truth && python pipelin
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 151개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정·서울 밖 다섯 도시)
+node --test tests/*.test.js          # 152개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정·서울 밖 다섯 도시·시내버스)
 node tools/verify_rush.js            # 출근 상식 전수 훑기 — 큰 수술 뒤엔 꼭 돌린다 (D-80)
 node tools/verify_deep.js            # 심층판: 퇴근·심야·무작위 1,135여정·몬테카를로 (D-81)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)

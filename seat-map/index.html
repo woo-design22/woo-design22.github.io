@@ -887,12 +887,22 @@
     }).catch(function(){ poiState = 2; });
   }
 
+  /* 이름이 같은 역이 전국에 여럿이다 (D-106)
+     「시청역」은 서울·부산·대전에 다 있고 「월곡」도 서울과 대구에 있다. 기준점이 없으면
+     검색이 엉뚱한 도시를 먼저 내놓고, 그대로 고르면 경로가 아예 안 나온다.
+     기준점은 셋 중 있는 것을 쓴다 — ① 반대편 지점(가장 좋다) ② 마지막에 고른 곳
+     ③ 그래도 없으면 이름순. 마지막에 고른 곳을 기억해 두는 것이 ②다. */
+  function lastPlace(){
+    try { var o=JSON.parse(store.get(PFX+'last')||'null');
+          return (o && o.lat && o.lon) ? o : null; } catch(e){ return null; }
+  }
   function hookSearch(inputId, listId, key){
     var inp=$(inputId);
     attachSearch(inp, $(listId), function(h){
       S[key]={name:h.name, detail:h.detail, lat:h.lat, lon:h.lon};
+      store.set(PFX+'last', JSON.stringify({lat:h.lat, lon:h.lon}));
       inp.value=h.name; save(); refreshNext(); showPlaces();
-    }, function(){ return S[key === 'from' ? 'to' : 'from'] || null; });
+    }, function(){ return S[key === 'from' ? 'to' : 'from'] || lastPlace(); });
     inp.addEventListener('input', function(){ S[key]=null; refreshNext(); showPlaces(); });
   }
   hookSearch('fromQ','fromList','from');

@@ -198,6 +198,23 @@
   /* near 를 주면 **같은 매칭 등급 안에서** 가까운 쪽을 먼저 준다 (D-90).
      실사용 사고: 서울에서 「중구청」을 치면 대전 중구청역이 1위였다(정확일치 + 역 가산점).
      매칭 등급 자체는 안 흔든다 — 이름이 정확히 맞는 것이 여전히 먼저다. */
+  /* 그 노드에 서는 노선이 몇 개인가. 한 번 세어 그래프에 붙여 둔다 —
+     검색은 자판을 칠 때마다 도는데 노드가 2만 6천 개라 매번 세면 화면이 걸린다. */
+  function degreeOf(graph, i) {
+    var d = graph._deg;
+    if (!d) {
+      d = graph._deg = new Int32Array(graph.nodes.length);
+      for (var r = 0; r < graph.routes.length; r++) {
+        var dirs = graph.routes[r].dirs || [];
+        for (var k = 0; k < dirs.length; k++) {
+          var arr = dirs[k];
+          for (var p = 0; p < arr.length; p++) if (arr[p] < d.length) d[arr[p]]++;
+        }
+      }
+    }
+    return d[i] || 0;
+  }
+
   function findNodes(graph, q, limit, near) {
     var text = String(q || '').replace(/\s+/g, '');
     if (!text) return [];
@@ -206,12 +223,15 @@
     for (var i = 0; i < graph.nodes.length; i++) {
       var nm = graph.nodes[i].name.replace(/\s+/g, '');
       var nb = nm.replace(/역$/, '');
+      /* ★ 「역」이 붙고 안 붙고는 차이로 치지 않는다 (D-106) ★
+         전국 정류장이 들어오면서 **딴 도시의 정류장 이름이 정확히 맞는** 일이 생겼다.
+         「월곡」을 치면 대구의 정류장 「월곡」이 정확히 맞아(0점) 서울 「월곡역」(1점)을
+         밀어냈고, 그 바람에 서울 경로가 통째로 안 나왔다. 사람이 「월곡」이라고 칠 때
+         찾는 것은 대개 그 역이다. 그래서 둘을 같은 등급으로 놓고, 뒤의 두 가지로 가른다. */
       var s;
-      if (nm === text) s = 0;
-      else if (nb === bare) s = 1;
-      else if (nm.indexOf(text) === 0) s = 2;
-      else if (nb.indexOf(bare) === 0) s = 3;
-      else if (nm.indexOf(text) >= 0) s = 4;
+      if (nm === text || nb === bare) s = 0;
+      else if (nm.indexOf(text) === 0 || nb.indexOf(bare) === 0) s = 1;
+      else if (nm.indexOf(text) >= 0) s = 2;
       else continue;
       if (graph.nodes[i].kinds.indexOf('subway') >= 0) s -= 0.5;   // 같은 점수면 역이 먼저
       var far = 0;
@@ -219,12 +239,14 @@
         var km = T.haversine(near, graph.nodes[i]) / 1000;
         far = km > 40 ? 2 : (km > 15 ? 1 : 0);   // 딴 권역(40km+)은 등급을 뒤로 민다
       }
-      scored.push([s + far, nm.length, i]);
+      scored.push([s + far, nm.length, -degreeOf(graph, i), i]);
     }
-    scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    /* 같은 점수·같은 이름 길이면 **노선이 많이 서는 곳**이 먼저다. 이름이 겹칠 때
+       사람이 찾는 곳은 대개 큰 곳이고, 한 노선만 지나는 외딴 정류장이 아니다. */
+    scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; });
     return scored.slice(0, limit || 30).map(function (x) {
-      var n = graph.nodes[x[2]];
-      return { node: x[2], name: n.name, kinds: n.kinds, lat: n.lat, lon: n.lon };
+      var n = graph.nodes[x[3]];
+      return { node: x[3], name: n.name, kinds: n.kinds, lat: n.lat, lon: n.lon };
     });
   }
 

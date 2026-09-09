@@ -21,6 +21,16 @@ const RIDE = load(path.join(D, 'subway', 'ride.json'));
 const CALIB = load(path.join(D, 'bus', 'tdata-calib.json'));
 const KINDLOAD = load(path.join(D, 'bus', 'kind-load.json'));
 if (!NODES || !ROUTES || !CONG) { console.error('자료가 없다 — pipeline 을 먼저 돌린다'); process.exit(1); }
+/* 앱(index.html)과 같은 합치기 — 지방 5개 도시(D-103)·수도권 광역전철(D-108)도 훑는다.
+   이걸 빼면 그 노선들이 「모름 = 서서」로 조용히 빠져 검증이 서울만 본다. */
+for (const ext of [load(path.join(D, 'subway', 'cities.json')), load(path.join(D, 'subway', 'rail.json'))]) {
+  if (!ext || !ext.congestion || !ext.ride) continue;
+  for (const k in ext.congestion.grid) if (!(k in CONG.grid)) CONG.grid[k] = ext.congestion.grid[k];
+  for (const k in ext.ride.grid) if (!(k in RIDE.grid)) RIDE.grid[k] = ext.ride.grid[k];
+  CONG.estimatedLines = (CONG.estimatedLines || []).concat(ext.estimatedLines || []);
+  if (ext.estimatedStations) CONG.estimatedStations = Object.assign(CONG.estimatedStations || {}, ext.estimatedStations);
+  if (ext.modelErrorPct) CONG.modelErrorPct = Math.max(CONG.modelErrorPct || 0, ext.modelErrorPct);
+}
 const graph = { nodes: NODES.nodes, routes: ROUTES.routes };
 const index = R.buildIndex(graph);
 

@@ -129,9 +129,9 @@ GET .../getRouteAcctoThrghSttnList?cityCode=22&routeId=DGB1000001000
 
 | 서비스 | 번호 | 신청 주소 | 상태 |
 |---|---|---|---|
-| (TAGO)_열차정보 | 15098552 | https://www.data.go.kr/data/15098552/openapi.do | ⬜ 미승인 |
-| (TAGO)_고속버스정보 | 15098522 | https://www.data.go.kr/data/15098522/openapi.do | ⬜ 미승인 |
-| (TAGO)_시외버스정보 | 15098541 | https://www.data.go.kr/data/15098541/openapi.do | ⬜ 미승인 |
+| (TAGO)_열차정보 | 15098552 | https://www.data.go.kr/data/15098552/openapi.do | ✅ 승인(2026-09-09) |
+| (TAGO)_고속버스정보 | 15098522 | https://www.data.go.kr/data/15098522/openapi.do | ✅ 승인(2026-09-09) |
+| (TAGO)_시외버스정보 | 15098541 | https://www.data.go.kr/data/15098541/openapi.do | ✅ 승인(2026-09-09) |
 
 ```
 host apis.data.go.kr/1613000/TrainInfo       (★ TrainInfoService 가 아니다)
@@ -152,6 +152,29 @@ host apis.data.go.kr/1613000/SuburbsBusInfo  /GetSuberbsBusTrminlList · /GetStr
 
 **SRT(수서고속철도)는 SR 운영이라 이 API 에 없을 수 있다.** 승인 뒤 `/GetVhcleKndList` 로
 확인하고, 없으면 그 사실을 화면에 밝힌다.
+→ (2026-09-09) **세 서비스 모두 승인·수집 완료**(D-107). SRT 는 코드 17 로는 0편이고
+수서역 출발 편이 KTX 이름으로 오는 것을 `SRT_STATIONS` 로 바로잡았다.
+
+### 0-5. 수도권 광역전철 — 서울 열린데이터광장 + 코레일 파일 (D-108) ★
+
+경의중앙·수인분당·9호선·경춘·공항철도와 1·3·4호선 코레일 직결 구간을 채우는 원천 셋.
+
+| 원천 | 주소/서비스 | 내용 | 한계 |
+|---|---|---|---|
+| `CardSubwayTime` | openapi.seoul.go.kr:8088 | 역별·시간대별 승하차, **27개 노선**(경부·경인·중앙·분당·수인·서해·공항철도…) | 월 합계라 요일 없음 → ride.json 요일 비로 나눔 |
+| `SearchSTNTimeTableByIDService` | 〃 | 역별 시간표 → **역마다 배차를 직접 센다** | **1~9호선 계통만** 답한다(1호선은 연천~신창~인천 102역 전부 「01호선」으로 들어 있다). 하루 1,000건 |
+| 코레일 여객열차 운행횟수(주중) | data.go.kr **15068409** 파일 (`fetch_korail_runs.py`) | 노선별 전동차 회/일(경인 474·경부 392·분당 360…) | 노선 총계뿐 — 1호선 하루 모양으로 펴서 시간당으로. **기준일 2020-09-29**(코레일 광역 배차는 그 뒤 크게 안 변했지만 어림임을 안다) |
+
+승하차 원천에 **없는** 노선: 신분당·김포골드·에버라인·의정부·용인·대경선·부산 동해선 —
+혼잡도를 만들지 않는다(동명 환승역 값만 걸려 「빈 차」로 보인다). 공표 배차간격만 싣는다.
+**서해선은 원천이 있어도 뺀다** — 김포공항·부천종합운동장 허브의 타 노선 승하차가 역 이름으로
+합산돼 폭주 OD 가 실린다(D-108). 역시 배차만.
+
+```
+python pipeline/fetch_seoul_rail.py            # 승하차 6달 (SEOUL_OPEN_KEY)
+python pipeline/fetch_rail_tph.py              # 역별 배차 (하루 1,000건 안에서 이어받기)
+python pipeline/build_rail_congestion.py --validate
+```
 
 ---
 
@@ -168,7 +191,7 @@ host apis.data.go.kr/1613000/SuburbsBusInfo  /GetSuberbsBusTrminlList · /GetStr
 
 | 소스 | 키 이름 | 발급 | 상태 |
 |---|---|---|---|
-| 서울 열린데이터광장 | `SEOUL_OPEN_KEY` | **즉시** | ⬜ 신청 안 함 |
+| 서울 열린데이터광장 | `SEOUL_OPEN_KEY` | **즉시** | ✅ **발급·확인**(2026-09-09) — CardSubwayTime 6달·역별 시간표 458역 수집(D-108) |
 | 공공데이터포털 | `DATA_GO_KR_KEY` | 승인 며칠 | ✅ **발급·확인**(2026-09-05) — 노선정보조회·특일정보 승인, 연결 검증 완료. TAGO 버스노선정보도 승인했으나 **서울 미포함**(도시 138개에 서울 없음) |
 | T-DATA (TAIMS) | `TDATA_KEY` | 승인 필요 | ✅ **발급·확인**(2026-09-05) — 구간별 승객수 개발계정. 게이트웨이가 요청당 **3분** 걸린다. 필드명 실측 확인(`maxA18Num…`), 값 있는 날짜 탐색 중 |
 

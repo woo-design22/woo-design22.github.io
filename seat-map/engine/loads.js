@@ -140,16 +140,15 @@
       if (effMin < svc0 - 40 || effMin > svc1 + 40)
         return { notRunning: true, why: '그 시각에는 지하철이 다니지 않는다' };
     }
-    /* 직결 통합 노선(D-87)의 코레일 구간엔 혼잡도 원천이 없다 — 그 역이 낀 구간은
-       호선피크로 물러나지 말고 통째로 「모름 = 서서」(D-25)로 둔다. 산본 낮 시간에
-       4호선 피크값을 씌우면 없는 만원을 지어내는 셈이다. */
-    if (route.noCong) {
-      if (!route._noCongSet) {
-        route._noCongSet = {};
-        for (var nq = 0; nq < route.noCong.length; nq++) route._noCongSet[route.noCong[nq]] = 1;
-      }
-      for (var np = leg.fromPos; np <= leg.toPos; np++)
-        if (route._noCongSet[names[np]]) return null;
+    /* 직결 통합 노선(D-87)의 코레일 구간 — 옛날엔 원천이 없어 그 역이 낀 leg 를 통째로
+       「모름 = 서서」(D-25)로 뒀다. D-108 이 그 구간을 승하차 모형(rail.json)으로 채웠으므로
+       이제는 **그 역의 방향값이 실제로 있으면 그걸 쓴다**. 없으면(자료를 못 읽은 구성)
+       옛 규칙 그대로 leg 전체를 모름으로 — 아래 층(이웃·역최대·호선피크)으로 물러나
+       산본 낮 시간에 4호선 피크값을 씌우는 사고(D-87)는 여전히 막는다. 검사는 아래
+       구간 루프 안에서 한다(방향값을 찾아본 다음이라야 「있는지」를 알 수 있다). */
+    if (route.noCong && !route._noCongSet) {
+      route._noCongSet = {};
+      for (var nq = 0; nq < route.noCong.length; nq++) route._noCongSet[route.noCong[nq]] = 1;
     }
     var oor = outOfRange(ctx.congestion, minutes);
     var per = trainsPerHour(minutes, route) * carsOf(route);
@@ -157,6 +156,16 @@
        밝히도록 여기서 표시를 켠다 — 추정을 숨기면 사양서 3.3 위반이다. */
     var modeled = !!(ctx.congestion && ctx.congestion.estimatedLines
                      && ctx.congestion.estimatedLines.indexOf(line) >= 0);
+    /* 1·3·4호선은 서울 구간만 실측이고 코레일 직결 구간은 모형이다(D-108).
+       노선 전체가 아니라 역 단위라 estimatedStations 로 따로 온다 — 이 leg 가
+       그런 역을 하나라도 지나면 추정으로 표시한다(실측 구간만 지나면 실측 그대로). */
+    if (!modeled && ctx.congestion && ctx.congestion.estimatedStations) {
+      var estSt = ctx.congestion.estimatedStations[line];
+      if (estSt) {
+        for (var eq = leg.fromPos; eq <= leg.toPos && !modeled; eq++)
+          if (estSt.indexOf(names[eq]) >= 0) modeled = true;
+      }
+    }
     var side = dirName(route, leg.dirIdx);
     var segs = [], estimated = false, any = false, usedDir = false;
     var bestOff = -1, bestOffAt = null;
@@ -167,6 +176,8 @@
       var pct = gridValue(ctx.congestion, line + '|' + here + '|' + day + '|' + side, t);
       var tierName = pct !== null ? '방향값' : null;
       if (pct !== null) usedDir = true;
+      /* D-87 역인데 방향값이 없다 — 이 leg 는 통째로 모름(폴백 금지). 위 주석 참고. */
+      if (pct === null && route._noCongSet && route._noCongSet[here]) return null;
       /* ★ 이웃 메우기 (D-79) ★
          지선 접점(성수·신도림)은 원천에 그 방향 줄이 아예 없다(전부 0이라 수집기가 버린다).
          혼잡은 한 역 사이에 확 안 바뀌므로 **같은 방향** 이웃 역 값으로 메운다.

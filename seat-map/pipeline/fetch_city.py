@@ -36,7 +36,9 @@ UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) seat-map/0.1',
 OUT_DIR = os.path.join(C.RAW, 'city')
 
 
-def download(item, out_dir):
+def download(item, out_dir, min_bytes=2000):
+    """min_bytes: 이보다 작으면 실패로 본다 — 단계를 건너뛴 0바이트를 잡는 문턱.
+    코레일 운행횟수(951바이트)처럼 원래 작은 파일은 부르는 쪽이 낮춰 준다."""
     cj = http.cookiejar.CookieJar()
     op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
     page = BASE + '/data/%s/fileData.do' % item['pk']
@@ -71,7 +73,7 @@ def download(item, out_dir):
            + '&fileDetailSn=' + fsn + '&dataNm=' + urllib.parse.quote(nm))
     blob = op.open(urllib.request.Request(url, headers=dict(UA, Referer=page)), timeout=300).read()
     # ★ 0바이트를 성공으로 넘기지 말 것 ★ — 단계를 건너뛰면 이렇게 온다
-    if len(blob) < 2000:
+    if len(blob) < min_bytes:
         C.log('  %s — 내려온 것이 %d바이트뿐이다. 받기 흐름이 바뀐 것 같다.'
               % (item['title'], len(blob)))
         return None

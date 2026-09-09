@@ -170,6 +170,30 @@ host apis.data.go.kr/1613000/SuburbsBusInfo  /GetSuberbsBusTrminlList · /GetStr
 **서해선은 원천이 있어도 뺀다** — 김포공항·부천종합운동장 허브의 타 노선 승하차가 역 이름으로
 합산돼 폭주 OD 가 실린다(D-108). 역시 배차만.
 
+### 0-7. 경기 광역버스 — 경기데이터드림 (D-109) ★
+
+「경기도 광역버스 버스노선별 정류장별 시간대별 일자별 승하차 인원」 — 서울 버스와 같은
+「정류장별 시간대별」 모양이라 같은 OD 모형이 그대로 돈다. 경기 자료 중 이 모양은 광역버스뿐이다.
+
+| 항목 | 값 |
+|---|---|
+| 페이지 | data.gg.go.kr `selectServicePage.do?infId=96F1E7F440966B9486CB39084852&infSeq=2` |
+| 파일 | 월 400MB CSV(파이프 구분, UTF-8), 2025-01~12. fileSeq 16562(2501)+달마다 1 |
+| 내려받기 | **로그인·키 불필요, 단 네 단계**: 페이지→파일목록 AJAX(Accept: json!)→목적신고 POST→download. 몰아 부르면 몇 분 차단(재시도로 기다림). `fetch_ggbus.py` |
+| 노선망 | TAGO 31개 시·군, 유형 직행좌석·광역급행·좌석만(~480). `fetch_ggbus_routes.py` |
+| 열쇠 | TAGO nodeid = `GGB`+GBIS 정류소아이디 = 승하차 정류소아이디 (ID 직결) |
+| 주의 | 노선번호가 회사끼리 겹친다(3100×4) — (번호,업체명)으로 가른다. 「(미정차)」 지점 걷어낼 것 |
+
+경기 일반 시내버스·마을버스는 시간대별 원천이 없다(정류소별 집계는 하루 총계) — 아직 밖이다.
+`GG_DATA_KEY`(경기데이터드림 인증키)는 받아 두었지만 파일 내려받기에는 필요 없었다 —
+OpenAPI 조회를 쓰게 되면 그때 쓴다.
+
+```
+python pipeline/fetch_ggbus.py --months 2511,2512   # 승하차 (달 이름표가 실제 달과 어긋나기도 한다 — 내용 날짜 기준으로 집계)
+python pipeline/fetch_ggbus_routes.py               # 노선망 (TAGO, ~520호출)
+python pipeline/build_ggbus.py                      # 그래프 + data/bus/routes/경기_*.json
+```
+
 ```
 python pipeline/fetch_seoul_rail.py            # 승하차 6달 (SEOUL_OPEN_KEY)
 python pipeline/fetch_rail_tph.py              # 역별 배차 (하루 1,000건 안에서 이어받기)

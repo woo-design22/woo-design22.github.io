@@ -3,5 +3,6 @@
 
   "SEOUL_OPEN_KEY": "서울 열린데이터광장 인증키 — https://data.seoul.go.kr 회원가입 후 즉시 발급",
   "DATA_GO_KR_KEY": "공공데이터포털 서비스키 — https://www.data.go.kr 활용신청 승인 필요. 디코딩된 키를 넣는다",
-  "TDATA_KEY": "T-DATA(TAIMS) 인증키 — https://t-data.seoul.go.kr 활용신청"
+  "TDATA_KEY": "T-DATA(TAIMS) 인증키 — https://t-data.seoul.go.kr 활용신청",
+  "GG_DATA_KEY": "경기데이터드림 인증키 — https://data.gg.go.kr (지금 쓰는 파일 내려받기에는 필요 없다. OpenAPI 조회용 예비)"
 }

@@ -31,7 +31,8 @@ function busDoc(name) {
    지방 버스는 아래에서 따로 본다. */
 const isSeoulBus = r => r.kind !== 'subway'
   && !String(r.id || '').startsWith('CB-')      // 지방 시내버스(D-106)
-  && !String(r.id || '').startsWith('IC-');     // 도시 간 지정석 노선(D-107)
+  && !String(r.id || '').startsWith('IC-')      // 도시 간 지정석 노선(D-107)
+  && !String(r.id || '').startsWith('GG-');     // 경기 광역버스(D-109) — 서울 인가대수 밖이다
 
 t('노선별 인가 배차간격이 실려 있고, 나누는 수가 그 값을 쓴다 (D-57)', () => {
   const bus = ROUTES.routes.filter(isSeoulBus);

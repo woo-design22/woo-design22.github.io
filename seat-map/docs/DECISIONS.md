@@ -1975,6 +1975,13 @@ SRT 가 통째로 사라지고, 서울→대구가 **대구역 21편**으로 잡
 Deno Deploy 에 `DATA_GO_KR_KEY` 환경변수 + Playground 재배포. 프록시 시험 15개
 (`counsel-proxy/tests/testbus.mjs`) — Origin·키 부재·입력 검사·캐시·리밋·키 안 새는 것.
 
+**배포 실측(2026-09-10 00:22)**: 경기 뚫림 — 당동주공 「4분 뒤 · 40석」, 한양대입구
+「9분 뒤 · 0석(만석)」, 15초 캐시 hit 확인. 필드 이름이 파서와 그대로 일치
+(predictTime·remainSeatCnt·crowded). 서울은 활용신청 반영 대기(401).
+★ 파일을 Playground 로 나르다 한 번 넘어졌다 ★ — PowerShell `Get-Content` 는 BOM 없는
+UTF-8 을 CP949 로 읽어 **한글이 깨진 채 클립보드에 실렸고** 배포가 SyntaxError 로 터졌다.
+`[System.IO.File]::ReadAllText(경로, UTF8)` 로 복사해야 한다.
+
 ---
 
 ## 아직 못 정한 것

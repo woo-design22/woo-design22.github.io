@@ -129,6 +129,7 @@ seat-map/
 | OD 감쇠 10 · 환승벌점 4 | `city_spec.py` | 부산 1호선 실측과 상관 0.976으로 고른 값 → D-103·D-105 |
 | 방향 = 색인 증가가 하선 | `build_city_congestion.py` | 뒤집으면 상관 0.95 → 0.59. 시험이 지킨다 → D-103 |
 | 추정 자료는 확률 곡선을 무디게 | `seat-model.js kRatioFor` | 오차 8%p 를 무시하면 「3%」 같은 확신이 나온다 → D-104 |
+| 지정석은 확률로 말하지 않는다 | `seat-model.js VEHICLES.reserved` | 표가 곧 좌석이다. 「모름=서서」에 흘리면 KTX 를 내내 서서 간다고 한다 → D-107 |
 | 지방 버스 이름엔 도시를 붙인다 | `build_citybus.py` | 「101」이 서울·대구에 다 있다. 겹치면 남의 승하차 파일을 읽는다 → D-106 |
 | 이름이 같은 역은 기준점으로 가린다 | `route.js findNodes` | 「시청역」이 서울·부산·대전 셋. 기준점 없이 고르면 서울 경로가 통째로 사라졌다 → D-106 |
 | 방향값 없는 노선은 회차점으로 가른다 | `build_citybus.py split_round_trip` | 광주는 356개 전부 방향이 없다. 한 줄로 두면 그 방향이 사라진다 → D-51·D-106 |
@@ -194,6 +195,17 @@ cd C:\Claude\seat-map && python pipeline/fetch_city.py --truth && python pipelin
 모형이나 자료를 고친 뒤에는 반드시 이것을 돌려 통과한 것만 내보낸다.
 **`build_graph.py` 를 다시 돌리면 노선의 편성·배차가 지워지므로 이 세 줄을 다시 돌린다.**
 
+도시 간 이동(KTX·고속·시외버스)은 **활용신청 세 건이 승인된 뒤에** 두 줄이면 된다(D-107).
+승인 상태는 `--probe` 가 말해 준다:
+
+```bash
+cd C:\Claude\seat-map && python pipeline/fetch_intercity.py --probe
+```
+
+```bash
+cd C:\Claude\seat-map && python pipeline/fetch_intercity.py && python pipeline/build_intercity.py
+```
+
 광역시 **시내버스**까지 넣으려면 두 줄을 더 돌린다(TAGO — `DATA_GO_KR_KEY` 필요, D-106).
 노선 1,394개를 한 번씩 부르므로 개발계정 하루 상한에 걸릴 수 있다 — 걸리면 남은 수를 말하고
 멈추므로 다음 날 그대로 다시 돌리면 이어 받는다:
@@ -213,7 +225,7 @@ cd C:\Claude\seat-map && python pipeline/fetch_citybus.py && python pipeline/bui
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 152개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정·서울 밖 다섯 도시·시내버스)
+node --test tests/*.test.js          # 156개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정·서울 밖 다섯 도시·시내버스·도시 간)
 node tools/verify_rush.js            # 출근 상식 전수 훑기 — 큰 수술 뒤엔 꼭 돌린다 (D-80)
 node tools/verify_deep.js            # 심층판: 퇴근·심야·무작위 1,135여정·몬테카를로 (D-81)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)

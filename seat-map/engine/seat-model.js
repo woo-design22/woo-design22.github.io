@@ -36,7 +36,13 @@
     busTrunk:   { name: '간선버스',   seats: 23, capacity: 45,  standing: true },
     busBranch:  { name: '지선버스',   seats: 23, capacity: 45,  standing: true },
     busVillage: { name: '마을버스',   seats: 15, capacity: 30,  standing: true },
-    busExpress: { name: '광역버스',   seats: 41, capacity: 41,  standing: false }
+    busExpress: { name: '광역버스',   seats: 41, capacity: 41,  standing: false },
+    /* ★ 도시 간 이동은 「확률」이 아니라 「사실」이다 (D-107) ★
+       KTX·SRT·고속버스·시외버스는 전 좌석 지정석이다. 표를 끊었으면 앉고, 매진이면 못 탄다 —
+       예측할 것이 없다. 그래서 퍼센트로 말하지 않고 `reserved` 로 표시해 문구로 답한다.
+       (무궁화·새마을의 입석·자유석은 본인이 고르는 것이라 예측 대상이 아니다.) */
+    trainReserved: { name: '열차 좌석',     seats: 60, capacity: 60, standing: false, reserved: true },
+    coachReserved: { name: '고속·시외버스', seats: 28, capacity: 28, standing: false, reserved: true }
   };
 
   var SEAT_RATIO_SUBWAY = 0.34;   // 지하철 혼잡도 34% = 좌석 만석 (사양서 4.1)
@@ -161,6 +167,17 @@
     var segs = opt.segments || [];
     var total = 0, i;
     for (i = 0; i < segs.length; i++) total += segs[i].minutes;
+
+    /* 지정석(KTX·SRT·고속·시외버스): 표를 끊었으면 앉는다 — 서서 가는 시간은 0이다.
+       확률을 지어내지 않고 `reserved` 를 달아 보낸다. 화면은 퍼센트 대신
+       「지정석 — 예매하면 앉아 갑니다(매진이면 탈 수 없습니다)」로 답한다(D-107). */
+    if (veh.reserved) {
+      return {
+        pBoard: 1, pDuring: 0, pSeated: 1, reserved: true, boardable: 1,
+        standingMinutes: 0, totalMinutes: total,
+        perSegment: segs.map(function (s) { return { minutes: s.minutes, standingProb: 0 }; })
+      };
+    }
 
     // 광역버스: 탔으면 앉은 것이고, 못 타면 이 경로가 성립하지 않는다.
     if (veh.standing === false) {

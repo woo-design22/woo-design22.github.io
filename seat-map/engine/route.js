@@ -554,6 +554,13 @@
       leg.emptySeats = M.emptySeats(info.segments[0].load, veh.seats);
       leg.seats = veh.seats;
       leg.seatText = M.describeSeats(info.segments[0].load, veh.seats);
+      /* 지정석은 「몇 자리 비었나」를 말할 수 없다 — 표가 있으면 내 자리가 있고 없으면 못 탄다.
+         빈자리 수를 지어내지 말고 화면이 문구로 답하게 표시만 넘긴다(D-107). */
+      if (r.reserved) {
+        leg.reserved = true;
+        leg.seatText = null;
+        leg.emptySeats = null;
+      }
       /* ★ 추정이면 추정이라고 화면까지 가져간다 ★ 여기서 안 실으면 상세 화면의
          「추정입니다」 줄이 영영 안 뜬다 — 실제로 그동안 안 떴다(D-104에서 발견).
          사유(why)도 함께 보낸다: 버스의 「하루 평균」과 부산의 「승하차에서 되짚음」은

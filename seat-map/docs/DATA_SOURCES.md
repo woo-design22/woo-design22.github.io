@@ -122,8 +122,36 @@ GET .../getRouteAcctoThrghSttnList?cityCode=22&routeId=DGB1000001000
 지금은 이 자료를 아직 안 쓴다 — 지방 시내버스는 **같은 종류 버스의 시간대 평균**으로
 어림하고 「추정」이라고 밝힌다(D-86). 정밀화는 대구·인천 파일부터 하면 된다.
 
-**넣지 않기로 한 것**: KTX·SRT·고속버스·시외버스. 전부 전 좌석 지정석이라 표를 끊으면
-앉는다 — 이 앱이 답할 질문이 아니다(D-106).
+### 0-4. 도시 간 이동 — TAGO 열차·고속버스·시외버스 (★ 활용신청 3건 필요)
+
+전 좌석 지정석이라 「앉을 확률」이 아니라 **편수·소요시간·등급·요금**을 받는다(D-107).
+같은 국토교통부(1613000) 안이라도 **서비스마다 키를 따로 등록**해야 한다.
+
+| 서비스 | 번호 | 신청 주소 | 상태 |
+|---|---|---|---|
+| (TAGO)_열차정보 | 15098552 | https://www.data.go.kr/data/15098552/openapi.do | ⬜ 미승인 |
+| (TAGO)_고속버스정보 | 15098522 | https://www.data.go.kr/data/15098522/openapi.do | ⬜ 미승인 |
+| (TAGO)_시외버스정보 | 15098541 | https://www.data.go.kr/data/15098541/openapi.do | ⬜ 미승인 |
+
+```
+host apis.data.go.kr/1613000/TrainInfo       (★ TrainInfoService 가 아니다)
+  /GetCtyCodeList · /GetCtyAcctoTrainSttnList · /GetVhcleKndList
+  /GetStrtpntAlocFndTrainInfo   ← depPlaceId·arrPlaceId·depPlandTime(YYYYMMDD)
+      응답: trainno · traingradename · depplandtime · arrplandtime · adultcharge
+host apis.data.go.kr/1613000/ExpBusInfo      /GetExpBusTrminlList · /GetStrtpntAlocFndExpbusInfo
+host apis.data.go.kr/1613000/SuburbsBusInfo  /GetSuberbsBusTrminlList · /GetStrtpntAlocFndSuberbsBusInfo
+      응답: routeId · depPlaceNm · arrPlaceNm · depPlandTime · arrPlandTime · charge · gradeNm
+```
+
+**오퍼레이션 이름이 대문자로 시작한다.** 주소가 틀리면 400 `NO_OPENAPI_SERVICE_ERROR`,
+키가 등록 안 됐으면 403 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR` 라 서로 구분된다 —
+`python pipeline/fetch_intercity.py --probe` 가 이 둘을 갈라 말한다.
+
+**터미널·역 목록에 좌표가 없다.** 그래서 그래프의 기존 노드와 **이름으로** 맞춘다
+(도시 상자 안에서만 — 같은 이름이 딴 도시에 있어도 안 섞인다).
+
+**SRT(수서고속철도)는 SR 운영이라 이 API 에 없을 수 있다.** 승인 뒤 `/GetVhcleKndList` 로
+확인하고, 없으면 그 사실을 화면에 밝힌다.
 
 ---
 

@@ -446,6 +446,15 @@
     return function (leg) {
       var route = ctx.graph.routes[leg.routeIdx];
       var got;
+      /* ★ 지정석 노선(도시 간 열차·고속·시외버스)은 셀 재차가 없다 (D-107) ★
+         표가 곧 좌석이다. 여기서 안 잡아 주면 「자료 없음 = 서서 간다」(D-25)로 떨어져
+         **지정석인데 내내 서서 가는 것으로** 계산된다 — 정반대의 답이 나온다. */
+      if (route.reserved) {
+        return { segments: [{ load: 0, alightAtEnd: 0, boardAtEnd: 0,
+                              minutes: (route.minutes || 30) * Math.max(1, leg.stops || 1) }],
+                 estimated: false, reserved: true, direction: null, bestOffAt: null,
+                 boardMinutes: legMinutes(ctx, leg) };
+      }
       if (route.kind === 'subway') {
         got = subwaySegments(ctx, leg, route);
       } else {

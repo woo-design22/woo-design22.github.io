@@ -472,7 +472,7 @@
   var $=function(id){ return document.getElementById(id); };
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
-  var G=null, IDX=null, CONG=null, RIDE=null, CALIB=null, KINDLOAD=null, LOADCAL=null, busCache={};
+  var G=null, IDX=null, CONG=null, RIDE=null, FIRSTLAST=null, CALIB=null, KINDLOAD=null, LOADCAL=null, busCache={};
   var S={ from:null, to:null, via:[], dayType:'weekday', minutes:8*60, walk:'normal', step:1, picked:null, list:[] };
 
   $('attrib').textContent = SeatGeo.ATTRIBUTION;
@@ -487,18 +487,82 @@
     });
   }
 
+  /* ★ 지역 분할 로딩 (D-113) ★
+     첫 화면에 전국 버스를 다 받으면 25MB 다 — 셀룰러로 여는 어르신에게 그건 손해다.
+     core(지하철·전철·도시간 + 수도권 버스, 3.9MB)만 먼저 받고, 출발·도착이 지방 상자에
+     들어오면 그때 그 조각을 더 받는다. **core.json 이 없으면 옛 방식으로 그대로 돈다** —
+     파이프라인을 아직 안 돌린 사람의 앱을 깨뜨리지 않는다. */
+  var REGIONS = null, regionLoaded = {};
+  function loadRegion(code){
+    if (regionLoaded[code]) return regionLoaded[code];
+    return (regionLoaded[code] = getJSON('data/graph/region-'+code+'.json')
+      .then(function(doc){
+        var k;
+        // 노드는 번호를 그대로 쓴다 — 조각과 core 가 한 그래프여야 경로가 이어진다
+        for (k in (doc.nodes||{})) G.nodes[+k] = doc.nodes[k];
+        (doc.routes||[]).forEach(function(r){ G.routes.push(r); });
+        IDX = SeatRoute.buildIndex(G);       // 노선이 늘었으니 색인을 다시 만든다
+        return true;
+      })
+      .catch(function(){ return false; }));   // 조각이 없으면 그 지역이 안 나올 뿐
+  }
+  /* 지점이 어느 조각인지 — 상자 안이면 그 코드. 여러 개면 다 받는다(경계가 겹친다). */
+  function regionsFor(pt){
+    if (!REGIONS || !pt) return [];
+    return REGIONS.regions.filter(function(r){
+      return pt.lat >= r.box[0] && pt.lat <= r.box[1] && pt.lon >= r.box[2] && pt.lon <= r.box[3];
+    }).map(function(r){ return r.code; });
+  }
+  /* 길찾기 전에 필요한 조각을 받아 둔다. 이미 받았으면 즉시 끝난다. */
+  function ensureRegions(pts){
+    var want = {};
+    (pts||[]).forEach(function(p){ regionsFor(p).forEach(function(c){ want[c]=1; }); });
+    var jobs = Object.keys(want).filter(function(c){ return !regionLoaded[c]; }).map(loadRegion);
+    return jobs.length ? Promise.all(jobs) : Promise.resolve([]);
+  }
+
   Promise.all([
-    getJSON('data/graph/nodes.json'), getJSON('data/graph/routes.json'),
+    getJSON('data/graph/core.json').catch(function(){ return null; }),      // 지역 분할(D-113)
+    getJSON('data/graph/regions.json').catch(function(){ return null; }),
     getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json'),
     getJSON('data/bus/tdata-calib.json'),    // 없으면 null — 지하철 차용 계수로 물러난다
     getJSON('data/bus/kind-load.json'),      // 없으면 null — 자료 없는 노선은 「알 수 없음」으로
     getJSON('data/bus/load-calib.json').catch(function(){ return null; }),  // 실측 여유 비율(D-101)
     getJSON('data/subway/cities.json').catch(function(){ return null; }),   // 서울 밖 추정 혼잡도(D-103·D-105)
-    getJSON('data/subway/rail.json').catch(function(){ return null; })      // 수도권 광역전철 추정 혼잡도(D-108)
+    getJSON('data/subway/rail.json').catch(function(){ return null; }),     // 수도권 광역전철 추정 혼잡도(D-108)
+    getJSON('data/subway/firstlast.json').catch(function(){ return null; }) // 역별 첫·막차(D-112). 없으면 근사로 물러난다
   ]).then(function(v){
-    G={ nodes:v[0].nodes, routes:v[1].routes };
-    IDX=SeatRoute.buildIndex(G);
+    /* core 가 있으면 그것으로 시작하고(3.9MB), 없으면 옛 통짜 파일로 물러난다(6.3MB). */
+    if (v[0] && v[0].routes) {
+      REGIONS = v[1];
+      var maxIdx = 0, kk;
+      for (kk in (v[0].nodes||{})) if (+kk > maxIdx) maxIdx = +kk;
+      var arr = new Array(maxIdx + 1);
+      /* ★ 빈 자리를 undefined 로 두면 안 된다 ★ 노드 번호를 보존하려고 띄엄띄엄 채우는데,
+         엔진·화면이 nodes 를 훑으며 .lat 을 읽는 자리가 여럿이라 그대로 두면 터진다
+         (실측: 길찾기가 「찾고 있습니다…」에서 멈췄다). 아직 안 받은 지역 자리는
+         **아무도 고르지 않는 더미**로 채운다 — 좌표가 없으므로(NaN) 거리 계산에서 늘 진다. */
+      for (var fi = 0; fi <= maxIdx; fi++)
+        arr[fi] = { name: '', lat: NaN, lon: NaN, kinds: [], _hole: 1 };
+      for (kk in (v[0].nodes||{})) arr[+kk] = v[0].nodes[kk];
+      G = { nodes: arr, routes: v[0].routes };
+      IDX = SeatRoute.buildIndex(G);
+      return finishBoot(v, true);
+    }
+    return Promise.all([getJSON('data/graph/nodes.json'), getJSON('data/graph/routes.json')])
+      .then(function(old){
+        G = { nodes: old[0].nodes, routes: old[1].routes };
+        IDX = SeatRoute.buildIndex(G);
+        return finishBoot(v, false);
+      });
+  }).then(function(){}).catch(function(e){
+    $('bootNote').innerHTML = '<b>자료를 못 읽었습니다: '+esc(e.message)+'</b><br>'
+      + 'file:// 로 열면 브라우저가 자료 파일을 막습니다. <code>python -m http.server 8765</code> 로 여세요.';
+  });
+
+  function finishBoot(v, split){
     CONG=v[2]; RIDE=v[3]; CALIB=v[4]||null; KINDLOAD=v[5]||null; LOADCAL=v[6]||null;
+    FIRSTLAST=v[9]||null;   // 역별 첫·막차(D-112)
     /* 서울 밖(부산·대구·대전·광주·인천)은 원천이 달라(승하차뿐) 파일이 따로다.
        격자 모양은 같게 만들어 두었으므로 칸만 합친다 — 없으면 그 노선들이
        「모름 = 서서」로 남을 뿐 앱은 그대로 돈다.
@@ -520,13 +584,14 @@
       /* 오차 폭은 큰 쪽을 쓴다 — 좁은 폭을 쓰면 추정을 실측처럼 자신하게 된다 */
       if (ext.modelErrorPct) CONG.modelErrorPct=Math.max(CONG.modelErrorPct||0, ext.modelErrorPct);
     });
-    $('bootNote').textContent = '역·정류장 ' + G.nodes.length.toLocaleString('ko-KR')
-      + '곳, 노선 ' + G.routes.length + '개. 주소·건물 이름도 넣을 수 있습니다.';
+    /* 분할이면 「수도권 + 필요할 때 지방」임을 밝힌다 — 숫자가 적어 보이는 이유를
+       사용자가 알아야 한다(지방을 검색하면 그때 늘어난다). */
+    var cnt = G.nodes.filter(function(x){ return x && !x._hole; }).length;
+    $('bootNote').textContent = '역·정류장 ' + cnt.toLocaleString('ko-KR')
+      + '곳, 노선 ' + G.routes.length + '개'
+      + (split ? ' (지방은 검색할 때 더 받습니다)' : '') + '. 주소·건물 이름도 넣을 수 있습니다.';
     restore(); refreshNext();
-  }).catch(function(e){
-    $('bootNote').innerHTML = '<b>자료를 못 읽었습니다: '+esc(e.message)+'</b><br>'
-      + 'file:// 로 열면 브라우저가 자료 파일을 막습니다. <code>python -m http.server 8765</code> 로 여세요.';
-  });
+  }
 
   function preloadBus(names){
     return Promise.all(names.filter(function(n){ return !(n in busCache); }).map(function(n){
@@ -869,10 +934,15 @@
       if(!G || q.length<1){ box.hidden=true; box.innerHTML=''; return; }
       // 반대편(이미 고른 출발·도착)을 기준으로 같은 이름 중 가까운 쪽을 먼저 (D-90)
       loadPoi();                                  // 장소 목록은 **칠 때** 받는다(D-100)
+      loadSearchIndex();                          // 전국 정류장 색인도 **칠 때**(D-113)
       var nearPt = nearOf && nearOf();
+      /* ★ 검색은 늘 전국이다 (D-113) ★ 그래프는 core(수도권)만 들고 있어도
+         「부산역」이 검색돼야 거기서 그 지역 조각을 받을 수 있다. 전국 색인이 오면
+         그것으로, 아직 안 왔으면 현재 그래프로 찾는다(둘 다 같은 모양이라 함수는 하나다). */
+      var searchG = SEARCHG || G;
       /* 정류장·역 먼저, 그 다음 장소(병의원·약국 이름) — 「미아동 내과」처럼 상호로 찾는 길(D-99).
          장소 목록이 없으면(파일 미배포·아직 못 받음) 이 줄은 아무 일도 하지 않는다. */
-      var localHits=SeatGeo.local(G, q, 6, nearPt).concat(SeatGeo.poiSearch(q, 4, nearPt));
+      var localHits=SeatGeo.local(searchG, q, 6, nearPt).concat(SeatGeo.poiSearch(q, 4, nearPt));
       draw(localHits, q.length>=2);
       if(q.length<2) return;
       clearTimeout(timer);
@@ -892,6 +962,23 @@
   /* 장소 목록(병의원·약국·가게)은 3MB 안팎이라 **시작할 때 받지 않는다**(D-100).
      검색을 시작한 순간 한 번만 받아 두고, 그 다음부터는 메모리에서 찾는다.
      못 받아도 조용히 넘어간다 — 정류장·역 검색은 그대로 돈다. */
+  /* 전국 검색 색인(D-113) — 이름·좌표·종류만 담은 2MB. 첫 화면에 넣으면 무거우므로
+     POI 와 같은 규칙으로 **칠 때** 받는다. 못 받아도 조용히 넘어간다(core 안에서만 찾힐 뿐). */
+  var SEARCHG = null, searchState = 0;
+  function loadSearchIndex(){
+    if (searchState) return;
+    searchState = 1;
+    getJSON('data/graph/search.json').then(function(d){
+      searchState = 2;
+      if (!d || !d.stops) return;
+      // SeatGeo.local 이 쓰는 그래프 모양으로 맞춘다(노선은 없다 — 검색에는 안 쓴다)
+      SEARCHG = { nodes: d.stops.map(function(s){
+        return { name: s.n, lat: s.a, lon: s.o,
+                 kinds: s.k.indexOf('s') >= 0 ? ['subway','bus'] : ['bus'] };
+      }), routes: [] };
+    }).catch(function(){ searchState = 2; });
+  }
+
   var poiState = 0;         // 0 아직 · 1 받는 중 · 2 끝
   function loadPoi(){
     if (poiState) return;
@@ -1170,7 +1257,7 @@
     preloadBus(Object.keys(names)).then(function(){
       if(mine!==seatSeq) return;              // 그 사이 시각·목적지가 바뀌었다
       SeatLoads.clearCache();
-      var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, kindLoad:KINDLOAD, loadCalib:LOADCAL, waitAsStanding: !S.waitSit, busRouteOf:function(n){ return busCache[n]||null; },
+      var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, kindLoad:KINDLOAD, loadCalib:LOADCAL, firstLast:FIRSTLAST, waitAsStanding: !S.waitSit, busRouteOf:function(n){ return busCache[n]||null; },
                 minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
       ctx.loadFor=SeatLoads.makeLoadFor(ctx);
       var t0=Date.now();
@@ -1229,6 +1316,9 @@
     $('edDay').value=S.dayType;
     $('results').innerHTML='';
     $('listNote').textContent='길을 찾고 있습니다…';
+    /* 지방이면 그 지역 조각을 먼저 받는다(D-113). 수도권만이면 즉시 지나간다.
+       못 받아도 길찾기는 그대로 진행한다 — 그 지역 버스가 안 나올 뿐이다. */
+    ensureRegions([S.from].concat(S.via.filter(Boolean)).concat([S.to])).then(function(){
     setTimeout(function(){
       var t0=Date.now();
       // 출발 → (경유…) → 도착. 구간마다 따로 찾아 이어 붙인다.
@@ -1258,7 +1348,7 @@
         j.legs.forEach(function(l){ if(l.kind!=='subway') names[l.routeName]=1; }); }); });
       preloadBus(Object.keys(names)).then(function(){
         if(mineF!==findSeq) return;           // 그 사이 조건이 바뀌었다
-        var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, kindLoad:KINDLOAD, loadCalib:LOADCAL, waitAsStanding: !S.waitSit, busRouteOf:function(n){ return busCache[n]||null; },
+        var ctx={ graph:G, congestion:CONG, ride:RIDE, busCalib:CALIB, kindLoad:KINDLOAD, loadCalib:LOADCAL, firstLast:FIRSTLAST, waitAsStanding: !S.waitSit, busRouteOf:function(n){ return busCache[n]||null; },
                   minutes:S.minutes, dayType:S.dayType, alpha:SeatModel.ALPHA_DEFAULT };
         ctx.loadFor=SeatLoads.makeLoadFor(ctx);
         segs.forEach(function(list){ list.forEach(function(j){ SeatRoute.evaluate(j, ctx); }); });
@@ -1270,6 +1360,7 @@
       if (typeof done === 'function') done();
       });
     }, 30);
+    });   // ensureRegions (D-113)
   }
 
   function renderList(ms){

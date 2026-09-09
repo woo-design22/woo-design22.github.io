@@ -73,6 +73,15 @@ def hour_of(t):
     return h % 24 if h < 30 else None      # 25:xx 같은 표기는 다음날로 돈다
 
 
+def minute_of(t):
+    """05:20:30 → 320(분). 25:10 같은 넘김 표기는 +1440 안 하고 그대로 둔다(막차 비교용)."""
+    m = re.match(r'\s*(\d{1,2}):(\d{2})', str(t or ''))
+    if not m:
+        return None
+    hh, mm = int(m.group(1)), int(m.group(2))
+    return hh * 60 + mm
+
+
 def main():
     ap = argparse.ArgumentParser(description='수도권 광역전철 역별 배차 세기')
     ap.add_argument('--cap', type=int, default=900, help='한 번에 부를 최대 횟수(하루 1,000건)')
@@ -93,25 +102,31 @@ def main():
         except Exception:
             pass
 
-    todo = [s for s in stations if str(s.get('STATION_CD')) not in out['stations']]
+    # 아직 안 받은 역 + 첫·막차가 없는 역(D-111 로 항목이 늘었다 — 옛 자료를 갱신한다)
+    todo = [s for s in stations
+            if str(s.get('STATION_CD')) not in out['stations']
+            or not out['stations'][str(s.get('STATION_CD'))].get('firstlast')]
     C.log('== 역별 배차 세기 == 전체 %d역 · 남은 것 %d역' % (len(stations), len(todo)))
     calls = 0
     for s in todo:
         if calls >= a.cap:
             break
         cd = str(s.get('STATION_CD'))
-        rows = []
-        for inout in ('1', '2'):                 # 상행이 비면 하행으로
+        # 첫·막차는 방향(상행1·하행2)마다 다르다 — 둘 다 받아 각각의 최소·최대를 잡는다.
+        # tph 는 한쪽만 있으면 그것을 쓴다(복선이라 편수는 방향이 거의 같다 — D-108).
+        rows_by_dir = {}
+        for inout in ('1', '2'):
             try:
-                rows = call(k, 'SearchSTNTimeTableByIDService/1/1000/%s/1/%s/' % (cd, inout))
+                r = call(k, 'SearchSTNTimeTableByIDService/1/1000/%s/1/%s/' % (cd, inout))
             except Exception as e:
                 C.log('   %s %s — 실패(%s)' % (s.get('STATION_NM'), cd, str(e)[:40]))
-                rows = []
+                r = []
             calls += 1
-            if rows:
-                break
-        if not rows:
+            if r:
+                rows_by_dir[inout] = r
+        if not rows_by_dir:
             continue
+        rows = rows_by_dir.get('1') or rows_by_dir.get('2')   # tph 용(한 방향)
         cnt = collections.Counter()
         for r in rows:
             h = hour_of(r.get('ARRIVETIME') or r.get('LEFTTIME'))
@@ -119,8 +134,16 @@ def main():
                 cnt[h] += 1
         if not cnt:
             continue
+        # 첫·막차 = 그 역·방향에서 출발(없으면 도착)하는 시각의 최소·최대(분).
+        firstlast = {}
+        for inout, rr in rows_by_dir.items():
+            mins = [minute_of(r.get('LEFTTIME') or r.get('ARRIVETIME')) for r in rr]
+            mins = [m for m in mins if m is not None and m > 0]
+            if mins:
+                firstlast[inout] = [min(mins), max(mins)]
         out['stations'][cd] = {'line': s.get('LINE_NUM'), 'name': s.get('STATION_NM'),
-                               'tph': [cnt.get(h, 0) for h in range(24)]}
+                               'tph': [cnt.get(h, 0) for h in range(24)],
+                               'firstlast': firstlast}   # {'1':[첫,막], '2':[첫,막]} 분 단위
         if len(out['stations']) % 60 == 0:
             C.save_json(OUT, out)
             C.log('   %d역까지 (호출 %d)' % (len(out['stations']), calls))

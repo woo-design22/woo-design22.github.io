@@ -1489,11 +1489,14 @@
     if (id.indexOf('GG-GGB') === 0)          // 경기 광역 — GBIS 노선·정류소 ID 그대로
       return { kind: 'gg', q: 'stationId=' + sid, match: id.slice(6) };
     if (id.indexOf('CB-') === 0 || id.indexOf('IC-') === 0) return null;   // 실시간 원천 없음
-    var doc = busCache[route.name];          // 서울 — 승하차 파일의 정류소 ARS(5자리)로 묻는다
+    /* 서울 — 노선 기준(getArrInfoByRouteAll, 승인된 15000314 소속)으로 노선 전체를 받아
+       내가 타는 정류장(ARS 5자리)만 골라 쓴다. 그래프의 노선 id 가 곧 busRouteId 다. */
+    if (!/^\d{9}$/.test(id)) return null;
+    var doc = busCache[route.name];
     if (!doc || !doc.stops) return null;
     for (var i = 0; i < doc.stops.length; i++)
       if (doc.stops[i].stopId === sid && /^\d{5}$/.test(doc.stops[i].ars || ''))
-        return { kind: 'seoul', q: 'arsId=' + doc.stops[i].ars, match: route.name };
+        return { kind: 'seoul', q: 'busRouteId=' + id, match: doc.stops[i].ars };
     return null;
   }
 
@@ -1518,13 +1521,13 @@
     }
     return null;
   }
-  function rtTextSeoul(doc, rtNm){
+  function rtTextSeoul(doc, ars){
     var b = doc && doc.msgBody, list = b && b.itemList;
     if (!list) return null;
     if (!Array.isArray(list)) list = [list];
     for (var i = 0; i < list.length; i++){
       var x = list[i];
-      if (String(x.rtNm) !== String(rtNm)) continue;
+      if (String(x.arsId) !== String(ars)) continue;   // 노선 전체에서 내가 타는 정류장만
       var m1 = x.arrmsg1 || '';
       if (!m1 || /운행종료|출발대기|정보없음/.test(m1)) return null;
       var cong = null;
@@ -1533,6 +1536,7 @@
         if (RT_CONG[v]) { cong = RT_CONG[v]; break; }
       }
       return '<b>지금</b> ' + esc(m1) + (cong ? ' · <b>' + cong + '</b>' : '')
+           + (String(x.isLast1) === '1' ? ' · <b>막차</b>' : '')
            + ' <span class="muted">— 실시간</span>';
     }
     return null;

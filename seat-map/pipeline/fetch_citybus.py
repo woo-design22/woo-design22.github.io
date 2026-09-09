@@ -33,7 +33,7 @@ import common as C   # noqa: E402
 BASE = 'http://apis.data.go.kr/1613000/BusRouteInfoInqireService'
 OUT_DIR = os.path.join(C.RAW, 'citybus')
 CITIES = {'busan': ('부산', 21), 'daegu': ('대구', 22), 'incheon': ('인천', 23),
-          'gwangju': ('광주', 24), 'daejeon': ('대전', 25)}
+          'gwangju': ('광주', 24), 'daejeon': ('대전', 25), 'ulsan': ('울산', 26)}
 
 
 def key():

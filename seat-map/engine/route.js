@@ -560,6 +560,11 @@
         leg.reserved = true;
         leg.seatText = null;
         leg.emptySeats = null;
+        /* 도시 간 이동에서 사람이 다음으로 묻는 것은 「얼마인가·자주 있나」다.
+           자료에 실려 있으니 화면까지 가져간다 — 안 그러면 굽기만 하고 안 쓰는 값이 된다. */
+        var rt = ctx.graph.routes[leg.routeIdx] || {};
+        leg.fare = rt.fare || null;
+        leg.runsPerDay = rt.runsPerDay || null;
       }
       /* ★ 추정이면 추정이라고 화면까지 가져간다 ★ 여기서 안 실으면 상세 화면의
          「추정입니다」 줄이 영영 안 뜬다 — 실제로 그동안 안 떴다(D-104에서 발견).

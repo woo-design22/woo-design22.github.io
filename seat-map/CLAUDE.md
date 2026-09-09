@@ -225,7 +225,7 @@ cd C:\Claude\seat-map && python pipeline/fetch_citybus.py && python pipeline/bui
 
 ```bash
 cd C:\Claude\seat-map
-node --test tests/*.test.js          # 156개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정·서울 밖 다섯 도시·시내버스·도시 간)
+node --test tests/*.test.js          # 157개 (모델·버그 방지·검증·필터·길찾기·장소 찾기·보정·서울 밖 도시·시내버스·도시 간)
 node tools/verify_rush.js            # 출근 상식 전수 훑기 — 큰 수술 뒤엔 꼭 돌린다 (D-80)
 node tools/verify_deep.js            # 심층판: 퇴근·심야·무작위 1,135여정·몬테카를로 (D-81)
 python pipeline/parse_tdata.py --selftest   # 스키마 파서 (키 불필요)

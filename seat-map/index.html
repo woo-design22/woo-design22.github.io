@@ -1381,7 +1381,12 @@
       /* 지정석(KTX·SRT·고속·시외버스)은 확률로 말하지 않는다 — 표가 곧 좌석이다.
          대신 「매진이면 못 탄다」를 같이 말해야 절반만 말하는 것이 아니게 된다(D-107). */
       if(l.reserved){
+        /* 요금·편수는 도시 간 이동에서 사람이 바로 다음에 묻는 것이다. 자료에 있으니 보여 준다. */
+        var extra=[];
+        if(l.fare) extra.push('어른 '+l.fare.toLocaleString('ko-KR')+'원');
+        if(l.runsPerDay) extra.push('하루 '+l.runsPerDay+'편');
         html += '<div style="margin-top:8px"><span class="phrase tone-best">● 지정석입니다 — 예매하면 앉아 갑니다</span>'
+             + (extra.length ? ' <b class="small">'+esc(extra.join(' · '))+'</b>' : '')
              + ' <span class="muted small">매진이면 탈 수 없습니다 · 실시간 잔여석은 예매처에서 확인하세요</span></div>';
       }
       if(l.seatText){

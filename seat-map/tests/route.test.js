@@ -446,12 +446,23 @@ t('도시 간 노선은 두 지점을 잇는 지정석 편도다 (D-107)', () =>
 t('지방 시내버스도 방향이 갈려 있고 노드가 제대로 붙어 있다 (D-106)', () => {
   const city = graph.routes.filter(r => String(r.id || '').startsWith('CB-'));
   if (!city.length) return;                     // 아직 안 넣었으면 건너뛴다
+  /* ★ 도시마다 자료 사정이 다르다 ★ (실측)
+       부산 99% · 대전 98% · 인천 94% 는 자료에 방향값(updowncd)이 들어 있고,
+       **광주와 울산은 0%** 다(TAGO 가 아예 안 준다). 대구는 49%.
+     그래서 전체 비율 하나로 재면 안 된다. 두 가지를 따로 본다:
+       ① 방향값을 주는 도시는 거의 다 두 방향이어야 한다 — 그 파싱이 깨지면 여기서 잡힌다
+       ② 전체는 회차점 분리(split_round_trip)가 살려 낸 몫까지 포함해야 한다.
+          그것이 죽으면 47%로 떨어지므로 60% 문턱이 그 사고를 잡는다. */
+  const hasDir = city.filter(r => /^(부산|대전|인천) /.test(r.name));
+  const hasDirTwo = hasDir.filter(r => r.dirs.length === 2);
+  assert.ok(hasDirTwo.length / hasDir.length > 0.9,
+    `방향값을 주는 도시인데 두 방향이 ${hasDirTwo.length}/${hasDir.length} 뿐이다 — updowncd 를 놓쳤다`);
   const two = city.filter(r => r.dirs.length === 2);
-  assert.ok(two.length / city.length > 0.7,
-    `두 방향인 지방 노선이 ${two.length}/${city.length} 뿐이다 — 방향값(updowncd)을 놓쳤다`);
+  assert.ok(two.length / city.length > 0.6,
+    `두 방향인 지방 노선이 ${two.length}/${city.length} 뿐이다 — 회차점 분리가 죽었다`);
   for (const r of city) {
     assert.ok(!r.stops, `${r.name}: 지방 버스에 stops 를 싣지 않기로 했다(승하차 파일이 없다)`);
-    assert.ok(/^(부산|대구|대전|광주|인천) /.test(r.name),
+    assert.ok(/^(부산|대구|대전|광주|인천|울산) /.test(r.name),
       `${r.name}: 도시 이름이 안 붙었다 — 서울 노선과 이름이 겹치면 남의 혼잡도를 읽는다`);
     for (const d of r.dirs) {
       assert.ok(d.length >= 3, `${r.name}: 정류장이 ${d.length}개뿐`);

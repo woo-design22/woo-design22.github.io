@@ -53,6 +53,15 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #info .hurt{border-left:2px solid var(--warn);padding-left:9px}
 #info .hurt p{color:#f0cdc7}
 #info .none{font-size:12px;color:var(--dim);line-height:1.6}
+#info .hurtmot{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px}
+#info .hm{border:1px solid var(--line);background:#171c22;color:var(--fg);
+  border-radius:12px;padding:4px 10px;font-size:11.5px;cursor:pointer;
+  font-family:inherit;white-space:nowrap}
+#info .hm:hover{background:#222a34}
+#info .hm.lv3{border-color:#ff4d3d;color:#ffb4a8}
+#info .hm.lv2{border-color:#ff9f43;color:#ffd6ab}
+#info .hm.lv1{border-color:#5a6672;color:#aeb9c4}
+#info .hmnote{font-size:10.5px;color:var(--dim);margin-top:6px;line-height:1.5}
 #info .src-ok{font-size:11.5px;color:#7fc98a;line-height:1.5}
 #info .src-no{font-size:11px;color:#8e9aa6;line-height:1.55;margin-top:14px;
   border-left:2px solid #3a4450;padding-left:9px}
@@ -770,7 +779,8 @@ var MOTIONS=[
  note:'신전근이 당기고 <b>신전지대</b>가 힘줄이 떠오르지 않게 눌러 줍니다. 손바닥쪽 인대가 늘어나고, 등쪽에서는 <b>주상골과 요골이 서로 부딪힙니다</b>.',
  load:{'Extensor carpi radialis*':3,'Extensor carpi ulnaris*':2,'Extensor digitorum*':2,
        'Extensor retinaculum of wrist':3,'Scaphoid bone':2,'Lunate bone':2,
-       'Radius':2,'Articular capsule of radiocarpal joint':2}},
+       'Radius':2,'Articular capsule of radiocarpal joint':2,
+       'Scapholunate interosseous ligament':2}},
 {id:'udev',ko:'새끼손가락 쪽으로 꺾기',
  note:'손목이 척측으로 기울면 <b>척골 머리와 삼각골 사이가 좁아지며 TFCC가 짓눌립니다</b>. 척골이 상대적으로 긴 사람은 이 자세만으로도 아플 수 있습니다(척측 충돌 증후군).',
  load:{'Articular disc of distal radio-ulnar joint':3,'Triquetrum bone':3,
@@ -789,12 +799,12 @@ var MOTIONS=[
  load:{'Flexor digitorum profundus*':3,'Humero-ulnar head of flexor digitorum superficialis':3,
        'Flexor pollicis longus*':2,'Flexor retinaculum of wrist':3,'Median nerve':3,
        'Hamate bone':2,'Deep branch of ulnar nerve':2,'Ulnar nerve':2,
-       'Extensor carpi radialis*':2}},
+       'Extensor carpi radialis*':2,'Scapholunate interosseous ligament':2}},
 {id:'push',ko:'팔굽혀펴기',
  note:'손목을 <b>끝까지 젖힌 채 체중이 축으로 실립니다</b>. 등쪽에서 요골과 손목뼈가 맞부딪혀(배측 충돌) 아프고, 주상골·월상골·유두골이 압박을 받습니다. 손목 통증으로 팔굽혀펴기를 못 하는 사람 대부분이 여기입니다.',
  load:{'Scaphoid bone':3,'Lunate bone':3,'Capitate bone':3,'Radius':3,
        'Articular capsule of radiocarpal joint':3,'Dorsal radiocarpal ligament':3,
-       'Dorsal intercarpal ligaments':2,'Scapholunate interosseous ligament':2,
+       'Dorsal intercarpal ligaments':2,'Scapholunate interosseous ligament':3,
        'Extensor carpi radialis*':2,'Extensor retinaculum of wrist':2}},
 {id:'twist',ko:'병뚜껑 돌리기 · 걸레 짜기',
  note:'회전과 쥐는 힘이 <b>동시에</b> 걸립니다. TFCC에 가장 가혹한 동작이라, TFCC 파열 환자가 가장 먼저 못 하게 되는 일이 문고리 돌리기와 걸레 짜기입니다.',
@@ -1064,7 +1074,13 @@ function buildGroups(){
   });
 }
 
+var BONE_LAYER=7;   // LAYERS 의 '8_뼈'
+
 function visible(p){
+  // 움직이는 동안에는 뼈만 그린다.
+  // 근육·힘줄·신경은 팔뚝 위까지 이어져 있어 강체로 돌리면 중간이 찢어진다.
+  // 제대로 하려면 스키닝이 필요한데 이 데이터에는 가중치가 없다.
+  if(ANIM.on) return p.layer===BONE_LAYER && GROUPS[p.gi].on;
   return p.layer>=peel && on[p.layer] && GROUPS[p.gi].on;
 }
 
@@ -1233,6 +1249,22 @@ function pick(sx,sy){
   return -1;
 }
 
+// ── 이 구조가 다치면 어떤 동작이 힘든가 ─────────────────────
+// 동작→부하 자료를 뒤집는다. 환자가 실제로 궁금한 방향이 이쪽이다.
+function motionsHurtBy(gi){
+  var g=GROUPS[gi], out=[];
+  MOTIONS.forEach(function(m){
+    var best=0;
+    g.idx.forEach(function(i){
+      var bn=baseName(parts[i].name);
+      for(var k in m.load) if(matchKey(k,bn)) best=Math.max(best, m.load[k]);
+    });
+    if(best) out.push({m:m, lv:best});
+  });
+  out.sort(function(a,b){ return b.lv-a.lv; });
+  return out;
+}
+
 // ── 설명 패널 ────────────────────────────────────────────────
 var info=document.getElementById('info');
 function show(i){
@@ -1251,6 +1283,15 @@ function show(i){
   if(t.inj) h+='<div class="hurt"><h3>손상·파열되면</h3><p>'+t.inj+'</p></div>';
   // 출처가 있는 것과 없는 것을 반드시 구분해 보여 준다.
   // 대조하지 않은 설명을 근거 있는 것처럼 보이게 두면 교육 자료로서 위험하다.
+  // 다치면 못 하게 되는 일 — 누르면 그 동작으로 바로 간다
+  var hurt = (p.gi!==undefined) ? motionsHurtBy(p.gi) : [];
+  if(hurt.length){
+    h+='<h3>여기가 다치면 힘든 동작</h3><div class="hurtmot">';
+    hurt.forEach(function(o){
+      h+='<button class="hm lv'+o.lv+'" data-m="'+o.m.id+'">'+o.m.ko+'</button>';
+    });
+    h+='</div><p class="hmnote">진한 것일수록 부하가 큽니다. 눌러 보면 어디에 무리가 가는지 보여 줍니다.</p>';
+  }
   if(t.src) h+='<h3>근거</h3><p class="src-ok">✓ '+t.src+'</p>';
   else if(t.fn||t.inj) h+='<p class="src-no">이 설명은 아직 출처 대조를 거치지 않았습니다. '+
        '표준 해부학 내용이지만 인용 전에 확인이 필요합니다.</p>';
@@ -1260,6 +1301,13 @@ function show(i){
   h+='<h3 style="margin-top:18px">원어</h3><p style="color:#8e9aa6;font-size:12px">'+
      p.name.replace(/\.(e\d?|o\d?)?r$/,'')+'</p>';
   document.getElementById('i-body').innerHTML=h;
+  // innerHTML 로 다시 그렸으므로 핸들러를 새로 건다
+  [].forEach.call(document.querySelectorAll('#i-body .hm'), function(b){
+    b.onclick=function(){
+      var m=MOTIONS.filter(function(x){return x.id===b.dataset.m;})[0];
+      if(m){ clearFocus(); setMotion(m); }
+    };
+  });
   info.classList.add('on');
 }
 document.getElementById('close').onclick=function(){ show(-1); };
@@ -1483,8 +1531,8 @@ function toggleAnim(){
   var b=document.getElementById('mgo');
   b.classList.toggle('on', ANIM.on);
   b.textContent = ANIM.on ? '■ 멈추기' : '▶ 움직여 보기';
-  // 움직이는 동안엔 뼈만 본다 — 강체 회전이라 연부조직은 어차피 안 맞는다
-  if(ANIM.on && peel<7){ pe.value=7; pe.oninput(); }
+  // 슬라이더도 맞춰 준다(보임 판정에서 이미 막지만 화면이 헷갈리지 않게)
+  if(ANIM.on && peel<BONE_LAYER){ pe.value=BONE_LAYER; pe.oninput(); }
   inval();
 }
 
@@ -1520,7 +1568,8 @@ function setMotion(m){
   if(mv){
     pl.classList.add('on');
     document.getElementById('mwhy').innerHTML=
-      mv.note+' · <b style="color:#8e9aa6">뼈만 강체로 돌립니다 — 힘줄·신경은 실제처럼 늘어나지 않습니다</b>';
+      mv.note+' · <b style="color:#8e9aa6">뼈만 움직입니다. 근육·힘줄은 실제로 늘어나고 미끄러지는데 '+
+      '여기서는 그걸 흉내 낼 수 없어 재생 중에는 감춥니다</b>';
   } else pl.classList.remove('on');
 
   var hit=0; for(var q in MOT.load) hit++;
@@ -1758,6 +1807,7 @@ function boot(){
       groups:GROUPS,motions:MOTIONS,mot:MOT,setMotion:setMotion,
       anim:anim,record:record,shoot:shoot,
       anim2:ANIM,move:MOVE,toggleAnim:toggleAnim,rotAbout:rotAbout,
+      hurtBy:motionsHurtBy,
       search:search,goto:gotoGroup,focus:function(){return FOCUS;},
       clearFocus:clearFocus,center:groupCenter,
       show:show,pick:pick,draw:draw,

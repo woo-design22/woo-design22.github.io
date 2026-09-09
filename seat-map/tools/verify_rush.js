@@ -20,6 +20,7 @@ const CONG = load(path.join(D, 'subway', 'congestion.json'));
 const RIDE = load(path.join(D, 'subway', 'ride.json'));
 const CALIB = load(path.join(D, 'bus', 'tdata-calib.json'));
 const KINDLOAD = load(path.join(D, 'bus', 'kind-load.json'));
+const FIRSTLAST = load(path.join(D, 'subway', 'firstlast.json'));   // 역별 첫·막차(D-112)
 if (!NODES || !ROUTES || !CONG) { console.error('자료가 없다 — pipeline 을 먼저 돌린다'); process.exit(1); }
 /* 앱(index.html)과 같은 합치기 — 지방 5개 도시(D-103)·수도권 광역전철(D-108)도 훑는다.
    이걸 빼면 그 노선들이 「모름 = 서서」로 조용히 빠져 검증이 서울만 본다. */
@@ -41,7 +42,7 @@ function busRouteOf(name) {
   return (busCache[name] = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null);
 }
 function ctxAt(minutes, dayType) {
-  const ctx = { graph, congestion: CONG, ride: RIDE, busCalib: CALIB, kindLoad: KINDLOAD, busRouteOf,
+  const ctx = { graph, congestion: CONG, ride: RIDE, busCalib: CALIB, kindLoad: KINDLOAD, firstLast: FIRSTLAST, busRouteOf,
                 minutes, dayType, alpha: M.ALPHA_DEFAULT };
   ctx.loadFor = L.makeLoadFor(ctx);
   return ctx;

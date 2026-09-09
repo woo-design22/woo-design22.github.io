@@ -129,11 +129,53 @@
     if (!names) return null;
     /* 1칸 정원. 노선에 적혀 있으면 그것이 옳다(부산 중형 118 · 경전철 53). 서울은 160. */
     var cap = route.capacity || 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
+    /* ★ 실제 첫·막차가 있으면 그것이 먼저다 (D-112) ★
+       아래 D-81 근사는 노선 공통(05:30~24:30 ±40분)이라 역마다 한 시간 넘게 어긋난다 —
+       연천 막차 23:28 과 상계 01:02 를 같은 자로 재면 「막차 끊겼나」에 거짓말을 한다.
+       내가 **타는 역·타는 방향**의 시각표 값으로 답하고, 없는 역만 근사로 물러난다.
+       방향은 원천 표기(1=상행·2=하행)라 우리 라벨(상선/하선/내선/외선)과 맞춰 읽는다 —
+       라벨은 노선마다 뒤집혀 있어(D-36) route.dirLabels 를 통해야 한다. */
+    var fl = ctx.firstLast && ctx.firstLast.stations
+           ? ctx.firstLast.stations[String(names[leg.fromPos] || '').replace(/\(.*?\)/g, '').replace(/\s/g, '')]
+           : null;
+    if (fl) {
+      var sideNm = dirName(route, leg.dirIdx);
+      /* 상선·내선을 상행(1)로, 하선·외선을 하행(2)로 본다. 어느 쪽인지 못 가리면
+         두 방향 중 넓은 창(가장 이른 첫차~가장 늦은 막차)으로 봐준다 — 없는 막차를
+         지어내 사람을 세워 두는 것보다, 애매하면 「있을 수 있다」가 안전하다. */
+      var want = (sideNm === '상선' || sideNm === '내선') ? fl['1']
+               : (sideNm === '하선' || sideNm === '외선') ? fl['2'] : null;
+      var lo, hi;
+      if (want) { lo = want[0]; hi = want[1]; }
+      else {
+        var a1 = fl['1'], a2 = fl['2'];
+        if (a1 && a2) { lo = Math.min(a1[0], a2[0]); hi = Math.max(a1[1], a2[1]); }
+        else if (a1 || a2) { var one = a1 || a2; lo = one[0]; hi = one[1]; }
+      }
+      if (lo !== undefined) {
+        /* ★ 막차는 24시를 넘겨 표기된다 ★ 원천 시각표가 25:02 를 1502분으로 준다(실측:
+           4호선 상계 상행 막차 1502). 이걸 %1440 으로 접어 비교하면 00:30 에 물었을 때
+           「[364,1502] 밖」이 되어 **살아 있는 막차를 죽인다** — 실제로 그랬다.
+           그래서 새벽(03시 전)에 물으면 하루를 이어 붙여(+1440) 같은 자로 잰다.
+           드물게 hi < lo 로 접혀 온 자료도 있을 수 있어 그 경우도 함께 받는다. */
+        var t = minutes % 1440;
+        if (t < 180) t += 1440;                 // 00:00~02:59 = 어제의 연장(D-81 과 같은 규칙)
+        var inService = (hi < lo)
+          ? (t >= lo || t <= hi || t - 1440 <= hi)      // 접힌 표기
+          : (t >= lo && t <= hi);
+        if (!inService) {
+          return { notRunning: true,
+                   why: '그 시각에는 이 역에서 그 방향 열차가 다니지 않는다 (첫차 '
+                        + I.hhmm(lo % 1440) + ' · 막차 ' + I.hhmm(hi % 1440) + ')' };
+        }
+      }
+    }
     /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★ — ★ 반드시 noCong(D-87)보다 먼저 ★
        noCong 이 먼저 null 을 돌려주면 「모름 = 서서」로 살아나 심야 게이트를 건너뛴다.
        직결 병합 뒤 5분 시뮬레이션에서 02~04시에 1·3호선이 산 채로 나왔다 — 이 순서가 근거다.
-       규칙 자체(D-81): 혼잡도 범위(05:30~24:30) 40분 밖 = 안 다님, 자정 직후는 하루의 연장. */
-    if (ctx.congestion && ctx.congestion.startMinutes !== undefined) {
+       규칙 자체(D-81): 혼잡도 범위(05:30~24:30) 40분 밖 = 안 다님, 자정 직후는 하루의 연장.
+       ★ 위 D-112 가 실제 시각으로 답한 역은 여기 오지 않는다 — 근사는 폴백일 뿐이다. */
+    if (!fl && ctx.congestion && ctx.congestion.startMinutes !== undefined) {
       var svc0 = ctx.congestion.startMinutes;
       var svc1 = svc0 + ((ctx.congestion.slots || 39) - 1) * (ctx.congestion.slotMinutes || 30);
       var effMin = minutes < 180 ? minutes + 1440 : minutes;

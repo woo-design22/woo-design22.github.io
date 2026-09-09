@@ -837,18 +837,21 @@ var LOADCOL={1:[1.0,.851,.239],2:[1.0,.624,.263],3:[1.0,.302,.239]};
 // deg 는 그 동작의 최대 각도, set 은 무엇이 따라 움직이는가다.
 var WRIST_PIV=[5,-5,1];        // 손목 회전 중심 ≈ 유두골 머리
 var FORE_PIV=[26,-9,-6];       // 아래팔 회전축 ≈ 척골 원위부
+// 섞이는 구간 [관절 높이, 반폭]. 손목은 좁게 꺾이고 아래팔 회전은 넓게 비틀린다.
+var BLEND_WRIST=[3, 26];
+var BLEND_FORE =[70, 95];
 var AX={x:[1,0,0], y:[0,1,0], z:[0,0,1]};
 var MOVE={
-  pron: {ax:AX.y, deg:-80, piv:FORE_PIV, set:'fore', note:'요골이 척골을 넘어 돌아갑니다'},
-  sup:  {ax:AX.y, deg: 80, piv:FORE_PIV, set:'fore', note:'두 뼈가 나란해집니다'},
-  flex: {ax:AX.x, deg:-70, piv:WRIST_PIV, set:'hand', note:'손목을 손바닥 쪽으로 굽힙니다'},
-  ext:  {ax:AX.x, deg: 60, piv:WRIST_PIV, set:'hand', note:'손목을 손등 쪽으로 젖힙니다'},
-  udev: {ax:AX.z, deg: 35, piv:WRIST_PIV, set:'hand', note:'새끼손가락 쪽으로 기웁니다'},
-  push: {ax:AX.x, deg: 80, piv:WRIST_PIV, set:'hand', note:'체중을 받치느라 끝까지 젖혀집니다'},
-  hang: {ax:AX.x, deg: 25, piv:WRIST_PIV, set:'hand', note:'매달린 무게로 살짝 젖혀집니다'},
-  lift: {ax:AX.x, deg: 30, piv:WRIST_PIV, set:'hand', note:'쥘 때 손목을 젖혀 고정합니다'},
-  bike: {ax:AX.x, deg: 35, piv:WRIST_PIV, set:'hand', note:'핸들을 잡으면 젖힌 채 고정됩니다'},
-  twist:{ax:AX.y, deg: 80, piv:FORE_PIV, set:'fore', osc:true,
+  pron: {ax:AX.y, deg:-80, piv:FORE_PIV, set:'fore', blend:BLEND_FORE, note:'요골이 척골을 넘어 돌아갑니다'},
+  sup:  {ax:AX.y, deg: 80, piv:FORE_PIV, set:'fore', blend:BLEND_FORE, note:'두 뼈가 나란해집니다'},
+  flex: {ax:AX.x, deg:-70, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'손목을 손바닥 쪽으로 굽힙니다'},
+  ext:  {ax:AX.x, deg: 60, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'손목을 손등 쪽으로 젖힙니다'},
+  udev: {ax:AX.z, deg: 35, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'새끼손가락 쪽으로 기웁니다'},
+  push: {ax:AX.x, deg: 80, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'체중을 받치느라 끝까지 젖혀집니다'},
+  hang: {ax:AX.x, deg: 25, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'매달린 무게로 살짝 젖혀집니다'},
+  lift: {ax:AX.x, deg: 30, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'쥘 때 손목을 젖혀 고정합니다'},
+  bike: {ax:AX.x, deg: 35, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'핸들을 잡으면 젖힌 채 고정됩니다'},
+  twist:{ax:AX.y, deg: 80, piv:FORE_PIV, set:'fore', osc:true, blend:BLEND_FORE,
          note:'회내와 회외를 오갑니다 — TFCC에 가장 가혹합니다'}
 };
 var IDENT=[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
@@ -877,14 +880,30 @@ function movesWith(i, set){
   return p.cen[1] < 50;                         // 손목 관절선보다 원위
 }
 
-function animMat(i){
-  if(!ANIM.on || !MOT.m) return IDENT;
+// 지금 동작의 회전 행렬 하나. 부위마다 다르지 않다 — 다른 것은 「얼마나 따라가나」다.
+function animRot(){
+  if(!ANIM.on || !MOT.m) return null;
   var mv=MOVE[MOT.m.id];
-  if(!mv || !movesWith(i, mv.set)) return IDENT;
+  if(!mv) return null;
   var u=ANIM.u;
   // 오가는 동작은 사인, 한쪽으로 가는 동작은 갔다 돌아온다
   var k = mv.osc ? Math.sin(u*Math.PI*2) : (1-Math.cos(u*Math.PI*2))/2;
-  return rotAbout(mv.ax, mv.deg*Math.PI/180*k, mv.piv);
+  return {m:rotAbout(mv.ax, mv.deg*Math.PI/180*k, mv.piv), mv:mv};
+}
+
+// 이 부위를 어떻게 섞을 것인가.
+//   뼈    — 통째로 0 또는 1. 뼈가 휘면 그것대로 틀린 그림이다.
+//   나머지 — 정점 높이로 부드럽게. 이래야 관절을 건너며 늘어난다.
+function skinFor(i, rot){
+  if(!rot) return [0,0,0];
+  var p=parts[i], mv=rot.mv, bn=baseName(p.name);
+  if(p.layer===BONE_LAYER){
+    if(bn==='Ulna') return [0,0,0];                       // 척골은 두 동작 모두 축이다
+    if(bn==='Radius') return [mv.set==='fore'?1:0,0,0];   // 아래팔 회전에서만 요골이 돈다
+    return [p.cen[1] < 50 ? 1 : 0, 0, 0];
+  }
+  var b = mv.blend || BLEND_WRIST;
+  return [2, b[0], b[1]];
 }
 var MOT={m:null,load:{}};
 
@@ -917,11 +936,15 @@ var VS=
 'in uvec3 aQ; in vec3 aN;\n'+
 'uniform mat4 uMVP; uniform mat4 uMV; uniform mat3 uNM;\n'+
 'uniform vec3 uLo, uSpan; uniform mat4 uModel;\n'+
+'uniform vec3 uSkin;   // x: 0 고정 / 1 전부 따라감 / 2 높이로 섞기, y: 관절 높이, z: 섞이는 폭\n'+
 'out vec3 vN; out vec3 vP;\n'+
 'void main(){\n'+
 '  vec3 p0 = uLo + (vec3(aQ)/65535.0)*uSpan;\n'+
-'  vec4 p = uModel*vec4(p0,1.0);\n'+
-'  vN = normalize(uNM*(mat3(uModel)*aN));\n'+
+'  float w = uSkin.x;\n'+
+'  if(uSkin.x > 1.5)\n'+
+'    w = smoothstep(uSkin.y + uSkin.z, uSkin.y - uSkin.z, p0.y);\n'+
+'  vec4 p = mix(vec4(p0,1.0), uModel*vec4(p0,1.0), w);\n'+
+'  vN = normalize(uNM*mix(aN, mat3(uModel)*aN, w));\n'+
 '  vP = (uMV*p).xyz;\n'+
 '  gl_Position = uMVP*p;\n'+
 '}';
@@ -1082,12 +1105,9 @@ function buildGroups(){
 var BONE_LAYER=7;   // LAYERS 의 '8_뼈'
 var LIGA_LAYER=6;   // LAYERS 의 '7_인대관절낭'
 
-// 재생 중에 그려도 되는 층. 인대·관절낭은 손목에 몰려 있어 강체로 돌려도 티가 안 난다.
-// 근육·힘줄·신경·피부는 팔뚝 위까지 이어져 있어 중간이 어긋나 보인다(실제로 찢어져 보였다).
-function animSafe(layer){ return layer===BONE_LAYER || layer===LIGA_LAYER; }
-
+// 스키닝이 들어온 뒤로는 조직이 관절을 건너며 늘어나므로 감출 이유가 없다.
+// (전에는 통째로 돌려서 어긋났고, 그래서 재생 중에 뼈만 보여 줬다.)
 function visible(p){
-  if(ANIM.on) return animSafe(p.layer) && on[p.layer] && GROUPS[p.gi].on;
   return p.layer>=peel && on[p.layer] && GROUPS[p.gi].on;
 }
 
@@ -1125,9 +1145,11 @@ function draw(){
   gl.uniform3fv(A.u.uLo,new Float32Array(META.quant.lo));
   gl.uniform3fv(A.u.uSpan,new Float32Array(META.quant.span));
   gl.uniformMatrix4fv(A.u.uModel,false,new Float32Array(IDENT));
+  gl.uniform3f(A.u.uSkin,0,0,0);
 
   // 동작이 켜져 있으면 부하 받는 곳만 빛나고 나머지는 흐려진다.
   var pulse=MOT.m ? (0.5+0.5*Math.sin(Date.now()/300)) : 0;
+  var ROT=animRot();
 
   function one(i){
     var p=parts[i];
@@ -1149,7 +1171,8 @@ function draw(){
     if(al<1 && emph>0) al=Math.min(1, al+0.45);
     // 투시 중 가리는 것들은 얇게 — 이래야 안쪽 구조가 실제로 보인다
     if(FOCUS>=0 && p.gi!==FOCUS) al=Math.min(al, 0.13);
-    gl.uniformMatrix4fv(A.u.uModel,false,new Float32Array(animMat(i)));
+    gl.uniformMatrix4fv(A.u.uModel,false,new Float32Array(ROT?ROT.m:IDENT));
+    var sk=skinFor(i,ROT); gl.uniform3f(A.u.uSkin,sk[0],sk[1],sk[2]);
     gl.uniform3f(A.u.uCol,c[0],c[1],c[2]);
     gl.uniform1f(A.u.uAlpha,al);
     gl.uniform1f(A.u.uFade,fade);
@@ -1238,10 +1261,13 @@ function pick(sx,sy){
   gl.uniform3fv(K.u.uLo,new Float32Array(META.quant.lo));
   gl.uniform3fv(K.u.uSpan,new Float32Array(META.quant.span));
   gl.uniformMatrix4fv(K.u.uModel,false,new Float32Array(IDENT));
+  gl.uniform3f(K.u.uSkin,0,0,0);
   for(var i=0;i<parts.length;i++){
     var p=parts[i]; if(!visible(p)) continue;
     var id=p.id;
-    gl.uniformMatrix4fv(K.u.uModel,false,new Float32Array(animMat(i)));
+    var kr=animRot();
+    gl.uniformMatrix4fv(K.u.uModel,false,new Float32Array(kr?kr.m:IDENT));
+    var ks=skinFor(i,kr); gl.uniform3f(K.u.uSkin,ks[0],ks[1],ks[2]);
     gl.uniform3f(K.u.uId,(id&255)/255,((id>>8)&255)/255,((id>>16)&255)/255);
     gl.bindVertexArray(p.vao);
     gl.drawElements(gl.TRIANGLES,p.n,p.type,0);
@@ -1545,11 +1571,7 @@ function toggleAnim(){
   var b=document.getElementById('mgo');
   b.classList.toggle('on', ANIM.on);
   b.textContent = ANIM.on ? '■ 멈추기' : '▶ 움직여 보기';
-  // 슬라이더도 맞춰 준다(보임 판정에서 이미 막지만 화면이 헷갈리지 않게)
-  if(ANIM.on && peel<LIGA_LAYER){ pe.value=LIGA_LAYER; pe.oninput(); }
-  // 인대 층은 켜 둔다 — TFCC 를 보러 왔는데 꺼져 있으면 헛일이다
-  if(ANIM.on){ on[LIGA_LAYER]=true; on[BONE_LAYER]=true; syncLay(); }
-  inval();
+  inval();   // 이제 어느 층을 보고 있든 그대로 움직인다
 }
 
 function buildMot(){
@@ -1584,8 +1606,8 @@ function setMotion(m){
   if(mv){
     pl.classList.add('on');
     document.getElementById('mwhy').innerHTML=
-      mv.note+' · <b style="color:#8e9aa6">뼈와 인대만 움직입니다. 근육·힘줄·신경은 팔뚝까지 이어져 있어 '+
-      '강체로 돌리면 어긋나 보이므로 재생 중에는 감춥니다</b>';
+      mv.note+' · <b style="color:#8e9aa6">뼈는 그대로 돌고 인대·힘줄·근육은 늘어납니다. '+
+      '다만 힘줄이 집 안에서 미끄러지는 것이나 근육이 불룩해지는 것까지는 흉내 내지 못합니다</b>';
   } else pl.classList.remove('on');
 
   var hit=0; for(var q in MOT.load) hit++;
@@ -1823,6 +1845,7 @@ function boot(){
       groups:GROUPS,motions:MOTIONS,mot:MOT,setMotion:setMotion,
       anim:anim,record:record,shoot:shoot,
       anim2:ANIM,move:MOVE,toggleAnim:toggleAnim,rotAbout:rotAbout,
+      animRot:animRot,skinFor:skinFor,
       hurtBy:motionsHurtBy,
       search:search,goto:gotoGroup,focus:function(){return FOCUS;},
       clearFocus:clearFocus,center:groupCenter,

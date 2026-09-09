@@ -67,7 +67,9 @@
   .grid { display: flex; flex-direction: column; gap: 10px; }
 
   a.card {
-    display: block;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;   /* 설명이 긴 카드가 있어 가운데가 아니라 위쪽에 맞춘다 */
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 14px;
@@ -80,6 +82,13 @@
   a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   a.card:active { transform: scale(0.995); }
 
+  /* 썸네일: 밝은 타일 한 장. 어두운 화면에서도 그대로 밝게 둔다(앱 아이콘처럼 보이라고). */
+  .card .thumb {
+    flex: 0 0 52px; width: 52px; height: 52px;
+    border-radius: 10px; border: 1px solid var(--line);
+    background: #f4f4f2;
+  }
+  .card .body { min-width: 0; }   /* 긴 낱말이 칸을 밀어내지 않게 */
   .card .name { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
   .card .desc { color: var(--ink-2); font-size: 14px; margin-top: 3px; }
 
@@ -122,72 +131,111 @@
   <h2>AI 대화</h2>
   <div class="grid">
     <a class="card" href="counsel-chat/">
-      <div class="name">마음톡<span class="tag">개발 중</span></div>
-      <div class="desc">심리상담 훈련을 받은 AI와 나누는 대화. 8개 분야를 골라 이야기합니다.</div>
+      <img class="thumb" src="thumbs/counsel-chat.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">마음톡<span class="tag">개발 중</span></div>
+        <div class="desc">심리상담 훈련을 받은 AI와 나누는 대화. 8개 분야를 골라 이야기합니다.</div>
+      </div>
     </a>
     <a class="card" href="emergency-chat/">
-      <div class="name">지금바로 구급대원<span class="tag">개발 중</span></div>
-      <div class="desc">119에 전화하기 망설여질 때, 응급인지 먼저 물어보는 곳.</div>
+      <img class="thumb" src="thumbs/emergency-chat.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">지금바로 구급대원<span class="tag">개발 중</span></div>
+        <div class="desc">119에 전화하기 망설여질 때, 응급인지 먼저 물어보는 곳.</div>
+      </div>
     </a>
   </div>
 
   <h2>게임</h2>
   <div class="grid">
     <a class="card" href="soccer/">
-      <div class="name">반대항축구<span class="tag">🔊 소리 나옴</span></div>
-      <div class="desc">반 전원이 뛰는 탑뷰 2D 축구. 드리블·슛·감아차기에 발차기와 방귀까지 있고, 캐릭터 6종이 저마다 필살기를 하나씩 가집니다. <b>혼자 하기</b>는 인공지능과 2:2로 바로 됩니다. <b>여러 명이서 하기</b>(최대 20명)는 만든 사람의 컴퓨터에서 서버가 켜져 있는 동안만 되며, 켜져 있으면 로비가 그날의 주소를 자동으로 찾습니다. PC 는 방향키와 글쇠, 휴대폰은 가로로 돌리면 조이스틱과 단추가 나옵니다.</div>
+      <img class="thumb" src="thumbs/soccer.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">반대항축구<span class="tag">🔊 소리 나옴</span></div>
+        <div class="desc">반 전원이 뛰는 탑뷰 2D 축구. 드리블·슛·감아차기에 발차기와 방귀까지 있고, 캐릭터 6종이 저마다 필살기를 하나씩 가집니다. <b>혼자 하기</b>는 인공지능과 2:2로 바로 됩니다. <b>여러 명이서 하기</b>(최대 20명)는 만든 사람의 컴퓨터에서 서버가 켜져 있는 동안만 되며, 켜져 있으면 로비가 그날의 주소를 자동으로 찾습니다. PC 는 방향키와 글쇠, 휴대폰은 가로로 돌리면 조이스틱과 단추가 나옵니다.</div>
+      </div>
     </a>
     <a class="card" href="sand-mix/">
-      <div class="name">샌드믹스</div>
-      <div class="desc">블록이 떨어지면 모래로 부서집니다. 같은 색이 벽에서 벽까지 이어지면 소거.</div>
+      <img class="thumb" src="thumbs/sand-mix.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">샌드믹스</div>
+        <div class="desc">블록이 떨어지면 모래로 부서집니다. 같은 색이 벽에서 벽까지 이어지면 소거.</div>
+      </div>
     </a>
     <a class="card" href="game-2048/">
-      <div class="name">2048</div>
-      <div class="desc">같은 숫자를 합쳐 2048을 만드는 퍼즐.</div>
+      <img class="thumb" src="thumbs/game-2048.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">2048</div>
+        <div class="desc">같은 숫자를 합쳐 2048을 만드는 퍼즐.</div>
+      </div>
     </a>
   </div>
 
   <h2>문학</h2>
   <div class="grid">
     <a class="card" href="iso-faces/">
-      <div class="name">격리실의 얼굴들<span class="tag">🔊 소리 나옴</span></div>
-      <div class="desc">머리만 남은 채 우주선에 실려 가는 사람이 잠시 몸을 얻었다가 다시 빼앗기는 이야기를, 1인칭 3D로 걸어서 겪습니다. 조작할 수 있는 범위가 곧 이야기입니다 — 처음에는 냄새를 맡는 것 말고 할 수 있는 일이 없고, 다음에는 눈동자만 굴려 커서를 한 픽셀씩 밉니다. 몸이 붙는 순간 비로소 걷고 달리고 뛸 수 있게 됩니다. 아홉 장으로 이어지며 장마다 작은 목표가 하나씩 주어집니다. 몸을 빼앗긴 사람들의 이야기라 분위기가 어둡습니다.</div>
+      <img class="thumb" src="thumbs/iso-faces.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">격리실의 얼굴들<span class="tag">🔊 소리 나옴</span></div>
+        <div class="desc">머리만 남은 채 우주선에 실려 가는 사람이 잠시 몸을 얻었다가 다시 빼앗기는 이야기를, 1인칭 3D로 걸어서 겪습니다. 조작할 수 있는 범위가 곧 이야기입니다 — 처음에는 냄새를 맡는 것 말고 할 수 있는 일이 없고, 다음에는 눈동자만 굴려 커서를 한 픽셀씩 밉니다. 몸이 붙는 순간 비로소 걷고 달리고 뛸 수 있게 됩니다. 아홉 장으로 이어지며 장마다 작은 목표가 하나씩 주어집니다. 몸을 빼앗긴 사람들의 이야기라 분위기가 어둡습니다.</div>
+      </div>
     </a>
     <a class="card" href="lucky-day/">
-      <div class="name">운수 좋은 날<span class="tag">🔊 소리 나옴</span></div>
-      <div class="desc">현진건의 소설 첫 문단 하나만 읽고 세운 3D 장면. 진눈깨비 내리는 1924년의 거리를 인력거꾼 김 첨지가 지나갑니다. 흐르는 자막은 모두 원문 그대로이고, 어느 구절이 화면의 무엇이 되었는지 대조표로 볼 수 있습니다.</div>
+      <img class="thumb" src="thumbs/lucky-day.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">운수 좋은 날<span class="tag">🔊 소리 나옴</span></div>
+        <div class="desc">현진건의 소설 첫 문단 하나만 읽고 세운 3D 장면. 진눈깨비 내리는 1924년의 거리를 인력거꾼 김 첨지가 지나갑니다. 흐르는 자막은 모두 원문 그대로이고, 어느 구절이 화면의 무엇이 되었는지 대조표로 볼 수 있습니다.</div>
+      </div>
     </a>
   </div>
 
   <h2>과학 체험</h2>
   <div class="grid">
     <a class="card" href="fly-brain/">
-      <div class="name">초파리에게 설탕을 주면<span class="tag">🔊 소리 나옴</span></div>
-      <div class="desc">바닥에 각설탕을 놓으면 초파리가 걸어가 먹습니다. 실제 뇌 배선도로 계산한 뇌 회로가 반짝이며 소리를 내고, 주둥이가 나오는지는 뇌가 정합니다. 쓴 약을 섞거나 더듬이를 간지럽히고, 뉴런을 꺼서 못 먹게 만드는 퍼즐도 있습니다.</div>
+      <img class="thumb" src="thumbs/fly-brain.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">초파리에게 설탕을 주면<span class="tag">🔊 소리 나옴</span></div>
+        <div class="desc">바닥에 각설탕을 놓으면 초파리가 걸어가 먹습니다. 실제 뇌 배선도로 계산한 뇌 회로가 반짝이며 소리를 내고, 주둥이가 나오는지는 뇌가 정합니다. 쓴 약을 섞거나 더듬이를 간지럽히고, 뉴런을 꺼서 못 먹게 만드는 퍼즐도 있습니다.</div>
+      </div>
     </a>
   </div>
 
   <h2>도구</h2>
   <div class="grid">
     <a class="card" href="onepage/">
-      <div class="name">한 쪽으로 줄이기<span class="tag">서버 필요</span></div>
-      <div class="desc">여러 쪽짜리 보고서를 1쪽 회의자료(한글 파일)로 줄입니다. 한글·워드·엑셀·파워포인트·PDF·그림을 섞어 올려도 됩니다. 내 서버에서 도는 도구라 여기는 들어가는 문입니다.</div>
+      <img class="thumb" src="thumbs/onepage.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">한 쪽으로 줄이기<span class="tag">서버 필요</span></div>
+        <div class="desc">여러 쪽짜리 보고서를 1쪽 회의자료(한글 파일)로 줄입니다. 한글·워드·엑셀·파워포인트·PDF·그림을 섞어 올려도 됩니다. 내 서버에서 도는 도구라 여기는 들어가는 문입니다.</div>
+      </div>
     </a>
     <a class="card" href="shade-map/">
-      <div class="name">그늘 지도<span class="tag">실험</span></div>
-      <div class="desc">건물 그림자를 계산해 지금 어디가 그늘인지 보여줍니다. 시각을 옮기면 그림자도 따라 움직입니다.</div>
+      <img class="thumb" src="thumbs/shade-map.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">그늘 지도<span class="tag">실험</span></div>
+        <div class="desc">건물 그림자를 계산해 지금 어디가 그늘인지 보여줍니다. 시각을 옮기면 그림자도 따라 움직입니다.</div>
+      </div>
     </a>
     <a class="card" href="mood-log/">
-      <div class="name">기분 일지</div>
-      <div class="desc">기분·수면·통증을 기록하고 주간·월간 흐름을 봅니다. 진료실 제출용 인쇄 지원.</div>
+      <img class="thumb" src="thumbs/mood-log.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">기분 일지</div>
+        <div class="desc">기분·수면·통증을 기록하고 주간·월간 흐름을 봅니다. 진료실 제출용 인쇄 지원.</div>
+      </div>
     </a>
     <a class="card" href="pomodoro-todo/">
-      <div class="name">뽀모도로 + 할 일</div>
-      <div class="desc">25분 집중 타이머와 할 일 목록.</div>
+      <img class="thumb" src="thumbs/pomodoro-todo.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">뽀모도로 + 할 일</div>
+        <div class="desc">25분 집중 타이머와 할 일 목록.</div>
+      </div>
     </a>
     <a class="card" href="particle-playground/">
-      <div class="name">파티클 플레이그라운드</div>
-      <div class="desc">손가락이나 마우스로 그리는 캔버스 파티클 놀이터.</div>
+      <img class="thumb" src="thumbs/particle-playground.svg" alt="" loading="lazy" decoding="async">
+      <div class="body">
+        <div class="name">파티클 플레이그라운드</div>
+        <div class="desc">손가락이나 마우스로 그리는 캔버스 파티클 놀이터.</div>
+      </div>
     </a>
   </div>
 

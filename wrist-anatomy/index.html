@@ -860,8 +860,9 @@ function computeForeAxis(){
 }
 var AX={x:[1,0,0], y:[0,1,0], z:[0,0,1]};
 var MOVE={
-  pron: {ax:AX.y, deg:-80, piv:FORE_PIV, set:'fore', blend:BLEND_FORE, note:'요골이 척골을 넘어 돌아갑니다'},
-  sup:  {ax:AX.y, deg: 80, piv:FORE_PIV, set:'fore', blend:BLEND_FORE, note:'두 뼈가 나란해집니다'},
+  // 회내·회외·비틀기는 뺐다. 아래팔 회전은 근육이 길이 방향으로 비틀리는 것이라
+  // 진짜 스키닝 가중치 없이는 어떤 근사를 써도 틀린 그림이 나온다(주석 맨 위 참고).
+  // 부하 표시는 그대로 두므로 「어디에 무리가 가는가」는 여전히 볼 수 있다.
   flex: {ax:AX.x, deg:-70, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'손목을 손바닥 쪽으로 굽힙니다'},
   ext:  {ax:AX.x, deg: 60, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'손목을 손등 쪽으로 젖힙니다'},
   udev: {ax:AX.z, deg: 35, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'새끼손가락 쪽으로 기웁니다'},
@@ -869,8 +870,6 @@ var MOVE={
   hang: {ax:AX.x, deg: 25, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'매달린 무게로 살짝 젖혀집니다'},
   lift: {ax:AX.x, deg: 30, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'쥘 때 손목을 젖혀 고정합니다'},
   bike: {ax:AX.x, deg: 35, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'핸들을 잡으면 젖힌 채 고정됩니다'},
-  twist:{ax:AX.y, deg: 80, piv:FORE_PIV, set:'fore', osc:true, blend:BLEND_FORE,
-         note:'회내와 회외를 오갑니다 — TFCC에 가장 가혹합니다'}
 };
 var IDENT=[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 var ANIM={on:false, u:0, last:0};
@@ -1696,6 +1695,12 @@ function setMotion(m){
 
   var hit=0; for(var q in MOT.load) hit++;
   note.innerHTML=m.note+'<br><span style="color:#5c6874">부하를 받는 구조 '+hit+'개를 빛냈습니다.</span>';
+  // 왜 이 동작만 못 움직이는지 밝힌다. 그냥 없으면 빠뜨린 것으로 읽힌다.
+  // (note.innerHTML 을 덮어쓴 뒤에 붙여야 한다 — 앞에 붙이면 지워진다.)
+  if(!mv && (m.id==='pron'||m.id==='sup'||m.id==='twist'))
+    note.innerHTML += '<br><span style="color:#8e9aa6">아래팔 회전은 <b>움직임을 보여 주지 않습니다</b> — '+
+      '근육이 길이 방향으로 비틀리는 것이라, 원본에 스키닝 정보가 없는 이 자료로는 '+
+      '어떤 방식으로 근사해도 틀린 그림이 됩니다. 부하를 받는 곳은 그대로 표시됩니다.</span>';
   note.classList.add('on'); leg.classList.add('on');
   // 피부·근막이 덮고 있으면 안이 안 보인다. 처음 한 번만 걷어 준다.
   if(peel<2){ pe.value=2; pe.oninput(); }

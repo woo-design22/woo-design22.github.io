@@ -413,9 +413,11 @@ t('출근시간이 한산한 시각·요일과 분명히 다르다', () => {
 });
 
 t('버스 왕복이 방향별로 갈려 있다 (D-51)', () => {
-  /* 서울 버스만 본다 — 지방 시내버스(CB-)는 원천이 TAGO 라 방향이 자료에 이미 있고,
-     승하차 파일이 없어 정류장 ID(stops)를 싣지 않는다(D-106). 아래에서 따로 본다. */
-  const bus = graph.routes.filter(r => r.kind !== 'subway' && !String(r.id || '').startsWith('CB-'));
+  /* 서울 버스만 본다 — 지방 시내버스(CB-)는 원천이 TAGO 라 방향이 자료에 이미 있고
+     승하차 파일이 없어 정류장 ID(stops)를 싣지 않는다(D-106). 도시 간 노선(IC-)은
+     애초에 버스 왕복이 아니라 편도 한 구간이다(D-107). 둘 다 아래에서 따로 본다. */
+  const bus = graph.routes.filter(r => r.kind !== 'subway'
+    && !String(r.id || '').startsWith('CB-') && !String(r.id || '').startsWith('IC-'));
   const two = bus.filter(r => r.dirs.length === 2);
   assert.ok(two.length / bus.length > 0.7,
     `두 방향으로 갈린 노선이 ${two.length}/${bus.length} 뿐이다 — 회차점 찾기가 망가졌다`);
@@ -424,6 +426,21 @@ t('버스 왕복이 방향별로 갈려 있다 (D-51)', () => {
     r.dirs.forEach((d, i) => assert.strictEqual(d.length, r.stops[i].length,
       `${r.name} 방향${i + 1}: 노드와 정류장 ID 개수가 다르다`));
   });
+});
+
+t('도시 간 노선은 두 지점을 잇는 지정석 편도다 (D-107)', () => {
+  const ic = graph.routes.filter(r => String(r.id || '').startsWith('IC-'));
+  if (!ic.length) return;                       // 아직 안 넣었으면 건너뛴다
+  for (const r of ic) {
+    assert.strictEqual(r.reserved, true, r.name + ': 지정석 표시가 없다 — 「모름=서서」로 떨어진다');
+    assert.ok(['rail', 'coach'].indexOf(r.kind) >= 0, r.name + ': 모르는 종류 ' + r.kind);
+    assert.strictEqual(r.dirs.length, 1, r.name + ': 도시 간 노선은 편도 한 줄이다');
+    assert.strictEqual(r.dirs[0].length, 2, r.name + ': 두 지점만 잇는다');
+    assert.notStrictEqual(r.dirs[0][0], r.dirs[0][1], r.name + ': 출발과 도착이 같은 노드다');
+    assert.ok(r.minutes >= 5 && r.minutes <= 12 * 60, r.name + ': 소요시간 ' + r.minutes + '분');
+    assert.ok(r.headwayMin >= 20, r.name + ': 배차 ' + r.headwayMin + '분 — 도시 간인데 너무 잦다');
+    assert.ok(r.runsPerDay >= 1, r.name + ': 편수가 없다');
+  }
 });
 
 t('지방 시내버스도 방향이 갈려 있고 노드가 제대로 붙어 있다 (D-106)', () => {

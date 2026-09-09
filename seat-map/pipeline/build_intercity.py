@@ -39,8 +39,27 @@ BOX = {
     '대구': (35.75, 36.00, 128.45, 128.75),
     '대전': (36.23, 36.45, 127.30, 127.52),
     '광주': (35.08, 35.25, 126.75, 126.95),
-    '인천': (37.35, 37.60, 126.55, 126.80),
+    # 인천 상자는 **영종도까지** 넓힌다 — 인천공항(126.44)이 시내 상자 밖이라
+    # 공항 오가는 고속·시외버스가 통째로 빠졌다(실제로 빠졌다).
+    '인천': (37.35, 37.60, 126.38, 126.80),
 }
+# 터미널 이름은 자료마다 다르게 적힌다 — API 는 「서울경부」, 우리 그래프(버스 정류장)는
+# 「경부고속터미널」이다. 이름이 안 붙으면 그 노선이 통째로 사라지므로 표로 못 박는다.
+# ★ 오른쪽 값은 반드시 그래프에 실제로 있는 이름이어야 한다 ★ (없으면 조용히 버려진다)
+ALIAS = {
+    '서울경부': '경부고속터미널',
+    '센트럴시티(서울)': '호남고속터미널',
+    '대구용계': '용계역',
+    '부산사상': '서부시외버스터미널(사상역)',
+    '대전복합': '복합터미널',
+    '광주(유·스퀘어)': '광주종합버스터미널',
+    '인천공항2터미널': '인천공항2터미널역',
+    '인천공항T1': '인천공항1터미널역',
+    '인천공항1터미널': '인천공항1터미널역',
+    '대구서부': '서부정류장역',
+    '부산해운대': '해운대역',       # 해운대 시외정류소는 역 앞이다
+}
+
 MODE_INFO = {
     'train':   {'kind': 'rail',  'vehicle': 'trainReserved', 'label': '열차'},
     'express': {'kind': 'coach', 'vehicle': 'coachReserved', 'label': '고속버스'},
@@ -85,24 +104,41 @@ class Finder(object):
         self.nodes = nodes
 
     def find(self, name, city):
+        """★ 느슨하게 맞추면 안 된다 ★
+
+        처음엔 「이름이 들어 있으면 맞다」로 했다가 **KTX 가 서울월드컵경기장에서 출발해
+        부산원동역에 닿는** 노선이 만들어졌다 — 「서울」이 「서울월드컵경기장…」에,
+        「부산」이 「부산원동역」에 걸린 것이다. 오류가 안 나고 경로만 여섯 시간이 된다.
+
+        그래서 순서를 못 박는다: ① 별칭 표 ② 이름 그대로 ③ **이름+「역」**
+        (TAGO 는 「서울·부산」, 우리 그래프는 「서울역·부산역」이다) ④ 그래도 없으면
+        **그 이름으로 시작하고 세 글자 이내로만 긴** 이름 중에서 지하철역을 먼저.
+        """
         box = BOX.get(city)
         if not box:
             return None
         lo_la, hi_la, lo_lo, hi_lo = box
+
+        def inside(i):
+            n = self.nodes[i]
+            return lo_la <= n['lat'] <= hi_la and lo_lo <= n['lon'] <= hi_lo
+
         target = flat(name)
-        cands = [target]
-        # 「부산종합버스터미널」 ↔ 「노포(부산종합버스터미널)」 처럼 괄호로 붙어 있기도 하다
-        for k in self.by:
-            if len(cands) > 40:
-                break
-            if target and (target in k or (len(k) >= 4 and k in target)):
-                cands.append(k)
-        for k in cands:
+        exact = ([flat(ALIAS[name])] if name in ALIAS else []) + [target, target + '역']
+        for k in exact:
             for i in self.by.get(k, ()):
-                n = self.nodes[i]
-                if lo_la <= n['lat'] <= hi_la and lo_lo <= n['lon'] <= hi_lo:
+                if inside(i):
                     return i
-        return None
+        cands = []
+        for k, idxs in self.by.items():
+            if not k.startswith(target) or len(k) > len(target) + 3:
+                continue
+            for i in idxs:
+                if inside(i):
+                    kinds = self.nodes[i].get('kinds') or []
+                    cands.append((0 if 'subway' in kinds else 1, len(k), i))
+        cands.sort()
+        return cands[0][2] if cands else None
 
 
 def build():

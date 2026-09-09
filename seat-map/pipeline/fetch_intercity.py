@@ -48,17 +48,17 @@ MODES = {
     'train': {'path': 'TrainInfo', 'name': '열차',
               'list': 'GetCtyAcctoTrainSttnList', 'find': 'GetStrtpntAlocFndTrainInfo',
               'dep': 'depPlaceId', 'arr': 'arrPlaceId',
-              'id': 'nodeid', 'nm': 'nodename',
+              'id': 'nodeid', 'nm': 'nodename', 'ahead': 7,
               'apply': 'https://www.data.go.kr/data/15098552/openapi.do'},
     'express': {'path': 'ExpBusInfo', 'name': '고속버스',
                 'list': 'GetExpBusTrminlList', 'find': 'GetStrtpntAlocFndExpbusInfo',
                 'dep': 'depTerminalId', 'arr': 'arrTerminalId',
-                'id': 'terminalId', 'nm': 'terminalNm',
+                'id': 'terminalId', 'nm': 'terminalNm', 'ahead': 2,
                 'apply': 'https://www.data.go.kr/data/15098522/openapi.do'},
     'suburb': {'path': 'SuburbsBusInfo', 'name': '시외버스',
                'list': 'GetSuberbsBusTrminlList', 'find': 'GetStrtpntAlocFndSuberbsBusInfo',
                'dep': 'depTerminalId', 'arr': 'arrTerminalId',
-               'id': 'terminalId', 'nm': 'terminalNm',
+               'id': 'terminalId', 'nm': 'terminalNm', 'ahead': 2,
                'apply': 'https://www.data.go.kr/data/15098541/openapi.do'},
 }
 
@@ -121,20 +121,55 @@ def city_codes(k, mode):
     return out
 
 
-def places(k, mode, code):
-    """그 도시의 역·터미널 목록. 이름이 큰 곳(본역·종합터미널)이 앞에 오게 정렬한다."""
+def places(k, mode, code, city):
+    """그 도시의 역·터미널 후보.
+
+    ★ 수단마다 목록 부르는 법이 다르다 ★ (실측으로 확인)
+      · 열차·시외버스 — `cityCode` 가 먹는다
+      · 고속버스     — **cityCode 를 무시하고 전국 453곳을 준다.** 그래서 도시 이름으로
+                       검색해야 한다(`terminalNm`). 안 그러면 목록 앞머리의 「병점역」이
+                       서울 대표로 잡힌다 — 실제로 그렇게 잡혀 조회가 통째로 0이 됐다.
+    이름 정렬은 어림일 뿐이고, **어느 조합이 맞는지는 편수가 말한다**(harvest 참고).
+    """
     m = MODES[mode]
-    got = items(call(k, m['path'], m['list'], cityCode=code))
-    out = []
+    if mode == 'express':
+        got = items(call(k, m['path'], m['list'], terminalNm=city))
+    else:
+        got = items(call(k, m['path'], m['list'], cityCode=code))
+    out, seen = [], set()
     for x in got:
         pid, nm = x.get(m['id']), str(x.get(m['nm']) or '').strip()
-        if pid and nm:
-            out.append({'id': str(pid), 'name': nm})
+        if not pid or not nm or nm in seen:
+            continue
+        seen.add(nm)
+        out.append({'id': str(pid), 'name': nm})
+
     def rank(p):
         n = p['name']
-        return (0 if ('종합' in n or n.endswith('역')) else 1, len(n))
+        # 도시 이름으로 시작하는 큰 곳이 먼저, 그 다음 짧은 이름.
+        # 버스에서 「◯◯역」은 터미널이 아니라 경유 정류소인 경우가 많아 뒤로 민다.
+        return (0 if n.startswith(city) or n == city else 1,
+                1 if (mode != 'train' and n.endswith('역')) else 0,
+                len(n))
     out.sort(key=rank)
     return out
+
+
+def pick_date(mode, given):
+    """수단마다 **볼 수 있는 날이 다르다** (실측).
+       열차는 일주일 뒤도 나오는데 **고속·시외버스는 이틀 뒤까지만** 나온다(사흘 뒤면 0편).
+       그래서 한 날짜로 다 받으면 버스가 통째로 비어 버린다 — 실제로 그렇게 비었다.
+       평일을 대표로 삼되, 그 범위 안에 평일이 없으면 있는 날을 쓴다."""
+    if given:
+        return given
+    import datetime
+    ahead = MODES[mode].get('ahead', 7)
+    today = datetime.date.today()
+    cands = [today + datetime.timedelta(days=d) for d in range(1, ahead + 1)] + [today]
+    for d in cands:
+        if d.weekday() < 5:
+            return d.strftime('%Y%m%d')
+    return cands[0].strftime('%Y%m%d')
 
 
 def probe(k):
@@ -154,10 +189,11 @@ def probe(k):
     return ok
 
 
-def harvest(k, date):
+def harvest(k, given_date):
     os.makedirs(OUT_DIR, exist_ok=True)
     for mode, m in MODES.items():
-        C.log(' %s' % m['name'])
+        date = pick_date(mode, given_date)
+        C.log(' %s (기준일 %s)' % (m['name'], date))
         try:
             codes = city_codes(k, mode)
         except NotRegistered:
@@ -169,7 +205,7 @@ def harvest(k, date):
         spots = {}
         for city, code in codes.items():
             try:
-                spots[city] = places(k, mode, code)[:2]     # 도시마다 큰 곳 두 군데까지
+                spots[city] = places(k, mode, code, city)[:3]   # 도시마다 후보 세 곳
             except Exception as e:
                 C.log('  %s 목록 실패 — %s' % (city, str(e)[:50]))
         doc = {'mode': mode, 'name': m['name'], 'date': date,
@@ -179,6 +215,9 @@ def harvest(k, date):
             for b in CITIES:
                 if a == b or a not in spots or b not in spots:
                     continue
+                # ★ 첫 조합에서 멈추면 안 된다 ★ 처음엔 「편성이 나오는 첫 조합」을 썼더니
+                # 서울→부산이 **구포** 경유 27편으로 잡혔다(부산역 본선이 아니라 지선이다).
+                # 후보를 다 돌려 **편수가 가장 많은 조합**을 고른다 — 그게 그 도시의 본역·본터미널이다.
                 found = None
                 for pa in spots[a]:
                     for pb in spots[b]:
@@ -187,11 +226,8 @@ def harvest(k, date):
                                              **{m['dep']: pa['id'], m['arr']: pb['id']}))
                         except Exception:
                             got = []
-                        if got:
+                        if got and (found is None or len(got) > len(found[2])):
                             found = (pa, pb, got)
-                            break
-                    if found:
-                        break
                 pairs += 1
                 if not found:
                     continue
@@ -213,16 +249,10 @@ def main():
     if a.probe:
         probe(k)
         return
-    date = a.date
-    if not date:
-        import datetime
-        d = datetime.date.today()
-        d += datetime.timedelta(days=(2 - d.weekday()) % 7 or 7)   # 다음 수요일(평일 대표)
-        date = d.strftime('%Y%m%d')
-    C.log('== 도시 간 이동 받기 (기준일 %s) ==' % date)
+    C.log('== 도시 간 이동 받기 ==')
     if not probe(k):
         C.log('  ※ 등록 안 된 서비스는 건너뛴다. 위 주소에서 활용신청 뒤 다시 돌리면 채워진다.')
-    harvest(k, date)
+    harvest(k, a.date)
     C.log('== %s ==' % OUT_DIR)
 
 

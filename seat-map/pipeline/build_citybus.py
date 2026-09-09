@@ -191,7 +191,14 @@ def build(only=None):
 
     # ★ 다시 돌려도 같은 결과가 나오게 ★ 앞서 붙인 노선과 노드를 먼저 걷어낸다.
     # 안 걷어내면 돌릴 때마다 노드가 쌓이고, 옛 노드를 가리키는 노선이 남아 경로가 어긋난다.
-    routes[:] = [r for r in routes if not str(r.get('id', '')).startswith('CB-')]
+    # 도시 간 노선(IC-)도 함께 걷어낸다 — 그것들은 여기서 붙인 정류장을 가리키고 있어서,
+    # 남겨 두면 「지우려는 노드를 아직 쓰는 노선이 있다」로 막힌다(실제로 막혔다).
+    # 노드 번호가 다시 매겨지므로 build_intercity.py 를 뒤이어 돌려야 한다.
+    had_ic = sum(1 for r in routes if str(r.get('id', '')).startswith('IC-'))
+    routes[:] = [r for r in routes
+                 if not str(r.get('id', '')).startswith(('CB-', 'IC-'))]
+    if had_ic:
+        C.log('  도시 간 노선 %d개도 함께 걷어냈다 — 끝나면 build_intercity.py 를 다시 돌릴 것' % had_ic)
     first_cb = next((i for i, n in enumerate(nodes) if n.get('cb')), None)
     if first_cb is not None:
         tail = nodes[first_cb:]

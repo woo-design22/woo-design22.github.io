@@ -17,12 +17,20 @@
 
   // ── 시간당 운행 대수 (추정) ──────────────────────────────────────────────
   var SUBWAY_CARS = 8;            // 서울 1~8호선은 대개 8칸(2·5호선 10칸 구간도 있다)
-  function trainsPerHour(minutes) {
+  /* ★ 서울 값을 전국에 쓰지 말 것 ★ 아래 상수는 서울 배차다. 부산은 1호선이 출근 4분·
+     평시 6분이라 다르고 편성도 4~8량으로 제각각이다. 노선에 `tph`(24칸 표)와 `cars` 가
+     적혀 있으면 그것을 먼저 읽는다 — 없을 때만 서울 값으로 물러난다(D-103). */
+  function trainsPerHour(minutes, route) {
     var h = minutes / 60;
+    if (route && route.tph && route.tph.length === 24) {
+      var v = route.tph[Math.max(0, Math.min(23, Math.floor((minutes % 1440) / 60)))];
+      if (v > 0) return v;
+    }
     if ((h >= 7 && h < 9.5) || (h >= 17.5 && h < 19.5)) return 20;   // 출퇴근 배차 약 3분
     if (h >= 6 && h < 23) return 12;                                  // 평시 약 5분
     return 7;                                                          // 첫·막차 무렵
   }
+  function carsOf(route) { return (route && route.cars) || SUBWAY_CARS; }
   /* ── 시간당 몇 대가 오는가 ────────────────────────────────────────────
      ★ 이 나누는 수가 두 배 틀리면 앉을 확률이 통째로 뒤집힌다 ★
      예전에는 종류별 상수(간선 10 × 첨두 1.4 = 14대/시 = 4.3분 배차)를 박아 두었는데,
@@ -119,7 +127,8 @@
     var line = route.line || String(route.id).replace(/^S/, '');
     var names = route.stops && route.stops[leg.dirIdx];
     if (!names) return null;
-    var cap = 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
+    /* 1칸 정원. 노선에 적혀 있으면 그것이 옳다(부산 중형 118 · 경전철 53). 서울은 160. */
+    var cap = route.capacity || 160, minutes = legMinutes(ctx, leg), day = ctx.dayType || 'weekday';
     /* ★ 자료 범위가 곧 운행 시간이다 (D-81) ★ — ★ 반드시 noCong(D-87)보다 먼저 ★
        noCong 이 먼저 null 을 돌려주면 「모름 = 서서」로 살아나 심야 게이트를 건너뛴다.
        직결 병합 뒤 5분 시뮬레이션에서 02~04시에 1·3호선이 산 채로 나왔다 — 이 순서가 근거다.
@@ -131,19 +140,32 @@
       if (effMin < svc0 - 40 || effMin > svc1 + 40)
         return { notRunning: true, why: '그 시각에는 지하철이 다니지 않는다' };
     }
-    /* 직결 통합 노선(D-87)의 코레일 구간엔 혼잡도 원천이 없다 — 그 역이 낀 구간은
-       호선피크로 물러나지 말고 통째로 「모름 = 서서」(D-25)로 둔다. 산본 낮 시간에
-       4호선 피크값을 씌우면 없는 만원을 지어내는 셈이다. */
-    if (route.noCong) {
-      if (!route._noCongSet) {
-        route._noCongSet = {};
-        for (var nq = 0; nq < route.noCong.length; nq++) route._noCongSet[route.noCong[nq]] = 1;
-      }
-      for (var np = leg.fromPos; np <= leg.toPos; np++)
-        if (route._noCongSet[names[np]]) return null;
+    /* 직결 통합 노선(D-87)의 코레일 구간 — 옛날엔 원천이 없어 그 역이 낀 leg 를 통째로
+       「모름 = 서서」(D-25)로 뒀다. D-108 이 그 구간을 승하차 모형(rail.json)으로 채웠으므로
+       이제는 **그 역의 방향값이 실제로 있으면 그걸 쓴다**. 없으면(자료를 못 읽은 구성)
+       옛 규칙 그대로 leg 전체를 모름으로 — 아래 층(이웃·역최대·호선피크)으로 물러나
+       산본 낮 시간에 4호선 피크값을 씌우는 사고(D-87)는 여전히 막는다. 검사는 아래
+       구간 루프 안에서 한다(방향값을 찾아본 다음이라야 「있는지」를 알 수 있다). */
+    if (route.noCong && !route._noCongSet) {
+      route._noCongSet = {};
+      for (var nq = 0; nq < route.noCong.length; nq++) route._noCongSet[route.noCong[nq]] = 1;
     }
     var oor = outOfRange(ctx.congestion, minutes);
-    var per = trainsPerHour(minutes) * SUBWAY_CARS;
+    var per = trainsPerHour(minutes, route) * carsOf(route);
+    /* 승하차 자료에서 되짚은 혼잡도인 노선(부산)은 실측이 아니다. 화면이 그대로
+       밝히도록 여기서 표시를 켠다 — 추정을 숨기면 사양서 3.3 위반이다. */
+    var modeled = !!(ctx.congestion && ctx.congestion.estimatedLines
+                     && ctx.congestion.estimatedLines.indexOf(line) >= 0);
+    /* 1·3·4호선은 서울 구간만 실측이고 코레일 직결 구간은 모형이다(D-108).
+       노선 전체가 아니라 역 단위라 estimatedStations 로 따로 온다 — 이 leg 가
+       그런 역을 하나라도 지나면 추정으로 표시한다(실측 구간만 지나면 실측 그대로). */
+    if (!modeled && ctx.congestion && ctx.congestion.estimatedStations) {
+      var estSt = ctx.congestion.estimatedStations[line];
+      if (estSt) {
+        for (var eq = leg.fromPos; eq <= leg.toPos && !modeled; eq++)
+          if (estSt.indexOf(names[eq]) >= 0) modeled = true;
+      }
+    }
     var side = dirName(route, leg.dirIdx);
     var segs = [], estimated = false, any = false, usedDir = false;
     var bestOff = -1, bestOffAt = null;
@@ -154,6 +176,8 @@
       var pct = gridValue(ctx.congestion, line + '|' + here + '|' + day + '|' + side, t);
       var tierName = pct !== null ? '방향값' : null;
       if (pct !== null) usedDir = true;
+      /* D-87 역인데 방향값이 없다 — 이 leg 는 통째로 모름(폴백 금지). 위 주석 참고. */
+      if (pct === null && route._noCongSet && route._noCongSet[here]) return null;
       /* ★ 이웃 메우기 (D-79) ★
          지선 접점(성수·신도림)은 원천에 그 방향 줄이 아예 없다(전부 0이라 수집기가 버린다).
          혼잡은 한 역 사이에 확 안 바뀌므로 **같은 방향** 이웃 역 값으로 메운다.
@@ -203,13 +227,17 @@
     for (var q = 0; q + 1 < segs.length; q++)
       segs[q].boardAtEnd = Math.max(0, segs[q + 1].load - segs[q].load + (segs[q].alightAtEnd || 0));
     if (!any || !segs.length) return null;
-    return { segments: segs, estimated: estimated, direction: usedDir ? side : null,
+    return { segments: segs, estimated: estimated || modeled, direction: usedDir ? side : null,
              bestOffAt: bestOffAt, boardMinutes: minutes,
+             /* 되짚은 혼잡도의 오차 폭(한 칸 몇 명). 확률 곡선을 그만큼 무디게 한다(D-104).
+                실측 노선은 0 이라 아무 일도 일어나지 않는다. */
+             loadSigma: modeled ? (ctx.congestion.modelErrorPct || 8) / 100 * cap : 0,
              outOfRange: oor ? (oor.before
                  ? '그 시각엔 아직 첫차가 없을 수 있습니다 — 자료가 ' + I.hhmm(oor.at) + '부터라 그 값으로 봤습니다'
                  : '그 시각엔 이미 막차가 끊겼을 수 있습니다 — 자료가 ' + I.hhmm(oor.at) + '까지라 그 값으로 봤습니다') : null,
-             why: estimated ? '하차 인원을 양방향 절반 · 시간당 열차 ' + trainsPerHour(minutes)
-                            + '대 × ' + SUBWAY_CARS + '칸으로 나눈 추정' : '' };
+             why: modeled ? '이 지역은 혼잡도 실측이 없어 승하차 인원에서 되짚은 추정'
+                 : (estimated ? '하차 인원을 양방향 절반 · 시간당 열차 ' + trainsPerHour(minutes, route)
+                                + '대 × ' + carsOf(route) + '칸으로 나눈 추정' : '') };
   }
 
   // ── 버스 ────────────────────────────────────────────────────────────────
@@ -429,6 +457,15 @@
     return function (leg) {
       var route = ctx.graph.routes[leg.routeIdx];
       var got;
+      /* ★ 지정석 노선(도시 간 열차·고속·시외버스)은 셀 재차가 없다 (D-107) ★
+         표가 곧 좌석이다. 여기서 안 잡아 주면 「자료 없음 = 서서 간다」(D-25)로 떨어져
+         **지정석인데 내내 서서 가는 것으로** 계산된다 — 정반대의 답이 나온다. */
+      if (route.reserved) {
+        return { segments: [{ load: 0, alightAtEnd: 0, boardAtEnd: 0,
+                              minutes: (route.minutes || 30) * Math.max(1, leg.stops || 1) }],
+                 estimated: false, reserved: true, direction: null, bestOffAt: null,
+                 boardMinutes: legMinutes(ctx, leg) };
+      }
       if (route.kind === 'subway') {
         got = subwaySegments(ctx, leg, route);
       } else {

@@ -25,8 +25,17 @@ function busDoc(name) {
   return load(f);
 }
 
+/* ★ 서울 버스만 본다 ★ (D-106)
+   지방 시내버스(id 가 CB- 로 시작)는 원천이 달라 인가 배차가 안 온다 —
+   서울 기준을 그대로 들이대면 「망가졌다」고 잘못 말한다. 서울 쪽 불변식은 그대로 지키고
+   지방 버스는 아래에서 따로 본다. */
+const isSeoulBus = r => r.kind !== 'subway'
+  && !String(r.id || '').startsWith('CB-')      // 지방 시내버스(D-106)
+  && !String(r.id || '').startsWith('IC-')      // 도시 간 지정석 노선(D-107)
+  && !String(r.id || '').startsWith('GG-');     // 경기 광역버스(D-109) — 서울 인가대수 밖이다
+
 t('노선별 인가 배차간격이 실려 있고, 나누는 수가 그 값을 쓴다 (D-57)', () => {
-  const bus = ROUTES.routes.filter(r => r.kind !== 'subway');
+  const bus = ROUTES.routes.filter(isSeoulBus);
   const withHw = bus.filter(r => r.headwayMin >= 3 && r.headwayMin <= 60);
   assert.ok(withHw.length / bus.length > 0.8,
     `배차간격이 실린 노선이 ${withHw.length}/${bus.length}뿐 — load_headways 가 망가졌다`);
@@ -47,7 +56,7 @@ t('배차 가정을 전부 더해도 서울에 있는 버스 대수를 넘지 �
   const SEOUL_BUSES = 9009;
   let need = 0;
   for (const r of ROUTES.routes) {
-    if (r.kind === 'subway') continue;
+    if (!isSeoulBus(r)) continue;              // 지방 버스는 서울 인가대수와 무관하다
     const stops = r.dirs.reduce((s, d) => s + d.length, 0);
     need += L.busesPerHour(r, 8 * 60) * (stops * 2.0 / 60);
   }

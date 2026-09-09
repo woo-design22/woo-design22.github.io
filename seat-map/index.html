@@ -259,6 +259,8 @@
     .typeTag.t-walk{background:#44403c55; color:#d6d3d1}
   }
 
+  .rtNow{margin-top:7px}
+  .rtNow b{color:var(--accent)}
   .whenSeat{display:inline-block; margin-top:7px; padding:7px 12px; border-radius:9px;
     border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:.92em; cursor:pointer}
   .whenSeat[aria-expanded="true"]{background:var(--card)}
@@ -439,7 +441,9 @@
 
 <footer>
   <span id="attrib"></span> · 도보 경로 © OSRM (OpenStreetMap 자료) ·
+  <!-- 출처 표시는 이용약관 사항이다. 자료를 늘리면 여기도 함께 늘린다 — 지우지 말 것. -->
   대중교통 자료 © 서울교통공사 · 서울특별시 (서울 열린데이터광장) ·
+  부산·대구·대전·광주·인천교통공사 · 한국철도공사 · 국토교통부(TAGO) (공공데이터포털) ·
   <a href="explore.html">자료 살펴보기</a>
 </footer>
 
@@ -460,6 +464,10 @@
     set:function(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
   };
   var PFX='seat_';
+  /* 실시간 버스 도착(D-110) — counsel-proxy 의 /bus 라우트. 키는 서버에만 있다.
+     경기 광역버스는 남은 좌석 수까지(GBIS remainSeatCnt), 서울 버스는 도착·혼잡 단계.
+     실시간은 덤이다 — 프록시가 죽어도 앱은 통계로 그대로 돈다(조용히 접는다). 비우면 꺼진다. */
+  var RT_PROXY='https://stormy-cuttlefish-2376.woo-design22.deno.net/bus';
   var $=function(id){ return document.getElementById(id); };
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
@@ -483,11 +491,34 @@
     getJSON('data/subway/congestion.json'), getJSON('data/subway/ride.json'),
     getJSON('data/bus/tdata-calib.json'),    // 없으면 null — 지하철 차용 계수로 물러난다
     getJSON('data/bus/kind-load.json'),      // 없으면 null — 자료 없는 노선은 「알 수 없음」으로
-    getJSON('data/bus/load-calib.json').catch(function(){ return null; })   // 실측 여유 비율(D-101)
+    getJSON('data/bus/load-calib.json').catch(function(){ return null; }),  // 실측 여유 비율(D-101)
+    getJSON('data/subway/cities.json').catch(function(){ return null; }),   // 서울 밖 추정 혼잡도(D-103·D-105)
+    getJSON('data/subway/rail.json').catch(function(){ return null; })      // 수도권 광역전철 추정 혼잡도(D-108)
   ]).then(function(v){
     G={ nodes:v[0].nodes, routes:v[1].routes };
     IDX=SeatRoute.buildIndex(G);
     CONG=v[2]; RIDE=v[3]; CALIB=v[4]||null; KINDLOAD=v[5]||null; LOADCAL=v[6]||null;
+    /* 서울 밖(부산·대구·대전·광주·인천)은 원천이 달라(승하차뿐) 파일이 따로다.
+       격자 모양은 같게 만들어 두었으므로 칸만 합친다 — 없으면 그 노선들이
+       「모름 = 서서」로 남을 뿐 앱은 그대로 돈다.
+       ★ 서울 자료를 덮어쓰지 않는다 ★ 키에 호선 이름이 들어 있어 겹치지 않지만,
+       그래도 이미 있는 키는 건드리지 않는다(실측이 언제나 추정보다 우선이다). */
+    [v[7], v[8]].forEach(function(ext){   // v[7] 지방 5개 도시 · v[8] 수도권 광역전철(D-108)
+      if (!ext || !ext.congestion || !ext.ride) return;
+      var bc=ext.congestion, br=ext.ride, k;
+      if (bc.slotMinutes===CONG.slotMinutes && bc.startMinutes===CONG.startMinutes)
+        for (k in bc.grid) if (!(k in CONG.grid)) CONG.grid[k]=bc.grid[k];
+      if (br.slotMinutes===RIDE.slotMinutes && br.startMinutes===RIDE.startMinutes)
+        for (k in br.grid) if (!(k in RIDE.grid)) RIDE.grid[k]=br.grid[k];
+      CONG.estimatedLines=(CONG.estimatedLines||[]).concat(ext.estimatedLines||[]);
+      /* 1·3·4호선의 코레일 구간처럼 「이 역들만 추정」인 것 — 노선 단위 표시와 별도다 */
+      if (ext.estimatedStations){
+        CONG.estimatedStations=CONG.estimatedStations||{};
+        for (k in ext.estimatedStations) CONG.estimatedStations[k]=ext.estimatedStations[k];
+      }
+      /* 오차 폭은 큰 쪽을 쓴다 — 좁은 폭을 쓰면 추정을 실측처럼 자신하게 된다 */
+      if (ext.modelErrorPct) CONG.modelErrorPct=Math.max(CONG.modelErrorPct||0, ext.modelErrorPct);
+    });
     $('bootNote').textContent = '역·정류장 ' + G.nodes.length.toLocaleString('ko-KR')
       + '곳, 노선 ' + G.routes.length + '개. 주소·건물 이름도 넣을 수 있습니다.';
     restore(); refreshNext();
@@ -870,12 +901,22 @@
     }).catch(function(){ poiState = 2; });
   }
 
+  /* 이름이 같은 역이 전국에 여럿이다 (D-106)
+     「시청역」은 서울·부산·대전에 다 있고 「월곡」도 서울과 대구에 있다. 기준점이 없으면
+     검색이 엉뚱한 도시를 먼저 내놓고, 그대로 고르면 경로가 아예 안 나온다.
+     기준점은 셋 중 있는 것을 쓴다 — ① 반대편 지점(가장 좋다) ② 마지막에 고른 곳
+     ③ 그래도 없으면 이름순. 마지막에 고른 곳을 기억해 두는 것이 ②다. */
+  function lastPlace(){
+    try { var o=JSON.parse(store.get(PFX+'last')||'null');
+          return (o && o.lat && o.lon) ? o : null; } catch(e){ return null; }
+  }
   function hookSearch(inputId, listId, key){
     var inp=$(inputId);
     attachSearch(inp, $(listId), function(h){
       S[key]={name:h.name, detail:h.detail, lat:h.lat, lon:h.lon};
+      store.set(PFX+'last', JSON.stringify({lat:h.lat, lon:h.lon}));
       inp.value=h.name; save(); refreshNext(); showPlaces();
-    }, function(){ return S[key === 'from' ? 'to' : 'from'] || null; });
+    }, function(){ return S[key === 'from' ? 'to' : 'from'] || lastPlace(); });
     inp.addEventListener('input', function(){ S[key]=null; refreshNext(); showPlaces(); });
   }
   hookSearch('fromQ','fromList','from');
@@ -1351,12 +1392,25 @@
         + (typeof l.boardMinutes==='number'
             ? ' · <b>'+SeatInterp.hhmm(Math.round(l.boardMinutes))+'쯤 탑니다</b>' : '')+'</div>'
         + (l.outOfRange ? '<div class="note warn">'+esc(l.outOfRange)+'</div>' : '');
+      /* 지정석(KTX·SRT·고속·시외버스)은 확률로 말하지 않는다 — 표가 곧 좌석이다.
+         대신 「매진이면 못 탄다」를 같이 말해야 절반만 말하는 것이 아니게 된다(D-107). */
+      if(l.reserved){
+        /* 요금·편수는 도시 간 이동에서 사람이 바로 다음에 묻는 것이다. 자료에 있으니 보여 준다. */
+        var extra=[];
+        if(l.fare) extra.push('어른 '+l.fare.toLocaleString('ko-KR')+'원');
+        if(l.runsPerDay) extra.push('하루 '+l.runsPerDay+'편');
+        html += '<div style="margin-top:8px"><span class="phrase tone-best">● 지정석입니다 — 예매하면 앉아 갑니다</span>'
+             + (extra.length ? ' <b class="small">'+esc(extra.join(' · '))+'</b>' : '')
+             + ' <span class="muted small">매진이면 탈 수 없습니다 · 실시간 잔여석은 예매처에서 확인하세요</span></div>';
+      }
       if(l.seatText){
         /* 버스의 좌석 수는 실측이 아니라 추정이다(월 총계 평균 + 배차 가정).
            「2자리 비어 있습니다」라고 단정했더니 그 숫자 하나로 전체를 못 믿게 됐다 —
            추정이면 추정이라고 그 자리에 바로 말한다. */
         html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)
-          + (l.estimated ? ' <span class="muted">— 하루 평균으로 낸 값이라 차마다 다릅니다</span>' : '')
+          + (l.estimated ? ' <span class="muted">— '
+              + esc(/되짚/.test(l.why||'') ? '이 지역은 혼잡도 실측이 없어 승하차 인원에서 되짚은 값입니다'
+                                           : '하루 평균으로 낸 값이라 차마다 다릅니다') + '</span>' : '')
           + '</div>' + seatGrid(l);
         var p=SeatModel.seatChance(l.pSeated);
         html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)
@@ -1398,6 +1452,11 @@
         html += '<div class="note">이 노선의 혼잡 자료가 없어 앉을 수 있을지 알 수 없습니다. '
              + '모르는 구간은 <b>서서 간다고 보고</b> 계산했습니다.</div>';
       }
+      /* 실시간 도착(D-110) — 위의 확률은 「그 시각의 평균」이고, 이 줄은 「지금 이 순간」이다.
+         경기 광역버스는 남은 좌석 수 그 자체가 온다. 못 받으면 줄째 접는다(덤이니까). */
+      var rt = rtParamsFor(l);
+      if (rt) html += '<div class="rtNow small muted" data-rtkind="'+rt.kind+'" data-rtq="'+rt.q
+                    + '" data-rtroute="'+esc(rt.match)+'">지금 도착 정보 확인 중…</div>';
       html += '</div>';
     });
     if (j.endWalkMeters > 25)
@@ -1405,6 +1464,7 @@
         + fmtM(j.endWalkWalked)+' · '+Math.round(SeatTransfer.walkMinutes(j.endWalkMeters,S.walk))+'분 걷기');
 
     html += '<div class="note">지하철 혼잡도는 서울교통공사 실측(30분 단위), 버스는 정류장별 승·하차 실측(1시간 단위)입니다. '
+      + '실측이 없는 수도권 광역전철·지방 도시철도는 승하차 인원에서 되짚은 추정이며 경로에 「추정」으로 표시됩니다. '
       + '그 사이 값은 부드럽게 이은 예상값입니다. 도보는 직선거리에 ×'+SeatTransfer.WALK_DETOUR+'를 곱해 잡았습니다. '
       + '지도의 걷는 길과 버스 길은 실제 도로를 따라 그립니다(지하철은 선로라 역 사이를 곧게 잇습니다).';
     if(anyEstimate) html += '<br><b>차 한 대에 몇 명인지는 추정입니다</b> — 노선별 인가 배차간격으로 나누고, '
@@ -1412,7 +1472,85 @@
       + '같은 시각에도 차마다 붐빔이 다른 것(예: 8대 중 3대만 만원)은 아직 공개 자료가 없어 근사로 담았습니다.';
     html += '</div>';
     d.innerHTML=html;
+    fillRealtime(d);
     showMap(j);
+  }
+
+  /* ── 실시간 버스 도착 (D-110) ───────────────────────────────────────────
+     확률(통계)과 실시간(지금)은 딴 것이다 — 줄 끝에 「— 실시간」을 붙여 가른다.
+     프록시·공공 API 어느 쪽이 못 답해도 앱은 멀쩡해야 하므로 실패는 전부 조용히 접는다. */
+  function rtParamsFor(l){
+    if (!RT_PROXY || l.kind === 'subway' || l.reserved) return null;
+    var route = G.routes[l.routeIdx];
+    if (!route || !route.stops || !route.stops[l.dirIdx]) return null;
+    var sid = route.stops[l.dirIdx][l.fromPos];
+    if (!sid) return null;
+    var id = String(route.id || '');
+    if (id.indexOf('GG-GGB') === 0)          // 경기 광역 — GBIS 노선·정류소 ID 그대로
+      return { kind: 'gg', q: 'stationId=' + sid, match: id.slice(6) };
+    if (id.indexOf('CB-') === 0 || id.indexOf('IC-') === 0) return null;   // 실시간 원천 없음
+    var doc = busCache[route.name];          // 서울 — 승하차 파일의 정류소 ARS(5자리)로 묻는다
+    if (!doc || !doc.stops) return null;
+    for (var i = 0; i < doc.stops.length; i++)
+      if (doc.stops[i].stopId === sid && /^\d{5}$/.test(doc.stops[i].ars || ''))
+        return { kind: 'seoul', q: 'arsId=' + doc.stops[i].ars, match: route.name };
+    return null;
+  }
+
+  var RT_CONG = { 3: '여유', 4: '보통', 5: '혼잡', 6: '매우 혼잡' };
+  function rtTextGg(doc, routeId){
+    var b = doc && doc.response && doc.response.msgBody;
+    var list = b && b.busArrivalList;
+    if (!list) return null;
+    if (!Array.isArray(list)) list = [list];
+    for (var i = 0; i < list.length; i++){
+      var x = list[i];
+      if (String(x.routeId) !== String(routeId)) continue;
+      var t1 = parseInt(x.predictTime1, 10);
+      if (isNaN(t1)) return null;
+      var s1 = parseInt(x.remainSeatCnt1, 10), t2 = parseInt(x.predictTime2, 10),
+          s2 = parseInt(x.remainSeatCnt2, 10);
+      var out = '<b>지금</b> ' + t1 + '분 뒤 도착'
+              + (s1 >= 0 ? ' · <b>빈자리 ' + s1 + '석</b>' : '');
+      if (!isNaN(t2)) out += ' <span class="muted">(다음 차 ' + t2 + '분 뒤'
+                           + (s2 >= 0 ? ' · ' + s2 + '석' : '') + ')</span>';
+      return out + ' <span class="muted">— 실시간</span>';
+    }
+    return null;
+  }
+  function rtTextSeoul(doc, rtNm){
+    var b = doc && doc.msgBody, list = b && b.itemList;
+    if (!list) return null;
+    if (!Array.isArray(list)) list = [list];
+    for (var i = 0; i < list.length; i++){
+      var x = list[i];
+      if (String(x.rtNm) !== String(rtNm)) continue;
+      var m1 = x.arrmsg1 || '';
+      if (!m1 || /운행종료|출발대기|정보없음/.test(m1)) return null;
+      var cong = null;
+      for (var k in x) if (/congestion|reride/i.test(k)) {
+        var v = parseInt(x[k], 10);
+        if (RT_CONG[v]) { cong = RT_CONG[v]; break; }
+      }
+      return '<b>지금</b> ' + esc(m1) + (cong ? ' · <b>' + cong + '</b>' : '')
+           + ' <span class="muted">— 실시간</span>';
+    }
+    return null;
+  }
+  function fillRealtime(box){
+    var els = box.querySelectorAll ? box.querySelectorAll('.rtNow') : [];
+    Array.prototype.forEach.call(els, function(el){
+      var kind = el.getAttribute('data-rtkind');
+      fetch(RT_PROXY + '?kind=' + kind + '&' + el.getAttribute('data-rtq'))
+        .then(function(r){ if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+        .then(function(doc){
+          var name = el.getAttribute('data-rtroute');
+          var txt = kind === 'gg' ? rtTextGg(doc, name) : rtTextSeoul(doc, name);
+          if (txt) { el.innerHTML = txt; el.classList.remove('muted'); }
+          else el.hidden = true;             // 지금 오는 차가 없으면 빈 줄을 안 남긴다
+        })
+        .catch(function(){ el.hidden = true; });
+    });
   }
 
   function seatGrid(l){

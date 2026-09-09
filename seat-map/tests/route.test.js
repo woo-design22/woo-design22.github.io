@@ -413,7 +413,11 @@ t('출근시간이 한산한 시각·요일과 분명히 다르다', () => {
 });
 
 t('버스 왕복이 방향별로 갈려 있다 (D-51)', () => {
-  const bus = graph.routes.filter(r => r.kind !== 'subway');
+  /* 서울 버스만 본다 — 지방 시내버스(CB-)는 원천이 TAGO 라 방향이 자료에 이미 있고
+     승하차 파일이 없어 정류장 ID(stops)를 싣지 않는다(D-106). 도시 간 노선(IC-)은
+     애초에 버스 왕복이 아니라 편도 한 구간이다(D-107). 둘 다 아래에서 따로 본다. */
+  const bus = graph.routes.filter(r => r.kind !== 'subway'
+    && !String(r.id || '').startsWith('CB-') && !String(r.id || '').startsWith('IC-'));
   const two = bus.filter(r => r.dirs.length === 2);
   assert.ok(two.length / bus.length > 0.7,
     `두 방향으로 갈린 노선이 ${two.length}/${bus.length} 뿐이다 — 회차점 찾기가 망가졌다`);
@@ -422,6 +426,50 @@ t('버스 왕복이 방향별로 갈려 있다 (D-51)', () => {
     r.dirs.forEach((d, i) => assert.strictEqual(d.length, r.stops[i].length,
       `${r.name} 방향${i + 1}: 노드와 정류장 ID 개수가 다르다`));
   });
+});
+
+t('도시 간 노선은 두 지점을 잇는 지정석 편도다 (D-107)', () => {
+  const ic = graph.routes.filter(r => String(r.id || '').startsWith('IC-'));
+  if (!ic.length) return;                       // 아직 안 넣었으면 건너뛴다
+  for (const r of ic) {
+    assert.strictEqual(r.reserved, true, r.name + ': 지정석 표시가 없다 — 「모름=서서」로 떨어진다');
+    assert.ok(['rail', 'coach'].indexOf(r.kind) >= 0, r.name + ': 모르는 종류 ' + r.kind);
+    assert.strictEqual(r.dirs.length, 1, r.name + ': 도시 간 노선은 편도 한 줄이다');
+    assert.strictEqual(r.dirs[0].length, 2, r.name + ': 두 지점만 잇는다');
+    assert.notStrictEqual(r.dirs[0][0], r.dirs[0][1], r.name + ': 출발과 도착이 같은 노드다');
+    assert.ok(r.minutes >= 5 && r.minutes <= 12 * 60, r.name + ': 소요시간 ' + r.minutes + '분');
+    assert.ok(r.headwayMin >= 20, r.name + ': 배차 ' + r.headwayMin + '분 — 도시 간인데 너무 잦다');
+    assert.ok(r.runsPerDay >= 1, r.name + ': 편수가 없다');
+  }
+});
+
+t('지방 시내버스도 방향이 갈려 있고 노드가 제대로 붙어 있다 (D-106)', () => {
+  const city = graph.routes.filter(r => String(r.id || '').startsWith('CB-'));
+  if (!city.length) return;                     // 아직 안 넣었으면 건너뛴다
+  /* ★ 도시마다 자료 사정이 다르다 ★ (실측)
+       부산 99% · 대전 98% · 인천 94% 는 자료에 방향값(updowncd)이 들어 있고,
+       **광주와 울산은 0%** 다(TAGO 가 아예 안 준다). 대구는 49%.
+     그래서 전체 비율 하나로 재면 안 된다. 두 가지를 따로 본다:
+       ① 방향값을 주는 도시는 거의 다 두 방향이어야 한다 — 그 파싱이 깨지면 여기서 잡힌다
+       ② 전체는 회차점 분리(split_round_trip)가 살려 낸 몫까지 포함해야 한다.
+          그것이 죽으면 47%로 떨어지므로 60% 문턱이 그 사고를 잡는다. */
+  const hasDir = city.filter(r => /^(부산|대전|인천) /.test(r.name));
+  const hasDirTwo = hasDir.filter(r => r.dirs.length === 2);
+  assert.ok(hasDirTwo.length / hasDir.length > 0.9,
+    `방향값을 주는 도시인데 두 방향이 ${hasDirTwo.length}/${hasDir.length} 뿐이다 — updowncd 를 놓쳤다`);
+  const two = city.filter(r => r.dirs.length === 2);
+  assert.ok(two.length / city.length > 0.6,
+    `두 방향인 지방 노선이 ${two.length}/${city.length} 뿐이다 — 회차점 분리가 죽었다`);
+  for (const r of city) {
+    assert.ok(!r.stops, `${r.name}: 지방 버스에 stops 를 싣지 않기로 했다(승하차 파일이 없다)`);
+    assert.ok(/^(부산|대구|대전|광주|인천|울산) /.test(r.name),
+      `${r.name}: 도시 이름이 안 붙었다 — 서울 노선과 이름이 겹치면 남의 혼잡도를 읽는다`);
+    for (const d of r.dirs) {
+      assert.ok(d.length >= 3, `${r.name}: 정류장이 ${d.length}개뿐`);
+      for (let i = 1; i < d.length; i++)
+        assert.notStrictEqual(d[i], d[i - 1], `${r.name}: 같은 노드를 연달아 지난다`);
+    }
+  }
 });
 
 t('같은 노선이라도 방향이 다르면 혼잡이 다르다', () => {

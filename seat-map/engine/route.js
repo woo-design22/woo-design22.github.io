@@ -198,6 +198,23 @@
   /* near 를 주면 **같은 매칭 등급 안에서** 가까운 쪽을 먼저 준다 (D-90).
      실사용 사고: 서울에서 「중구청」을 치면 대전 중구청역이 1위였다(정확일치 + 역 가산점).
      매칭 등급 자체는 안 흔든다 — 이름이 정확히 맞는 것이 여전히 먼저다. */
+  /* 그 노드에 서는 노선이 몇 개인가. 한 번 세어 그래프에 붙여 둔다 —
+     검색은 자판을 칠 때마다 도는데 노드가 2만 6천 개라 매번 세면 화면이 걸린다. */
+  function degreeOf(graph, i) {
+    var d = graph._deg;
+    if (!d) {
+      d = graph._deg = new Int32Array(graph.nodes.length);
+      for (var r = 0; r < graph.routes.length; r++) {
+        var dirs = graph.routes[r].dirs || [];
+        for (var k = 0; k < dirs.length; k++) {
+          var arr = dirs[k];
+          for (var p = 0; p < arr.length; p++) if (arr[p] < d.length) d[arr[p]]++;
+        }
+      }
+    }
+    return d[i] || 0;
+  }
+
   function findNodes(graph, q, limit, near) {
     var text = String(q || '').replace(/\s+/g, '');
     if (!text) return [];
@@ -206,12 +223,15 @@
     for (var i = 0; i < graph.nodes.length; i++) {
       var nm = graph.nodes[i].name.replace(/\s+/g, '');
       var nb = nm.replace(/역$/, '');
+      /* ★ 「역」이 붙고 안 붙고는 차이로 치지 않는다 (D-106) ★
+         전국 정류장이 들어오면서 **딴 도시의 정류장 이름이 정확히 맞는** 일이 생겼다.
+         「월곡」을 치면 대구의 정류장 「월곡」이 정확히 맞아(0점) 서울 「월곡역」(1점)을
+         밀어냈고, 그 바람에 서울 경로가 통째로 안 나왔다. 사람이 「월곡」이라고 칠 때
+         찾는 것은 대개 그 역이다. 그래서 둘을 같은 등급으로 놓고, 뒤의 두 가지로 가른다. */
       var s;
-      if (nm === text) s = 0;
-      else if (nb === bare) s = 1;
-      else if (nm.indexOf(text) === 0) s = 2;
-      else if (nb.indexOf(bare) === 0) s = 3;
-      else if (nm.indexOf(text) >= 0) s = 4;
+      if (nm === text || nb === bare) s = 0;
+      else if (nm.indexOf(text) === 0 || nb.indexOf(bare) === 0) s = 1;
+      else if (nm.indexOf(text) >= 0) s = 2;
       else continue;
       if (graph.nodes[i].kinds.indexOf('subway') >= 0) s -= 0.5;   // 같은 점수면 역이 먼저
       var far = 0;
@@ -219,12 +239,14 @@
         var km = T.haversine(near, graph.nodes[i]) / 1000;
         far = km > 40 ? 2 : (km > 15 ? 1 : 0);   // 딴 권역(40km+)은 등급을 뒤로 민다
       }
-      scored.push([s + far, nm.length, i]);
+      scored.push([s + far, nm.length, -degreeOf(graph, i), i]);
     }
-    scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    /* 같은 점수·같은 이름 길이면 **노선이 많이 서는 곳**이 먼저다. 이름이 겹칠 때
+       사람이 찾는 곳은 대개 큰 곳이고, 한 노선만 지나는 외딴 정류장이 아니다. */
+    scored.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; });
     return scored.slice(0, limit || 30).map(function (x) {
-      var n = graph.nodes[x[2]];
-      return { node: x[2], name: n.name, kinds: n.kinds, lat: n.lat, lon: n.lon };
+      var n = graph.nodes[x[3]];
+      return { node: x[3], name: n.name, kinds: n.kinds, lat: n.lat, lon: n.lon };
     });
   }
 
@@ -492,9 +514,11 @@
       known++;
       var r = info.sd
         ? M.rideSpread({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments,
-                         freeSeats: info.freeSeats, seatBase: info.seatBase })
+                         freeSeats: info.freeSeats, seatBase: info.seatBase,
+                         loadSigma: info.loadSigma })
         : M.ride({ vehicle: leg.vehicle, alpha: ctx.alpha, segments: info.segments,
-                   freeSeats: info.freeSeats, seatBase: info.seatBase });
+                   freeSeats: info.freeSeats, seatBase: info.seatBase,
+                   loadSigma: info.loadSigma });
       /* ★ 「앉을 확률」 = 그 역에서 **탈 때 바로** 앉을 확률 ★
          (2026-09-04 사용자 지시: 「타자마자 앉을 확률을 말한다.
           중간에 가다가 누가 내려서 그 자리에 앉을 확률이 아니라」)
@@ -530,6 +554,24 @@
       leg.emptySeats = M.emptySeats(info.segments[0].load, veh.seats);
       leg.seats = veh.seats;
       leg.seatText = M.describeSeats(info.segments[0].load, veh.seats);
+      /* 지정석은 「몇 자리 비었나」를 말할 수 없다 — 표가 있으면 내 자리가 있고 없으면 못 탄다.
+         빈자리 수를 지어내지 말고 화면이 문구로 답하게 표시만 넘긴다(D-107). */
+      if (r.reserved) {
+        leg.reserved = true;
+        leg.seatText = null;
+        leg.emptySeats = null;
+        /* 도시 간 이동에서 사람이 다음으로 묻는 것은 「얼마인가·자주 있나」다.
+           자료에 실려 있으니 화면까지 가져간다 — 안 그러면 굽기만 하고 안 쓰는 값이 된다. */
+        var rt = ctx.graph.routes[leg.routeIdx] || {};
+        leg.fare = rt.fare || null;
+        leg.runsPerDay = rt.runsPerDay || null;
+      }
+      /* ★ 추정이면 추정이라고 화면까지 가져간다 ★ 여기서 안 실으면 상세 화면의
+         「추정입니다」 줄이 영영 안 뜬다 — 실제로 그동안 안 떴다(D-104에서 발견).
+         사유(why)도 함께 보낸다: 버스의 「하루 평균」과 부산의 「승하차에서 되짚음」은
+         같은 「추정」이 아니라서 한 문구로 뭉뚱그리면 안 된다. */
+      leg.estimated = !!info.estimated;
+      leg.why = info.why || '';
       standing += r.standingMinutes;
     }
     /* ★ 기다림도 서 있는 것이다 (D-74, 사용자 지시) ★
@@ -619,7 +661,7 @@
           if (!info || info.notRunning || !info.segments || !info.segments.length) continue;
           var r = M.ride({ vehicle: route.vehicle, alpha: opt.alpha,
                            segments: info.segments, freeSeats: info.freeSeats,
-                           seatBase: info.seatBase });
+                           seatBase: info.seatBase, loadSigma: info.loadSigma });
           if (r.pBoard < minP) continue;
           if (leg.rideMinutes > maxRide) continue;
           /* 한두 정거장 타려고 자리를 찾아 가는 것은 뜻이 없다 — 그 거리면 걸어간다.
@@ -686,7 +728,7 @@
         if (!info || info.notRunning || !info.segments || !info.segments.length) continue;
         var r = M.ride({ vehicle: route.vehicle, alpha: opt.alpha,
                          segments: info.segments, freeSeats: info.freeSeats,
-                         seatBase: info.seatBase });
+                         seatBase: info.seatBase, loadSigma: info.loadSigma });
         if (r.pBoard < (opt.minP === undefined ? 0.5 : opt.minP)) continue;
         seen[key] = 1;
         var veh = M.VEHICLES[route.vehicle];

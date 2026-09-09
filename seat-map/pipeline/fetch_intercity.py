@@ -74,6 +74,16 @@ def key():
     return urllib.parse.unquote(k)
 
 
+# ★ 수서역에서 떠나는 고속열차는 SRT 다 ★
+# 이 API 는 SR(수서고속철도)의 열차를 **차량 형식명(KTX·KTX-산천)으로 표기**해 준다.
+# 실측: 등급코드 17(SRT)로 물으면 0편인데, 수서→부산을 등급 없이 물으면 34편이
+# 「KTX·KTX-산천·KTX-산천(A-type)」으로 나온다. 수서역은 SRT 전용역이라
+# 코레일 KTX 가 들어오지 않으므로, 그 편들은 SRT 다.
+# 이름을 그대로 두면 화면이 「KTX 수서→부산」이라고 거짓말을 하고, 등급이 겹쳐
+# 아래 「새 등급만 담는다」 규칙에 걸려 통째로 빠진다. 그래서 여기서 바로잡는다.
+SRT_STATIONS = {'수서'}
+
+
 class NotRegistered(Exception):
     pass
 
@@ -205,7 +215,9 @@ def harvest(k, given_date):
         spots = {}
         for city, code in codes.items():
             try:
-                spots[city] = places(k, mode, code, city)[:3]   # 도시마다 후보 세 곳
+                # 열차는 후보를 넉넉히 본다 — 수서(SRT)·용산·광명처럼 도시 이름이 안 들어간
+                # 역이 있어서, 셋만 보면 그 역에서만 다니는 등급이 통째로 빠진다.
+                spots[city] = places(k, mode, code, city)[:(5 if mode == 'train' else 3)]
             except Exception as e:
                 C.log('  %s 목록 실패 — %s' % (city, str(e)[:50]))
         doc = {'mode': mode, 'name': m['name'], 'date': date,
@@ -217,8 +229,12 @@ def harvest(k, given_date):
                     continue
                 # ★ 첫 조합에서 멈추면 안 된다 ★ 처음엔 「편성이 나오는 첫 조합」을 썼더니
                 # 서울→부산이 **구포** 경유 27편으로 잡혔다(부산역 본선이 아니라 지선이다).
-                # 후보를 다 돌려 **편수가 가장 많은 조합**을 고른다 — 그게 그 도시의 본역·본터미널이다.
-                found = None
+                # 후보를 다 돌려 **편수가 가장 많은 조합**을 먼저 고른다.
+                #
+                # ★ 그런데 하나만 고르면 SRT 가 사라진다 ★ SRT 는 서울역이 아니라 **수서역**에서
+                # 떠나므로, 편수가 가장 많은 조합(서울역)만 남기면 통째로 빠진다.
+                # 그래서 **새 등급을 물어오는 조합은 함께 담는다** — 같은 등급만 있으면 버린다.
+                combos = []
                 for pa in spots[a]:
                     for pb in spots[b]:
                         try:
@@ -226,16 +242,28 @@ def harvest(k, given_date):
                                              **{m['dep']: pa['id'], m['arr']: pb['id']}))
                         except Exception:
                             got = []
-                        if got and (found is None or len(got) > len(found[2])):
-                            found = (pa, pb, got)
+                        if got:
+                            if mode == 'train' and (pa['name'] in SRT_STATIONS
+                                                    or pb['name'] in SRT_STATIONS):
+                                for it in got:
+                                    it['traingradename'] = 'SRT'
+                            combos.append((pa, pb, got))
                 pairs += 1
-                if not found:
+                if not combos:
                     continue
-                pa, pb, got = found
-                doc['runs'].append({'from': a, 'to': b,
-                                    'fromPlace': pa['name'], 'toPlace': pb['name'],
-                                    'items': got})
-                C.log('  %s → %s : %d편 (%s → %s)' % (a, b, len(got), pa['name'], pb['name']))
+                combos.sort(key=lambda c: -len(c[2]))
+                seen = set()
+                for pa, pb, got in combos:
+                    grades = set(str(it.get('traingradename') or it.get('gradeNm') or '').strip()
+                                 for it in got)
+                    if seen and not (grades - seen):
+                        continue                      # 이미 담은 등급뿐이면 건너뛴다
+                    seen |= grades
+                    doc['runs'].append({'from': a, 'to': b,
+                                        'fromPlace': pa['name'], 'toPlace': pb['name'],
+                                        'items': got})
+                    C.log('  %s → %s : %d편 (%s → %s) %s'
+                          % (a, b, len(got), pa['name'], pb['name'], '·'.join(sorted(grades))[:40]))
         C.save_json(os.path.join(OUT_DIR, mode + '.json'), doc)
         C.log('  %s — 쌍 %d개 중 %d개에 편성이 있다' % (m['name'], pairs, len(doc['runs'])))
 

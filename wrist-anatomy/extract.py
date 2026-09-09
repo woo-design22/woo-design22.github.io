@@ -29,7 +29,7 @@ ANCHOR = "Scaphoid bone.r"   # 오른쪽 손목의 기준점
 REGION_R = 0.075             # 기준점에서 7.5cm 상자 안에 걸치는 것만 가져온다
 
 # 근육만 무겁다(전체의 64%). 목표 정점 수를 넘으면 그 층만 줄인다.
-DECIMATE = {"5_근육": 0.45}
+DECIMATE = {"5_근육": 0.35, "1_피부표면": 0.6}
 
 # 신경·혈관은 커브다. 굵기가 0 이면 선으로만 보이므로 관으로 만들어 준다.
 CURVE_BEVEL = {"3_천부맥관": 0.0009, "6_심부맥관": 0.0011}
@@ -54,6 +54,64 @@ RULES = [
 # 뼈의 표지점(돌기·결절·관절면)은 이름이 ".j" 로 끝난다. 골절·압통점 설명에
 # 반드시 필요하므로 버리지 않고 뼈 층으로 흡수한다.
 LANDMARK_SUFFIX = ".j"
+
+# 정점이 이보다 적으면 세분해서 매끄럽게 만든다. 없는 형상을 지어내는 것이 아니라
+# 있는 형상의 각을 죽이는 것이다(관절원반 16, 배측 요척인대 8 처럼 거친 것이 많다).
+COARSE_VERTS = 60
+
+# 얇은 판에 줄 두께(mm). 근막·지대·관절낭은 종이가 아니라 조직이다.
+# 두께가 없으면 옆에서 볼 때 사라지고 뚫린 자리가 시커먼 구멍이 된다.
+SHEET_MM = {
+    "1_피부표면": 0.6,
+    "2_근막": 0.5,
+    "4_힘줄지지대": 0.9,
+    "7_인대관절낭": 0.7,
+}
+
+
+# 안쪽 구멍을 메울 층. 이어져 있어야 맞는 판만 넣는다.
+# 관절낭은 넣지 않는다 — 그 구멍들은 뼈가 지나가는 실제 개구부다.
+FILL_HOLES = {"1_피부표면", "2_근막"}
+
+
+def boundary_loops(bm):
+    """열린 모서리들을 이어 붙여 경계 고리별로 나눈다."""
+    open_edges = [e for e in bm.edges if len(e.link_faces) == 1]
+    if not open_edges:
+        return []
+    by_vert = {}
+    for e in open_edges:
+        for v in e.verts:
+            by_vert.setdefault(v.index, []).append(e)
+    seen, loops = set(), []
+    for e0 in open_edges:
+        if e0.index in seen:
+            continue
+        stack, group = [e0], []
+        while stack:
+            e = stack.pop()
+            if e.index in seen:
+                continue
+            seen.add(e.index)
+            group.append(e)
+            for v in e.verts:
+                for n in by_vert.get(v.index, ()):
+                    if n.index not in seen:
+                        stack.append(n)
+        loops.append(group)
+    return loops
+
+
+def is_open(mesh):
+    """경계가 열린 판인가. 모서리 하나를 면 하나만 쓰면 그 모서리는 테두리다."""
+    use = {}
+    for poly in mesh.polygons:
+        vs = poly.vertices
+        for k in range(len(vs)):
+            a, b = vs[k], vs[(k + 1) % len(vs)]
+            key = (a, b) if a < b else (b, a)
+            use[key] = use.get(key, 0) + 1
+    return any(v == 1 for v in use.values())
 
 # 계통 이름표(.g)와 방향·기준면은 해부 구조가 아니다. 버린다.
 DROP_EXACT = {"Abduction", "Distal", "Proximal", "Dorsal", "Palmar",
@@ -195,17 +253,46 @@ dropped = []      # 면이 없어 버린 것. 무엇이 빠졌는지 반드시 �
 for layer in LAYER_ORDER:
     ratio = DECIMATE.get(layer)
     for o in picked[layer]:
-        # 감량이 필요한 층이면 모디파이어를 얹고 평가한다
-        mod = None
+        mods = []
+
+        # ① 정점이 모자란 것은 세분한다.
+        #    원본이 거칠어 각진 조각처럼 보이는 구조가 많다(관절원반 16, 배측 요척인대 8).
+        #    세분은 없는 해부를 지어내지 않는다 — 있는 형상을 매끄럽게 할 뿐이다.
+        if o.type == "MESH" and len(o.data.vertices) < COARSE_VERTS:
+            sub = o.modifiers.new("sub", "SUBSURF")
+            sub.levels = sub.render_levels = 1
+            mods.append(sub)
+
+        # ② 얇은 판에는 두께를 준다.
+        #    근막·지대·관절낭은 종이가 아니라 조직이다. 두께가 없으면 옆에서 볼 때
+        #    사라지고, 뚫린 자리가 시커먼 구멍으로 보인다.
+        th = SHEET_MM.get(layer)
+        if th and o.type == "MESH" and is_open(o.data):
+            sol = o.modifiers.new("sol", "SOLIDIFY")
+            sol.thickness = th / 1000.0
+            sol.offset = 0.0                  # 원래 면을 가운데 두고 양쪽으로 부푼다
+            sol.use_rim = True
+            sol.use_rim_only = False
+            mods.append(sol)
+
+        # ③ 감량이 필요한 층이면 마지막에 줄인다
         if ratio and o.type == "MESH" and len(o.data.vertices) > 400:
-            mod = o.modifiers.new("dec", "DECIMATE")
-            mod.ratio = ratio
+            dec = o.modifiers.new("dec", "DECIMATE")
+            dec.ratio = ratio
+            mods.append(dec)
+
+        # **모디파이어를 붙였으면 의존성 그래프를 다시 받아야 한다.**
+        # 루프 밖에서 한 번 받아 둔 그래프로 평가하면 붙인 것이 반영되지 않는다
+        # (그래서 세분·두께는 물론 감량까지 조용히 무시되고 있었다).
+        if mods:
+            bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
 
         # 커브든 메시든 평가된 결과를 메시로 받는다(커브는 bevel 이 얹힌 관이 나온다)
-        ev = o.evaluated_get(depsgraph)
+        ev = o.evaluated_get(dg)
         me = bpy.data.meshes.new_from_object(ev)
-        if mod:
-            o.modifiers.remove(mod)
+        for m in mods:
+            o.modifiers.remove(m)
 
         if me is None or not me.polygons:
             if me is not None:
@@ -216,6 +303,18 @@ for layer in LAYER_ORDER:
         me.transform(o.matrix_world)
         bm = bmesh.new()
         bm.from_mesh(me)
+
+        # 이어져 있어야 맞는 판에서 안쪽 구멍을 메운다.
+        # **관절낭은 건드리지 않는다** — 그 구멍 여섯 개는 뼈가 지나가는 실제 개구부다.
+        # 바깥 테두리(가장 큰 고리)는 남기고 그보다 작은 고리만 막는다.
+        if layer in FILL_HOLES:
+            loops = boundary_loops(bm)
+            if len(loops) > 1:
+                biggest = max(len(x) for x in loops)
+                inner = [e for lp in loops if len(lp) < biggest for e in lp]
+                if inner:
+                    bmesh.ops.holes_fill(bm, edges=inner, sides=0)
+
         bmesh.ops.triangulate(bm, faces=bm.faces[:])
         bm.to_mesh(me)
         bm.free()

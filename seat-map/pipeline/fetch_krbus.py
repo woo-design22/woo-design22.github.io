@@ -40,7 +40,8 @@ def city_list(k):
 
 
 def harvest_city(k, code, name, cap_left):
-    """한 도시의 전 노선(경기는 일반·마을만). 돌아오는 값: 쓴 호출 수, 남은 노선 수."""
+    """한 도시의 전 노선(경기는 일반·마을만).
+    돌아오는 값: (쓴 호출 수, 남은 노선 수, 막혔나) — 막혔으면 부르는 쪽도 접는다."""
     path = os.path.join(OUT_DIR, '%d.json' % code)
     doc = {'city': name, 'code': code, 'routes': []}
     if os.path.exists(path):
@@ -50,6 +51,7 @@ def harvest_city(k, code, name, cap_left):
             pass
     done = {r['id'] for r in doc['routes']}
     calls = 0
+    miss = [0]                # 잇달아 막힌 횟수(위 except 참고)
     lst, page = [], 1
     while True:
         its = FC.items_of(FC.call('getRouteNoList', k, cityCode=code, pageNo=page))
@@ -67,11 +69,11 @@ def harvest_city(k, code, name, cap_left):
             if not (gg and str(r.get('routetp')) in GG_SKIP_TYPES)]
     todo = [r for r in want if str(r.get('routeid')) not in done]
     if not todo:
-        return calls, 0
+        return calls, 0, False
     for r in todo:
         if calls >= cap_left:
             C.save_json(path, doc)
-            return calls, len(todo) - (len(doc['routes']) - len(done))
+            return calls, len(todo) - (len(doc['routes']) - len(done)), False
         rid = str(r.get('routeid'))
         try:
             st = FC.items_of(FC.call('getRouteAcctoThrghSttnList', k,
@@ -79,7 +81,16 @@ def harvest_city(k, code, name, cap_left):
         except Exception as e:
             C.log('   %s %s — 실패(%s)' % (r.get('routeno'), rid, str(e)[:40]))
             calls += 1
+            # ★ 연달아 막히면 스스로 멈춘다 ★ 유량·일일 한도에 걸린 뒤에도 계속 부르면
+            # 그냥 헛돈다(실측: 13분간 89번). 다섯 번 잇달아 실패하면 접고 다음 실행에
+            # 이어 받는다 — 받아 둔 것은 이미 저장돼 있어 잃는 것이 없다.
+            miss[0] += 1
+            if miss[0] >= 5:
+                C.save_json(path, doc)
+                C.log('   연달아 %d번 막혔다 — 여기서 멈춘다(다음 실행에 이어 받는다)' % miss[0])
+                return calls, len(todo) - (len(doc['routes']) - len(done)), True
             continue
+        miss[0] = 0
         calls += 1
         stops = []
         for s in sorted(st, key=lambda x: (x.get('updowncd') or 0, x.get('nodeord') or 0)):
@@ -97,7 +108,7 @@ def harvest_city(k, code, name, cap_left):
         if len(doc['routes']) % 60 == 0:
             C.save_json(path, doc)
     C.save_json(path, doc)
-    return calls, 0
+    return calls, 0, False
 
 
 def main():
@@ -123,7 +134,7 @@ def main():
         if total_calls >= a.cap:
             C.log('  호출 상한(%d)에 닿았다 — 내일 그대로 다시 돌리면 이어 받는다' % a.cap)
             break
-        used, left = harvest_city(k, code, name, a.cap - total_calls)
+        used, left, blocked = harvest_city(k, code, name, a.cap - total_calls)
         total_calls += used
         left_routes += left
         done_cities += 1
@@ -136,6 +147,10 @@ def main():
                 pass
         C.log('  %-6s(%d) 노선 %d개%s · 누적 호출 %d'
               % (name, code, n, (' · 못 받은 %d' % left) if left else '', total_calls))
+        if blocked:
+            # 한 도시가 막혔으면 다음 도시도 막힌다 — 여기서 접는다(호출을 낭비하지 않는다)
+            C.log('  유량·한도에 걸렸다 — 오늘은 여기까지. 그대로 다시 돌리면 이어 받는다')
+            break
     C.log('== 도시 %d곳 훑음 · 호출 %d회%s ==' %
           (done_cities, total_calls,
            (' · 남은 노선 %d개(이어받기)' % left_routes) if left_routes else ''))

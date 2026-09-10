@@ -50,17 +50,25 @@ def main():
                     slot['n'] += 1
                     if isfull:
                         slot['full'] += 1
-                    if cong == 3:
+                    # ★ 한 칸에 두 가지가 섞여 온다 ★ 3~6 은 등급, 7 이상은 실제 재차인원(명)
+                    # 이다(D-120 에서 같은 차를 두 API 로 맞대 확인). 6 과 인원 값을 else 로
+                    # 흘리면 **가장 붐비는 차가 「미제공」으로 사라진다** — 정확히 거꾸로다.
+                    if cong >= 7:
+                        slot['riders'] = slot.get('riders', 0) + 1
+                        slot['ridersum'] = slot.get('ridersum', 0) + cong
+                    elif cong == 3:
                         slot['free'] += 1
                     elif cong == 4:
                         slot['mid'] += 1
                     elif cong == 5:
                         slot['crowd'] += 1
+                    elif cong == 6:
+                        slot['jam'] = slot.get('jam', 0) + 1
                     else:
                         slot['na'] += 1
     C.save_json(OUT, {
         'source': '서울시 버스위치정보(getBusPosByRtid) 차량별 혼잡도 순간사진',
-        'legend': 'free=여유(3) mid=보통(4) crowd=혼잡(5) full=만차 na=미제공(0). n=관측 차량 연인원',
+        'legend': 'free=여유(3) mid=보통(4) crowd=혼잡(5) jam=매우혼잡(6) full=만차 na=미제공(0) riders=인원보고 차량수·ridersum=그 합(7 이상은 등급이 아니라 명, D-120). n=관측 차량 연인원',
         'note': '표본단이 이용객 상위 위주라 서울 평균이 아니라 「주요 노선」 분포다. n 이 얇은 칸은 쓰지 말 것',
         'snapshots': snaps,
         'dist': agg,

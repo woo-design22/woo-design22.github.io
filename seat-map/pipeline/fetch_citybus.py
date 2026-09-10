@@ -24,6 +24,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -47,12 +48,18 @@ def key():
     return urllib.parse.unquote(k)
 
 
-# ★ 유량 제한(429)을 조심한다 ★ 간격 없이 때리면 TAGO 가 429 Too Many Requests 로
-# 막는다 — 실측(2026-09-10) 전국 수집이 분당 100회쯤에서 걸려 13분간 89번 헛돌았다.
-# 그래서 ① 호출 사이 최소 간격을 두고 ② 429 는 다른 오류보다 훨씬 길게 쉰다.
-# 429 는 「잠깐 쉬라」는 뜻이라 1.5초 재시도로는 계속 맞는다.
+# ★ 429 는 두 가지다 — 가려서 다뤄야 한다 ★ (실측 2026-09-10)
+#   ① 유량 제한: 너무 빨리 불렀다 → 쉬면 풀린다
+#   ② **일일 요청제한 초과**(본문 LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR,
+#      returnReasonCode 22): 오늘은 끝났다 → **아무리 쉬어도 안 풀린다**
+# 둘을 같게 다뤘다가 ②에 걸린 채 20·40·60초씩 쉬며 헛돌았다(한 노선에 2분씩 낭비).
+# 그래서 ②는 QuotaExceeded 로 즉시 던져 부르는 쪽이 그날 작업을 접게 한다.
 MIN_GAP_SEC = 0.15
 _last_call = [0.0]
+
+
+class QuotaExceeded(Exception):
+    """오늘 몫을 다 썼다. 쉬어도 안 풀리니 그 자리에서 접고 내일 이어 받는다."""
 
 
 def call(op, k, tries=4, **kw):
@@ -68,11 +75,21 @@ def call(op, k, tries=4, **kw):
             raw = urllib.request.urlopen(url, timeout=120).read().decode('utf-8', 'replace')
             _last_call[0] = time.time()
             return json.loads(raw)
+        except urllib.error.HTTPError as e:
+            _last_call[0] = time.time()
+            body = ''
+            try:
+                body = e.read().decode('utf-8', 'replace')
+            except Exception:
+                pass
+            if 'LIMITED_NUMBER_OF_SERVICE_REQUESTS' in body:
+                raise QuotaExceeded(op)          # 오늘은 끝 — 쉬어 봐야 소용없다
+            last = e
+            time.sleep((20.0 * (i + 1)) if e.code == 429 else 1.5 * (i + 1))
         except Exception as e:
             _last_call[0] = time.time()
             last = e
-            over = getattr(e, 'code', None) == 429
-            time.sleep((20.0 * (i + 1)) if over else 1.5 * (i + 1))
+            time.sleep(1.5 * (i + 1))
     raise last
 
 

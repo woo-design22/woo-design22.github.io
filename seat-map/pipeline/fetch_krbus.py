@@ -54,12 +54,16 @@ def harvest_city(k, code, name, cap_left):
     miss = [0]                # 잇달아 막힌 횟수(위 except 참고)
     lst, page = [], 1
     while True:
-        its = FC.items_of(FC.call('getRouteNoList', k, cityCode=code, pageNo=page))
-        calls += 1
-        if not its and page == 1:              # 일시 오류(수원 0개 사건) — 한 번 쉬고 다시
-            time.sleep(2)
+        try:
             its = FC.items_of(FC.call('getRouteNoList', k, cityCode=code, pageNo=page))
             calls += 1
+            if not its and page == 1:          # 일시 오류(수원 0개 사건) — 한 번 쉬고 다시
+                time.sleep(2)
+                its = FC.items_of(FC.call('getRouteNoList', k, cityCode=code, pageNo=page))
+                calls += 1
+        except FC.QuotaExceeded:
+            C.log('   오늘 몫을 다 썼다 — 노선 목록 단계에서 멈춘다')
+            return calls, 0, True
         lst += its
         if len(its) < 500:
             break
@@ -78,6 +82,11 @@ def harvest_city(k, code, name, cap_left):
         try:
             st = FC.items_of(FC.call('getRouteAcctoThrghSttnList', k,
                                      cityCode=code, routeId=rid))
+        except FC.QuotaExceeded:
+            # 오늘 몫을 다 썼다 — 쉬어도 안 풀리니 그 자리에서 접는다(내일 이어 받는다)
+            C.save_json(path, doc)
+            C.log('   오늘 몫을 다 썼다 — 여기서 멈춘다(내일 그대로 다시 돌리면 이어 받는다)')
+            return calls, len(todo) - (len(doc['routes']) - len(done)), True
         except Exception as e:
             C.log('   %s %s — 실패(%s)' % (r.get('routeno'), rid, str(e)[:40]))
             calls += 1

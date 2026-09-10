@@ -867,10 +867,22 @@ function computeForeAxis(){
 var AX={x:[1,0,0], y:[0,1,0], z:[0,0,1]};
 var MOVE={
   // 아래팔 회전. 강체로 도는 것(척골·요골·손)만 보여 준다 — 주석 맨 위 참고.
-  pron: {ax:AX.y, deg:-80, piv:FORE_PIV, set:'fore', note:'요골이 척골을 넘어 돌아갑니다'},
-  sup:  {ax:AX.y, deg: 75, piv:FORE_PIV, set:'fore', note:'두 뼈가 나란해집니다'},
-  twist:{ax:AX.y, deg: 75, piv:FORE_PIV, set:'fore', osc:true,
-         note:'회내와 회외를 오갑니다 — TFCC에 가장 가혹합니다'},
+  //
+  // **부호를 눈대중으로 정하지 말 것.** 한동안 회내와 회외가 뒤바뀌어 있었다.
+  // 좌표를 재서 정한다 — 회내는 **원위 요골이 척골 앞(장측)으로 넘어가는** 쪽이다.
+  //   축 +쪽으로 돌리면: 요골이 척골 기준 (-2, +30) — 앞으로 넘어감 = 회내
+  //   축 -쪽으로 돌리면: 요골이 척골 기준 (-10, -34) — 뒤로 넘어감 = 회내가 아니다
+  //
+  // 그리고 **쉴 때 이 모델은 이미 완전 회외**다(손바닥 법선이 거의 순수 장측 +0.88).
+  // 거기서 더 회외시킬 각도가 없으므로, 회외는 「회내된 자리에서 되돌아오는 것」으로
+  // 보여 준다 — 그래서 `from` 이 있다. 완전 회외 0° ↔ 완전 회내 150°
+  // (150°에서 손바닥 법선이 (+0.10, -0.12, -0.99) = 거의 순수 배측 = 손바닥이 아래).
+  pron: {ax:AX.y, from:0,   deg:150, piv:FORE_PIV, set:'fore',
+         note:'요골이 척골 앞을 넘어 돌아갑니다 — 손바닥이 아래를 봅니다'},
+  sup:  {ax:AX.y, from:150, deg:0,   piv:FORE_PIV, set:'fore',
+         note:'회내된 자리에서 되돌아옵니다 — 두 뼈가 나란해집니다'},
+  twist:{ax:AX.y, from:75,  deg:150, piv:FORE_PIV, set:'fore', osc:true,
+         note:'회내와 회외를 끝까지 오갑니다 — TFCC에 가장 가혹합니다'},
   flex: {ax:AX.x, deg:-70, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'손목을 손바닥 쪽으로 굽힙니다'},
   ext:  {ax:AX.x, deg: 60, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'손목을 손등 쪽으로 젖힙니다'},
   udev: {ax:AX.z, deg: 35, piv:WRIST_PIV, set:'hand', blend:BLEND_WRIST, note:'새끼손가락 쪽으로 기웁니다'},
@@ -941,7 +953,9 @@ function animRot(){
   // 아래팔 회전은 척골에서 구한 실제 축으로 돈다(기울어져 있다)
   var ax = mv.ax, piv = mv.piv;
   if(mv.set==='fore' && FORE_AXIS){ ax=FORE_AXIS.d; piv=FORE_AXIS.p; }
-  return {m:rotAbout(ax, mv.deg*Math.PI/180*k, piv), mv:mv};
+  // 시작 각도가 0이 아닌 동작이 있다(회외는 회내된 자리에서 되돌아온다)
+  var a0 = mv.from || 0, ang = a0 + (mv.deg - a0) * k;
+  return {m:rotAbout(ax, ang*Math.PI/180, piv), mv:mv};
 }
 
 // 이 부위를 어떻게 섞을 것인가.

@@ -1531,12 +1531,15 @@
            실제로는 **타는 그 시각의 승하차**를 쓴다(월곡동신 07시 17.5명 / 12시 13.9명 /
            22시 5.4명 — 시간마다 다르다) + 요일·시간 보정(D-54·D-64)까지 한다.
            문구가 우리 계산을 스스로 깎아내리고 있었다. 시각을 그대로 밝힌다. */
+        /* 「8시대」가 아니라 **탈 시각 그대로** 말한다 (D-119) — 07:05 와 07:55 는 다른데
+           한 시간을 통으로 부르면 그 차이를 없는 것처럼 말하게 된다. 원천은 1시간 칸이고
+           그 사이는 이어서 쓰므로(보간) 「무렵」이라고 밝힌다. */
         var hh = (typeof l.boardMinutes === 'number')
-          ? Math.floor((l.boardMinutes % 1440) / 60) + '시' : '이 시각';
+          ? SeatInterp.hhmm(Math.round(l.boardMinutes)) + ' 무렵' : '이 시각';
         html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)
           + (l.estimated ? ' <span class="muted">— '
               + esc(/되짚/.test(l.why||'') ? '이 지역은 혼잡도 실측이 없어 승하차 인원에서 되짚은 값입니다'
-                                           : hh + '대 승·하차 실측으로 낸 값이라, 같은 시각에도 차마다 다릅니다') + '</span>' : '')
+                                           : hh + ' 승·하차 실측(1시간 단위를 이어 쓴 값)이라, 같은 시각에도 차마다 다릅니다') + '</span>' : '')
           + '</div>' + seatGrid(l);
         var p=SeatModel.seatChance(l.pSeated);
         html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)

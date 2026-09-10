@@ -460,6 +460,7 @@
 <script src="engine/interp.js"></script>
 <script src="engine/seat-model.js"></script>
 <script src="engine/transfer.js"></script>
+<script src="engine/transfer-pos.js"></script>
 <script src="engine/fare.js"></script>
 <script src="engine/sim-seoul.js"></script>
 <script src="engine/route.js"></script>
@@ -482,7 +483,7 @@
   var $=function(id){ return document.getElementById(id); };
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
-  var G=null, IDX=null, CONG=null, RIDE=null, FIRSTLAST=null, CALIB=null, KINDLOAD=null, LOADCAL=null, busCache={};
+  var G=null, IDX=null, CONG=null, RIDE=null, FIRSTLAST=null, TPOS=null, CALIB=null, KINDLOAD=null, LOADCAL=null, busCache={};
   var S={ from:null, to:null, via:[], dayType:'weekday', minutes:8*60, walk:'normal', step:1, picked:null, list:[] };
 
   $('attrib').textContent = SeatGeo.ATTRIBUTION;
@@ -540,7 +541,8 @@
     getJSON('data/bus/load-calib.json').catch(function(){ return null; }),  // 실측 여유 비율(D-101)
     getJSON('data/subway/cities.json').catch(function(){ return null; }),   // 서울 밖 추정 혼잡도(D-103·D-105)
     getJSON('data/subway/rail.json').catch(function(){ return null; }),     // 수도권 광역전철 추정 혼잡도(D-108)
-    getJSON('data/subway/firstlast.json').catch(function(){ return null; }) // 역별 첫·막차(D-112). 없으면 근사로 물러난다
+    getJSON('data/subway/firstlast.json').catch(function(){ return null; }), // 역별 첫·막차(D-112). 없으면 근사로 물러난다
+    getJSON('data/subway/transfer-pos.json').catch(function(){ return null; }) // 환승 승차위치(D-116). 없으면 그 줄만 안 나온다
   ]).then(function(v){
     /* core 가 있으면 그것으로 시작하고(3.9MB), 없으면 옛 통짜 파일로 물러난다(6.3MB). */
     if (v[0] && v[0].routes) {
@@ -573,6 +575,7 @@
   function finishBoot(v, split){
     CONG=v[2]; RIDE=v[3]; CALIB=v[4]||null; KINDLOAD=v[5]||null; LOADCAL=v[6]||null;
     FIRSTLAST=v[9]||null;   // 역별 첫·막차(D-112)
+    TPOS=(v[10]&&v[10].pairs)||null;   // 환승 승차위치(D-116)
     /* 서울 밖(부산·대구·대전·광주·인천)은 원천이 달라(승하차뿐) 파일이 따로다.
        격자 모양은 같게 만들어 두었으므로 칸만 합친다 — 없으면 그 노선들이
        「모름 = 서서」로 남을 뿐 앱은 그대로 돈다.
@@ -1487,6 +1490,14 @@
           +' 걸어서 갈아타기 · 약 '+Math.max(SeatRoute.TRANSFER_WALK_MIN,
             Math.round(SeatTransfer.walkMinutes(l.walkFromPrev, S.walk)))+'분'
         : '갈아타기 · 약 '+SeatRoute.TRANSFER_WALK_MIN+'분 걷기');
+      /* 환승 승차위치(D-116) — 어느 칸에서 내리면 갈아타는 길이 가장 짧은지.
+         통로를 덜 걷는 것이 곧 서서 버티는 시간이 주는 것이라 이 앱의 일이다.
+         원천이 109역뿐이라 없는 환승이 많다 — 못 찾으면 줄을 아예 안 그린다. */
+      if(i>0 && TPOS && window.SeatTransferPos){
+        var tp = SeatTransferPos.forTransfer(TPOS, G, j.legs[i-1], l);
+        var tpTxt = tp && SeatTransferPos.text(tp);
+        if(tpTxt) html += walkRow('🚪', tpTxt);
+      }
       html += '<div class="leg'+(l.kind==='subway'?' subway':'')+'">'
         + '<h3><button class="lineBtn" data-ri="'+l.routeIdx+'" data-di="'+l.dirIdx+'"'
         + ' data-fp="'+l.fromPos+'" data-tp="'+l.toPos+'"'

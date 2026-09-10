@@ -413,13 +413,25 @@
       for (var i = 0; i < doc.stops.length; i++) byId[doc.stops[i].stopId] = doc.stops[i];
     }
 
-    var hour = Math.max(0, Math.min(23, Math.floor((when % 1440) / 60)));
+    var mm = when % 1440;
+    var hour = Math.max(0, Math.min(23, Math.floor(mm / 60)));
     var dayMul = busDayFactor(ctx, route.kind, hour);   // 월 총계에는 요일이 없다 — 실측 비율로 되돌린다
+    /* ★ 한 시간을 통으로 쓰지 않는다 (D-119, 사용자 지적) ★
+       버스 승하차 원천은 1시간 칸이라 07:05 와 07:55 가 같은 값이 됐다 —
+       「출퇴근은 10분마다 차이가 큰데 7시·12시 같은 큰 칸은 의미가 없다」.
+       지하철은 이미 30분 칸을 분 단위로 이어 쓰는데(gridValue → valueAt) 버스만 계단이었다.
+       같은 잣대로 맞춘다. **칸의 대표 시각은 그 시간의 한가운데(00:30, 07:30 …)** 이므로
+       startMinutes 를 30 으로 준다 — 0 으로 두면 07시 값이 07:00 을 가리켜 30분씩 밀린다.
+       원천이 1시간인 것은 그대로다. 없는 정밀도를 지어내는 것이 아니라, 칸 사이를
+       뚝 끊지 않고 잇는 것이다(사양서 3.3 — 보간이면 보간이라 밝힌다). */
+    var atNow = function (arr) {
+      return I.valueAt(arr, { slotMinutes: 60, startMinutes: 30, atMinutes: mm });
+    };
     var boardings = [], attract = [], found = 0, k;
     for (k = 0; k < ids.length; k++) {
       var s = byId[ids[k]];
-      var on = s ? (s.on[hour] || 0) * dayMul : 0;
-      var off = s ? (s.off[hour] || 0) * dayMul : 0;
+      var on = s ? atNow(s.on) * dayMul : 0;
+      var off = s ? atNow(s.off) * dayMul : 0;
       if (s) found++;
       boardings.push(on);
       attract.push(off + 0.0001);
@@ -430,8 +442,18 @@
        처음엔 이걸 안 걸러서 오전 8시에 **심야버스 N51 이 1순위**로 올라왔다 —
        그 시각 승하차가 전부 0이라 「23자리가 모두 비어 있습니다」로 계산됐기 때문이다.
        자료가 없을수록 점수가 좋아지는 구조는 이 서비스에서 가장 위험한 함정이다. */
+    /* ★ 「다니나 안 다니나」는 보간값으로 묻지 않는다 (D-119) ★
+       보간은 값이 이어질 때만 맞다. 첫차·막차 경계는 0 에서 갑자기 뛰므로 그 사이를 이으면
+       실제보다 훨씬 낮은 값이 나온다 — 실측: 8101 광역버스의 06:00 승하차가 칸 값 5.5 인데
+       보간하면 0.1 이 되어 아래 「승객<1 = 안 다님」에 걸려 **첫차 시간대에 노선이 통째로
+       죽었다**(수유역→종로3가 06시에 직통이 사라지고 환승 경로가 1위가 됐다).
+       그래서 운행 여부는 **그 시간 칸 그대로** 묻는다 — 원천이 1시간 단위이니 「이 시간대에
+       이 노선이 다니는가」는 칸이 답할 문제다. 재차 계산만 보간값을 쓴다. */
     var moved = 0;
-    for (k = 0; k < ids.length; k++) moved += boardings[k] + (attract[k] - 0.0001);
+    for (k = 0; k < ids.length; k++) {
+      var sh = byId[ids[k]];
+      if (sh) moved += ((sh.on[hour] || 0) + (sh.off[hour] || 0)) * dayMul;
+    }
     /* 심야버스는 제 시간대엔 자료가 얇아도 다닌다 (D-81): 승하차 표본이 적은 N15·N16이
        「승객<1 = 안 다님」 규칙(원래 낮 유령 노선용)에 제 시간대에 살해당해, 02시 미아에서
        심야버스가 전멸했다. 심야 창(23~05시)의 night 노선만 면제 — 낮 유령은 계속 죽는다. */
@@ -444,7 +466,9 @@
     /* ★ 캐시 키에 **방향**이 반드시 들어가야 한다 ★
        버스도 왕복을 두 방향으로 가르면서(D-51) 방향마다 정류장 ID 가 달라졌다 —
        방향을 빼면 아침 도심행의 값이 한산한 반대 방향에 그대로 쓰인다. */
-    var ck = (doc.route || '') + '@' + hour + '#' + leg.dirIdx + '/' + ctx.dayType
+    /* 캐시 열쇠도 10분으로 잘게 (D-119) — 시간 단위로 두면 보간해 놓고 07:00 값을
+       07:50 에 그대로 돌려준다. 분 단위로 하면 캐시가 거의 안 맞으니 10분에서 끊는다. */
+    var ck = (doc.route || '') + '@' + Math.round(mm / 10) + '#' + leg.dirIdx + '/' + ctx.dayType
            + (ctx.busCalib ? '/c' : '');
     var od;
     if (!busCache[ck]) busCache[ck] = SIM.odLoads({ boardings: boardings, attract: attract,

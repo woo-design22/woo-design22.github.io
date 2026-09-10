@@ -1531,12 +1531,15 @@
            실제로는 **타는 그 시각의 승하차**를 쓴다(월곡동신 07시 17.5명 / 12시 13.9명 /
            22시 5.4명 — 시간마다 다르다) + 요일·시간 보정(D-54·D-64)까지 한다.
            문구가 우리 계산을 스스로 깎아내리고 있었다. 시각을 그대로 밝힌다. */
+        /* 「8시대」가 아니라 **탈 시각 그대로** 말한다 (D-119) — 07:05 와 07:55 는 다른데
+           한 시간을 통으로 부르면 그 차이를 없는 것처럼 말하게 된다. 원천은 1시간 칸이고
+           그 사이는 이어서 쓰므로(보간) 「무렵」이라고 밝힌다. */
         var hh = (typeof l.boardMinutes === 'number')
-          ? Math.floor((l.boardMinutes % 1440) / 60) + '시' : '이 시각';
+          ? SeatInterp.hhmm(Math.round(l.boardMinutes)) + ' 무렵' : '이 시각';
         html += '<div class="small" style="margin-top:7px">'+esc(l.seatText)
           + (l.estimated ? ' <span class="muted">— '
               + esc(/되짚/.test(l.why||'') ? '이 지역은 혼잡도 실측이 없어 승하차 인원에서 되짚은 값입니다'
-                                           : hh + '대 승·하차 실측으로 낸 값이라, 같은 시각에도 차마다 다릅니다') + '</span>' : '')
+                                           : hh + ' 승·하차 실측(1시간 단위를 이어 쓴 값)이라, 같은 시각에도 차마다 다릅니다') + '</span>' : '')
           + '</div>' + seatGrid(l);
         var p=SeatModel.seatChance(l.pSeated);
         html += '<div><span class="phrase tone-'+p.tone+'">● '+esc(p.text)
@@ -1976,6 +1979,27 @@
      그리는 셈이라 더 큰 거짓말이 된다(역 사이 직선으로 두고 화면에 그렇게 밝힌다).
      시간·좌석 계산에는 아무 영향이 없다 — 그림만 바꾼다. */
   var ROADPATH = {};
+  /* 두 점 사이 직선 합(km) — 차도 경로가 말이 되는지 재는 잣대다. */
+  function straightKm(coords){
+    var d = 0;
+    for (var i = 0; i + 1 < coords.length; i++)
+      d += SeatTransfer.haversine({lat:coords[i][0], lon:coords[i][1]},
+                                  {lat:coords[i+1][0], lon:coords[i+1][1]}) / 1000;
+    return d;
+  }
+  /* ★ 터무니없는 차도 경로는 버린다 (D-118, 사용자 지적 「노선표시 이상함」) ★
+     버스 정류장은 길 양쪽에 있고 우리 노드는 150m 로 묶어 대표 좌표 하나만 쓴다. 그래서
+     **반대편 차로에 잡히면** 자동차 경로가 일방통행을 지키느라 크게 U턴한다 —
+     실측: 월곡동신아파트→KT월곡지사 직선 0.24km 인데 차도 8.37km(35배), 그 leg 전체가
+     0.96km → 22.4km 가 되어 지도에 커다란 고리가 그려졌다.
+     도로가 직선보다 조금 도는 것은 정상이라(104번 1.43배) 문턱을 넉넉히 두고,
+     넘으면 그 구간은 **직선으로 남긴다**(지하철과 같은 모양 — 없는 길을 그리지 않는다). */
+  var ROAD_MAX_RATIO = 2.5, ROAD_MAX_ADD_KM = 0.3;
+  function roadSane(coords, meters){
+    var st = straightKm(coords);
+    return (meters / 1000) <= st * ROAD_MAX_RATIO + ROAD_MAX_ADD_KM;
+  }
+
   function realRoad(map, path, coords, key){
     if (coords.length < 2) return;
     if (ROADPATH[key]){ path.pts = ROADPATH[key]; return; }
@@ -1997,9 +2021,12 @@
     fetch(url, ctl ? { signal: ctl.signal } : undefined)
       .then(function(r){ return r.json(); })
       .then(function(o){
-        var c = o && o.routes && o.routes[0] && o.routes[0].geometry
-              && o.routes[0].geometry.coordinates;
+        var r0 = o && o.routes && o.routes[0];
+        var c = r0 && r0.geometry && r0.geometry.coordinates;
         if (!c || c.length < 2) throw new Error('no route');
+        // 반대편 차로에 잡혀 크게 도는 경로는 쓰지 않는다(D-118)
+        if (typeof r0.distance === 'number' && !roadSane(coords, r0.distance))
+          throw new Error('detour');
         var line = c.map(function(pt){ return [pt[1], pt[0]]; });
         ROADPATH[key] = line;
         path.pts = line;

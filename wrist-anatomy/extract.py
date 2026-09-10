@@ -27,7 +27,11 @@ from mathutils import Vector
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 ANCHOR = "Scaphoid bone.r"   # 오른쪽 손목의 기준점
-REGION_R = 0.075             # 기준점에서 7.5cm 상자 안에 걸치는 것만 가져온다
+REGION_R = 0.075             # 옆·앞뒤·근위로는 기준점에서 7.5cm
+# 손끝 쪽으로만 더 내려간다. 7.5cm 상자로 자르면 **손가락뼈가 통째로 빠진다** —
+# 상자를 벗어난 중간·끝마디뼈가 안 들어오는데 손가락 피부·인대·관절낭은 통짜 객체라
+# 그대로 들어오므로, 층을 벗기면 속이 빈 하얀 관절낭만 뼈처럼 떠 보였다.
+REGION_DISTAL = 0.175
 
 # 근육만 무겁다(전체의 64%). 목표 정점 수를 넘으면 그 층만 줄인다.
 DECIMATE = {"5_근육": 0.35}   # 피부는 줄이지 않는다 — 각이 져 조각처럼 보인다
@@ -190,7 +194,7 @@ if anchor is None:
 
 ab = world_bbox(anchor)
 cx, cy, cz = (ab[0] + ab[3]) / 2, (ab[1] + ab[4]) / 2, (ab[2] + ab[5]) / 2
-box = (cx - REGION_R, cy - REGION_R, cz - REGION_R,
+box = (cx - REGION_R, cy - REGION_R, cz - REGION_DISTAL,
        cx + REGION_R, cy + REGION_R, cz + REGION_R)
 
 picked = defaultdict(list)

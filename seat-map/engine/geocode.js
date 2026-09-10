@@ -190,7 +190,11 @@
      정확히 맞지 않으므로 주소가 위로 간다 — 두 요구가 다 지켜진다. */
   function canonQ(s) { return String(s || '').replace(/\s+/g, '').replace(/역$/, ''); }
 
-  function merge(localHits, onlineHits, limit, q) {
+  /* 동명이 전국에 있을 때 「먼 곳」의 문턱. findNodes 와 같은 값을 쓴다 — 한쪽만 고치면
+     로컬 목록과 합친 목록이 서로 다른 순서를 말한다. */
+  var FAR_KM = 40;
+
+  function merge(localHits, onlineHits, limit, q, near) {
     var loc = (localHits || []).slice();
     var on = onlineHits || [];
     var out = [], used = {}, i, j;
@@ -209,13 +213,23 @@
       on = keep;
     }
 
-    // ① 친 이름과 정확히 맞는 로컬부터
+    /* ① 친 이름과 정확히 맞는 로컬부터.
+       ★ 다만 먼 곳은 끌어올리지 않는다 (D-117, 사용자 지적) ★
+       「중구청」을 치면 이름이 통째로 맞는 것은 **대전** 중구청역이고, 서울 사람이 찾는
+       「중구청앞.덕수중학교」는 부분 일치라 뒤로 밀린다. 로컬 목록(findNodes)은 기준점을
+       보고 서울을 1위로 줬는데, 여기서 이름만 보고 다시 앞으로 당겨 **1초 뒤에 순서가
+       뒤집혔다**(실측: 즉시엔 서울 1위 → 온라인 병합 뒤 대전 1위). 그대로 고르면
+       월곡동에서 대전까지 KTX 경로가 나온다. 기준점이 있으면 40km 안의 것만 당긴다. */
     if (want) {
       for (j = 0; j < loc.length; j++) {
-        if (!used[j] && canonQ(loc[j].name) === want) { used[j] = 1; out.push(loc[j]); }
+        if (used[j] || canonQ(loc[j].name) !== want) continue;
+        if (near && loc[j].lat != null &&
+            T.haversine(near, loc[j]) / 1000 > FAR_KM) continue;   // 딴 권역은 제자리에 둔다
+        used[j] = 1; out.push(loc[j]);
       }
     }
     // ② 주소·상호
+    var farOn = [];        // 딴 권역 것 — 아래에서 뒤로 민다(D-117)
     for (i = 0; i < on.length; i++) {
       var swapped = null;
       for (j = 0; j < loc.length; j++) {
@@ -223,10 +237,17 @@
       }
       if (!swapped && want && canonQ(on[i].name) === want &&
           out.some(function (o) { return canonQ(o.name) === want; })) continue;   // ①과 겹치면 생략
-      out.push(swapped || on[i]);
+      var pick = swapped || on[i];
+      /* ★ 온라인 결과도 기준점을 봐야 한다 (D-117) ★ 주소 검색은 전국을 뒤지므로
+         서울에서 출발하는데 「중구청」에 대전이 먼저 온다. 지우지는 않고 뒤로 민다 —
+         정말 대전에 가려는 사람도 있다(목록 아래에 그대로 있다). */
+      if (near && pick.lat != null && T.haversine(near, pick) / 1000 > FAR_KM) farOn.push(pick);
+      else out.push(pick);
     }
-    // ③ 나머지 정류장·역·장소
+    // ③ 나머지 정류장·역·장소 (가까운 것부터 — 로컬 목록이 이미 그 순서다)
     for (j = 0; j < loc.length; j++) if (!used[j]) out.push(loc[j]);
+    // ③-b 딴 권역 온라인 결과
+    for (i = 0; i < farOn.length; i++) out.push(farOn[i]);
     // ④ 동 이름이 어긋난 온라인 주소는 맨 뒤 (지우지 않는다)
     for (i = 0; i < onBad.length; i++) out.push(onBad[i]);
     return out.slice(0, limit || 12);

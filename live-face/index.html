@@ -1,14 +1,1 @@
-<!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>실시간 채팅 표정앱</title>
-<style>body{font-family:system-ui,sans-serif;background:#f4f4f2;color:#1c1e22;margin:0;min-height:100dvh;display:grid;place-items:center}main{max-width:480px;margin:24px;padding:32px;background:white;border:1px solid #e0dfda;border-radius:20px}h1{font-size:24px}p{line-height:1.8}button,a{font:inherit}button{background:#2f6f5e;color:white;border:0;padding:12px 20px;border-radius:10px;cursor:pointer}button:disabled{opacity:.5}a{color:#2f6f5e}small{display:block;margin-top:24px;color:#565a61}</style></head>
-<body><main><h1>실시간 채팅 표정앱</h1><p>글을 쓰는 동안 3D 얼굴의 표정이 바뀝니다.</p><p id="status" role="status">앱에 연결하고 있습니다…</p><button id="retry" disabled>다시 연결</button><small><a href="../">대문으로 돌아가기</a></small></main>
-<script>
-const status=document.getElementById('status'),retry=document.getElementById('retry');
-async function connect(){retry.disabled=true;status.textContent='앱에 연결하고 있습니다…';try{
- const config=await fetch('./connection.json?t='+Date.now(),{cache:'no-store',signal:AbortSignal.timeout(8000)}).then(r=>{if(!r.ok)throw Error();return r.json()});
- const target=new URL(config.url);if(target.protocol!=='https:'||!target.hostname.endsWith('.trycloudflare.com'))throw Error();
- const state=await fetch(target.origin+'/api/public/status',{cache:'no-store',signal:AbortSignal.timeout(10000)}).then(r=>{if(!r.ok)throw Error();return r.json()});
- if(!state.ready)throw Error();location.replace(target.origin+'/');
-}catch{status.textContent='지금은 앱 서버에 연결할 수 없습니다. 제작자 PC의 서버가 켜져 있을 때 이용할 수 있습니다.';retry.disabled=false;}}
-retry.addEventListener('click',connect);connect();
-</script></body></html>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>실시간 채팅 표정앱</title><meta http-equiv="refresh" content="0;url=https://live-chat-face.gundream.chatgpt.site/"><link rel="canonical" href="https://live-chat-face.gundream.chatgpt.site/"><style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100dvh;margin:0;background:#f4f4f2;color:#1c1e22}main{margin:24px}a{color:#2f6f5e;line-height:2}</style></head><body><main><h1>실시간 채팅 표정앱</h1><p>웹앱으로 이동합니다.</p><a href="https://live-chat-face.gundream.chatgpt.site/">웹앱 열기</a></main></body></html>

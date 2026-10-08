@@ -15,7 +15,7 @@ const exe = process.argv[3] === 'edge' ? 'C:\\Program Files (x86)\\Microsoft\\Ed
 const edge = spawn(exe, [
   '--headless=new', '--remote-debugging-port=' + port, '--user-data-dir=' + process.env.TEMP + '\\edge-fps-probe',
   '--no-first-run', '--no-default-browser-check', '--window-size=' + (process.env.PROBE_SIZE || '1280,800'), 'about:blank'
-], { stdio: 'ignore' });
+], { stdio: 'ignore', windowsHide: true });
 const skipKeys = process.env.PROBE_SKIP_KEYS === '1';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function getJSON(u) { return new Promise((res, rej) => http.get(u, r => { let b = ''; r.on('data', d => b += d); r.on('end', () => res(JSON.parse(b))); }).on('error', rej)); }

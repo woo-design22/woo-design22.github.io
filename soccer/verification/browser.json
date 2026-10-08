@@ -1,0 +1,23 @@
+{
+  "roomActions": [
+    {
+      "id": "rmReady",
+      "visible": true
+    },
+    {
+      "id": "rmStart",
+      "visible": true
+    },
+    {
+      "id": "rmLeave",
+      "visible": true
+    }
+  ],
+  "touchButtons": 7,
+  "overlaps": 0,
+  "automaticReconnect": true,
+  "samePlayerId": true,
+  "teamLabels": true,
+  "offlineSwitch": true,
+  "consoleExceptions": []
+}

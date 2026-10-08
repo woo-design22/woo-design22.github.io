@@ -58,7 +58,7 @@ function client(nick) {
       case 'rooms': c.rooms = m.list; break;
       case 'joined': c.roomId = m.id; break;
       case 'room': c.room = m.state; break;
-      case 'match.start': c.phase = 'playing'; break;
+      case 'match.start': c.phase = 'playing'; c.snaps = 0; c.firstSnapAt = 0; c.lastSnapAt = 0; break;
       case 'match.end': c.phase = 'lobby'; break;
       case 'event': c.events.push(m.kind); break;
       case 'chat': c.chats.push(m.from + ': ' + m.text); break;
@@ -75,6 +75,7 @@ const waitFor = async (fn, ms) => { const t0 = Date.now(); while (Date.now() - t
 async function runRoom(idx) {
   const cs = [];
   for (let i = 0; i < PLAYERS; i++) cs.push(client('테스트' + (idx * PLAYERS + i + 1)));
+  try {
   const ok = await waitFor(() => cs.every(c => c.welcomed || c.rejected || c.closeCode), 4000);
 
   const rejected = cs.filter(c => c.rejected);
@@ -102,7 +103,7 @@ async function runRoom(idx) {
   cs.forEach(c => { c.afterJoin = true; });
 
   // 팀을 반씩 나누고 캐릭터를 고르고 준비
-  cs.forEach((c, i) => { c.send({ t: 'team', team: i % 2 }); c.send({ t: 'char', id: i % 6 }); });
+  cs.forEach((c, i) => { c.send({ t: 'team', team: i % 2 }); c.send({ t: 'char', id: i % core.CHARACTERS.length }); });
   await sleep(200);
   // 인원이 다 차기 전에 시작을 눌러 본다(막혀야 한다)
   const earlyStart = { tried: false, blocked: false };
@@ -139,7 +140,7 @@ async function runRoom(idx) {
       core.encodeInput(seq, (Date.now() % 1500 < 120) ? core.BTN.KICK : 0, dx, dy, buf);
       if (c.ws.readyState === 1) c.ws.send(buf, { binary: true });
     });
-  }, 50);
+  }, 1000 / core.C.TICK_HZ);
   host.send({ t: 'chat', text: '테스트 채팅' });
   await sleep(SECONDS * 1000);
   clearInterval(inputTimer);
@@ -158,14 +159,17 @@ async function runRoom(idx) {
     채팅수신: host.chats.length,
     퇴장: cs.filter(c => c.kicked).map(c => c.kicked.msg)
   };
-  cs.forEach(c => { try { c.ws.close(); } catch (e) {} });
   return out;
+  } finally { cs.forEach(c => { try { c.ws.close(1000); } catch (e) {} }); }
 }
 
 (async () => {
-  const results = [];
-  for (let i = 0; i < ROOMS; i++) results.push(await runRoom(i));
+  const results = await Promise.all(Array.from({ length: ROOMS }, (_, i) => runRoom(i)));
   console.log(JSON.stringify({ 설정: { 주소: WS_URL, PLAYERS, ROOMS, DELAY, DELAY_AFTER, DROP, SECONDS }, 결과: results }, null, 1));
   await sleep(300);
-  process.exit(0);
+  const good = results.every(r => DELAY > 100 || DROP ? r['결과'] === '지연 게이트 거부' :
+    r['결과'] === '경기 시작됨' && r['입장'] === PLAYERS + '/' + PLAYERS && r['틀린비번_막힘'] &&
+    r['방장아님_시작막힘'] && r['미준비_시작막힘'].startsWith('예') && r['채팅수신'] > 0 &&
+    (DELAY_AFTER ? r['퇴장'].length > 0 : r['스냅샷'].Hz >= core.C.TICK_HZ * 0.95));
+  process.exit(good ? 0 : 1);
 })();

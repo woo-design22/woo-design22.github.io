@@ -5,7 +5,10 @@
   "description": "반대항축구 온라인 서버 — 정적 파일 + WebSocket 경기 서버",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "regress": "node ../tools/regress.js",
+    "loadtest": "node loadtest.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

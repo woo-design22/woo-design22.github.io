@@ -304,7 +304,7 @@
 <div id="overlay">
   <div class="panel" id="panelHome">
     <h1>반대항축구</h1>
-    <div class="sub" id="ovSub">혼자 하기 — 인공지능과 대전. 전·후반 각 3분, 골키퍼는 자동. 캐릭터와 인원을 고르고 시작하세요.</div>
+    <div class="sub" id="ovSub">혼자 하기 — 인공지능과 대전. 전·후반 각 1분 30초, 골키퍼는 자동. 캐릭터와 인원을 고르고 시작하세요.</div>
     <div class="final" id="ovFinal" style="display:none"></div>
     <div class="chars" id="ovChars"></div>
     <div class="ultinfo" id="ovUlt"></div>
@@ -356,6 +356,8 @@
         <input type="text" id="crName" maxlength="20" placeholder="방 이름" style="width:150px">
         <select id="crSize"><option value="1">1:1</option><option value="2" selected>2:2</option><option value="3">3:3</option><option value="4">4:4</option><option value="5">5:5</option><option value="10">10:10</option></select>
         <select id="crHalf"><option value="90" selected>전후반 1분30초</option><option value="120">전후반 2분</option><option value="180">전후반 3분</option></select>
+        <label>우리 반 <input type="number" id="crClassA" min="1" max="12" value="1" aria-label="우리 반 번호" style="width:64px"></label>
+        <label>상대 반 <input type="number" id="crClassB" min="1" max="12" value="2" aria-label="상대 반 번호" style="width:64px"></label>
         <input type="password" id="crPass" maxlength="12" placeholder="비밀번호(없으면 공개)" style="width:150px">
         <button class="btn go" id="crMake" type="button">방 만들기</button>
       </div>
@@ -432,7 +434,9 @@
   var store = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
-    remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} }
+    remove: function (k) { try { localStorage.removeItem(k); } catch (e) {} },
+    sessionGet: function (k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    sessionSet: function (k, v) { try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch (e) {} }
   };
   var SETTINGS_KEY = 'soc_settings';
   var settings = { interpMs: 20, char: 0, minimap: true, sfx: true, bgm: true, teamA: 2, teamB: 2, sideTab: 'even',
@@ -1470,7 +1474,7 @@
     $('ovStart').textContent = final ? '다시 시작' : '시작';
     $('ovHint').innerHTML = touchOn
       ? '왼쪽 아래를 누른 채 끌면 이동 · <b>끝까지 밀면 달리기</b> · 오른쪽 버튼으로 슛·드리블·방귀'
-      : '<kbd>1</kbd>~<kbd>6</kbd> 캐릭터 · <kbd>Enter</kbd> 시작<br>방향키 이동 · <kbd>W</kbd> 드리블(길게=멀리) · <kbd>D</kbd> 슛/발차기 · <kbd>S</kbd> 방귀 · <kbd>Q</kbd><kbd>E</kbd> 감아차기 · <kbd>Z</kbd> 패스 · <kbd>A</kbd> 필살기';
+      : '<kbd>1</kbd>~<kbd>9</kbd> 캐릭터 · <kbd>Enter</kbd> 시작<br>방향키 이동 · <kbd>W</kbd> 드리블(길게=멀리) · <kbd>D</kbd> 슛/발차기 · <kbd>S</kbd> 방귀 · <kbd>Q</kbd><kbd>E</kbd> 감아차기 · <kbd>Z</kbd> 패스 · <kbd>A</kbd> 필살기';
     renderOverlay();
   }
   function hideOverlay() { overlayMode = false; $('overlay').classList.remove('show'); if ($('btnExit')) syncExitBtn(); }
@@ -1482,7 +1486,8 @@
     $('lbNick').value = store.get('soc_nick') || '';
     // 주소 우선순위: ①주소창 ?server= ②게시판 ③지난번에 쓴 주소 ④이 페이지를 준 서버.
     // 게시판이 저장값보다 앞선다 — 터널 주소는 켤 때마다 바뀌므로 **지난번 주소는 거의 항상 죽어 있다**.
-    var forced = params.get('server') || '';
+    var direct = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || /\.trycloudflare\.com$/.test(location.hostname);
+    var forced = params.get('server') || (direct ? location.origin : '');
     $('lbServer').value = forced;
     showPanel('lobby');
     if (forced) maybeAutoConnect();
@@ -1495,7 +1500,8 @@
   $('lbRefresh').addEventListener('click', function () { netSend({ t: 'room.list' }); });
   $('crMake').addEventListener('click', function () {
     netSend({ t: 'room.create', name: $('crName').value, teamSize: +$('crSize').value,
-      halfSec: +$('crHalf').value, pass: $('crPass').value, field: settings.field });
+      halfSec: +$('crHalf').value, pass: $('crPass').value, field: settings.field,
+      classA: +$('crClassA').value, classB: +$('crClassB').value });
   });
   $('rmTeam').addEventListener('click', function () { var me = myMember(); netSend({ t: 'team', team: me && me.team ? 0 : 1 }); });
   $('rmReady').addEventListener('click', function () { var me = myMember(); netSend({ t: 'ready', on: !(me && me.ready) }); });
@@ -1508,13 +1514,13 @@
     if (v) netSend({ t: 'chat', text: v });
     $('rmChatIn').value = '';
   });
-  $('msgHome').addEventListener('click', function () { showOverlay(null); });
+  $('msgHome').addEventListener('click', function () { disconnectOnline(); showOverlay(null); });
   $('msgRetry').addEventListener('click', function () {
-    if (net.ws) { try { net.ws.close(); } catch (e) {} net.ws = null; }
-    net.room = null; net.roomId = null;
+    clearTimeout(net.retryTimer); net.retryTimer = null;
+    if (net.ws && net.ws.readyState <= 1) return;
     showPanel('lobby');
-    $('lbAfter').style.display = 'none';
     $('lbNick').value = store.get('soc_nick') || '';
+    netConnect();
   });
 
   /* ── 소리 — 파일 없이 WebAudio 로 합성한다 (이 저장소는 CDN·외부 에셋을 쓰지 않는다) ────
@@ -1713,7 +1719,8 @@
      보간 기준 시각은 서버 시계가 아니라 **스냅샷이 도착한 로컬 시각**이다(연습장과 같음) — 시계 동기 없이도 부드럽다. */
   var net = {
     ws: null, nick: '', roomId: null, room: null, myId: 0, mySlot: -1, rtt: 0,
-    screen: 'home', inputTimer: null, seq: 0, buf: new Uint8Array(core.INPUT_BYTES), listTimer: null
+    screen: 'home', inputTimer: null, seq: 0, buf: new Uint8Array(core.INPUT_BYTES), listTimer: null,
+    token: '', tokenKey: '', retryTimer: null, reconnectUntil: 0, blocked: false
   };
   // 서버 주소는 세 곳에서 온다: ①주소창 `?server=` ②입력란(저장됨) ③비어 있으면 이 페이지를 준 서버.
   // ③ 이 기본인 이유: 서버가 정적 파일까지 서빙하므로 보통은 같은 주소다.
@@ -1728,7 +1735,7 @@
      쓰는 쪽은 내 PC 의 `gh gist edit` 뿐이고, 읽기는 누구나 된다(주소 한 줄만 들어 있다). */
   var GIST_ID = '5d0b2f4daf7e089553c5a541b53cd29c';
   var GIST_FILE = 'soccer-server.json';
-  var REGISTRY = 'https://gray-macaque-4849.woo-design22.deno.net';   // 예비 게시판(Deno)
+  var REGISTRY = ''; // 예전 Deno 게시판은 비활성. 현재는 GitHub Gist를 사용한다.
   var OFF_NOTE = [
     '이 게임은 만든 사람의 컴퓨터에서 서버를 켜 두는 동안만 온라인으로 할 수 있습니다.',
     '켜지면 위 주소 칸이 자동으로 채워집니다. 직접 받은 주소가 있으면 거기에 넣고 「접속」을 누르세요.',
@@ -1826,25 +1833,50 @@
   }
   function netSend(o) { if (net.ws && net.ws.readyState === 1) net.ws.send(JSON.stringify(o)); }
 
+  function cancelReconnect() {
+    clearTimeout(net.retryTimer); net.retryTimer = null; net.reconnectUntil = 0; net.blocked = true;
+  }
+  function disconnectOnline() {
+    cancelReconnect(); stopInputSender();
+    if (net.listTimer) { clearInterval(net.listTimer); net.listTimer = null; }
+    if (net.ws) { var previous = net.ws; net.ws = null; try { previous.close(1000); } catch (e) {} }
+    store.sessionSet(net.tokenKey, ''); net.token = ''; net.room = null; net.roomId = null;
+  }
   function netConnect() {
+    if (net.ws && net.ws.readyState <= 1) return;
+    net.blocked = false;
+    var tokenKey = 'soc_resume:' + wsUrl();
+    net.token = store.sessionGet(tokenKey) || (tokenKey === net.tokenKey ? net.token : '') || '';
+    net.tokenKey = tokenKey;
     var nick = ($('lbNick').value || '').trim();
     if (nick.length < 2) { $('lbState').textContent = '아이디는 2자 이상'; return; }
     store.set('soc_nick', nick);
     store.set('soc_server', ($('lbServer').value || '').trim());
     net.nick = nick;
     $('lbState').textContent = '접속 중…';
-    try { net.ws = new WebSocket(wsUrl()); } catch (e) { $('lbState').textContent = '접속 실패'; return; }
+    var socket;
+    try { socket = net.ws = new WebSocket(wsUrl()); } catch (e) { $('lbState').textContent = '접속 실패'; return; }
     net.ws.binaryType = 'arraybuffer';
-    net.ws.onopen = function () { netSend({ t: 'hello', v: core.PROTOCOL_VERSION, nick: net.nick }); };
+    net.ws.onopen = function () { netSend({ t: 'hello', v: core.PROTOCOL_VERSION, nick: net.nick, token: net.token }); };
     net.ws.onmessage = function (ev) {
+      if (net.ws !== socket) return;
       if (typeof ev.data !== 'string') { pushSnapshot(new Uint8Array(ev.data), performance.now()); return; }
       var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
       onNetText(m);
     };
     net.ws.onclose = function (e) {
+      if (net.ws !== socket) return;
       stopInputSender();
-      if (net.screen === 'msg') return;                       // 이미 사유를 보여 주고 있다
-      netMsg('연결이 끊겼습니다', e.reason || ('코드 ' + e.code), true);
+      if (net.listTimer) { clearInterval(net.listTimer); net.listTimer = null; }
+      if (!net.blocked && e.code !== 1000 && e.code < 4000 && net.roomId) {
+        if (!net.reconnectUntil) net.reconnectUntil = Date.now() + 14000;
+        if (Date.now() < net.reconnectUntil) {
+          netMsg('연결 복구 중', '잠시 끊겼습니다. 15초 안에 연결되면 같은 선수로 돌아갑니다.', false);
+          net.retryTimer = setTimeout(netConnect, 800); return;
+        }
+      }
+      if (net.blocked) return;
+      netMsg('연결이 끊겼습니다', e.reason || '다시 시도를 눌러 접속하세요.', true);
     };
     net.ws.onerror = function () {};
   }
@@ -1852,6 +1884,10 @@
     switch (m.t) {
       case 'ping': netSend({ t: 'pong', id: m.id }); break;
       case 'welcome':
+        clearTimeout(net.retryTimer); net.retryTimer = null; net.reconnectUntil = 0;
+        net.myId = m.id || 0; net.nick = m.nick || net.nick;
+        net.token = m.slotToken || ''; store.sessionSet(net.tokenKey, net.token);
+        if (!m.resumed) { net.room = null; net.roomId = null; }
         net.rtt = m.rtt;
         $('lbState').textContent = '접속됨 · 지연 ' + m.rtt + 'ms';
         $('lbAfter').style.display = '';
@@ -1860,12 +1896,14 @@
         net.listTimer = setInterval(function () { if (net.screen === 'lobby') netSend({ t: 'room.list' }); }, 2000);
         break;
       case 'reject':
+        cancelReconnect();
         netMsg('네트워크 오류',
           '지연이 커서 접속할 수 없습니다.\n측정 중앙값 ' + m.rtt + 'ms · 상위10% ' + m.p90 + 'ms'
           + (m.missing ? (' · 무응답 ' + m.missing + '개') : '')
           + '\n기준 ' + m.limit.median + ' / ' + m.limit.p90 + 'ms', true);
         break;
       case 'kick':
+        cancelReconnect(); net.token = ''; store.sessionSet(net.tokenKey, '');
         netMsg('퇴장되었습니다', m.msg || '', true);
         break;
       case 'rooms': renderRooms(m.list); break;
@@ -1885,7 +1923,7 @@
         renderRoom();
         break;
       case 'lobby.field': onLobbyField(m); break;
-      case 'match.start': onMatchStart(); break;
+      case 'match.start': onMatchStart(m); break;
       case 'match.end':
         game = null; snaps.length = 0;   // 곧 lobby.field 가 다시 와서 공용 운동장으로 돌아간다
         if (!$('dockBody').children.length) showPanel('room'); else dockShow('room');
@@ -1911,14 +1949,14 @@
     if (!list.length) { tb.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">방이 없습니다. 아래에서 만들어 보세요.</td></tr>'; return; }
     list.forEach(function (r) {
       var tr = document.createElement('tr');
-      var full = r.players >= r.cap || r.phase === 'playing';
+      var full = r.players >= r.cap;
       if (full) tr.className = 'full';
       tr.innerHTML = '<td>' + (r.lock ? '🔒 ' : '') + esc(r.name) + '</td><td>' + r.players + '/' + r.cap + '</td><td>'
         + Math.round(r.halfSec / 60 * 10) / 10 + '분</td><td>' + esc(r.host) + '</td>';
       var td = document.createElement('td');
       var b = document.createElement('button');
       b.className = 'btn sm'; b.type = 'button';
-      b.textContent = r.phase === 'playing' ? '경기중' : (full ? '가득참' : '입장');
+      b.textContent = full ? '가득참' : (r.phase === 'playing' ? '경기 참가' : '입장');
       b.disabled = full;
       b.addEventListener('click', function () {
         var pass = r.lock ? (prompt('비밀번호를 입력하세요') || '') : '';
@@ -1930,11 +1968,12 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (m) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]; }); }
   function myMember() {
     if (!net.room) return null;
-    for (var i = 0; i < net.room.members.length; i++) if (net.room.members[i].nick === net.nick) return net.room.members[i];
+    for (var i = 0; i < net.room.members.length; i++) if (net.myId ? net.room.members[i].id === net.myId : net.room.members[i].nick === net.nick) return net.room.members[i];
     return null;
   }
   function renderRoom() {
     var r = net.room; if (!r) return;
+    TEAM_NAMES[0] = r.classes[0] + '반'; TEAM_NAMES[1] = r.classes[1] + '반';
     $('rmName').textContent = r.name + (r.lock ? ' 🔒' : '');
     $('rmSub').textContent = r.teamSize + ':' + r.teamSize + ' · 전후반 각 ' + Math.round(r.halfSec / 60 * 10) / 10 + '분 · '
       + r.members.length + '/' + r.cap + '명 · ' + core.fieldOf(r.field).name;
@@ -1947,7 +1986,7 @@
       d.innerHTML = '<span class="tag ' + (m.team ? 'b' : 'a') + '">' + (m.team ? TEAM_NAMES[1] : TEAM_NAMES[0]) + '</span>'
         + '<b>' + esc(m.nick) + '</b>' + (m.host ? ' <span style="color:var(--charge)">방장</span>' : '')
         + ' <span style="color:var(--muted)">' + esc((core.CHARACTERS[m.char] || {}).name || '') + '</span>'
-        + ' <span style="margin-left:auto" class="' + (m.ready ? 'rd' : 'no') + '">' + (m.ready ? '준비 완료' : '대기') + '</span>';
+        + ' <span style="margin-left:auto" class="' + (m.ready ? 'rd' : 'no') + '">' + (m.disconnected ? '재접속 대기' : (m.ready ? '준비 완료' : '대기')) + '</span>';
       // 방장은 다른 사람을 내보낼 수 있다(2026-08-26 지시)
       if (me && me.host && m.id !== me.id) {
         var kb = document.createElement('button');
@@ -1969,9 +2008,9 @@
     $('rmReady').textContent = (me && me.ready) ? '준비 해제' : '준비';
     var host = me && me.host;
     $('rmStart').style.display = host ? '' : 'none';
-    $('rmStart').disabled = !(r.members.length === r.cap && r.members.every(function (m) { return m.ready; }));
+    $('rmStart').disabled = !(r.members.length === r.cap && r.members.every(function (m) { return m.ready && !m.disconnected; }));
   }
-  function onMatchStart() {
+  function onMatchStart(message) {
     var me = myMember();
     net.mySlot = me ? me.slot : 0;
     TEAM_NAMES[0] = (net.room.classes[0]) + '반'; TEAM_NAMES[1] = (net.room.classes[1]) + '반';
@@ -1985,7 +2024,7 @@
     chatPlace(true);
     syncScoreboard();
     preloadChars();
-    startCountdown();      // 경기 시작에도 3·2·1 — 첫 킥오프는 이벤트가 따로 오지 않는다
+    if (!message || !message.late) startCountdown(); // 복귀·중도 참가에는 시작 카운트다운을 반복하지 않는다
     startInputSender();
   }
   /* ── 공용 운동장 · 채팅 (2026-08-26 지시) ─────────────────────────────────
@@ -2114,7 +2153,7 @@
   }
   function stopInputSender() { if (net.inputTimer) { clearInterval(net.inputTimer); net.inputTimer = null; } }
   function handleNetEvent(m) {
-    var e = { kind: m.kind, team: m.team, slot: m.slot, side: m.side, name: m.name, score: m.score };
+    var e = { kind: m.kind, team: m.team, slot: m.slot, side: m.side, name: m.name, score: m.score, table: m.table, mom: m.mom, scorer: m.scorer };
     handleEvents([e], 0);
   }
 
@@ -2125,6 +2164,7 @@
   var tickStats = { count: 0, msSum: 0, msMax: 0 };
   // 혼자 할 때는 2:2 (내 팀에 인공지능 1명, 상대 인공지능 2명). `dummies` 를 주면 옛 허수아비 모드 — 검증 도구가 쓴다.
   function startPractice(opts) {
+    if (net) disconnectOnline();
     opts = opts || {};
     var state = core.createState({ halfSec: opts.halfSec, field: opts.field || settings.field });
     setField(state.field);
@@ -2259,7 +2299,7 @@
       'mode ' + st.mode + '  tick ' + st.tick + '  phase ' + st.phase + '  motion ' + st.motion + '\n' +
       'cam ' + st.cam.x + ',' + st.cam.y + '  view ' + st.cam.worldW + '×' + st.cam.worldH + ' @' + st.cam.scale + '  그림 ' + st.drawn + '/' + rs.n + '\n' +
       'snapshot ' + st.snapshotBytes + 'B @' + st.snapshotHz + 'Hz  buffered ' + st.buffered + '  interp ' + st.interpMs + 'ms  필살 ' + st.ult + '%\n' +
-      'tick ' + st.tickMsAvg + 'ms avg / ' + st.tickMsMax + 'ms max' + (game ? '\nhash ' + core.hashState(game.state) : '');
+      'tick ' + st.tickMsAvg + 'ms avg / ' + st.tickMsMax + 'ms max' + (game && game.state ? '\nhash ' + core.hashState(game.state) : '');
   }
 
   // ── 디버그·검증 API (CLAUDE.md §7) ──
@@ -2269,7 +2309,7 @@
     raw: function () { return game ? game.state : null; },      // 온라인에서는 null (서버만 state 를 갖는다)
     net: function () { return { screen: net.screen, nick: net.nick, room: net.room, mySlot: net.mySlot, rtt: net.rtt,
                                 open: !!(net.ws && net.ws.readyState === 1) }; },
-    hash: function () { return game ? core.hashState(game.state) : null; },
+    hash: function () { return game && game.state ? core.hashState(game.state) : null; },
     events: function () { return eventLog.slice(); },
     setInput: function (partial, ticks) {
       if (!game) return Promise.reject(new Error('경기가 없다'));
@@ -2311,7 +2351,7 @@
     ai: function (slot) { return game && game.ai && game.ai.indexOf(slot) >= 0 ? core.AI.think(game.state, slot) : null; },
     selfTest: function (seed, ticks) { return core.selfTest(seed, ticks); },
     connect: function (nick) { $('lbNick').value = nick || store.get('soc_nick') || '검증'; showPanel('lobby'); netConnect(); return true; },
-    disconnect: function () { if (net.ws) { try { net.ws.close(); } catch (e) {} } stopInputSender(); return true; },
+    disconnect: function () { disconnectOnline(); return true; },
     // 숨겨진 탭(rAF 정지)에서도 렌더 경로를 검증할 수 있게 한 프레임을 동기로 그린다
     renderOnce: function (frames) {
       var n = Math.max(1, frames | 0), t0 = performance.now(), now = performance.now();

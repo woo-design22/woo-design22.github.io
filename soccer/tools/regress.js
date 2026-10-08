@@ -1,6 +1,6 @@
 /* 반대항축구 기능 대조표 — 틱 주파수를 바꿔도 **초·단위 거리**는 같아야 한다.
    game-core 만으로 돌린다(헤드리스). 인자로 잴 game-core.js 경로를 준다. */
-const core = require(process.argv[2]);
+const core = require(process.argv[2] || require('path').join(__dirname, '..', 'game-core.js'));
 const T = core.TUNING, C = core.C, B = core.BTN, HZ = C.TICK_HZ;
 const R = {}, sec = t => +(t / HZ).toFixed(3), r0 = v => Math.round(v);
 

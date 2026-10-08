@@ -4,7 +4,7 @@
    설계 요점
    - 시뮬레이션은 `../game-core.js` 를 **그대로 require** 한다. 브라우저와 같은 파일이라 물리가 갈라지지 않는다.
    - 서버 권위: 클라이언트는 입력만 보낸다. 위치·득점·쿨다운은 전부 여기서 정한다.
-   - 방마다 20Hz 틱 루프를 돌리고 매 틱 바이너리 스냅샷을 뿌린다.
+   - 방마다 60Hz 틱 루프를 돌리고 매 틱 바이너리 스냅샷을 뿌린다.
    - 접속 절차(§6): hello → ping×8 → 지연 판정 → welcome / reject(4001).
    - 경기 중에도 2초마다 핑을 재서 느려지면 퇴장(4004). */
 'use strict';
@@ -12,6 +12,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const core = require('../game-core.js');
 
@@ -26,6 +27,7 @@ const CFG = {
   //          loadtest 가 막히면 안 된다. 공인 IP 에는 그대로 적용된다(환경변수 MAX_PER_IP 로 조절).
   limits: { perIp: Number(process.env.MAX_PER_IP || 4), rooms: 20, nickMin: 2, nickMax: 12, chatLen: 200, chatPerSec: 5, textBytes: 2048, binBytes: 8 },
   roomEmptyMs: 30000,
+  reconnectMs: 15000,
   tickHz: core.C.TICK_HZ
 };
 // 종료 코드 (§3)
@@ -38,21 +40,29 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json' };
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, 'http://x');
-  if (url.pathname === '/stats') {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return;
+  }
+  let rel;
+  try { rel = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+  catch { res.writeHead(400); res.end('잘못된 주소'); return; }
+  if (rel === '/stats') {
     res.writeHead(200, { 'Content-Type': MIME['.json'], 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(statsSnapshot(), null, 1));
     return;
   }
-  let rel = decodeURIComponent(url.pathname);
   if (rel === '/' || rel === '') rel = '/index.html';
-  const file = path.join(ROOT, path.normalize(rel).replace(/^([/\\])+/, ''));
-  if (!file.startsWith(ROOT)) { res.writeHead(403); res.end('forbidden'); return; }   // 경로 탈출 차단
+  // 공개 게임 파일만 제공한다. 서버 설정·문서·패키지는 공개하지 않는다.
+  if (!['/index.html', '/game-core.js', '/sprites.js'].includes(rel) &&
+      !/^\/chars\/[a-z0-9-]+\.png$/.test(rel)) {
+    res.writeHead(404); res.end('없는 파일'); return;
+  }
+  const file = path.join(ROOT, rel.slice(1));
   fs.readFile(file, (err, buf) => {
     if (err) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('없는 파일'); return; }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': 'no-cache, must-revalidate' });
-    res.end(buf);
+      'Cache-Control': 'no-cache, must-revalidate', 'X-Content-Type-Options': 'nosniff' });
+    res.end(req.method === 'HEAD' ? undefined : buf);
   });
 });
 
@@ -61,6 +71,7 @@ let nextRoomId = 1, nextConnId = 1;
 const rooms = new Map();      // id → room
 const conns = new Map();      // id → conn
 const ipCount = new Map();
+const sessions = new Map(); // 비공개 복귀 토큰 → 연결(예기치 않은 종료 때 15초 보존)
 
 function makeRoom(opts, hostConn) {
   const teamSize = clampInt(opts.teamSize, 1, 10, 2);
@@ -93,7 +104,7 @@ function roomFull(r) {
     classes: r.classes, hostId: r.hostId, phase: r.phase, cap: r.teamSize * 2, field: r.field,
     members: r.members.map(id => {
       const c = conns.get(id);
-      return c ? { id: c.id, nick: c.nick, team: c.team, char: c.char, ready: c.ready, slot: c.slot, host: c.id === r.hostId, rtt: c.rtt } : null;
+      return c ? { id: c.id, nick: c.nick, team: c.team, char: c.char, ready: c.ready, slot: c.slot, host: c.id === r.hostId, rtt: c.rtt, disconnected: !!c.resumeTimer } : null;
     }).filter(Boolean)
   };
 }
@@ -106,7 +117,7 @@ function canStart(r) {
   if (r.phase !== 'lobby') return '이미 경기 중입니다';
   if (r.members.length !== r.teamSize * 2) return '인원이 다 차야 시작할 수 있습니다 (' + r.members.length + '/' + (r.teamSize * 2) + ')';
   if (teamCount(r, 0) !== r.teamSize || teamCount(r, 1) !== r.teamSize) return '양 팀 인원이 같아야 합니다';
-  for (const id of r.members) { const c = conns.get(id); if (c && !c.ready) return '모두 준비해야 시작할 수 있습니다'; }
+  for (const id of r.members) { const c = conns.get(id); if (c && (c.resumeTimer || !c.ready)) return '모두 연결되어 준비해야 시작할 수 있습니다'; }
   return null;
 }
 
@@ -185,7 +196,7 @@ function fieldRechar(c) {
 
 // ── 경기 루프 ─────────────────────────────────────────────────────────────
 function startMatch(r) {
-  const st = core.createState({ halfSec: r.halfSec });
+  const st = core.createState({ halfSec: r.halfSec, field: r.field });
   // 팀별로 슬롯을 나눠 준다: 팀0 = 0..teamSize-1, 팀1 = 10..10+teamSize-1
   let n0 = 0, n1 = 0;
   for (const id of r.members) {
@@ -210,7 +221,8 @@ function startMatch(r) {
   const loop = () => {
     if (!r.timer) return;
     let guard = 0;
-    while (Date.now() >= nextAt && guard++ < 5) { tickOnce(); nextAt += stepMs; }
+    while (r.timer && Date.now() >= nextAt && guard++ < 5) { tickOnce(); nextAt += stepMs; }
+    if (!r.timer) return;
     if (Date.now() - nextAt > stepMs * 20) nextAt = Date.now() + stepMs;   // 너무 밀리면 포기하고 현재로 맞춘다
     r.timer = setTimeout(loop, Math.max(0, Math.round(nextAt - Date.now())));
   };
@@ -272,21 +284,23 @@ function statsSnapshot() {
       tickP95Ms: r.tickMs.length ? Math.round(pct(r.tickMs, 0.95) * 1000) / 1000 : 0,
       ticks: r.tickCount });
   }
-  return { uptimeSec: Math.round((Date.now() - stats.started) / 1000), connections: conns.size,
+  return { build: 'handoff-2026-10-08', uptimeSec: Math.round((Date.now() - stats.started) / 1000), connections: [...conns.values()].filter(c => c.ws.readyState === 1).length,
+    reserved: [...conns.values()].filter(c => c.resumeTimer).length,
     totalConnections: stats.connections, rooms: rs, rejected: stats.rejected, protocol: core.PROTOCOL_VERSION };
 }
 
 // ── 방 나가기 / 정리 ──────────────────────────────────────────────────────
 function leaveRoom(c, silent) {
   const r = rooms.get(c.roomId);
+  const oldSlot = c.slot;
   c.roomId = null; c.team = 0; c.char = 0; c.ready = false; c.slot = -1;
   if (c.ws.readyState === 1) fieldJoin(lobby, c);   // 방을 나가면 공용 운동장으로 돌아간다
   else fieldLeave(c);
   if (!r) return;
   const i = r.members.indexOf(c.id);
   if (i >= 0) r.members.splice(i, 1);
-  if (r.phase === 'playing' && r.state && c.slot >= 0) core.removePlayer(r.state, c.slot);
-  if (!r.members.length) { r.emptyAt = Date.now(); if (r.timer) { clearTimeout(r.timer); r.timer = null; r.phase = 'lobby'; } return; }
+  if (r.phase === 'playing' && r.state && oldSlot >= 0) core.removePlayer(r.state, oldSlot);
+  if (!r.members.length) { r.emptyAt = Date.now(); if (r.timer) clearTimeout(r.timer); r.timer = null; r.phase = 'lobby'; r.state = null; r.inputs = null; return; }
   if (r.hostId === c.id) r.hostId = r.members[0];                   // 방장 승계
   if (r.phase === 'playing') {
     const alive = r.members.filter(id => conns.get(id));
@@ -314,12 +328,11 @@ wss.on('connection', (ws, req) => {
     stage: 'hello',                 // hello → gate → ok
     gate: { sent: 0, ids: new Map(), rtts: [], timer: null, timeout: null },
     rtt: 0, rttHist: [], missed: 0, pingAt: 0, pingId: 0, monTimer: null,
-    chatTimes: []
+    chatTimes: [], token: null, resumeFrom: null, resumeTimer: null
   };
   conns.set(c.id, c);
 
   const localIp = (ip === '127.0.0.1' || ip === '::1' || ip === '');
-  if (!localIp && n > CFG.limits.perIp) { kick(c, CLOSE.DUP_IP, '같은 주소에서 접속이 너무 많습니다'); return; }
 
   const helloTimer = setTimeout(() => { if (c.stage === 'hello') kick(c, CLOSE.RATE_LIMIT, 'hello 없음'); }, 5000);
 
@@ -334,17 +347,29 @@ wss.on('connection', (ws, req) => {
     } catch (e) { console.error('[msg]', e); }
   });
 
-  ws.on('close', () => {
+  ws.on('close', (code) => {
     clearTimeout(helloTimer);
     if (c.gate.timer) clearInterval(c.gate.timer);
     if (c.gate.timeout) clearTimeout(c.gate.timeout);
     if (c.monTimer) clearInterval(c.monTimer);
-    leaveRoom(c);
-    fieldLeave(c);
-    conns.delete(c.id);
-    ipCount.set(ip, Math.max(0, (ipCount.get(ip) || 1) - 1));
+    const left = Math.max(0, (ipCount.get(ip) || 1) - 1);
+    if (left) ipCount.set(ip, left); else ipCount.delete(ip);
+    c.input.dx = 0; c.input.dy = 0; c.input.buttons = 0;
+    const discard = () => {
+      c.resumeTimer = null;
+      leaveRoom(c); fieldLeave(c);
+      conns.delete(c.id);
+      if (c.token) sessions.delete(c.token);
+    };
+    if (c.stage === 'ok' && c.roomId && c.token && code !== 1000 && code < 4000) {
+      c.resumeTimer = setTimeout(discard, CFG.reconnectMs);
+      const r = rooms.get(c.roomId);
+      if (r) broadcast(r, { t: 'room', state: roomFull(r) });
+    } else discard();
   });
   ws.on('error', () => {});
+  // 거부된 연결에도 close 정리가 설치된 뒤 차단한다.
+  if (!localIp && n > CFG.limits.perIp) kick(c, CLOSE.DUP_IP, '같은 주소에서 접속이 너무 많습니다');
 });
 
 function onText(c, m, helloTimer) {
@@ -353,9 +378,10 @@ function onText(c, m, helloTimer) {
     if (c.stage !== 'hello') return;
     clearTimeout(helloTimer);
     if (m.v !== core.PROTOCOL_VERSION) { kick(c, CLOSE.VERSION, '새 버전이 있습니다. F5로 새로고침하세요'); return; }
-    let nick = String(m.nick || '').trim().slice(0, CFG.limits.nickMax);
+    let nick = String(m.nick || '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, CFG.limits.nickMax);
     if (nick.length < CFG.limits.nickMin) { kick(c, CLOSE.RATE_LIMIT, '아이디는 ' + CFG.limits.nickMin + '~' + CFG.limits.nickMax + '자입니다'); return; }
     c.nick = nick;
+    c.resumeFrom = typeof m.token === 'string' ? sessions.get(m.token) : null;
     c.stage = 'gate';
     startGate(c);
     return;
@@ -448,7 +474,7 @@ function onText(c, m, helloTimer) {
       // 방 안이면 방 사람들에게, 아니면 공용 운동장 사람들에게.
       // slot 을 같이 보내야 클라이언트가 **그 사람 머리 위에 말풍선**을 띄울 수 있다.
       const r = rooms.get(c.roomId);
-      if (r) broadcast(r, { t: 'chat', from: c.nick, text, slot: c.slot });
+      if (r) broadcast(r, { t: 'chat', from: c.nick, text, slot: r.phase === 'playing' ? c.slot : c.fieldSlot });
       else broadcast(lobby, { t: 'chat', from: c.nick, text, slot: c.fieldSlot });
       break;
     }
@@ -479,11 +505,31 @@ function finishGate(c) {
     try { c.ws.close(CLOSE.NET_SLOW, 'NET_SLOW'); } catch (e) {}
     return;
   }
+  // 지연 검사를 통과한 뒤에만 보존 슬롯의 소유권을 넘긴다.
+  const old = c.resumeFrom;
+  const resumed = !!(old && old.resumeTimer && conns.get(old.id) === old && rooms.has(old.roomId));
+  if (resumed) {
+    clearTimeout(old.resumeTimer); old.resumeTimer = null;
+    sessions.delete(old.token); conns.delete(c.id);
+    for (const key of ['id', 'nick', 'roomId', 'team', 'char', 'ready', 'slot', 'fieldSlot', 'fieldSess']) c[key] = old[key];
+    conns.set(c.id, c);
+  }
+  c.resumeFrom = null;
+  c.token = crypto.randomBytes(32).toString('hex');
+  sessions.set(c.token, c);
   c.stage = 'ok';
   c.rtt = med;
-  send(c, { t: 'welcome', nick: c.nick, rtt: med, p90, serverTime: Date.now(), protocol: core.PROTOCOL_VERSION });
+  send(c, { t: 'welcome', id: c.id, nick: c.nick, slotToken: c.token, resumed, rtt: med, p90, serverTime: Date.now(), protocol: core.PROTOCOL_VERSION });
   send(c, { t: 'rooms', list: [...rooms.values()].map(roomBrief) });
-  fieldJoin(lobby, c);     // 접속에 성공하면 곧바로 공용 운동장으로
+  if (resumed) {
+    const r = rooms.get(c.roomId);
+    send(c, { t: 'joined', id: r.id });
+    broadcast(r, { t: 'room', state: roomFull(r) });
+    if (r.phase === 'playing') {
+      send(c, { t: 'match.start', late: true });
+      sendBin(c, core.encodeSnapshot(r.state, Date.now() >>> 0));
+    } else fieldJoin(r.wait, c);
+  } else fieldJoin(lobby, c);
   startMonitor(c);
 }
 // 접속 뒤에도 계속 지연을 재서 나빠지면 퇴장시킨다.
@@ -521,9 +567,20 @@ function joinRoom(c, r) {
   r.emptyAt = 0;
   // 방에 들어가면 공용 운동장에서 빠져 **그 방의 운동장**으로 옮긴다(방이 고른 경기장).
   if (!r.wait) r.wait = makeSession('@room' + r.id, r.field);
-  fieldJoin(r.wait, c);
+  if (r.phase === 'playing') {
+    fieldLeave(c);
+    const base = c.team * 10;
+    c.slot = -1;
+    for (let slot = base; slot < base + r.teamSize; slot++) if (!r.state.players[slot]) { c.slot = slot; break; }
+    if (c.slot < 0) { leaveRoom(c); send(c, { t: 'error', msg: '그 팀은 자리가 없습니다' }); return; }
+    core.addPlayer(r.state, c.slot, c.team, c.char);
+  } else fieldJoin(r.wait, c);
   send(c, { t: 'joined', id: r.id });
   broadcast(r, { t: 'room', state: roomFull(r) });
+  if (r.phase === 'playing') {
+    send(c, { t: 'match.start', late: true });
+    sendBin(c, core.encodeSnapshot(r.state, Date.now() >>> 0));
+  }
 }
 
 function onBinary(c, data) {
@@ -540,6 +597,6 @@ function onBinary(c, data) {
 }
 
 fieldStart(lobby);   // 공용 운동장은 서버가 사는 동안 계속 돈다
-server.listen(PORT, () => {
-  console.log('반대항축구 서버 — http://localhost:' + PORT + '/  (프로토콜 v' + core.PROTOCOL_VERSION + ')');
+server.listen(PORT, process.env.HOST || '127.0.0.1', () => {
+  console.log('반대항축구 서버 — http://localhost:' + server.address().port + '/  (프로토콜 v' + core.PROTOCOL_VERSION + ')');
 });

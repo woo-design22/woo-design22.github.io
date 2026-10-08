@@ -17,14 +17,14 @@
 
 ---
 
-## 세션 23 — 2026-10-08 — GitHub 인증·온라인 운영 연결
+## 세션 23 — 2026-10-08 — GitHub 인증·온라인 운영 연결 — 공개 반영 완료
 
 - 기존 계정 woo-design22의 로그인 완료를 API로 확인했다. mini-web-apps 저장소의 관리자·쓰기 권한과 주소 Gist의 소유권이 모두 일치한다.
 - 실행기 온라인 준비 검사 통과. 안전한 종료 요청 파일 방식과 `온라인 끄기.cmd`를 추가하고 실제 로컬 시작→종료→상태 파일 삭제를 검증했다.
 - 수정 서버와 Cloudflare 빠른 터널을 실행하고 기존 Gist의 soccer-server.json을 실제 새 주소로 갱신했다. 고정 접속 입구는 https://woo-design22.github.io/soccer/ 이며 현재 서버 주소는 Gist에서 읽는다.
 - 서버는 이 PC의 숨김 프로세스로 실행 중이다. 정상 종료는 server/온라인 끄기.cmd로 한다. 재시작은 server/온라인 켜기.cmd. PC가 꺼지면 온라인도 종료된다. 프로세스 정보·실행 로그·스크린샷은 Git에서 제외한다.
-- 공개 반영 브랜치는 codex/soccer-handoff이며 GitHub PR을 통해 main에 합친다. Pages는 main 루트 기준으로 게시한다. 인증 때문에 막혔던 선행 조건은 해소했다.
-- 코드 검증: 기존 서버 통합 7/7, 100명 300초 60Hz, Chrome 자동 복귀·터치 버튼 배치 결과 유지. 추가 외부 접속 결과는 verification/online-loadtest.json 참조.
+- PR https://github.com/woo-design22/woo-design22.github.io/pull/124 를 main에 병합했다(2cfff055fa19bd8c3e646ece1e71698f98a87d66). Pages built 및 실제 /soccer/ 페이지의 반 번호 입력·재접속 코드·Deno 비활성화를 확인했다. 저장소의 현재 정식 주소는 woo-design22/woo-design22.github.io이며 origin도 갱신했다. 작업 사본은 main으로 동기화했다.
+- 코드 검증: 기존 서버 통합 7/7, 100명 300초 60Hz, Chrome 자동 복귀·터치 버튼 배치 결과 유지. 추가 Cloudflare 외부 4인 경기 검사도 시작·채팅·비밀번호·방장 검사 통과, 60.1Hz였다. 내부 server/ 파일은 실제 외부 요청에도 404다. verification/online-loadtest.json 및 deployment.json 참조.
 - 다음 사용자 확인은 실제 휴대폰에서 한 경기 플레이하는 것 하나다. 실제 손가락 조작·소리·모바일 통신 품질은 데스크톱 자동 검사로 대신할 수 없다.
 
 ---

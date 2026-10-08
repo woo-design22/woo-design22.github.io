@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-08",
+  "repository": "woo-design22/woo-design22.github.io",
+  "pr": 124,
+  "functionalCommit": "2cfff055fa19bd8c3e646ece1e71698f98a87d66",
+  "pagesStatus": "built",
+  "url": "https://woo-design22.github.io/soccer/",
+  "livePage": {
+    "status": 200,
+    "classSelector": true,
+    "reconnect": true,
+    "retiredRegistryDisabled": true
+  },
+  "externalMatch": {
+    "players": 4,
+    "hz": 60.1,
+    "started": true,
+    "chat": true,
+    "internalServerFilesStatus": 404
+  }
+}

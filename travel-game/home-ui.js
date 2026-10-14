@@ -1,6 +1,6 @@
-import {HOME_CITIES,HOME_TYPES,HOME_FINISHES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.5.1';
-import {atlasArt} from './generated-art.js?v=6.5.1';
-import {homeViewAsset,furnitureAsset} from './home-art.js?v=6.5.1';
+import {HOME_CITIES,HOME_TYPES,HOME_FINISHES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.5.2';
+import {atlasArt} from './generated-art.js?v=6.5.2';
+import {homeViewAsset,furnitureAsset} from './home-art.js?v=6.5.2';
 export function residenceHTML(p,tab='furniture',category='bed'){
  const h=residenceState(p.residence),city=HOME_CITIES.find(x=>x.id===h.city),type=HOME_TYPES.find(x=>x.id===h.type);
  const intro=`<div class="home-address"><strong>${city.name} · ${type.name}</strong><small>${city.view}</small></div><canvas id="residence-preview" width="720" height="480" aria-label="현재 집과 창밖 풍경"></canvas><button id="residence-look" class="secondary">풍경보기 · 우리 집 창밖</button><div class="home-design-tabs">${[['furniture','가구 교체'],['interior','집 인테리어'],['move','이사하기']].map(([id,name])=>`<button data-home-tab="${id}" class="${tab===id?'selected':''}">${name}</button>`).join('')}</div><p class="note">여행 보상 코인으로 나의 집을 꾸며요. 구매한 가구와 집, 동네는 언제든 다시 선택할 수 있어요.</p>`;

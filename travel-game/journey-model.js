@@ -1,10 +1,10 @@
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.5.1';
-import {ROUTES,routeOpen,newFlight,levelFor} from './passenger-model.js?v=6.5.1';
-import {suitcaseCapacity,shopItem,DUTY_ITEMS} from './shopping.js?v=6.5.1';
-import {roomProgress,restoreRoomLayout} from './room-model.js?v=6.5.1';
-import {cityGuide} from './city-guide.js?v=6.5.1';
-import {wishProgress,TRAVEL_WISHES} from './travel-wishes.js?v=6.5.1';
-import {tripFunds,returnTripFunds,publishTrip} from './travel-blog.js?v=6.5.1';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.5.2';
+import {ROUTES,routeOpen,newFlight,levelFor} from './passenger-model.js?v=6.5.2';
+import {suitcaseCapacity,shopItem,DUTY_ITEMS} from './shopping.js?v=6.5.2';
+import {roomProgress,restoreRoomLayout} from './room-model.js?v=6.5.2';
+import {cityGuide} from './city-guide.js?v=6.5.2';
+import {wishProgress,TRAVEL_WISHES} from './travel-wishes.js?v=6.5.2';
+import {tripFunds,returnTripFunds,publishTrip} from './travel-blog.js?v=6.5.2';
 export const STAGES=['packing','to-airport','airport','flight','arrival','to-hotel','hotel','complete'];
 export const PACKING=[
  {id:'passport',name:'여권',weight:0,icon:'book',tags:['document'],hint:'탑승에 꼭 필요해요'},
@@ -85,4 +85,4 @@ export function restoreJourney(raw){
  j.discovered=Array.isArray(raw.discovered)?[...new Set(raw.discovered.filter(id=>CITY_DISCOVERIES[j.routeId]&&[...CITY_DISCOVERIES[j.routeId].foods,...CITY_DISCOVERIES[j.routeId].places].some(item=>item.id===id)))]:[];j.animalMet=raw.animalMet===true;j.animalFed=raw.animalFed===true&&j.animalMet;
  j.nights=Number.isInteger(raw.nights)?Math.max(1,Math.min(30,raw.nights)):1;j.hotelLocation=['room','lobby','neighborhood'].includes(raw.hotelLocation)?raw.hotelLocation:'room';j.visitedToday=Array.isArray(raw.visitedToday)?raw.visitedToday.filter(id=>j.discovered.includes(id)):[...j.discovered];j.convenienceToday=Array.isArray(raw.convenienceToday)?raw.convenienceToday.filter(id=>['water','snack','animal-treat'].includes(id)):[];j.walkPosition=raw.walkPosition&&Number.isFinite(raw.walkPosition.x)&&Number.isFinite(raw.walkPosition.y)?{x:Math.max(20,Math.min(340,raw.walkPosition.x)),y:Math.max(42,Math.min(230,raw.walkPosition.y))}:null;j.walkTarget=null;j.walkPath=null;j.friendEvent=friendEventState(raw.friendEvent,j.routeId);j.wish=TRAVEL_WISHES.some(w=>w.id===raw.wish)?raw.wish:null;j.preparedCount=packingGoals(j).filter(Boolean).length;j.roomLayout=restoreRoomLayout(j);if(bagWeight(j)>j.capacity)return null;return j;
 }
-import {friendEventState} from './local-friends.js?v=6.5.1';
+import {friendEventState} from './local-friends.js?v=6.5.2';

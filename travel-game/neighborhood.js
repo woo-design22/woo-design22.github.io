@@ -1,11 +1,11 @@
-import {drawNeighborhoodPicture} from './neighborhood-art.js?v=6.5.1';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.5.1';
-import {localFlavor} from './local-flavors.js?v=6.5.1';
-import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.5.1';
-import {drawTraveler} from './avatar-art.js?v=6.5.1';
-import {currentLook,STYLES} from './wardrobe-model.js?v=6.5.1';
-import {eyewearBox} from './avatar-anchors.js?v=6.5.1';
-import {drawItemArt} from './item-art.js?v=6.5.1';
+import {drawNeighborhoodPicture} from './neighborhood-art.js?v=6.5.2';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.5.2';
+import {localFlavor} from './local-flavors.js?v=6.5.2';
+import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.5.2';
+import {drawTraveler} from './avatar-art.js?v=6.5.2';
+import {currentLook,STYLES} from './wardrobe-model.js?v=6.5.2';
+import {eyewearBox} from './avatar-anchors.js?v=6.5.2';
+import {drawItemArt} from './item-art.js?v=6.5.2';
 export function neighborhoodPlaces(route){const city=CITY_DISCOVERIES[route];if(!city)return [];return [
  {id:'hotel',name:'숙소',x:180,y:225,kind:'hotel'},
  {id:'convenience',name:'편의점',x:307,y:216,kind:'shop'},

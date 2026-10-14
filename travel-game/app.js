@@ -1,37 +1,37 @@
-import {railOptionArt} from './rail-art.js?v=6.5.1';
-import {observatoryContext,localObservatoryReady,drawLocalObservatory} from './airport-observatory.js?v=6.5.1';
-import {cinemaFrame,cinemaReady,drawCinema} from './cinema-player.js?v=6.5.1';
-import {neighborhoodArtReady} from './neighborhood-art.js?v=6.5.1';
-import {airportRegion,ORIGIN_AIRPORT,atLocalAirport} from './airport-context.js?v=6.5.1';
-import {drawCabinView} from './cabin-view.js?v=6.5.1';
-import {CABIN_EXPERIENCES,cabinExperience} from './cabin-experiences.js?v=6.5.1';
-import {neighborhoodPlaces,walkToPlace,walkToPoint,stepWalk} from './neighborhood.js?v=6.5.1';
-import {CONVENIENCE_ITEMS,extendStay,conveniencePurchase} from './stay-activities.js?v=6.5.1';
-import {cityArtReady,drawCityPanel} from './city-art.js?v=6.5.1';
-import {cityCaption,cityTransitName} from './city-captions.js?v=6.5.1';
-import {localFlavor} from './local-flavors.js?v=6.5.1';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS,canDiscover,discover,animalEncounter,meetAnimal} from './city-discoveries.js?v=6.5.1';
-import {drawAnimalElements} from './animal-art.js?v=6.5.1';
-import {DUTY_ITEMS,shopInventory,COLLECTION_ITEMS,SHOP_CATEGORIES,shopItem,shopIcon,canPurchase,purchase,equipPurchase,suitcaseCapacity} from './shopping.js?v=6.5.1';
-import {pixelIcon} from './pixel-ui.js?v=6.5.1';
-import {itemArt} from './item-art.js?v=6.5.1';
-import {atlasArt,atlasReady,discoveryArt,discoveryAsset,navArt,caseAsset} from './generated-art.js?v=6.5.1';
-import {HOME_CITIES,homePurchase} from './home-model.js?v=6.5.1';
-import {drawResidence,drawHomeWindow,drawDestinationWindow,homeArtReady} from './home-art.js?v=6.5.1';
-import {residenceHTML} from './home-ui.js?v=6.5.1';
-import {GUESTS,destinationLabel} from './model.js?v=6.5.1';
-import {HATS,SUNGLASSES,currentLook,selectTraveler,dressTraveler,wearPurchasedGlasses} from './wardrobe-model.js?v=6.5.1';
-import {drawScenery,flightAtmosphere,CITY_SCENES} from './scenery.js?v=6.5.1';
-import {ROUTES,CLASSES,TIMES,STYLES,GEAR,MAINS,DRINKS,DESSERTS,TAGS,profile,levelFor,threshold,validSeat,routeOpen,wishes,mealScore,newFlight,goals,takePhoto,finish,filmLimit,restFlight} from './passenger-model.js?v=6.5.1';
-import {PACKING,HOTELS,TO_AIRPORT,TO_HOTEL,AIRPORT_SHOPS,destination,bagWeight,packingGoals,togglePack,newJourney,moveTrip,settleRide,airportAction,board,land,immigration,collectBaggage,roomTask,checkIn,finishJourney} from './journey-model.js?v=6.5.1';
-import {drawTravelScene} from './travel-scene.js?v=6.5.1';
-import {ROOM_SPOTS,roomItems,roomProgress,placeInRoom} from './room-model.js?v=6.5.1';
-import {TravelSound} from './soundscape.js?v=6.5.1';
-import {environmentsReady,drawStayMemory} from './environment-art.js?v=6.5.1';
-import {TRAVEL_WISHES,wishProgress} from './travel-wishes.js?v=6.5.1';
-import {drawTravelerElements} from './avatar-art.js?v=6.5.1';
-import {tripFunds,fundJourney,returnTripFunds,publishTrip,settleBlog,postStory} from './travel-blog.js?v=6.5.1';
-import {MUSIC_THEMES,musicTheme} from './music-themes.js?v=6.5.1';
+import {railOptionArt} from './rail-art.js?v=6.5.2';
+import {observatoryContext,localObservatoryReady,drawLocalObservatory} from './airport-observatory.js?v=6.5.2';
+import {cinemaFrame,cinemaReady,drawCinema} from './cinema-player.js?v=6.5.2';
+import {neighborhoodArtReady} from './neighborhood-art.js?v=6.5.2';
+import {airportRegion,ORIGIN_AIRPORT,atLocalAirport} from './airport-context.js?v=6.5.2';
+import {drawCabinView} from './cabin-view.js?v=6.5.2';
+import {CABIN_EXPERIENCES,cabinExperience} from './cabin-experiences.js?v=6.5.2';
+import {neighborhoodPlaces,walkToPlace,walkToPoint,stepWalk} from './neighborhood.js?v=6.5.2';
+import {CONVENIENCE_ITEMS,extendStay,conveniencePurchase} from './stay-activities.js?v=6.5.2';
+import {cityArtReady,drawCityPanel} from './city-art.js?v=6.5.2';
+import {cityCaption,cityTransitName} from './city-captions.js?v=6.5.2';
+import {localFlavor} from './local-flavors.js?v=6.5.2';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS,canDiscover,discover,animalEncounter,meetAnimal} from './city-discoveries.js?v=6.5.2';
+import {drawAnimalElements} from './animal-art.js?v=6.5.2';
+import {DUTY_ITEMS,shopInventory,COLLECTION_ITEMS,SHOP_CATEGORIES,shopItem,shopIcon,canPurchase,purchase,equipPurchase,suitcaseCapacity} from './shopping.js?v=6.5.2';
+import {pixelIcon} from './pixel-ui.js?v=6.5.2';
+import {itemArt} from './item-art.js?v=6.5.2';
+import {atlasArt,atlasReady,discoveryArt,discoveryAsset,navArt,caseAsset} from './generated-art.js?v=6.5.2';
+import {HOME_CITIES,HOME_FURNITURE,homePurchase} from './home-model.js?v=6.5.2';
+import {drawResidence,drawHomeWindow,drawDestinationWindow,homeArtReady,furnitureAsset} from './home-art.js?v=6.5.2';
+import {residenceHTML} from './home-ui.js?v=6.5.2';
+import {GUESTS,destinationLabel} from './model.js?v=6.5.2';
+import {HATS,SUNGLASSES,currentLook,selectTraveler,dressTraveler,wearPurchasedGlasses} from './wardrobe-model.js?v=6.5.2';
+import {drawScenery,flightAtmosphere,CITY_SCENES} from './scenery.js?v=6.5.2';
+import {ROUTES,CLASSES,TIMES,STYLES,GEAR,MAINS,DRINKS,DESSERTS,TAGS,profile,levelFor,threshold,validSeat,routeOpen,wishes,mealScore,newFlight,goals,takePhoto,finish,filmLimit,restFlight} from './passenger-model.js?v=6.5.2';
+import {PACKING,HOTELS,TO_AIRPORT,TO_HOTEL,AIRPORT_SHOPS,destination,bagWeight,packingGoals,togglePack,newJourney,moveTrip,settleRide,airportAction,board,land,immigration,collectBaggage,roomTask,checkIn,finishJourney} from './journey-model.js?v=6.5.2';
+import {drawTravelScene} from './travel-scene.js?v=6.5.2';
+import {ROOM_SPOTS,roomItems,roomProgress,placeInRoom} from './room-model.js?v=6.5.2';
+import {TravelSound} from './soundscape.js?v=6.5.2';
+import {environmentsReady,drawStayMemory} from './environment-art.js?v=6.5.2';
+import {TRAVEL_WISHES,wishProgress} from './travel-wishes.js?v=6.5.2';
+import {drawTravelerElements} from './avatar-art.js?v=6.5.2';
+import {tripFunds,fundJourney,returnTripFunds,publishTrip,settleBlog,postStory} from './travel-blog.js?v=6.5.2';
+import {MUSIC_THEMES,musicTheme} from './music-themes.js?v=6.5.2';
 const $=id=>document.getElementById(id),KEY='flight-cafe-passenger-v1';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let raw,legacy;try{raw=JSON.parse(localStorage.getItem(KEY));legacy=JSON.parse(localStorage.getItem('cloud-cafe-v1'));}catch{}
@@ -80,7 +80,7 @@ function snapshot(){if(!f)return;const a=flightAtmosphere(renderFlight()),result
 function arrival(){if(!f||f.completed)return;resolveActivity();const r=finish(p,f);if(!r)return;if(j&&land(j,f,r)){pausedAt=0;$('modal').hidden=true;$('app').inert=false;f=null;walkTarget=155;save();renderJourney();toast('도착했어요! 이제 내 가방을 찾아 숙소로 가요.');return;}pausedAt=0;$('modal').hidden=true;$('app').inert=false;save();const dest=route(f.routeId);modal(`<div class="eyebrow">WELCOME TO ${dest.code}</div><h2 id="modal-title">${dest.name}에 도착했어요</h2><div class="arrival-art">${art(p.avatar,true)}${pixelIcon('ticket',36)}</div><div class="result-stars">${'★'.repeat(r.count)}${'☆'.repeat(3-r.count)}</div><p style="text-align:center">작은 계획 ${r.count}/3 · 입국 도장 +1<br>${r.after>r.before?'Lv.'+r.after+' 여행자로 성장했어요.':'또 하나의 여행이 기록됐어요.'}</p><div class="reward"><span>+${r.xp} XP</span><span>+${r.coins}코인</span><span>기념품 +${r.souvenirs}</span></div><p>여행 ${p.flights}회 · 열린 목적지 ${ROUTES.filter(v=>routeOpen(p,v.id)).length}/31<br>${r.after>r.before?STYLES.filter(s=>s.level>r.before&&s.level<=r.after).map(s=>s.name+' 선물').join(' · '):'오늘의 풍경을 여행수첩에서 다시 볼 수 있어요.'}</p><button id="arrival-home" class="primary">여행 마치기</button><button id="arrival-book" class="secondary">여행수첩 펼치기</button>`,false);ping(1000);}
 function help(){modal(`<div class="eyebrow">A JOURNEY FROM HOME</div><h2 id="modal-title">집에서 숙소까지 떠나요</h2><p>① 목적지 · 숙소 · 비행 좌석을 골라요.<br>② 집에서 여권과 휴대폰, 필요한 짐을 챙겨요.<br>③ 이동 수단을 골라 공항으로 가고, 체크인과 보안 검색을 마쳐요.<br>④ 비행기에서 식사·사진·휴식을 즐겨요.<br>⑤ 도착해서 내 가방을 찾고 숙소로 이동해요.<br>⑥ 객실에 들어가 쉬면 여행이 완성돼요.</p><p>첫 여행 경비 150으로 시작해요. 여행을 마치면 음식·명소·기념품·동물 기록이 블로그에 자동으로 올라가고, 광고 수입이 다음 여행 경비가 돼요. 코인은 꾸미기와 여행 도구에 써요. 짐은 무게 7까지 챙길 수 있어요.<br>비행과 이동 시간은 앱을 닫아도 흐르고, 다른 단계에서는 내 선택을 기다려요. 기록은 자동 저장돼요.</p><button class="primary" data-close>여행을 시작해볼까요</button>`);}
 function pause(){modal(`<div class="eyebrow">TAKE YOUR TIME</div><h2 id="modal-title">잠시 쉬어갈까요?</h2><p>지금은 비행 시간이 멈춰 있어요.<br>앱을 닫으면 시간이 다시 흐르고, 다음에 열 때 이어져요.</p>${musicControls()}<button class="primary" data-close>계속 여행하기</button><button id="leave-flight" class="secondary">이번 여정 취소하고 집으로</button>`);}
-$('updates').onclick=()=>modal(`<div class="eyebrow">TRAVEL GAME · 6.5.1</div><h2 id="modal-title">여행게임의 새 소식</h2><p>집에서 짐을 챙기고, 공항을 거쳐 낯선 도시의 숙소까지. 나만의 여행을 떠나보세요.</p><div class="update-entry"><strong>동네 산책과 하루 더 머물기</strong><p>숙소에서 나와 현지 식당, 카페, 명소와 편의점까지 걸어가요. 마음에 들면 하루씩 더 묵고, 여행을 끝내기 전에는 돌아갈 수 있어요.</p></div><div class="update-entry"><strong>나의 좌석에서 즐기는 시간</strong><p>퍼스트와 비즈니스 전용 서비스를 크게 감상해요. 시네마는 움직이는 여행 그림을 상영하고, 기내식은 단품으로도 주문할 수 있어요.</p></div><div class="update-entry"><strong>새로운 시작 화면</strong><p>밝은 공항과 바다 풍경 위에 큰 제목과 메뉴를 놓았어요. 게임 시작, 나의 집, 여행가방으로 바로 이동할 수 있어요. 시작 음악은 산뜻한 카페 재즈로 준비했어요.</p></div><div class="update-entry"><strong>손끝의 작은 반응</strong><p>버튼을 누르면 도트 테두리가 살짝 눌리고, 선택한 항목에는 체크 표시가 생겨요. 소리를 켜면 이동·선택·완료마다 짧고 포근한 소리를 들을 수 있어요. 토끼의 눈도 같은 크기로 맞췄어요.</p></div><div class="update-entry"><strong>여행 음악 32곡</strong><p>도시마다 다른 로파이와 보사노바, 피아노 음악을 준비했어요. 소리를 켜고 여행 중 메뉴에서 곡과 음량을 골라보세요.</p></div><div class="update-entry"><strong>나의 집을 내 취향대로</strong><p>가구 10개 분류에 각각 6가지, 벽과 바닥 인테리어 12가지를 골라 꾸밀 수 있어요. 이사한 동네의 창밖 풍경도 감상해보세요.</p></div><div class="update-entry"><strong>캐릭터마다 다른 여행 옷장</strong><p>여행옷 32벌, 모자 12개, 선글라스 12개를 준비했어요. 선택한 캐릭터에게 입히고 각자의 스타일을 간직하세요.</p></div><div class="update-entry"><strong>여행수첩과 작은 만남</strong><p>도시와 나라를 확인하고 현지 음식, 명소, 동물과의 만남을 모아보세요. 여행 블로그의 광고수입은 다음 여행과 집 꾸미기에 쓸 수 있어요.</p></div><button class="primary" data-close>여행 시작하기</button>`);
+$('updates').onclick=()=>modal(`<div class="eyebrow">TRAVEL GAME · 6.5.2</div><h2 id="modal-title">여행게임의 새 소식</h2><p>집에서 짐을 챙기고, 공항을 거쳐 낯선 도시의 숙소까지. 나만의 여행을 떠나보세요.</p><div class="update-entry"><strong>동네 산책과 하루 더 머물기</strong><p>숙소에서 나와 현지 식당, 카페, 명소와 편의점까지 걸어가요. 마음에 들면 하루씩 더 묵고, 여행을 끝내기 전에는 돌아갈 수 있어요.</p></div><div class="update-entry"><strong>나의 좌석에서 즐기는 시간</strong><p>퍼스트와 비즈니스 전용 서비스를 크게 감상해요. 시네마는 움직이는 여행 그림을 상영하고, 기내식은 단품으로도 주문할 수 있어요.</p></div><div class="update-entry"><strong>새로운 시작 화면</strong><p>밝은 공항과 바다 풍경 위에 큰 제목과 메뉴를 놓았어요. 게임 시작, 나의 집, 여행가방으로 바로 이동할 수 있어요. 시작 음악은 산뜻한 카페 재즈로 준비했어요.</p></div><div class="update-entry"><strong>손끝의 작은 반응</strong><p>버튼을 누르면 도트 테두리가 살짝 눌리고, 선택한 항목에는 체크 표시가 생겨요. 소리를 켜면 이동·선택·완료마다 짧고 포근한 소리를 들을 수 있어요. 토끼의 눈도 같은 크기로 맞췄어요.</p></div><div class="update-entry"><strong>여행 음악 32곡</strong><p>도시마다 다른 로파이와 보사노바, 피아노 음악을 준비했어요. 소리를 켜고 여행 중 메뉴에서 곡과 음량을 골라보세요.</p></div><div class="update-entry"><strong>나의 집을 내 취향대로</strong><p>가구 10개 분류에 각각 6가지, 벽과 바닥 인테리어 12가지를 골라 꾸밀 수 있어요. 이사한 동네의 창밖 풍경도 감상해보세요.</p></div><div class="update-entry"><strong>캐릭터마다 다른 여행 옷장</strong><p>여행옷 32벌, 모자 12개, 선글라스 12개를 준비했어요. 선택한 캐릭터에게 입히고 각자의 스타일을 간직하세요.</p></div><div class="update-entry"><strong>여행수첩과 작은 만남</strong><p>도시와 나라를 확인하고 현지 음식, 명소, 동물과의 만남을 모아보세요. 여행 블로그의 광고수입은 다음 여행과 집 꾸미기에 쓸 수 있어요.</p></div><button class="primary" data-close>여행 시작하기</button>`);
 $('boarding').onclick=()=>openPage('boarding');$('takeoff').onclick=startJourney;$('page-back').onclick=home;$('help').onclick=help;$('pause').onclick=pause;$('meal').onclick=mealModal;$('photo').onclick=snapshot;$('rest').onclick=()=>activity('rest');$('read').onclick=()=>activity('read');$('goals').onclick=goalModal;
 $('seat-map').onclick=()=>modal(`<div class="eyebrow">MY SEAT</div><h2 id="modal-title">나는 ${f.seat}에 앉아 있어요</h2><p>${cabin(f.cabin).name} · 갈색 테두리와 ●가 내 자리예요.</p>${seatPlan(true)}<button class="primary" data-close>내 자리로 돌아가기</button>`);
 $('sound').onclick=async()=>{p.audio.enabled=!travelSound.enabled;await travelSound.enable(p.audio.enabled);sound=travelSound.enabled;save();syncSoundButton();};
@@ -125,7 +125,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
  if(b.dataset.wardrobeTab){wardrobeTab=b.dataset.wardrobeTab;renderPage(true);return;}
  if(b.dataset.wearable){if(dressTraveler(p,b.dataset.wearableKind,b.dataset.wearable==='none'?null:b.dataset.wearable)){save();renderPage(true);}return;}
  if(b.dataset.style){if(dressTraveler(p,'style',b.dataset.style)){save();renderPage(true);}return;}
- if(b.dataset.buy){const g=GEAR.find(x=>x.id===b.dataset.buy);if(!g||p.gear.includes(g.id)||levelFor(p.xp)<g.level)return;if(p.coins<g.cost){toast(`${g.cost-p.coins}코인이 더 필요해요.`);return;}p.coins-=g.cost;p.gear.push(g.id);save();currencies();renderPage(true);toast(g.name+' 구매 완료! 여행에 바로 사용돼요.');return;}
+ if(b.dataset.buy){const g=GEAR.find(x=>x.id===b.dataset.buy);if(!g||p.gear.includes(g.id)||levelFor(p.xp)<g.level)return;if(p.coins<g.cost){toast(`${g.cost-p.coins}코인이 더 필요해요.`);return;}p.coins-=g.cost;p.gear.push(g.id);save();currencies();renderPage(true);purchaseComplete(g.name,itemArt('gear-'+g.id,240),'여행에 바로 사용돼요. · 남은 코인 '+p.coins);return;}
  if(b.dataset.food){const i=+b.dataset.group;mealChoices[i]=b.dataset.food;document.querySelectorAll(`[data-group="${i}"]`).forEach(el=>el.classList.toggle('selected',el===b));const ready=mealChoices.some(Boolean),match=ready?mealScore(f.routeId,mealChoices):0;$('order-meal').disabled=!ready;$('meal-preview').innerHTML=mealChoices.filter(Boolean).map(x=>itemArt('meal-'+x,100)).join('')+`<small>${mealChoices.filter(Boolean).length}개 선택 · 단품으로도 주문할 수 있어요.</small>`;return;}
  if(b.id==='choose-seat'){modal(`<div class="eyebrow">CHOOSE YOUR SEAT</div><h2 id="modal-title">마음에 드는 자리로</h2><p>A · D 창가 / B · C 통로<br>현재 ${cabin(p.cabin).name} · ${p.seat} 선택 중</p>${seatPlan()}<button class="primary" data-close>이 자리로 여행하기</button>`);return;}
  if(b.id==='all-routes'){modal(`<div class="eyebrow">DESTINATIONS</div><h2 id="modal-title">다음 여행지를 골라요</h2><p>도착한 여행 ${p.flights}회 · 31가지 목적지</p><div class="route-grid">${ROUTES.map((r,i)=>`<button class="route-card ${r.id===p.route?'selected':''}" data-route="${r.id}" ${routeOpen(p,r.id)?'':'disabled'}><span>${r.code}</span><strong>${r.name}</strong><small>${routeOpen(p,r.id)?p.stamps[r.id]?'방문 '+p.stamps[r.id]+'회':'새로운 여행':(r.id==='chengdu'?4:Math.ceil((i-2)*.8))+'회 여행 후'}</small></button>`).join('')}</div><button class="primary" data-close>돌아가기</button>`);return;}
@@ -196,7 +196,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
  if(b.dataset.shopCategory){shopCategory=b.dataset.shopCategory;dutyFreeModal();return;}
  if(b.dataset.purchase){purchaseDetail(b.dataset.purchase);return;}
  if(b.dataset.equipPurchase){if(shopItem(b.dataset.equipPurchase)?.category==='glasses'?wearPurchasedGlasses(p,b.dataset.equipPurchase):equipPurchase(p,b.dataset.equipPurchase)){save();renderPage(true);}return;}
- if(b.dataset.shopOrder){const result=airportAction(j,b.dataset.shopOrder);if(result.ok){j.orders={...(j.orders||{}),[b.dataset.shopOrder]:SHOP_MENUS[b.dataset.shopOrder][+b.dataset.orderIndex]};close();save();renderJourney(true);}toast(result.message);return;}
+ if(b.dataset.shopOrder){const type=b.dataset.shopOrder,index=+b.dataset.orderIndex,result=airportAction(j,type);if(result.ok){const name=SHOP_MENUS[type][index];j.orders={...(j.orders||{}),[type]:name};save();renderJourney(true);purchaseComplete(name,dutyProductArt(SHOP_MENU_ART[type][index],240),'남은 경비 '+j.budget,null,'주문 완료');}else toast(result.message);return;}
  if(b.id==='board-journey'){startFlight();return;}
  if(b.id==='immigration-open'){entryPurpose=entryHotel=null;walkTarget=75;immigrationModal();return;}
  if(b.dataset.entryPurpose){entryPurpose=b.dataset.entryPurpose;document.querySelectorAll('[data-entry-purpose]').forEach(x=>x.classList.toggle('selected',x===b));return;}
@@ -261,16 +261,19 @@ function paintWindowLook(){
 }
 homeArtReady();
 for(const [id,name] of [['wardrobe-icon','wardrobe'],['book-icon','passport'],['help-icon','help'],['home-design-icon','home']])$(id).innerHTML=navArt(name,34);
-document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.id==='residence-look'){windowLook();}else if(b.dataset.homeCategory){homeCategory=b.dataset.homeCategory;renderPage(true);}else if(b.dataset.homeTab){homeTab=b.dataset.homeTab;renderPage(true);}else if(b.dataset.homeChoice){const result=homePurchase(p,b.dataset.homeKind,b.dataset.homeChoice);if(result.ok){save();currencies();renderPage(true);}toast(result.message);}});
-import {SEORIRA,FRIEND_TOPICS,friendEventAvailable,inviteLocalFriend,visitLocalFriend,friendPortrait,friendNotebookHTML} from './local-friends.js?v=6.5.1';
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.id==='residence-look'){windowLook();}else if(b.dataset.homeCategory){homeCategory=b.dataset.homeCategory;renderPage(true);}else if(b.dataset.homeTab){homeTab=b.dataset.homeTab;renderPage(true);}else if(b.dataset.homeChoice){const kind=b.dataset.homeKind,id=b.dataset.homeChoice,result=homePurchase(p,kind,id);if(result.ok){save();currencies();renderPage(true);if(result.cost>0){const item=HOME_FURNITURE.find(x=>x.id===id);purchaseComplete(kind==='furniture'?item.name:'나의 집 꾸미기',kind==='furniture'?atlasArt(furnitureAsset(id),240,item.name):'<canvas id="purchase-home-preview" width="720" height="480" class="cabin-choice-preview" aria-label="구매 후 적용된 나의 집"></canvas>',result.message+' · 남은 코인 '+p.coins);if(kind!=='furniture'){const paint=()=>{const canvas=$('purchase-home-preview');if(canvas){const c=canvas.getContext('2d');c.save();c.scale(2,2);drawResidence(c,p,performance.now()/1000);c.restore();}};paint();homeArtReady().then(paint);}}else toast(result.message);}else toast(result.message);}});
+import {SEORIRA,FRIEND_TOPICS,friendEventAvailable,inviteLocalFriend,visitLocalFriend,friendPortrait,friendNotebookHTML} from './local-friends.js?v=6.5.2';
 
-import {dutyProductArt} from './duty-art.js?v=6.5.1';
+import {dutyProductArt} from './duty-art.js?v=6.5.2';
 
 function wishTitle(w){const key={scenery:'풍경',cozy:'푹 쉬는',thrifty:'가볍게',gifts:'선물'}[w.id];return w.name.replace(key,'<b class="keyword">'+key+'</b>');}
 function paintFlight(){if(view==='seat')drawCabinView($('scenery'),f,p,performance.now()/1000);else drawScenery($('scenery'),renderFlight(),f.elapsed);}
 function finishConfirmation(){modal(`<h2 id="modal-title">이번 여행을 마칠까요?</h2><p>여행수첩과 블로그에 기록을 남기고 첫 화면으로 돌아가요.<br>더 머물고 싶다면 돌아가서 산책하거나 하루 더 묵어도 좋아요.</p><button id="confirm-finish" class="primary">기록하고 여행 마치기</button><button class="secondary" data-close>돌아가기 · 계속 머물기</button>`,false);}
 function discoveryDetail(id,finished=false){const item=DISCOVERY_ITEMS.find(x=>x.id===id&&id.startsWith(j.routeId+':'));if(!item)return;const check=canDiscover(j,id);modal(`<div class="eyebrow">${destinationLabel(j.routeId)}</div><h2 id="modal-title">${item.name}</h2><div class="art-showcase">${discoveryArt(item,260)}</div><p>${finished?item.note:item.kind==='cafe'?localFlavor(j.routeId).cafe+'에 들러 잠깐 쉬어요.':item.kind==='place'?'잠시 걸음을 멈추고 풍경을 바라봐요.':'이 지역의 맛을 천천히 즐겨요.'}<br>${item.cost?item.cost+' 경비':'무료 산책'}</p>${!finished?`<button class="primary" data-discover-confirm="${id}" ${check.ok?'':'disabled'}>${check.ok?item.kind==='place'?'둘러보고 기억하기':'맛보고 기억하기':'오늘 이미 즐겼어요'}</button>`:'<p class="note">오늘의 기억이 여행수첩에 담겼어요.</p>'}<button class="secondary" data-close>산책으로 돌아가기</button>`,false);}
-function purchaseDetail(id){const item=shopInventory(j).find(x=>x.id===id);if(!item)return;const check=canPurchase(j,id);modal(`<h2 id="modal-title">${item.name}</h2><div class="art-showcase">${productArt(id,220)}</div><p>${item.cost} 경비 · ${item.minutes}분<br>${item.category==='magnet'?'이 공항에서만 만나는 지역 한정 기념품이에요.':itemEffect(item)}</p><button class="primary" data-purchase-confirm="${id}" ${check.ok?'':'disabled'}>이 물건 구매하기</button><button class="secondary" id="shop-return">돌아가기</button>`);}
+function purchaseComplete(name,picture,note,returnId=null,heading='구매 완료'){
+ modal(`<div class="eyebrow">${heading==='주문 완료'?'ORDER COMPLETE':'PURCHASE COMPLETE'}</div><h2 id="modal-title">${heading}</h2><p class="purchased-name">${esc(name)}</p><div class="art-showcase purchased-showcase" aria-label="${esc(name)} 구매 완료 이미지">${picture}</div><p>${esc(note)}</p><button class="primary" ${returnId?'id="'+returnId+'"':'data-close'}>${returnId?'매장으로 돌아가기':page==='residence'?'나의 집으로 돌아가기':'돌아가기'}</button>`,false);ping(760);
+}
+function purchaseDetail(id){const item=shopInventory(j).find(x=>x.id===id);if(!item)return;const check=canPurchase(j,id);modal(`<h2 id="modal-title">${item.name}</h2><div class="purchase-summary">${productArt(id,56)}</div><p>${item.cost} 경비 · ${item.minutes}분<br>${item.category==='magnet'?'이 공항에서만 만나는 지역 한정 기념품이에요.':itemEffect(item)}</p><button class="primary" data-purchase-confirm="${id}" ${check.ok?'':'disabled'}>이 물건 구매하기</button><button class="secondary" id="shop-return">돌아가기</button>`);}
 let airportLookContext=null;
 function airportLook(view){
  const context=observatoryContext(j,view);if(!context)return;airportLookContext=context;const {region,local}=context,name=local?route(region).name:'인천 국제공항';
@@ -314,10 +317,10 @@ document.addEventListener('click',event=>{const b=event.target.closest('button')
  if(b.id==='hotel-lobby'||b.id==='return-room'){j.hotelLocation=b.id==='hotel-lobby'?'lobby':'room';j.walkTarget=null;save();renderJourney();return;}
  if(b.dataset.localPlace){if(walkToPlace(j,b.dataset.localPlace))save();return;}
  if(b.id==='convenience-open'){convenienceModal();return;}
- if(b.dataset.convenience){const item=CONVENIENCE_ITEMS.find(x=>x.id===b.dataset.convenience);if(!item)return;modal(`<h2 id="modal-title">${item.name}</h2><div class="art-showcase">${itemArt(item.art,200)}</div><p>${item.cost} 경비 · 오늘 필요한 작은 물건이에요.</p><button class="primary" data-convenience-confirm="${item.id}">구매하기</button><button class="secondary" id="convenience-open">돌아가기</button>`,false);return;}
- if(b.dataset.convenienceConfirm){const result=conveniencePurchase(j,b.dataset.convenienceConfirm,bagWeight(j));if(result.ok){save();renderJourney(true);convenienceModal();}toast(result.message);return;}
+ if(b.dataset.convenience){const item=CONVENIENCE_ITEMS.find(x=>x.id===b.dataset.convenience);if(!item)return;modal(`<h2 id="modal-title">${item.name}</h2><div class="purchase-summary">${itemArt(item.art,56)}</div><p>${item.cost} 경비 · 오늘 필요한 작은 물건이에요.</p><button class="primary" data-convenience-confirm="${item.id}">구매하기</button><button class="secondary" id="convenience-open">돌아가기</button>`,false);return;}
+ if(b.dataset.convenienceConfirm){const result=conveniencePurchase(j,b.dataset.convenienceConfirm,bagWeight(j));if(result.ok){save();renderJourney(true);purchaseComplete(result.item.name,itemArt(result.item.art,240),'남은 경비 '+j.budget,'convenience-open');}else toast(result.message);return;}
  if(b.dataset.discoverConfirm){const result=discover(p,j,b.dataset.discoverConfirm);if(result.ok){save();renderJourney(true);discoveryDetail(b.dataset.discoverConfirm,true);ping();}toast(result.message);return;}
- if(b.dataset.purchaseConfirm){const result=purchase(p,j,b.dataset.purchaseConfirm);if(result.ok){save();renderJourney(true);dutyFreeModal();}toast(result.message);return;}
+ if(b.dataset.purchaseConfirm){const id=b.dataset.purchaseConfirm,result=purchase(p,j,id);if(result.ok){save();renderJourney(true);purchaseComplete(shopItem(id).name,productArt(id,240),'여행가방에 보관했어요. · 남은 경비 '+j.budget,'shop-return');}else toast(result.message);return;}
  if(b.id==='shop-return'){dutyFreeModal();return;}
  if(b.id==='arrival-observatory'){airportLook();return;}
  if(b.dataset.airportView){airportLook(b.dataset.airportView);return;}

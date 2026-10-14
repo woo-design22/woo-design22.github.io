@@ -1,4 +1,4 @@
-import {FOODS,ROUTES,OUTFITS,ITEMS,ACHIEVEMENTS,GUESTS,MODES,defaultProfile,normalizeProfile,levelFor,threshold,totalStars,sameOrder,applyFlight,cartInterval,equipmentStats,mission,campaignCount,settleOffline} from './model.js?v=6.5.1';
+import {FOODS,ROUTES,OUTFITS,ITEMS,ACHIEVEMENTS,GUESTS,MODES,defaultProfile,normalizeProfile,levelFor,threshold,totalStars,sameOrder,applyFlight,cartInterval,equipmentStats,mission,campaignCount,settleOffline} from './model.js?v=6.5.2';
 const $=id=>document.getElementById(id), storageKey='cloud-cafe-v1';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let p=defaultProfile(),saving=true,selected='jeju',tab='routes',flight=null,sound=false,audio=null,toastTimer,modalFocus=null,modalOnClose=null;

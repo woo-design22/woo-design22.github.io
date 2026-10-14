@@ -1,6 +1,6 @@
-import {drawAirportRailVehicle,drawRailBackground} from './rail-art.js?v=6.5.1';
-import {aerialPictures} from './aerial-atlas.js?v=6.5.1';
-import {drawCityVehicle,cityArtSource} from './city-art.js?v=6.5.1';
+import {drawAirportRailVehicle,drawRailBackground} from './rail-art.js?v=6.5.2';
+import {aerialPictures} from './aerial-atlas.js?v=6.5.2';
+import {drawCityVehicle,cityArtSource} from './city-art.js?v=6.5.2';
 const art={};
 for(const id of ['day','night','vehicles'])if(typeof Image!=='undefined'){art[id]=new Image();art[id].src=new URL(id==='vehicles'?'./assets/vehicles-v4.png':`./assets/road-${id}-v4.png`,import.meta.url).href;}
 const vehicleBoxes={bus:[850,139,656,338],limousine:[27,556,944,365],taxi:[1025,626,481,290]};

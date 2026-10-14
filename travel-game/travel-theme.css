@@ -190,3 +190,5 @@
 #app .flight-traveler>small{position:static;display:block;width:100%;font:9px Neo;color:#5e7550;text-align:center;line-height:1.3}
 #app .flight-stage .activity-bubble{right:12px;bottom:126px;max-width:220px}
 .rail-option-preview{display:block;width:60px;height:34px;border:1px solid #bcc8ac;background:#e7ecd9;overflow:hidden;flex-shrink:0}.rail-option-preview img{display:block;width:100%;height:100%;object-fit:cover;object-position:right center;image-rendering:pixelated}
+
+.purchase-summary{display:flex;justify-content:center;margin:10px 0}.purchase-summary>*{width:56px!important;height:56px!important;object-fit:contain}.purchased-name{text-align:center;font-size:17px}.purchased-showcase>.atlas-art,.purchased-showcase>.item-art,.purchased-showcase>.duty-product-icon{width:240px;height:240px;max-width:100%;object-fit:contain}.purchased-showcase>.regional-magnet{max-width:100%}

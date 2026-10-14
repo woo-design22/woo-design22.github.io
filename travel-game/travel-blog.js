@@ -1,7 +1,7 @@
-import {ROUTES} from './model.js?v=6.5.1';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.5.1';
-import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.5.1';
-import {cityGuide} from './city-guide.js?v=6.5.1';
+import {ROUTES} from './model.js?v=6.5.2';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.5.2';
+import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.5.2';
+import {cityGuide} from './city-guide.js?v=6.5.2';
 const cap=n=>Number.isFinite(n)?Math.max(0,Math.min(999999,Math.floor(n))):0;
 const knownRoute=id=>ROUTES.some(r=>r.id===id);
 export const STARTER_FUNDS=150;
@@ -56,4 +56,4 @@ export function postStory(post){
  if(post.photos)lines.push(`창밖 사진 ${post.photos}장도 함께 남겼어요.`);
  return {title:`${route.name}, ${post.animal?'작은 친구를 만난 날':foods.length?'맛있는 기억 한 줌':'잠시 쉬어 간 하루'}`,lines};
 }
-import {friendEventState} from './local-friends.js?v=6.5.1';
+import {friendEventState} from './local-friends.js?v=6.5.2';

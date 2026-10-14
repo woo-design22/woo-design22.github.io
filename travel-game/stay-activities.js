@@ -1,3 +1,5 @@
+import {newDay} from './travel-experience.js?v=6.6.0';
+import {resetWalk} from './city-streets.js?v=6.6.0';
 export const CONVENIENCE_ITEMS=[
  {id:'water',name:'생수',cost:2,comfort:6,joy:2,art:'convenience-water'},
  {id:'snack',name:'작은 간식',cost:3,comfort:4,joy:8,art:'meal-cookie'},
@@ -7,7 +9,7 @@ export function extendStay(j,cost){
  if(!j||j.stage!=='hotel'||!j.checkedIn||j.completed)return {ok:false,message:'객실에 체크인한 뒤 더 묵을 수 있어요.'};
  if((j.nights||1)>=30)return {ok:false,message:'이번 숙소에서는 30박까지 머무를 수 있어요.'};
  if(!Number.isFinite(cost)||cost<1||j.budget<cost)return {ok:false,message:'하루 더 묵을 경비가 부족해요.'};
- j.budget-=cost;j.nights=(j.nights||1)+1;j.hotelTask='sleep';j.hotelLocation='room';j.departure='day';j.visitedToday=[];j.convenienceToday=[];j.comfort=Math.min(100,j.comfort+25);j.joy=Math.min(100,j.joy+8);
+ newDay(j);resetWalk(j);j.budget-=cost;j.nights=(j.nights||1)+1;j.hotelTask='sleep';j.hotelLocation='room';j.departure='day';j.visitedToday=[];j.convenienceToday=[];j.comfort=Math.min(100,j.comfort+25);j.joy=Math.min(100,j.joy+8);
  return {ok:true,message:'푹 자고 일어났어요. 여행 '+j.nights+'일째, 새로운 하루예요.'};
 }
 export function conveniencePurchase(j,id,weight=0){

@@ -1,7 +1,8 @@
-import {HOME_CITIES,HOME_TYPES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.5.2';
-import {drawAtlas,atlasReady,discoveryAsset} from './generated-art.js?v=6.5.2';
+import {drawMemoryDisplay} from './memory-display.js?v=6.6.0';
+import {HOME_CITIES,HOME_TYPES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.6.0';
+import {drawAtlas,atlasReady,discoveryAsset} from './generated-art.js?v=6.6.0';
 export const HOME_ART_FILES=['home-views-v6.png','home-interiors-v6.1.png','navigation-cases-v6.png',...HOME_FURNITURE.map(x=>'furniture-'+x.id+'-v6.3.png')];
-export function homeArtReady(){return atlasReady(HOME_ART_FILES);}
+export function homeArtReady(p,category){const ids=p?Object.values(p.residence?.furniture||{}).filter(Boolean):['wood-bed','wood-desk','wood-lamp','wood-curtain','wood-plant'];if(category)ids.push(...HOME_FURNITURE.filter(x=>x.slot===category).map(x=>x.id));return atlasReady(['home-views-v6.png','home-interiors-v6.1.png','navigation-cases-v6.png',...new Set(ids.map(id=>'furniture-'+id+'-v6.3.png')),...(p?.travel?.displays||[]).map(id=>p.travel.photos.find(x=>x.id===id)?.place).filter(Boolean).map(id=>discoveryAsset(id).file)]);}
 export function homeViewAsset(id){const cell=Math.max(0,HOME_CITIES.findIndex(x=>x.id===id));return {file:'home-views-v6.png',columns:3,rows:4,col:cell%3,row:Math.floor(cell/3)};}
 export function furnitureAsset(id,placed=false){const item=HOME_FURNITURE.find(x=>x.id===id);return item?{file:'furniture-'+item.id+'-v6.3.png',columns:1,rows:1,col:0,row:0,source:[0,0,1,1],contain:true}:null;}
 const r=(c,x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};
@@ -71,6 +72,6 @@ export function drawResidence(c,p,t=0){
   }
   drawAtlas(c,asset,box);
  }
- return true;
+ drawMemoryDisplay(c,p);return true;
 }
 export function drawDestinationWindow(canvas,route,t=0,night=false){const c=canvas.getContext('2d'),w=canvas.width,h=canvas.height;c.clearRect(0,0,w,h);c.fillStyle='#dedfce';c.fillRect(0,0,w,h);const box=[w*.07,h*.08,w*.86,h*.82];c.save();c.beginPath();c.roundRect(...box,12);c.clip();const asset=discoveryAsset(route+':place-1');const drift=(Math.sin(t*.05)+1)*w*.022;drawAtlas(c,asset,[box[0]-drift,box[1],box[2]+w*.044,box[3]]);c.globalAlpha=.17;c.fillStyle='#f6f2e8';for(let n=0;n<3;n++){const x=box[0]+((t*1.4+n*w/3)%(box[2]+70))-35;c.fillRect(x,box[1]+22+n*12,55,3);}c.globalAlpha=1;if(night){c.globalAlpha=.38;c.fillStyle='#1e354f';c.fillRect(...box);c.globalAlpha=1;}c.restore();c.strokeStyle='#a9b6a5';c.lineWidth=6;c.beginPath();c.roundRect(...box,12);c.stroke();c.strokeStyle='#eeecdf';c.lineWidth=3;c.stroke();}

@@ -1,6 +1,6 @@
-import {ROUTES} from './model.js?v=6.5.2';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.5.2';
-import {airportRegion,atLocalAirport} from './airport-context.js?v=6.5.2';
+import {ROUTES} from './model.js?v=6.6.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.6.0';
+import {airportRegion,atLocalAirport} from './airport-context.js?v=6.6.0';
 export const SHOP_CATEGORIES=[{id:'magnet',name:'마그넷'},{id:'glasses',name:'안경'},{id:'chocolate',name:'초콜릿'},{id:'liquor',name:'양주'},{id:'gift',name:'작은 선물'}];
 export const DUTY_ITEMS=[
  {id:'magnet-tower',category:'magnet',name:'도쿄 타워 마그넷',cost:20,minutes:8,joy:12,color:'#d6c3a0'},

@@ -44,7 +44,7 @@ export function homePurchase(p,kind,id){
  if(!config)return {ok:false,message:'꾸밀 곳을 다시 골라주세요.'};
  const [pool,owned,key]=config,item=pool.find(x=>x.id===id);if(!item)return {ok:false,message:'물건을 다시 골라주세요.'};
  const cost=h[owned].includes(id)?0:item.cost;
- if(p.coins<cost)return {ok:false,message:`${cost-p.coins}코인을 더 모으면 선택할 수 있어요.`};
+ if(p.coins<cost)return {ok:false,message:`${cost-p.coins}머니을 더 모으면 선택할 수 있어요.`};
  p.coins-=cost;if(!h[owned].includes(id))h[owned].push(id);
  if(kind==='furniture')h.furniture[item.slot]=id;else h[key]=id;
  return {ok:true,cost,message:kind==='city'?item.name+'의 새 창밖이 기다려요.':'선택한 모습으로 바꾸었어요.'};

@@ -1,15 +1,16 @@
-import {STYLES,wardrobeState} from './wardrobe-model.js?v=6.5.2';
-import {ROUTES,levelFor,threshold} from './model.js?v=6.5.2';
-import {flightAtmosphere} from './scenery.js?v=6.5.2';
-import {restoreJourney} from './journey-model.js?v=6.5.2';
-import {shoppingState} from './shopping.js?v=6.5.2';
-import {discoveryState,animalState} from './city-discoveries.js?v=6.5.2';
-import {blogState} from './travel-blog.js?v=6.5.2';
-import {residenceState} from './home-model.js?v=6.5.2';
+import {travelState,normalizeExperience,planFor} from './travel-experience.js?v=6.6.0';
+import {STYLES,wardrobeState} from './wardrobe-model.js?v=6.6.0';
+import {ROUTES,levelFor,threshold} from './model.js?v=6.6.0';
+import {flightAtmosphere} from './scenery.js?v=6.6.0';
+import {restoreJourney} from './journey-model.js?v=6.6.0';
+import {shoppingState} from './shopping.js?v=6.6.0';
+import {discoveryState,animalState} from './city-discoveries.js?v=6.6.0';
+import {blogState} from './travel-blog.js?v=6.6.0';
+import {residenceState} from './home-model.js?v=6.6.0';
 export {ROUTES,levelFor,threshold};
 export const CLASSES=[{id:'economy',name:'이코노미',level:1,start:9,end:25},{id:'business',name:'비즈니스',level:8,start:4,end:8},{id:'first',name:'퍼스트',level:16,start:1,end:3}];
 export const TIMES=[{id:'day',name:'낮 비행',value:.08},{id:'evening',name:'노을 비행',value:.38},{id:'night',name:'밤 비행',value:.70}];
-export {STYLES} from './wardrobe-model.js?v=6.5.2';
+export {STYLES} from './wardrobe-model.js?v=6.6.0';
 export const GEAR=[{id:'pillow',name:'구름 목베개',level:2,cost:160,description:'휴식 한 번에 편안함 +35 (기본 +25)'},{id:'camera',name:'작은 필름 카메라',level:3,cost:220,description:'비행마다 사진 5장 (기본 3장)'},{id:'journal',name:'자동 여행수첩',level:4,cost:280,description:'사진을 못 찍었다면 도착 풍경을 자동 수집 · 기념품 +1'},{id:'headphones',name:'음악 헤드폰',level:5,cost:320,description:'독서 한 번에 즐거움 +30 (기본 +20)'}];
 export const MAINS=[{id:'rice',name:'따뜻한 덮밥',icon:'bento',tags:['warm','savory']},{id:'sandwich',name:'채소 샌드위치',icon:'bread',tags:['fresh','savory']},{id:'pancake',name:'꿀 팬케이크',icon:'cake',tags:['warm','sweet']},{id:'salad',name:'과일 샐러드',icon:'juice',tags:['fresh','sweet']}];
 export const DRINKS=[{id:'tea',name:'따뜻한 차',icon:'tea',tags:['warm','light']},{id:'latte',name:'우유 라테',icon:'coffee',tags:['warm','rich']},{id:'juice',name:'오렌지 주스',icon:'juice',tags:['fresh','light']},{id:'cocoa',name:'초콜릿 우유',icon:'coffee',tags:['sweet','rich']}];
@@ -18,6 +19,7 @@ export const TAGS={warm:'따뜻하게',fresh:'산뜻하게',sweet:'달콤하게'
 const n=v=>Number.isFinite(v)?Math.max(0,Math.floor(v)):0;
 export function profile(raw,legacy){
  const p={version:2,name:'하늘 여행자',xp:0,coins:0,flights:0,avatar:7,style:'sage',gear:[],stamps:{},photos:[],souvenirs:{},history:[],claimed:[],route:'jeju',seat:'9A',cabin:'economy',departure:'day',duration:180,active:null,journey:null,journeys:0,stays:[],visitedRooms:[],journeyClaimed:[],lodging:'guesthouse',tripWish:'scenery',discoveries:{},animals:{},collection:{},equipped:{}};
+ p.travel=travelState(raw?.travel);p.moneyVersion=raw?.moneyVersion===1?1:0;p.travelPlans=Object.fromEntries(ROUTES.filter(r=>Array.isArray(raw?.travelPlans?.[r.id])).map(r=>[r.id,normalizeExperience({plan:raw.travelPlans[r.id]},r.id).plan]));
  p.looks={7:{style:'sage',hat:null,glasses:null}};p.friends=friendBookState(raw?.friends);p.residence=residenceState(raw?.residence);p.blog=blogState(raw?.blog);p.audio={enabled:raw?.audio?.enabled!==false,volume:[.25,.5,.75].includes(raw?.audio?.volume)?raw.audio.volume:.5};
  if(!raw&&legacy){p.xp=n(legacy.xp);p.coins=n(legacy.coins);if(legacy.name&&legacy.name!=='하늘 바리스타')p.name=String(legacy.name).slice(0,18);return p;}
  if(!raw||raw.version!==2)return p;
@@ -48,7 +50,7 @@ export function profile(raw,legacy){
  return p;
 }
 export function validSeat(seat,cabin){const m=/^(\d{1,2})([ABCD])$/.exec(seat||'');const c=CLASSES.find(c=>c.id===cabin);return !!(m&&c&&+m[1]>=c.start&&+m[1]<=c.end);}
-export function routeOpen(p,id){const i=ROUTES.findIndex(r=>r.id===id);return i>=0&&(i<3||p.flights>=(id==='chengdu'?4:Math.ceil((i-2)*.8)));}
+export function routeOpen(p,id){const i=ROUTES.findIndex(r=>r.id===id);if(p.moneyVersion===1){const visited=new Set((p.stays||[]).map(s=>s.route));return i>=0&&i<Math.max(3,p.travel?.unlockFloor||0,3+visited.size*2+(p.travel?.pages?.length||0));}return i>=0&&(i<3||p.flights>=(id==='chengdu'?4:Math.ceil((i-2)*.8)));}
 export function wishes(route){const i=Math.max(0,ROUTES.findIndex(r=>r.id===route));return [['warm','sweet'],['fresh','light'],['savory','rich'],['sweet','light'],['fresh','savory']][i%5];}
 export function mealScore(route,choices){const foods=[MAINS.find(x=>x.id===choices[0]),DRINKS.find(x=>x.id===choices[1]),DESSERTS.find(x=>x.id===choices[2])];if(!foods.some(Boolean))return 0;return wishes(route).filter(tag=>foods.some(x=>x?.tags.includes(tag))).length;}
 export function newFlight(p,now=Date.now()){
@@ -80,12 +82,14 @@ export function finish(p,f,now=Date.now()){
  if(f.completed||p.claimed.includes(f.id)||f.elapsed<f.duration)return null;
  if(p.gear.includes('journal')&&!f.photoGoal)takePhoto(p,f,flightAtmosphere({route:{id:f.routeId,duration:f.duration,stage:0},time:f.elapsed,departure:f.departure}),now);
  const before=levelFor(p.xp),count=goals(f).filter(Boolean).length;
- const xp=90+count*50,coins=60+count*30,souvenirs=1+(count===3?1:0)+(p.gear.includes('journal')?1:0);
+ const flightKey=f.routeId+':'+f.cabin+':'+(f.departure<.3?'day':f.departure<.65?'evening':'night'),repeat=p.moneyVersion===1&&p.travel.flightClaims.includes(flightKey);
+ const xp=repeat?30+count*10:90+count*50,coins=repeat?15+count*5:60+count*30,souvenirs=1+(count===3?1:0)+(p.gear.includes('journal')?1:0);
+ if(p.moneyVersion===1&&!repeat)p.travel.flightClaims.push(flightKey);
  p.xp+=xp;p.coins+=coins;p.flights++;p.stamps[f.routeId]=(p.stamps[f.routeId]||0)+1;p.souvenirs[f.routeId]=(p.souvenirs[f.routeId]||0)+souvenirs;
  p.claimed.push(f.id);p.claimed=p.claimed.slice(-150);f.completed=true;p.active=null;
  p.history.unshift({route:f.routeId,seat:f.seat,cabin:f.cabin,date:now,goals:count});p.history=p.history.slice(0,20);
  return {xp,coins,souvenirs,count,before,after:levelFor(p.xp)};
 }
-import {friendBookState} from './local-friends.js?v=6.5.2';
+import {friendBookState} from './local-friends.js?v=6.6.0';
 
-import {restoreExperiences} from './cabin-experiences.js?v=6.5.2';
+import {restoreExperiences} from './cabin-experiences.js?v=6.6.0';

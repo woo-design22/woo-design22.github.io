@@ -2,6 +2,7 @@ const pictures={};
 const wrap=(value,size)=>(value%size+size)%size;
 export const RAIL_PICTURES={train:'rail-airport-v6.5.1.webp',subway:'rail-subway-v6.5.1.webp'};
 export const RAIL_TYPES={train:{name:'공항철도',cars:2,doorsPerCar:2,nose:'streamlined',background:'surface',width:288},subway:{name:'지하철',cars:3,doorsPerCar:3,nose:'flat',background:'tunnel',width:294}};
+export function railOptionArt(id){const file=RAIL_PICTURES[id];return file?`<span class="rail-option-preview"><img src="./assets/${file}" alt="${RAIL_TYPES[id].name} 차량"></span>`:'';}
 for(const [id,file] of Object.entries(RAIL_PICTURES))if(typeof Image!=='undefined'){const image=new Image();image.src=new URL('./assets/'+file,import.meta.url).href;pictures[id]=image;}
 export function drawAirportRailVehicle(c,id,night=false){const image=pictures[id];if(!image?.complete||!image.naturalWidth)return false;const width=RAIL_TYPES[id].width,height=width*image.naturalHeight/image.naturalWidth;c.save();c.imageSmoothingEnabled=false;if(night)c.filter='brightness(.82)';c.drawImage(image,(360-width)/2,218-height,width,height);c.restore();return true;}
 export function drawRailBackground(c,id,t=0,night=false){

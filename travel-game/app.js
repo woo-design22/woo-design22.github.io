@@ -277,7 +277,14 @@ let cinemaSession=null;
 const teaPairs=[['tea','cake'],['latte','bread'],['cocoa','cookie']],amenityFiles=['mask','lipbalm','towel'];
 function cabinServices(){const services=CABIN_EXPERIENCES[f.cabin]||[];modal(`<h2 id="modal-title">${cabin(f.cabin).name}에서의 시간</h2><p>${f.cabin==='business'?'넓은 좌석과 침대 모드, 작은 여행 도구와 기내 영상.':'조용한 스위트와 침구, 원하는 시간의 티·디저트.'}</p><div class="cabin-service-grid">${services.map(x=>`<button data-cabin-service="${x.id}">${x.name}<small>${f.experiences?.[x.id]?'다시 즐기기 · '+f.experiences[x.id]:'골라서 즐기기'}</small></button>`).join('')}</div><button class="secondary" data-close>좌석으로 돌아가기</button>`);}
 function serviceArt(id,i,size=64){return id==='tea'?teaPairs[i].map(x=>itemArt('meal-'+x,size)).join(''):id==='amenity'?`<img class="amenity-picture" width="${size}" height="${size}" src="./assets/amenity-${amenityFiles[i]}-v6.5.png" alt="">`:'';}
-function cabinServiceDetail(id){const item=CABIN_EXPERIENCES[f.cabin]?.find(x=>x.id===id);if(!item)return;modal(`<h2 id="modal-title">${item.name}</h2><p>${item.note}</p><div class="cabin-service-grid">${item.choices.map((choice,i)=>`<button data-cabin-choice="${id}" data-choice-index="${i}">${serviceArt(id,i)}<span>${choice}</span>${f.experiences?.[id]?'<small>이미지를 다시 볼 수 있어요</small>':''}</button>`).join('')}</div><button class="secondary" id="cabin-services">돌아가기</button>`);}
+function cabinServiceDetail(id){
+ const item=CABIN_EXPERIENCES[f.cabin]?.find(x=>x.id===id);if(!item)return;
+ const selected=Math.max(0,item.choices.indexOf(f.experiences?.[id])),theme=item.choices[selected];
+ if(id==='cinema')cinemaSession={theme,started:performance.now(),offset:.65,paused:false};
+ const preview=['tea','amenity'].includes(id)?`<div class="art-showcase cabin-choice-showcase ${id}">${serviceArt(id,selected,220)}</div>`:id==='cinema'?`<figure class="cinema-screen"><canvas id="cinema-screen" width="960" height="540" role="img" aria-label="여행 시네마 미리보기"></canvas><figcaption id="cinema-caption"></figcaption></figure>`:'<canvas class="cabin-choice-preview" id="cabin-choice-preview" width="720" height="480" role="img" aria-label="좌석 서비스 미리보기"></canvas>';
+ modal(`<h2 id="modal-title">${item.name}</h2>${preview}<p>${item.note}</p><div class="cabin-service-grid">${item.choices.map((choice,i)=>`<button data-cabin-choice="${id}" data-choice-index="${i}">${serviceArt(id,i)}<span>${choice}</span>${f.experiences?.[id]?'<small>이미지를 다시 볼 수 있어요</small>':''}</button>`).join('')}</div><button class="secondary" id="cabin-services">돌아가기</button>`);
+ if(id==='cinema')cinemaReady(theme).then(()=>paintCinema(performance.now()));else paintCabinPreview(performance.now());
+}
 function cabinServiceResult(id,choice,i,result){
  const item=result.item;
  if(id==='cinema'){

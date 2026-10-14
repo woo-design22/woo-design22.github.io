@@ -1,4 +1,4 @@
-import {shopItem} from './shopping.js?v=6.6.0';
+import {shopItem} from './shopping.js?v=6.7.0';
 export const TRAVEL_WISHES=[
  {id:'scenery',name:'풍경을 남기는 여행',icon:'camera',description:'공항 전망 · 창가 사진 · 명소 산책',goals:['공항 전망대에서 엽서 남기기','비행 중 사진 한 장 찍기','도시 산책에서 명소 둘러보기']},
  {id:'cozy',name:'푹 쉬는 여행',icon:'rest',description:'잠옷 · 편안한 비행 · 포근한 방',goals:['집에서 잠옷 챙기기','비행 편안함 80 채우기','숙소에서 포근하게 쉬기']},

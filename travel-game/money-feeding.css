@@ -1,0 +1,11 @@
+.money-icon{display:inline-block;object-fit:contain;vertical-align:middle;image-rendering:auto;flex:none;margin:0!important;filter:none!important}
+.money-amount{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;vertical-align:middle;font-weight:inherit}
+.money-amount .money-icon{width:22px;height:22px}
+.start-wallet{position:absolute;top:max(12px,env(safe-area-inset-top));right:18px;color:#536849;background:#faf4dfe6;border:2px solid #8d9f79;border-radius:9px;padding:5px 10px;box-shadow:0 3px 0 #566c4940;font-size:17px;z-index:5}
+.start-wallet small{display:block;font-size:11px;font-weight:400;text-align:right}
+.flight-head .flight-balance{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}
+.flight-balance .coins{font-size:13px}.flight-balance .money-icon{width:18px;height:18px}
+.page-head .coins{font-size:15px;flex:none}.travel-cash .money-amount{font-size:18px}.travel-cash .money-icon{width:20px;height:20px}
+.feeding-scene{display:block;width:100%;height:auto;max-width:360px;margin:12px auto;border:3px solid #84966f;border-radius:10px;image-rendering:pixelated;background:#e7eddd;box-shadow:0 4px 0 #52694926}
+.feeding-caption{min-height:46px;text-align:center;color:#567044}.feeding-scene+small{display:block;text-align:center}
+@media(max-width:380px){.start-wallet{font-size:15px;right:10px}.flight-head{gap:8px}.page-head .coins{font-size:13px}.money-amount{gap:2px}.money-amount .money-icon{width:18px;height:18px}}

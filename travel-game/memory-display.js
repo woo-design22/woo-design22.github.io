@@ -1,5 +1,5 @@
-import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.6.0';
-import {shopItem} from './shopping.js?v=6.6.0';
-import {drawItemArt} from './item-art.js?v=6.6.0';
+import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.7.0';
+import {shopItem} from './shopping.js?v=6.7.0';
+import {drawItemArt} from './item-art.js?v=6.7.0';
 const rect=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
 export function drawMemoryDisplay(c,p){const slots=p.travel?.displays||[];if(!slots.some(Boolean))return;rect(c,10,40,42,86,'#b8a88a');rect(c,12,42,38,82,'#eee1be');slots.forEach((id,i)=>{if(!id)return;const y=46+i*25,photo=p.travel?.photos.find(x=>x.id===id);rect(c,17,y,27,21,'#faf5e5');if(photo){c.save();c.beginPath();c.rect(19,y+2,23,17);c.clip();drawAtlas(c,{...discoveryAsset(photo.place),cover:true},photo.frame==='detail'?[13,y-3,35,27]:[19,y+2,23,17]);if(photo.phase){c.globalAlpha=photo.phase===2?.25:.13;rect(c,19,y+2,23,17,photo.phase===2?'#193750':'#dba167');}c.restore();}else{const item=shopItem(id);if(item?.category==='magnet'){drawAtlas(c,{...discoveryAsset((item.region==='incheon'?'jeju':item.region)+':place-0'),cover:true},[19,y+2,23,17]);}else drawItemArt(c,id,[19,y+2,23,17]);}});}

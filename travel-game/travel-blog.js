@@ -1,18 +1,19 @@
-import {memoryOptions,normalizeExperience,CITY_EPISODES,automaticHighlights} from './travel-experience.js?v=6.6.0';
-import {ROUTES} from './model.js?v=6.6.0';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.6.0';
-import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.6.0';
-import {cityGuide} from './city-guide.js?v=6.6.0';
+import {memoryOptions,normalizeExperience,CITY_EPISODES,automaticHighlights} from './travel-experience.js?v=6.7.0';
+import {ROUTES} from './model.js?v=6.7.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.7.0';
+import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.7.0';
+import {cityGuide} from './city-guide.js?v=6.7.0';
 const cap=n=>Number.isFinite(n)?Math.max(0,Math.min(999999,Math.floor(n))):0;
 const knownRoute=id=>ROUTES.some(r=>r.id===id);
-export const STARTER_FUNDS=150;
+export const STARTER_FUNDS=1000;
+const MIN_TRIP_FUNDS=150;
 export function blogState(raw,now=Date.now()){
  if(!raw)return {wallet:STARTER_FUNDS,earned:0,advance:0,posts:[],published:[],lastSettlement:now};
  const posts=Array.isArray(raw.posts)?raw.posts.filter(x=>x&&typeof x.id==='string'&&knownRoute(x.route)&&Number.isFinite(x.date)).slice(0,200).map(x=>({id:x.id.slice(0,120),highlights:(Array.isArray(x.highlights)?x.highlights:[]).filter(v=>typeof v==='string').slice(0,3),experience:x.experience?normalizeExperience(x.experience,x.route):null,route:x.route,date:capDate(x.date),income:cap(x.income),repayment:Math.min(cap(x.income),cap(x.repayment)),paid:Math.max(0,cap(x.income)-cap(x.repayment)),views:cap(x.views),likes:cap(x.likes),items:[...new Set((Array.isArray(x.items)?x.items:[]).filter(id=>DISCOVERY_ITEMS.some(i=>i.id===id&&id.startsWith(x.route+':'))))],gifts:[...new Set((Array.isArray(x.gifts)?x.gifts:[]).filter(id=>COLLECTION_ITEMS.some(i=>i.id===id)))],animal:x.animal===true,bond:x.bond===true&&x.animal===true,photos:Math.min(6,cap(x.photos)),firstCity:x.firstCity===true,friend:x.route==='mex'&&x.friend==='seorira'?'seorira':null,friendTopics:x.route==='mex'&&x.friend==='seorira'&&Array.isArray(x.friendTopics)?[...new Set(x.friendTopics.filter(id=>['work','restaurant','walk'].includes(id)))]:[]})):[];
  return {wallet:cap(raw.wallet),earned:cap(raw.earned),advance:cap(raw.advance),posts,published:[...new Set([...(Array.isArray(raw.published)?raw.published:[]).filter(id=>typeof id==='string'&&id.length<=120),...posts.map(x=>x.id)])].slice(-1000),lastSettlement:Number.isFinite(raw.lastSettlement)?Math.max(0,raw.lastSettlement):now};
 }
 function capDate(n){return Number.isFinite(n)?Math.max(0,Math.floor(n)):0;}
-export function tripFunds(p){return Math.min(300,Math.max(STARTER_FUNDS,p.blog?.wallet??STARTER_FUNDS));}
+export function tripFunds(p){return Math.min(300,Math.max(MIN_TRIP_FUNDS,p.blog?.wallet??STARTER_FUNDS));}
 export function fundJourney(p,j){
  p.blog||=blogState();if(!j||j.funded)return false;
  const funds=j.fundTotal||150,advance=Math.max(0,funds-p.blog.wallet);
@@ -61,4 +62,4 @@ export function postStory(post){
  if(post.photos)lines.push(`창밖 사진 ${post.photos}장도 함께 남겼어요.`);
  return {title:`${route.name}, ${post.animal?'작은 친구를 만난 날':foods.length?'맛있는 기억 한 줌':'잠시 쉬어 간 하루'}`,lines};
 }
-import {friendEventState} from './local-friends.js?v=6.6.0';
+import {friendEventState} from './local-friends.js?v=6.7.0';

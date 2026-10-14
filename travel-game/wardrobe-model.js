@@ -1,5 +1,5 @@
-import {levelFor} from './model.js?v=6.5.0';
-import {shopItem} from './shopping.js?v=6.5.0';
+import {levelFor} from './model.js?v=6.5.1';
+import {shopItem} from './shopping.js?v=6.5.1';
 const classics=[{id:'sage',name:'세이지 니트',color:'#8aa28c',level:1},{id:'cream',name:'크림 가디건',color:'#dbcaa8',level:1},{id:'rose',name:'로즈 리본',color:'#b58b91',level:3},{id:'ocean',name:'하늘 스카프',color:'#7eabc1',level:5},{id:'lavender',name:'라벤더 니트',color:'#a99bbd',level:8},{id:'sunset',name:'노을 가디건',color:'#c69873',level:12},{id:'midnight',name:'밤빛 리본',color:'#7385a2',level:16},{id:'gold',name:'여행가의 금빛',color:'#c6b678',level:24}];
 export const STYLES=[...classics,
  {id:'picnic',name:'피크닉 멜빵',color:'#a4b49c',level:2,cut:'overalls'},

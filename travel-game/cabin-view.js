@@ -1,8 +1,5 @@
+import {drawTraveler} from './avatar-art.js?v=6.5.1';
 const pictures={};for(const id of ['economy','business','first'])if(typeof Image!=='undefined'){const image=new Image();image.src=new URL('./assets/cabin-'+id+'-v6.5.webp',import.meta.url).href;pictures[id]=image;}
-import {drawTraveler} from './avatar-art.js?v=6.5.0';
-import {currentLook,STYLES} from './wardrobe-model.js?v=6.5.0';
-import {eyewearBox} from './avatar-anchors.js?v=6.5.0';
-import {drawItemArt} from './item-art.js?v=6.5.0';
 const r=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
 function seat(c,x,y,w,h,color,label,guest){r(c,x+2,y+3,w,h,'#697c6b');r(c,x,y,w,h,color);r(c,x+5,y+5,w-10,8,'#d8ddc6');r(c,x+4,y+h-12,w-8,12,'#a5b49a');r(c,x-3,y+h-19,w+6,6,'#d4d4be');r(c,x+6,y+h,4,8,'#657669');r(c,x+w-10,y+h,4,8,'#657669');if(guest!==undefined)drawTraveler(c,guest,0,null,false,[x+w*.15,y-19,w*.7,w*.7]);c.fillStyle='#526849';c.font='7px Neo';c.fillText(label,x+6,y+h-2);}
 export function drawCabinView(canvas,f,p,t=0){
@@ -16,8 +13,6 @@ export function drawCabinView(canvas,f,p,t=0){
   const resting=f.experiences?.turndown||f.experiences?.flatbed;
   if(bed&&resting?.includes('독서')||bed&&resting?.includes('책')){r(c,217,194,44,28,'#8b9675');r(c,219,195,19,25,'#fff4d9');r(c,240,195,19,25,'#f5ebd0');r(c,238,195,2,25,'#baa581');for(let y=200;y<216;y+=4){r(c,222,y,12,1,'#c6bba0');r(c,244,y,12,1,'#c6bba0');}}
   r(c,8,8,105,20,'#fff7e4de');c.fillStyle='#536a4b';c.font='8px Neo';c.fillText(f.seat+' · '+(first?sageFirst?'세이지 스위트':'크림 스위트':premium?'비즈니스':'이코노미'),13,21);
-  const look=currentLook(p);drawTraveler(c,p.avatar,0,STYLES.find(s=>s.id===look.style)?.color,false,[12,173,56,56],look.style,look.hat);
-  if(look.glasses)drawItemArt(c,look.glasses,eyewearBox(p.avatar,0,false,look.glasses,[12,173,56,56]));
   if(f.cinemaTheme){r(c,73,211,140,16,'#eee6d2e0');c.fillStyle='#526b51';c.fillText(f.cinemaTheme,80,223);}
   c.restore();return;
  }
@@ -32,6 +27,5 @@ export function drawCabinView(canvas,f,p,t=0){
  }
  if(first){r(c,0,173,65,67,'#a5957e');r(c,295,173,65,67,'#a5957e');if(f.suiteClosed){r(c,29,162,302,7,'#b6a58b');r(c,39,169,9,71,'#b6a58b');r(c,310,169,9,71,'#b6a58b');}}
  r(c,67,190,226,40,bed?'#e5e1cf':'#c7c6ac');r(c,70,187,220,4,'#eee9d6');if(bed){r(c,91,195,176,35,'#f2ecd9');r(c,104,191,65,14,'#fff7e4');}else {r(c,119,199,123,21,'#ece6d1');r(c,131,201,38,15,'#d9e2d0');r(c,135,204,31,10,'#76958d');r(c,182,202,13,13,'#f9f3dc');r(c,195,205,4,6,'#d9d5bf');}
- const look=currentLook(p);drawTraveler(c,p.avatar,0,STYLES.find(s=>s.id===look.style)?.color,false,[12,181,53,53],look.style,look.hat);
  c.fillStyle='#465e43';c.font='9px Neo';c.fillText(f.seat+' · '+(bed?'침대 모드':'나의 좌석'),76,182);if(f.cinemaTheme)c.fillText(f.cinemaTheme,132,214);c.restore();
 }

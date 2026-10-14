@@ -1,4 +1,4 @@
-import {MUSIC_CREDITS} from "./music-credits.js?v=6.5.0";
+import {MUSIC_CREDITS} from "./music-credits.js?v=6.5.1";
 const TITLES={"home":"설레는 여행의 시작","jeju":"귤빛 바람","tokyo":"벚꽃 주머니","taipei":"비 온 뒤 찻잔","paris":"창가의 마카롱","hawaii":"파도가 접어 둔 오후","moon":"달빛 잠옷","bkk":"망고빛 산책","sin":"잎사귀 정원","dad":"해변의 작은 발자국","dps":"초록 계단의 오후","syd":"항구의 구름","akl":"푸른 언덕 소풍","dxb":"모래 위의 티타임","ist":"고양이가 쉬는 계단","fco":"젤라토 한 스푼","bcn":"타일 위의 햇살","lis":"노란 전차의 낮잠","lhr":"빗소리 옆의 스콘","ams":"운하에 뜬 찻잔","cph":"항구의 작은 담요","hel":"시나몬 숲","zrh":"호수에 접힌 담요","prg":"다리 위의 작은 별","jfk":"공원의 치즈케이크","sfo":"안개 속의 초콜릿","yvr":"숲이 건네는 오후","mex":"광장의 초콜릿","lim":"바다를 담은 작은 컵","kef":"눈빛 여우의 꿈","stars":"별의 정원에서 쉬어요","chengdu":"대나무 그늘의 낮잠"};
 export const MUSIC_THEMES=Object.entries(MUSIC_CREDITS).map(([id,credit],index)=>({id,title:TITLES[id],index,...credit,file:`./assets/music/${id}.ogg`}));
 export const musicTheme=id=>MUSIC_THEMES.find(t=>t.id===id)||MUSIC_THEMES[0];

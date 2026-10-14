@@ -1,5 +1,5 @@
-import {HOME_CITIES,HOME_TYPES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.5.0';
-import {drawAtlas,atlasReady,discoveryAsset} from './generated-art.js?v=6.5.0';
+import {HOME_CITIES,HOME_TYPES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.5.1';
+import {drawAtlas,atlasReady,discoveryAsset} from './generated-art.js?v=6.5.1';
 export const HOME_ART_FILES=['home-views-v6.png','home-interiors-v6.1.png','navigation-cases-v6.png',...HOME_FURNITURE.map(x=>'furniture-'+x.id+'-v6.3.png')];
 export function homeArtReady(){return atlasReady(HOME_ART_FILES);}
 export function homeViewAsset(id){const cell=Math.max(0,HOME_CITIES.findIndex(x=>x.id===id));return {file:'home-views-v6.png',columns:3,rows:4,col:cell%3,row:Math.floor(cell/3)};}

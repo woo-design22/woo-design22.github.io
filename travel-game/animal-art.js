@@ -1,4 +1,4 @@
-import {SPRITE_BOUNDS} from './sprite-bounds.js?v=6.5.0';
+import {SPRITE_BOUNDS} from './sprite-bounds.js?v=6.5.1';
 const sheet=typeof Image==='undefined'?null:new Image();if(sheet)sheet.src=new URL('./assets/animals-v4.png',import.meta.url).href;
 const panda=typeof Image==='undefined'?null:new Image();if(panda)panda.src=new URL('./assets/panda-v4.png',import.meta.url).href;
 export function drawAnimal(canvas,id){const image=id===12?panda:sheet;if(!image?.complete||!image.naturalWidth)return;const bounds=id===12?[0,0,image.naturalWidth,image.naturalHeight]:SPRITE_BOUNDS['animals-v4.png'][id];if(!bounds)return;const c=canvas.getContext('2d'),[x,y,w,h]=bounds,scale=Math.min(canvas.width*.9/w,canvas.height*.9/h);c.imageSmoothingEnabled=false;c.clearRect(0,0,canvas.width,canvas.height);c.drawImage(image,x,y,w,h,(canvas.width-w*scale)/2,(canvas.height-h*scale)/2,w*scale,h*scale);}

@@ -1,0 +1,32 @@
+@font-face{font-family:TravelJua;src:url('./assets/travel-jua-full-v6.5.woff') format('woff');font-display:swap;font-weight:400;font-style:normal}
+#home.home{position:relative;isolation:isolate;display:flex;align-items:center;gap:13px;padding:24px 24px 14px;background:#b9e2df url('./assets/title-travel-v6.2.png') center bottom/cover no-repeat;overflow-y:auto}
+#home:before{content:'';position:absolute;inset:0;background:linear-gradient(#f2f4dc10,#f8f4e506 50%,#f2f2da08);z-index:-1;pointer-events:none}
+#home .brand{flex-shrink:0;margin:4px 0 0;text-align:center;position:relative;width:100%}
+.title-logo{display:inline-block;position:relative;padding:8px 18px 9px;transform:rotate(-2deg)}
+.title-logo:before,.title-logo:after{content:'';position:absolute;top:22px;width:22px;height:22px;border:2px solid #faf6dd;background:#dfc86a;transform:rotate(45deg);z-index:-1}
+.title-logo:before{left:0}.title-logo:after{right:0}
+#home .brand h1{font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:clamp(54px,15vw,70px);font-weight:400;line-height:1.12;letter-spacing:-2px;color:#fff5cc;-webkit-text-stroke:2px #506b47;paint-order:stroke fill;text-shadow:0 5px #506b47,0 8px #fff5db80;margin:0;white-space:nowrap}
+.title-caption{margin:12px 0 0;font-size:11px;color:#456b65;text-shadow:0 1px #f7f9e3;letter-spacing:1px}
+.start-mascot{position:relative;flex-shrink:0;width:120px;height:110px;margin:0 auto 1px}
+#home .start-mascot #home-avatar{display:block;position:static;inset:auto;width:120px;height:120px}
+#home .start-mascot .sprite{width:120px;height:120px;filter:drop-shadow(0 3px 0 #3a71602b)}
+.start-controls{width:100%;max-width:346px;flex-shrink:0}
+#home #boarding{font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:30px;letter-spacing:1px;min-height:65px;background:#789458;border:3px solid #536f41;color:#fff9dd;box-shadow:inset 0 3px #adc184,inset 0 -4px #65834b,0 5px #3b62444d;border-radius:4px}
+#home #boarding:active{transform:translateY(2px);box-shadow:inset 0 2px #68864e,0 2px #3b62444d}
+#home .home-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+#home .home-menu button{font-family:TravelJua,'Malgun Gothic',sans-serif;display:flex;flex-direction:row;justify-content:center;gap:9px;min-height:60px;padding:9px 7px;font-size:22px;line-height:1.2;border:2px solid #94ac80;background:#fff6dfec;color:#526743;box-shadow:inset 0 2px #fffdf2,inset 0 -3px #e6e3c9,0 4px #50765b38;border-radius:3px;white-space:nowrap}
+#home .home-menu button>span{min-height:0;display:flex;align-items:center;justify-content:center;width:27px;height:27px;flex-shrink:0}
+#home .home-menu .atlas-art{--art-size:27px!important;width:27px;height:27px}
+#home .home-menu .pixel-icon{width:26px;height:26px}
+#home .home-menu button:active{transform:translateY(2px);box-shadow:inset 0 2px #e9ecd8,0 1px #50765b38}
+.start-rest{flex:1;min-height:32px;width:100%;pointer-events:none}
+#home footer.start-footer{margin-top:0;display:flex;justify-content:space-between;align-items:center;width:100%;max-width:346px;flex-shrink:0;gap:10px}
+#home footer.start-footer button{font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:15px;min-height:42px;padding:8px 12px;border:1px solid #afc1a5;background:#f8f5ddde;color:#597052;box-shadow:0 2px #597b5630;border-radius:3px}
+#home #rename{font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:14px;min-height:36px;padding:6px 8px;max-width:70%;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+#home .start-progression{display:none}
+@media(max-height:700px){#home.home{gap:8px;padding-top:15px}.start-mascot{height:88px;width:100px}#home .start-mascot #home-avatar,#home .start-mascot .sprite{width:100px;height:100px}#home .brand h1{font-size:54px}.title-caption{margin-top:8px}.start-rest{min-height:15px}#home #boarding{min-height:56px;font-size:27px}#home .home-menu{gap:8px;margin-top:12px}#home .home-menu button{min-height:54px;font-size:20px}}
+@media(max-width:350px){#home.home{padding-left:18px;padding-right:18px}#home .home-menu button{font-size:19px;gap:6px}.title-logo{padding-left:12px;padding-right:12px}}
+@media(prefers-reduced-motion:reduce){#home #boarding:active,#home .home-menu button:active{transform:none}}
+
+.title-logo:before,.title-logo:after{display:none}
+#home #rename{font-family:Neo,system-ui,sans-serif;font-size:12px}

@@ -1,0 +1,35 @@
+// Fictional stays and little impressions, not real accommodation listings.
+export const CITY_GUIDE={
+ jeju:{hotels:['바람 골목집','돌담 창가 호텔','바다빛 리조트'],note:'돌담 사이로 바닷바람이 들어와요.',keepsake:'작은 귤빛 엽서',accent:'#97a780'},
+ tokyo:{hotels:['벚꽃 골목집','도시빛 창가 호텔','정원 스테이'],note:'철길 너머 작은 불빛들이 하나씩 켜져요.',keepsake:'벚꽃 책갈피',accent:'#b6979c'},
+ taipei:{hotels:['찻집 위 작은 방','산빛 창가 호텔','초록 테라스'],note:'산 아래 골목에서 차 향기가 올라와요.',keepsake:'찻잎 무늬 엽서',accent:'#8da18a'},
+ paris:{hotels:['센강 골목집','지붕 위 창가 호텔','장미 정원 스테이'],note:'옅은 노을이 지붕과 강 사이에 머물러요.',keepsake:'지붕빛 작은 자석',accent:'#aa9386'},
+ hawaii:{hotels:['파도 게스트하우스','산호빛 창가 호텔','야자수 리조트'],note:'발코니 너머로 잔잔한 파도 소리가 들려요.',keepsake:'산호색 조개 배지',accent:'#90b4af'},
+ moon:{hotels:['달빛 작은 집','은빛 창가 호텔','고요한 달 테라스'],note:'바다에 비친 달빛을 오래 바라봐요.',keepsake:'달빛 조각 배지',accent:'#a4a0b9'},
+ bkk:{hotels:['강가 골목집','사원빛 창가 호텔','초록 수변 스테이'],note:'강 건너 지붕 끝에 금빛 저녁이 내려요.',keepsake:'강가의 금빛 엽서',accent:'#b5a27d'},
+ sin:{hotels:['정원 골목집','항구빛 창가 호텔','초록빛 리조트'],note:'초록 정원 너머 항구가 천천히 밝아져요.',keepsake:'정원 잎사귀 배지',accent:'#87a795'},
+ dad:{hotels:['바닷길 작은 집','다리빛 창가 호텔','파도 테라스'],note:'다리의 불빛이 물 위로 길게 번져요.',keepsake:'다리빛 작은 자석',accent:'#93aeb5'},
+ dps:{hotels:['논길 작은 집','잎그늘 창가 호텔','야자 정원 리조트'],note:'초록 언덕 사이로 따뜻한 바람이 지나요.',keepsake:'야자잎 책갈피',accent:'#91a178'},
+ syd:{hotels:['항구 골목집','흰지붕 창가 호텔','블루베이 리조트'],note:'흰 지붕 뒤로 푸른 항구가 펼쳐져요.',keepsake:'작은 돛 배지',accent:'#8caab5'},
+ akl:{hotels:['초록언덕 작은 집','만빛 창가 호텔','이슬 정원 스테이'],note:'낮은 언덕과 작은 배들이 창에 담겨요.',keepsake:'항구의 초록 엽서',accent:'#8da891'},
+ dxb:{hotels:['모래길 작은 집','첨탑빛 창가 호텔','오아시스 리조트'],note:'모래빛 저녁 속에서 높은 첨탑이 빛나요.',keepsake:'모래색 유리 배지',accent:'#b9a783'},
+ ist:{hotels:['해협 골목집','푸른돔 창가 호텔','바람 정원 스테이'],note:'해협을 오가는 배가 두 동네를 이어요.',keepsake:'푸른 돔 엽서',accent:'#9daba5'},
+ fco:{hotels:['벽돌 골목집','돔빛 창가 호텔','올리브 정원 스테이'],note:'따뜻한 벽돌 지붕 사이로 돔이 보여요.',keepsake:'벽돌빛 작은 자석',accent:'#b19882'},
+ bcn:{hotels:['바닷길 골목집','첨탑 창가 호텔','햇살 테라스'],note:'반듯한 거리 끝에서 바다를 찾아봐요.',keepsake:'모자이크 책갈피',accent:'#b5a17f'},
+ lis:{hotels:['언덕 골목집','강빛 창가 호텔','레몬 정원 스테이'],note:'언덕 아래 강 위로 작은 다리가 걸려 있어요.',keepsake:'노란 전차 배지',accent:'#b5ad8a'},
+ lhr:{hotels:['책방 위 작은 방','시계탑 창가 호텔','이끼 정원 스테이'],note:'비가 그친 창에 강과 시계탑이 비쳐요.',keepsake:'작은 찻잔 엽서',accent:'#91a39c'},
+ ams:{hotels:['운하 골목집','박공지붕 창가 호텔','튤립 정원 스테이'],note:'운하 양쪽의 좁은 집들이 나란히 서 있어요.',keepsake:'운하 집 책갈피',accent:'#a89991'},
+ cph:{hotels:['항구 골목집','색지붕 창가 호텔','바람 정원 스테이'],note:'항구의 작은 집들이 물 위에 색을 남겨요.',keepsake:'항구빛 엽서',accent:'#a3adb4'},
+ hel:{hotels:['눈길 작은 집','섬빛 창가 호텔','숲속 사우나 스테이'],note:'차가운 바깥 공기와 따뜻한 방의 불빛.',keepsake:'눈꽃 배지',accent:'#a3b7b0'},
+ zrh:{hotels:['호숫길 작은 집','알프스 창가 호텔','산그늘 스테이'],note:'호수 뒤로 눈 덮인 산이 조용히 서 있어요.',keepsake:'산빛 책갈피',accent:'#9bafa7'},
+ prg:{hotels:['돌길 골목집','성빛 창가 호텔','강가 정원 스테이'],note:'오래된 다리 끝에서 성의 불빛을 발견해요.',keepsake:'돌다리 엽서',accent:'#aa9b86'},
+ jfk:{hotels:['벽돌 계단집','스카이라인 창가 호텔','공원 테라스'],note:'반듯한 거리 위에 수많은 창이 반짝여요.',keepsake:'도시빛 작은 배지',accent:'#91a1af'},
+ sfo:{hotels:['언덕 골목집','붉은다리 창가 호텔','안개 정원 스테이'],note:'안개가 잠깐 걷히면 붉은 다리가 보여요.',keepsake:'안개빛 다리 엽서',accent:'#b09b93'},
+ yvr:{hotels:['숲길 작은 집','산과만 창가 호텔','소나무 스테이'],note:'숲과 산 사이로 항구가 길게 이어져요.',keepsake:'단풍잎 책갈피',accent:'#8caa9b'},
+ mex:{hotels:['색벽 골목집','고원빛 창가 호텔','선인장 테라스'],note:'산 아래 넓은 도시에 저녁빛이 번져요.',keepsake:'고원의 작은 엽서',accent:'#b1a088'},
+ lim:{hotels:['해안 골목집','절벽빛 창가 호텔','바다안개 스테이'],note:'절벽 아래 바다는 잿빛 하늘을 담고 있어요.',keepsake:'해안빛 조각 배지',accent:'#9eaba6'},
+ kef:{hotels:['눈빛 골목집','오로라 창가 호텔','별숲 스테이'],note:'밤하늘의 옅은 초록빛을 기다려요.',keepsake:'오로라 책갈피',accent:'#9eafb5'},
+ stars:{hotels:['별빛 작은 방','성운 창가 호텔','고요한 우주 테라스'],note:'창밖의 별은 멀지만, 오늘의 방은 포근해요.',keepsake:'별무늬 배지',accent:'#aaa4b7'}
+};
+CITY_GUIDE.chengdu={hotels:['대나무 골목집','금강 창가 호텔','초록 정원 스테이'],note:'금강을 따라 천천히 켜지는 도시의 불빛을 봐요.',keepsake:'작은 대나무 책갈피',accent:'#93a288'};
+export function cityGuide(id){return CITY_GUIDE[id]||CITY_GUIDE.jeju;}

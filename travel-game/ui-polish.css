@@ -1,0 +1,54 @@
+/* Quiet pixel buttons: cream paper, a sage rim and a small tactile ledge. */
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:3px solid #77986f;outline-offset:3px}
+:is(.primary,.secondary,.square,.choice,.route-card,.pack-item,.transport-option,.airport-actions button,.style-card,.avatar-card,.room-item,.room-spots button,.wish-choice,.gear-card button,.scene-look,.journey-wish,.views button,.actions button,.home-menu button,.home-update){
+ border:2px solid #c5d0bb;background:#f7f4e9;color:#50634d;
+ box-shadow:inset 0 2px 0 #fffdf5,inset 0 -2px 0 #e9e9d9,0 3px 0 #cbd4c2;
+ border-radius:3px;transition:background-color .12s,box-shadow .10s,transform .10s;
+}
+button.primary{background:#6b8864;border-color:#4e6849;color:#fffbed;box-shadow:inset 0 2px 0 #93aa7c,inset 0 -3px 0 #5b7755,0 4px 0 #c4ceb9;min-height:54px;line-height:1.5}
+.primary small{color:#eef0d9;opacity:1}
+button.secondary{background:#efefe0;border-color:#bdcbb3;min-height:46px}
+button.square{background:#f7f3e4;border-color:#bccbb0;font-size:19px}
+.home-menu{gap:10px 9px}
+.home-menu button{min-height:86px;padding:10px 5px 9px;gap:8px;position:relative;line-height:1.45}
+.home-menu button>span{display:flex;align-items:center;justify-content:center;min-height:34px}
+.home-menu .pixel-icon,.home-menu .generated-nav{width:32px;height:32px}
+.home-menu button>small{font-size:9px;color:#788b6c}
+.home-update{background:#eaf0df;border-color:#b8cba8;padding:10px 12px}
+.home-update>span{background:#d9e5cb;box-shadow:inset 0 1px #f7f8e9;border:1px solid #bdcdae}
+:is(.choice,.route-card,.pack-item,.style-card,.avatar-card,.room-item,.transport-option,.wish-choice,.views button).selected,.actions button.active{
+ background:#dfead1;border-color:#769367;box-shadow:inset 0 2px #f2f7e7,inset 0 -2px #ccdcb8,0 3px #bbc9ad;color:#405e3c;
+}
+:is(.choice,.route-card,.pack-item,.style-card,.avatar-card,.room-item,.transport-option,.wish-choice).selected{position:relative}
+:is(.choice,.route-card,.pack-item,.style-card,.avatar-card,.room-item,.transport-option,.wish-choice).selected:before{
+ content:'✓';position:absolute;right:4px;top:4px;display:grid;place-items:center;width:13px;height:13px;background:#739164;color:#fffbed;font-size:9px;line-height:1;border:1px solid #536d49;pointer-events:none;
+}
+.seat-row button{border-radius:2px;box-shadow:inset 0 1px #f4f7e7,0 2px #bdc9ad}
+.seat-row button.mine{box-shadow:inset 0 2px #90aa7f,0 2px #bbc9ad}
+.actions button{padding-top:10px;gap:7px}
+.actions .pixel-icon{width:26px;height:26px}
+.views{gap:7px;padding-bottom:10px}.views button{padding:6px 8px;min-height:40px}
+.scene-look,.journey-wish{background:#f8f4e8ed;min-height:38px}
+button:disabled{opacity:.48;cursor:default;box-shadow:none!important;filter:grayscale(.3);transform:none!important}
+@media(hover:hover){:is(.primary,.secondary,.square,.choice,.route-card,.pack-item,.transport-option,.airport-actions button,.style-card,.avatar-card,.room-item,.room-spots button,.wish-choice,.gear-card button,.scene-look,.journey-wish,.views button,.actions button,.home-menu button,.home-update):not(:disabled):hover{filter:brightness(1.035)}}
+:is(.primary,.secondary,.square,.choice,.route-card,.pack-item,.transport-option,.airport-actions button,.style-card,.avatar-card,.room-item,.room-spots button,.wish-choice,.gear-card button,.scene-look,.journey-wish,.views button,.actions button,.home-menu button,.home-update):not(:disabled):active{
+ transform:translateY(2px);box-shadow:inset 0 2px 0 #edf1df,0 1px 0 #becbb1;
+}
+button.primary:not(:disabled):active{box-shadow:inset 0 2px #5c7856,0 1px #bcc9af}
+.ui-pressed{animation:button-confirm .16s ease-out}
+@keyframes button-confirm{0%{filter:brightness(.97)}60%{filter:brightness(1.05)}100%{filter:none}}
+@media(max-width:360px){.home-menu{gap:8px 6px}.home-menu button{font-size:10px;min-height:78px}.views{gap:4px}.views button{font-size:10px;padding:5px}.primary{font-size:14px}}
+@media(prefers-reduced-motion:reduce){button{transition:none!important}.ui-pressed{animation:none}:is(.primary,.secondary,.square,.choice,.route-card,.pack-item,.transport-option,.home-menu button):active{transform:none}}
+.pack-item.selected:after{display:none}
+.home-choice,.home-design-tabs button,.home-category-tabs button,.wearable-tabs button,.music-track,.discovery-option,.friend-event{
+ border-radius:3px;border:2px solid #c5d0bb;box-shadow:inset 0 2px #fffdf5,0 3px #cbd4c2;background:#f7f4e9;
+}
+:is(.home-choice,.home-design-tabs button,.home-category-tabs button,.music-track).selected,.wearable-tabs [aria-pressed="true"]{border-color:#769367;background:#dfead1;box-shadow:inset 0 2px #f2f7e7,0 3px #bbc9ad}
+:is(.home-choice,.home-design-tabs button,.home-category-tabs button,.wearable-tabs button,.music-track,.discovery-option,.friend-event):not(:disabled):active{transform:translateY(2px);box-shadow:inset 0 2px #edf1df,0 1px #becbb1}
+
+.local-friend-portrait{width:112px;height:130px;image-rendering:pixelated;flex-shrink:0}.local-friend-profile{display:flex;align-items:center;gap:14px;background:#eeeddd;border:2px solid #ccd5bf;padding:10px;margin:12px 0}.local-friend-profile p{font-size:11px!important;line-height:1.9!important;margin:8px 0}.local-friend-button .local-friend-portrait{width:65px;height:76px}.local-friend-button strong{font-size:13px}.friend-dialogue{border-left:3px solid #90a578;background:#eeefe0;padding:14px;margin:18px 0}.friend-dialogue>strong{font-size:12px;color:#58734d}.friend-dialogue p{color:#51684c!important}.local-friend-memory{margin:22px 0;border-top:1px dashed #cad6bf;padding-top:12px}@media(max-width:350px){.local-friend-profile{gap:10px;padding:8px}.local-friend-profile .local-friend-portrait{width:85px;height:105px}.local-friend-profile p{font-size:10px!important}}
+
+.duty-product-icon{display:block;object-fit:contain;image-rendering:pixelated;margin:auto;filter:drop-shadow(0 3px 0 #8d796d20)}.shop-tabs{flex-wrap:wrap}.shop-product .product-art{min-height:88px;background:linear-gradient(135deg,#fffaf0,#f0e8d9);border-radius:12px;border:1px solid #d8ccb8}.shop-product{border:2px solid #d5c4ac;box-shadow:0 4px 0 #c8b49b}.shop-product strong{font-size:15px}
+
+.shop-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:5px}.shop-tabs .duty-product-icon{margin:0;filter:none}.airport-actions .duty-product-icon,.transport-option .duty-product-icon{margin:0;flex:0 0 auto}

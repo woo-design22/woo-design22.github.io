@@ -1,0 +1,184 @@
+/* One tactile cream-and-sage family, from the title menu to the last receipt. */
+:root{
+ --travel-paper:#fff6df;--travel-ink:#526743;--travel-rim:#94ac80;
+ --travel-light:#fffdf2;--travel-shade:#e6e3c9;--travel-ledge:#50765b38;
+ --travel-green:#789458;--travel-green-rim:#536f41;
+ --travel-selected:#e2edcf;--travel-muted:#728466;
+}
+#app .page,#app .journey-screen,#app .flight{background:#f8f3e4;color:var(--travel-ink)}
+#app button,#modal-content button{
+ font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:16px;line-height:1.4;
+ color:var(--travel-ink);background:var(--travel-paper);border:2px solid var(--travel-rim);
+ border-radius:3px;box-shadow:inset 0 2px var(--travel-light),inset 0 -3px var(--travel-shade),0 4px var(--travel-ledge);
+ min-height:44px;padding:9px 10px;transition:filter .12s,transform .10s,box-shadow .10s;
+}
+#app button.primary,#modal-content button.primary{
+ background:var(--travel-green);border:3px solid var(--travel-green-rim);color:#fff9dd;
+ box-shadow:inset 0 3px #adc184,inset 0 -4px #65834b,0 5px #3b62444d;
+ min-height:56px;font-size:23px;letter-spacing:.3px;
+}
+#app button.selected,#modal-content button.selected,#app button[aria-pressed="true"],#modal-content button[aria-pressed="true"],#app .actions button.active{
+ background:var(--travel-selected);border-color:#769367;color:#405e3c;
+ box-shadow:inset 0 2px #f6f9eb,inset 0 -3px #cbdab5,0 4px var(--travel-ledge);
+}
+#app button:not(:disabled):active,#modal-content button:not(:disabled):active{
+ transform:translateY(2px);box-shadow:inset 0 2px #e9ecd8,0 1px var(--travel-ledge);
+}
+#app button.primary:not(:disabled):active,#modal-content button.primary:not(:disabled):active{
+ box-shadow:inset 0 2px #68864e,0 2px #3b62444d;
+}
+#app button:disabled,#modal-content button:disabled{opacity:.48;filter:grayscale(.25);box-shadow:none;transform:none;cursor:default}
+#app button:focus-visible,#modal-content button:focus-visible{outline:3px solid #537649;outline-offset:3px}
+#app button :is(strong,b),#modal-content button :is(strong,b){font:inherit;font-weight:400;line-height:1.45}
+#app button small,#modal-content button small{font-family:Neo,system-ui,sans-serif;font-size:10px;line-height:1.7;color:var(--travel-muted)}
+#app button.primary small,#modal-content button.primary small{color:#fff5d8}
+#app :is(.page-head,.journey-head,.flight-head){
+ background:linear-gradient(#f9f5e7e8,#f9f5e7e8),url('./assets/title-travel-v6.2.png') center 22%/cover;
+ border-bottom:2px solid #ccd7b9;padding:14px 16px;gap:12px;
+}
+#app .page-head h2,#app .journey-card h2,#modal-content h2{font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:25px;font-weight:400;line-height:1.45;color:#526743}
+#app :is(.section-title,#page-content h3){font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:19px;font-weight:400;line-height:1.5;color:#526743;margin-top:24px}
+#modal-content h3{font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:19px;font-weight:400;line-height:1.5;color:#526743}
+#app :is(.journey-head strong,.flight-head strong){font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:19px;font-weight:400}
+#app :is(.page-head .square,.journey-head .square,.flight-head .square){width:44px;min-width:44px;height:44px;padding:4px;font-size:23px}
+#app :is(.journey-footer,.passenger-panel,#boarding-footer){background:#f8f3e4;border-color:#cbd7b9;padding:14px 16px 18px}
+#app #page-content{padding:20px 18px 30px}
+#app :is(.intro,.note,.journey-card p){color:#718367;line-height:1.9}
+#app :is(.boarding-pass,.seat-detail,.bag-status,.blog-cover,.blog-stats,.gear-card,.trip-wishes),#modal-content :is(.meal-hint,.meal-preview,.reward,.friend-dialogue,.local-friend-profile){
+ background:#f1eed8;border-color:#b9cbaa;color:var(--travel-ink);border-radius:3px;
+}
+#modal-content{background:#fff8e7;border:3px solid #94ac80;border-radius:5px;box-shadow:inset 0 3px #fffdf2,inset 0 -4px #e6e3c9,0 8px #36513840;padding:22px}
+#modal-content :is(p,.note){color:#718367}
+#toast{width:max-content;max-width:min(360px,calc(100vw - 32px));font-family:TravelJua,'Malgun Gothic',sans-serif;font-size:15px;line-height:1.65;padding:12px 16px;word-break:keep-all;text-align:center;background:#607d4e;color:#fff8df;border:2px solid #4c6840;border-radius:3px;box-shadow:0 4px #36513840}
+#app :is(.home-design-tabs,.home-category-tabs,.wearable-tabs,.shop-tabs,.choice-row){gap:8px}
+#app :is(.home-category-tabs,.wearable-tabs,.shop-tabs) button{font-size:15px;min-height:44px;white-space:normal}
+#app .home-category-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+#app :is(.choice,.route-card,.pack-item,.style-card,.avatar-card,.room-item,.transport-option,.wish-choice).selected:after{content:none}
+#app :is(.home-type-grid,.home-furniture-grid,.home-finish-grid){gap:10px}
+#app .home-choice{padding:11px 6px;gap:9px}
+#app .home-choice strong{font-size:15px;line-height:1.45}
+#app .home-choice b{font-size:13px;color:#5c794b}
+#app .home-city-grid .home-choice{font-size:17px}
+#app :is(.avatar-card,.style-card){font-size:16px;gap:8px;padding:10px 6px 12px}
+#app .avatar-card,#app .home-choice strong,#app .route-card strong,#app .transport-option strong,#app .discovery-option strong,#modal-content .meal-option{word-break:keep-all;overflow-wrap:normal}
+#app .style-card{flex-direction:column;text-align:center;min-height:126px;padding:14px 10px;gap:10px}
+#app .style-card>span:not(.item-art){width:100%;word-break:keep-all;line-height:1.6}
+#app .style-card .item-art{width:48px;height:48px}
+#app .avatar-grid{gap:10px}
+#app .style-grid{gap:10px}
+#app .route-card{padding:12px 9px;gap:3px;font-size:18px}
+#app .route-card span{font:12px Neo,system-ui,sans-serif;color:#738763;margin:0 0 5px}
+#app .choice{font-size:16px;padding:10px 5px;min-width:0}
+#app .pack-item{font-size:16px;padding:11px 5px;gap:9px;min-height:88px}
+#app .transport-option{padding:13px 12px;gap:12px;font-size:18px}
+#app .airport-actions button{font-size:18px;padding:12px;min-height:70px}
+#app .shop-product{font-size:17px;padding:12px 8px;gap:10px;border-color:var(--travel-rim)}
+#app .shop-product .product-art{border:1px solid #d2d8bc;background:#faf4e1;border-radius:3px}
+#app .shop-tabs button{padding:8px 9px}
+#app .shop-tabs,#modal-content .shop-tabs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#modal-content .shop-tabs button{font-size:16px;padding:9px 10px;white-space:nowrap;min-width:0}
+#modal-content .shop-product strong,#modal-content .transport-option strong,#modal-content .discovery-option strong{word-break:keep-all;line-height:1.55}
+#modal-content .shop-product .product-art{border:1px solid #d2d8bc;background:#faf4e1;border-radius:3px}
+#app .room-item{padding:10px 8px;gap:8px;font-size:15px;min-width:0}
+#modal-content .room-item{padding:10px 6px;gap:8px;font-size:15px;word-break:keep-all;min-height:96px}
+#app .room-spots button{padding:12px 8px;font-size:15px}
+#app :is(.scene-look,.journey-wish){font-size:14px;min-height:40px;padding:7px 10px;background:#fff6dfed}
+#app .views{gap:7px;padding:10px 12px 12px}
+#app .views button{font-size:16px;padding:7px 8px;min-height:44px}
+#app #seat-map{font-size:14px;padding:7px 8px;color:var(--travel-ink)}
+#app .actions button{font-size:17px;padding:11px 4px;gap:7px;min-height:88px}
+#app .actions strong{font:inherit}
+#app .wellbeing{flex-wrap:wrap;gap:9px 14px;font-size:11px}
+#app #goals{font-size:13px;padding:5px 8px;min-height:34px}
+#app .music-track,#modal-content .music-track{font-size:18px;text-align:left;padding:14px}
+#app .discovery-option{font-size:18px;padding:12px;gap:12px}
+#modal-content .meal-option{font-size:16px;text-align:left;padding:11px 8px;gap:8px;min-width:0}
+#modal-content .meal-option>.item-art{width:48px;height:48px}
+.meal-picture{object-fit:contain;image-rendering:auto!important}
+#modal-content .meal-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+#modal-content .meal-option{flex-direction:column;text-align:center}
+#modal-content .meal-option>span{min-width:0;width:100%;overflow-wrap:anywhere}
+#modal-content .meal-option>.item-art{flex-shrink:0;width:64px;height:64px}
+#modal-content .seat-row button.mine{opacity:1!important;filter:none!important}
+#modal-content .choice{padding:10px 7px;font-size:16px;min-width:0}
+#app .seat-row button,#modal-content .seat-row button{font-family:Neo,system-ui,sans-serif;font-size:10px;min-height:36px;padding:5px 2px;box-shadow:inset 0 1px #fffdf2,0 2px #50765b38}
+#app .seat-row button.window,#modal-content .seat-row button.window{border-left:4px solid #8db2b4}
+#app .seat-row button.selected,#modal-content .seat-row button.selected{background:var(--travel-green);color:#fff9dd;border-color:var(--travel-green-rim)}
+#app .source-button,#modal-content .source-button{font-family:Neo,system-ui,sans-serif;font-size:11px;padding:6px 8px;min-height:34px}
+#app .stamp.earned{background:#f1eed8;border-color:#9aaf86;color:#5c794b}
+#app :is(.photo-card,.stay-card,.collection-card){border-color:#b9cbaa;background:#fff8e7;border-radius:3px}
+#app .stay-card time{display:block;margin-top:4px;white-space:nowrap;font-size:9px}
+#app .journey-step.current{color:#4f713c}.journey-step.current i{background:#789458;border-color:#536f41}
+#app .home-category-heading{align-items:center;gap:12px}.home-category-heading button{font-size:14px!important;min-height:38px!important}
+@media(max-width:370px){
+ #app button,#modal-content button{font-size:15px;padding-left:7px;padding-right:7px}
+ #app .home-choice strong{font-size:14px}#app .views{gap:5px;padding-left:9px;padding-right:9px}
+ #app .views button{font-size:14px;padding:6px 7px}#app .actions button{font-size:16px}
+ #app :is(.page-head,.journey-head,.flight-head){padding-left:12px;padding-right:12px;gap:9px}
+ #app .journey-head strong,#app .flight-head strong{font-size:17px}
+}
+@media(prefers-reduced-motion:reduce){#app button,#modal-content button{transition:none}#app button:active,#modal-content button:active{transform:none}}
+@media(min-width:500px) and (max-height:500px){
+ #app{width:100vw;max-width:980px}
+ #home.home{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto 1fr auto;gap:8px 16px;padding:14px 18px}
+ #home .brand{grid-column:1;grid-row:1;margin:0;align-self:end}
+ #home .brand h1{font-size:clamp(42px,6.2vw,54px)}
+ #home .title-caption{margin-top:7px;font-size:10px}
+ #home .start-mascot{grid-column:1;grid-row:2;align-self:center;margin:0 auto;width:110px;height:105px}
+ #home .start-mascot #home-avatar,#home .start-mascot .sprite{width:110px;height:110px}
+ #home .start-controls{grid-column:2;grid-row:1/3;justify-self:center;align-self:center;max-width:346px}
+ #home #boarding{min-height:52px;font-size:25px}
+ #home .home-menu{gap:8px;margin-top:10px}
+ #home .home-menu button{min-height:44px;font-size:18px;padding:8px 7px}
+ #home .start-rest{display:none}
+ #home footer.start-footer{grid-column:1/3;grid-row:3;max-width:none}
+ #app .flight{display:grid;grid-template-columns:minmax(0,1fr) 220px;grid-template-rows:auto auto 3px auto minmax(0,1fr)}
+ #app .flight-head{grid-column:1/3;grid-row:1;padding:8px 12px}
+ #app .journey-flight-link{grid-column:1/3;grid-row:2;margin-bottom:5px}
+ #app .flight-progress{grid-column:1/3;grid-row:3}
+ #app .views{grid-column:1;grid-row:4;padding:8px 10px;gap:6px}
+ #app .views button{min-height:40px;font-size:14px}
+ #app .flight-stage{grid-column:1;grid-row:5;min-height:0;height:100%;width:100%}
+ #app .passenger-panel{grid-column:2;grid-row:4/6;min-height:0;overflow-y:auto;padding:10px 10px 12px;border-left:2px solid #cbd7b9;border-top:0}
+ #app .actions{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #app .actions button{min-height:79px;font-size:16px}
+ #app .wellbeing{gap:8px;font-size:10px}
+ #app #goals{width:100%;margin-left:0}
+ #app #flight-hint{line-height:1.7;margin:8px 0}
+ #app .journey-screen{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.9fr);grid-template-rows:auto auto minmax(0,1fr) auto}
+ #app .journey-head{grid-column:1/3;grid-row:1;padding:8px 12px}
+ #app .journey-track{grid-column:1/3;grid-row:2;padding-bottom:8px}
+ #app .travel-stage{grid-column:1;grid-row:3/5;max-height:none;height:100%;min-height:0;overflow:hidden}
+ #app #travel-scene{height:100%;width:100%;max-height:none;object-fit:cover}
+ #app .journey-body{grid-column:2;grid-row:3;min-height:0;overflow-y:auto}
+ #app .journey-card{padding:12px 14px}
+ #app .journey-card h2{font-size:22px}
+ #app .journey-footer{grid-column:2;grid-row:4;padding:10px 14px 12px}
+ #app .journey-footer p{display:none}
+ #app .journey-footer .primary{font-size:19px;min-height:48px}
+ #app .journey-screen.scenery-only .travel-stage{grid-column:1/3;grid-row:3/5}
+}
+
+
+/* The game keeps the same button surfaces while applying emphasis intentionally. */
+#app .page button:not(.primary),#app .journey-screen button:not(.primary),#app .flight button:not(.primary),#modal-content button:not(.primary){font-family:Neo,system-ui,sans-serif;font-weight:400;font-size:14px}
+#app :is(.section-title,#page-content h3),#modal-content h3{font-family:Neo,system-ui,sans-serif;font-weight:400;font-size:17px}
+#app button :is(strong,b),#modal-content button :is(strong,b){font-weight:400}
+#app :is(.keyword,.section-title b),#modal-content :is(.keyword,.section-title b){font-weight:700}
+#app button small,#modal-content button small{font-weight:400}
+.art-showcase{display:flex;justify-content:center;align-items:center;width:100%;min-height:230px;margin:12px 0;background:#f5eddc;border:2px solid #bcc6a7;padding:12px;overflow:hidden}
+.art-showcase>.atlas-art{max-width:100%;flex-shrink:0}.art-showcase>.item-art,.art-showcase>.duty-product-icon{width:220px;height:220px;object-fit:contain}
+.regional-magnet{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:4px;border:3px solid #b7a67d;border-radius:10px;background:#f1e3bf;box-shadow:inset 0 0 0 2px #fff5d8,2px 3px #6477542a;overflow:hidden}.regional-magnet .atlas-art{border-radius:6px}.regional-magnet>img{width:100%;height:100%;object-fit:cover}.regional-magnet small{position:absolute;bottom:4px;left:4px;right:4px;background:#f8efd3d9;font:9px Neo;text-align:center}
+.local-stop-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.local-stop-list button{min-width:0;text-align:left}
+.cabin-service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cabin-service-grid button{text-align:left;padding:12px}
+#premium-actions{margin:8px 0}#premium-actions button{width:100%;min-height:44px}
+#app .flight-stage[data-view=seat] #scenery{width:100%;height:100%}#app .flight-stage[data-view=seat] .my-seat,#app .flight-stage[data-view=seat] .scene-info{display:none}
+.meal-preview{flex-wrap:wrap}.meal-preview .meal-picture{width:100px;height:100px}.meal-preview small{width:100%;text-align:center}
+
+.meal-order-showcase>.meal-picture{width:95px;height:95px;flex-shrink:1}.meal-order-showcase>.meal-picture:only-child{width:220px;height:220px;flex-shrink:0}
+
+#app .flight-stage[data-view=seat]{background:#e9e5d6}#app .flight-stage[data-view=seat] #scenery{object-fit:contain}#premium-actions button{font-size:13px!important}
+
+#app .flight-stage[data-view=seat] #scenery{margin:0;max-width:100%}
+
+.cinema-screen{margin:12px 0;padding:6px;background:#526051;border:2px solid #a8b59b;border-radius:8px}.cinema-screen canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:3px}.cinema-screen figcaption{padding:8px 4px 3px;color:#faf1da;font:12px Neo;line-height:1.6;text-align:center}.cinema-controls{display:flex;gap:8px}.cinema-controls button{flex:1;min-height:44px}.cabin-choice-preview{display:block;width:100%;height:auto;aspect-ratio:3/2;margin:12px 0;border:2px solid #a8b59b}.cabin-choice-showcase.tea{display:grid;grid-template-columns:1fr 1fr;gap:8px;min-height:210px}.cabin-choice-showcase.tea .meal-picture{width:100%;height:auto;max-height:220px;aspect-ratio:1}.cabin-choice-showcase .amenity-picture{width:260px;height:260px;max-width:100%;object-fit:contain}.cabin-service-grid .amenity-picture{display:block;object-fit:contain}.cabin-service-grid .meal-picture{width:54px;height:54px;object-fit:contain}.cabin-service-grid button>span{display:block;margin-top:6px}

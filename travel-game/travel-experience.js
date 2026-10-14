@@ -48,7 +48,7 @@ export function normalizeExperience(raw,route,wish='scenery'){
  const plan=[...new Set((Array.isArray(raw?.plan)?raw.plan:[]).filter(valid))].slice(0,2);
  return {plan:plan.length===2?plan:planFor(route,wish),visits:[...new Set((Array.isArray(raw?.visits)?raw.visits:[]).filter(valid))],ticks:integer(raw?.ticks,10000),dayTicks:integer(raw?.dayTicks,100),phase:integer(raw?.phase,2),choice:[0,1].includes(raw?.choice)?raw.choice:null,followed:raw?.followed===true,photoIds:(Array.isArray(raw?.photoIds)?raw.photoIds:[]).filter(x=>typeof x==='string').slice(0,200),highlights:(Array.isArray(raw?.highlights)?raw.highlights:[]).filter(x=>typeof x==='string').slice(0,3),pageClaimed:raw?.pageClaimed===true};
 }
-export function experience(j){return j.experience||=(normalizeExperience(null,j.routeId,j.wish));}
+export function experience(j){const phase=j.departure==='night'?2:j.departure==='evening'?1:0;return j.experience||=(normalizeExperience({phase,dayTicks:phase*2},j.routeId,j.wish));}
 export function travelState(raw){
  const photos=(Array.isArray(raw?.photos)?raw.photos:[]).filter(x=>x&&routeOK(x.route)&&localItems(x.route).some(i=>i.id===x.place)&&PHOTO_FRAMES.some(f=>f.id===x.frame)&&Number.isFinite(x.date)).slice(-1000).map(x=>({id:`photo:${x.place}:${integer(x.phase,2)}:${x.frame}`,route:x.route,place:x.place,frame:x.frame,phase:integer(x.phase,2),date:integer(x.date,Number.MAX_SAFE_INTEGER)}));
  const events=(Array.isArray(raw?.events)?raw.events:[]).filter(x=>x&&routeOK(x.route)&&[0,1].includes(x.choice)).slice(-100).map(x=>({route:x.route,choice:x.choice,followed:x.followed===true}));

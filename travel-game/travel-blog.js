@@ -1,8 +1,9 @@
-import {memoryOptions,normalizeExperience,CITY_EPISODES,automaticHighlights} from './travel-experience.js?v=6.8.0';
-import {ROUTES} from './model.js?v=6.8.0';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.8.0';
-import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.8.0';
-import {cityGuide} from './city-guide.js?v=6.8.0';
+import {coherentMemories,itineraryStoryLabel} from './travel-connections.js?v=6.9.0';
+import {memoryOptions,normalizeExperience,CITY_EPISODES,automaticHighlights} from './travel-experience.js?v=6.9.0';
+import {ROUTES} from './model.js?v=6.9.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.9.0';
+import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.9.0';
+import {cityGuide} from './city-guide.js?v=6.9.0';
 const cap=n=>Number.isFinite(n)?Math.max(0,Math.min(999999,Math.floor(n))):0;
 const knownRoute=id=>ROUTES.some(r=>r.id===id);
 export const STARTER_FUNDS=1000;
@@ -34,7 +35,7 @@ export function publishTrip(p,record,now=Date.now()){
  const variety=new Set(items.map(id=>DISCOVERY_ITEMS.find(i=>i.id===id)?.kind)).size+(gifts.length?1:0)+(animal?1:0);
  const friendEvent=friendEventState(record.friendEvent,record.route),friend=friendEvent?.met?'seorira':null;
  let income=150+items.length*18+gifts.length*12+photos*8+(animal?35:0)+(bond?20:0)+variety*8+(firstCity&&record.route!=='jeju'?35:0)+(friend?30+friendEvent.topics.length*5:0);
- const experience=record.experience?normalizeExperience(record.experience,record.route,record.wish):null;let highlights=[];if(experience&&p.moneyVersion===1){const options=memoryOptions(record,p);highlights=experience.highlights.filter(id=>options.some(x=>x.id===id));if(!highlights.length)highlights=automaticHighlights(options);const kinds=new Set(highlights.map(id=>options.find(x=>x.id===id).kind));const oldItems=new Set(p.blog.posts.filter(x=>x.route===record.route).flatMap(x=>x.items));const newItems=items.filter(id=>!oldItems.has(id)).length;income=140+(firstCity?35:0)+Math.min(3,kinds.size)*12+Math.min(5,newItems)*6+(experience.choice!==null?20:0)+(experience.followed?15:0)+(animal?15:0)+(bond?10:0)+(friend?20:0);}
+ const experience=record.experience?normalizeExperience(record.experience,record.route,record.wish):null;let highlights=[];if(experience&&p.moneyVersion===1){const options=memoryOptions(record,p);highlights=experience.highlights.filter(id=>options.some(x=>x.id===id));if(!highlights.length)highlights=automaticHighlights(options);const kinds=new Set(highlights.map(id=>options.find(x=>x.id===id).kind));const oldItems=new Set(p.blog.posts.filter(x=>x.route===record.route).flatMap(x=>x.items));const newItems=items.filter(id=>!oldItems.has(id)).length;income=140+(firstCity?35:0)+Math.min(3,kinds.size)*12+Math.min(5,newItems)*6+(experience.choice!==null&&!p.blog.posts.some(x=>x.route===record.route&&x.experience?.choice===experience.choice)?20:0)+(experience.followed&&!p.blog.posts.some(x=>x.route===record.route&&x.experience?.followed)?15:0)+(animal?15:0)+(bond?10:0)+(friend?20:0)+(coherentMemories(highlights)&&!p.blog.posts.some(x=>x.route===record.route&&JSON.stringify(x.highlights)===JSON.stringify(highlights))?12:0);}
  const views=income*9+items.length*37+(animal?210:0);
  const post={activities:{cafe:Math.min(90,cap(record.life?.orders)),recipe:record.life?.recipe===true},highlights,experience,id:record.id,route:record.route,date:now,income,views,likes:Math.floor(views*.06),items,gifts,photos,animal,bond,firstCity,friend,friendTopics:friend?friendEvent.topics:[]};
  const repayment=Math.min(p.blog.advance||0,income);p.blog.advance-=repayment;post.repayment=repayment;post.paid=income-repayment;
@@ -52,7 +53,8 @@ export function postStory(post){
  const selected=new Set(post.highlights||[]),recorded=selected.size?post.items.filter(id=>selected.has('visit:'+id)):post.items;const foods=recorded.map(id=>DISCOVERY_ITEMS.find(i=>i.id===id)).filter(i=>i&&i.kind!=='place').map(i=>i.name),places=recorded.map(id=>DISCOVERY_ITEMS.find(i=>i.id===id)).filter(i=>i?.kind==='place').map(i=>i.name);
  const options=memoryOptions({life:{orders:post.activities?.cafe},route:post.route,discovered:post.items,animalMet:post.animal,experience:post.experience,purchases:Object.fromEntries(post.gifts.map(id=>[id,shopItem(id).name]))},{travel:{photos:[]}});
  const lines=[`${route.name}에서 작은 하루를 보냈어요. ${guide.note}`];
- if(post.experience?.choice!==null&&post.experience&&(!selected.size||selected.has('story:'+post.route))){const ep=CITY_EPISODES[post.route];lines.push(ep.choices[post.experience.choice]+'의 기억을 남겼어요.');if(post.experience.followed)lines.push(ep.follow);}
+ if(post.experience?.choice!==null&&post.experience&&(!selected.size||selected.has('story:'+post.route))){const ep=CITY_EPISODES[post.route];lines.push(itineraryStoryLabel(post.route,post.experience)+'의 기억을 남겼어요.');if(post.experience.followed)lines.push(ep.follow);}
+ for(const id of selected){if(!id.startsWith('incident:'))continue;const entry=post.experience?.incidents?.find(x=>'incident:'+x.key===id);if(entry)lines.push(entry.title+' — '+entry.text);}
  if(selected.size)lines.push('오늘 골라 남긴 기억: '+[...selected].map(id=>options.find(x=>x.id===id)?.label||(id.startsWith('photo:')?'현지에서 찍은 사진':'여행의 작은 순간')).join(' · '));
  if(foods.length)lines.push(`${foods.join(' · ')}의 맛을 여행수첩에 담았어요.`);
  if(places.length)lines.push(`${places.join(' · ')}에서 잠깐 멈춰 풍경을 바라봤어요.`);
@@ -61,6 +63,6 @@ export function postStory(post){
  const shownGifts=selected.size?post.gifts.filter(id=>selected.has('gift:'+id)):post.gifts;if(shownGifts.length)lines.push(`집에 가져갈 작은 선물도 골랐어요. ${shownGifts.map(id=>shopItem(id).name).join(' · ')}.`);
  if(post.activities?.cafe&&(!selected.size||selected.has('cafe:'+post.route)))lines.push(`현지 카페에서 손님 ${post.activities.cafe}명의 음료를 직접 만들었어요.${post.activities.recipe?' 배운 레시피는 집에서도 만들어볼 거예요.':''}`);
  if(post.photos)lines.push(`창밖 사진 ${post.photos}장도 함께 남겼어요.`);
- return {title:`${route.name}, ${post.animal?'작은 친구를 만난 날':foods.length?'맛있는 기억 한 줌':'잠시 쉬어 간 하루'}`,lines};
+ const first=post.highlights?.[0],leading=options.find(x=>x.id===first)?.label||(first?.startsWith('photo:')?(DISCOVERY_ITEMS.find(x=>x.id===first.slice(6).replace(/:[0-2]:(wide|detail)(?::(scene|food|table|animal))?$/,''))?.name||'현지')+'의 한 장':null);return {title:leading?`${route.name}, ${leading}`:`${route.name}, ${post.animal?'작은 친구를 만난 날':foods.length?'맛있는 기억 한 줌':'잠시 쉬어 간 하루'}`,lines};
 }
-import {friendEventState} from './local-friends.js?v=6.8.0';
+import {friendEventState} from './local-friends.js?v=6.9.0';

@@ -1,6 +1,6 @@
-import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.8.0';
-import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.8.0';
-import {ROOM_BOUNDS} from './room-bounds.js?v=6.8.0';
+import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.9.0';
+import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.9.0';
+import {ROOM_BOUNDS} from './room-bounds.js?v=6.9.0';
 // Every destination resolves to its own painted rooms, terminal, and three vehicle bodies.
 export const CITY_VISUALS=[
   {
@@ -416,7 +416,7 @@ export function cityArtSpec(id,kind,slot=0){
  if(kind==='vehicle')return {file:`vehicles-${letter}-v5.png`,cols:single?1:3,rows:single?3:6,col:single?0:slot,row:single?slot:city.row};
  throw new Error('Unknown art kind '+kind);
 }
-export function cityImage(spec){if(typeof Image==='undefined')return null;if(!pictures.has(spec.file)){const image=new Image();image.src=new URL('./assets/'+spec.file,import.meta.url).href;pictures.set(spec.file,image);}return pictures.get(spec.file);}
+export function cityImage(spec){if(typeof Image==='undefined')return null;if(pictures.has(spec.file)){const image=pictures.get(spec.file);pictures.delete(spec.file);pictures.set(spec.file,image);return image;}if(!pictures.has(spec.file)){const image=new Image();image.src=new URL('./assets/'+spec.file,import.meta.url).href;pictures.set(spec.file,image);if(pictures.size>8)pictures.delete(pictures.keys().next().value);}return pictures.get(spec.file);}
 export function cityArtSource(id,kind,slot=0){const spec=cityArtSpec(id,kind,slot),image=cityImage(spec);if(!image?.complete||!image.naturalWidth)return null;const key=spec.col+':'+spec.row,bounds=kind==='vehicle'?VEHICLE_BOUNDS[spec.file]?.[key]:kind==='airport'?AIRPORT_BOUNDS[spec.file]?.[key]:ROOM_BOUNDS[spec.file]?.[key];if(bounds)return {image,x:bounds[0],y:bounds[1],width:bounds[2],height:bounds[3],spec};const width=image.naturalWidth/spec.cols,height=image.naturalHeight/spec.rows;return {image,x:spec.col*width+2,y:spec.row*height+2,width:width-4,height:height-4,spec};}
 export function drawCityPanel(c,id,kind,slot=0,box=[0,0,360,240]){const source=cityArtSource(id,kind,slot);if(!source)return false;
  if(kind==='airport'&&source.width/source.height>1.8){const height=box[2]*source.height/source.width;c.drawImage(source.image,source.x,source.y,source.width,source.height,box[0],box[1],box[2],height);const floor=airportFloorColor(source);c.fillStyle=floor;c.fillRect(box[0],box[1]+height-1,box[2],box[3]-height+1);c.fillStyle='#fff6e818';for(let row=0;row<3;row++)c.fillRect(box[0],Math.round(box[1]+height+(box[3]-height)*(row+1)/4),box[2],1);}else c.drawImage(source.image,source.x,source.y,source.width,source.height,...box);return true;}

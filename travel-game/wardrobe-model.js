@@ -1,5 +1,6 @@
-import {levelFor} from './model.js?v=6.8.0';
-import {shopItem} from './shopping.js?v=6.8.0';
+import {MEMORY_GOALS} from './travel-connections.js?v=6.9.0';
+import {levelFor} from './model.js?v=6.9.0';
+import {shopItem} from './shopping.js?v=6.9.0';
 const classics=[{id:'sage',name:'세이지 니트',color:'#8aa28c',level:1},{id:'cream',name:'크림 가디건',color:'#dbcaa8',level:1},{id:'rose',name:'로즈 리본',color:'#b58b91',level:3},{id:'ocean',name:'하늘 스카프',color:'#7eabc1',level:5},{id:'lavender',name:'라벤더 니트',color:'#a99bbd',level:8},{id:'sunset',name:'노을 가디건',color:'#c69873',level:12},{id:'midnight',name:'밤빛 리본',color:'#7385a2',level:16},{id:'gold',name:'여행가의 금빛',color:'#c6b678',level:24}];
 export const STYLES=[...classics,
  {id:'picnic',name:'피크닉 멜빵',color:'#a4b49c',level:2,cut:'overalls'},
@@ -56,11 +57,13 @@ export const SUNGLASSES=[
  {id:'sun-butterfly',name:'나비 선글라스',level:20,color:'#bba18c'}
 ];
 
+export const MEMORY_OUTFITS={picnic:'city-page',ocean:'sea-gallery',rose:'connected-friend'};
+export function wearableAvailable(p,item){return !!item&&(levelFor(p.xp)>=item.level||(!!p.travel?.rewards?.includes(MEMORY_OUTFITS[item.id])||!!MEMORY_GOALS.find(g=>g.id===MEMORY_OUTFITS[item.id])?.done(p)));}
 export function wardrobeState(p,raw={}){
  const level=levelFor(p.xp),looks={};
  for(let avatar=0;avatar<12;avatar++){
   const saved=raw.looks?.[avatar],legacy=avatar===p.avatar;
-  const style=STYLES.find(s=>s.id===(saved?.style??(legacy?p.style:'sage'))&&s.level<=level)?.id||'sage';
+  const style=STYLES.find(s=>s.id===(saved?.style??(legacy?raw.style||p.style:'sage'))&&wearableAvailable(p,s))?.id||'sage';
   const hat=HATS.find(x=>x.id===saved?.hat&&x.level<=level)?.id||null;
   const candidate=saved?.glasses??(legacy?p.equipped?.glasses:null),bought=shopItem(candidate);
   const glasses=SUNGLASSES.find(x=>x.id===candidate&&x.level<=level)?.id||(bought?.category==='glasses'&&p.collection?.[candidate]?candidate:null);
@@ -71,6 +74,6 @@ export function wardrobeState(p,raw={}){
 export function currentLook(p,avatar=p.avatar){return p.looks?.[avatar]||{style:avatar===p.avatar?p.style||'sage':'sage',hat:null,glasses:avatar===p.avatar?p.equipped?.glasses||null:null};}
 export function syncLook(p){const look=currentLook(p);p.style=look.style;p.equipped||={};if(shopItem(look.glasses)?.category==='glasses')p.equipped.glasses=look.glasses;else delete p.equipped.glasses;}
 export function selectTraveler(p,id){const level=levelFor(p.xp);if(!Number.isInteger(id)||id<0||id>=12||id!==7&&id>=Math.min(12,level+2))return false;p.looks||={};p.looks[p.avatar]||=currentLook(p);p.avatar=id;p.looks[id]||={style:'sage',hat:null,glasses:null};syncLook(p);return true;}
-export function dressTraveler(p,kind,id){const pool={style:STYLES,hat:HATS,glasses:SUNGLASSES}[kind];if(!pool)return false;const item=pool.find(x=>x.id===id);if(id!==null&&(!item||item.level>levelFor(p.xp)))return false;if(kind==='style'&&id===null)return false;p.looks||={};p.looks[p.avatar]={...currentLook(p),[kind]:id};syncLook(p);return true;}
+export function dressTraveler(p,kind,id){const pool={style:STYLES,hat:HATS,glasses:SUNGLASSES}[kind];if(!pool)return false;const item=pool.find(x=>x.id===id);if(id!==null&&(!wearableAvailable(p,item)))return false;if(kind==='style'&&id===null)return false;p.looks||={};p.looks[p.avatar]={...currentLook(p),[kind]:id};syncLook(p);return true;}
 export function wearPurchasedGlasses(p,id){if(shopItem(id)?.category!=='glasses'||!p.collection?.[id])return false;p.looks||={};const look=currentLook(p);p.looks[p.avatar]={...look,glasses:look.glasses===id?null:id};syncLook(p);return true;}
 export const wardrobeFrame=()=>0;

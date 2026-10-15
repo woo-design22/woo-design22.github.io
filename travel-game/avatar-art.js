@@ -1,8 +1,8 @@
-import {travelerProtection} from './avatar-protection.js?v=6.8.0';
-import {travelerFaceOffset,eyewearBox} from './avatar-anchors.js?v=6.8.0';
-import {SPRITE_BOUNDS} from './sprite-bounds.js?v=6.8.0';
-import {drawItemArt} from './item-art.js?v=6.8.0';
-import {wardrobeFrame} from './wardrobe-model.js?v=6.8.0';
+import {travelerProtection} from './avatar-protection.js?v=6.9.0';
+import {travelerFaceOffset,eyewearBox} from './avatar-anchors.js?v=6.9.0';
+import {SPRITE_BOUNDS} from './sprite-bounds.js?v=6.9.0';
+import {drawItemArt} from './item-art.js?v=6.9.0';
+import {wardrobeFrame} from './wardrobe-model.js?v=6.9.0';
 const sheets={};
 for(const kind of ['seated','walk'])if(typeof Image!=='undefined'){
  const im=new Image();sheets[kind]=im;
@@ -52,7 +52,7 @@ export function drawTraveler(c,id=7,frame=0,color=null,walking=false,box=[0,0,96
    }
    const torsoTop=(neck[g.kind][g.id]-2)*2;
    lc.putImageData(base,0,0,48,torsoTop,96,176-torsoTop);
-   outfitCache.set(key,layer);if(outfitCache.size>240)outfitCache.delete(outfitCache.keys().next().value);
+   outfitCache.set(key,layer);if(outfitCache.size>64)outfitCache.delete(outfitCache.keys().next().value);
   }
   c.save();c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(layer,x+poseX,y,w,h);
   if(hat)drawItemArt(c,hat,[x+26*w/96,y+hatTop[g.id]*h/96,44*w/96,30*h/96]);

@@ -1,8 +1,8 @@
-import {CITY_EPISODES} from './travel-experience.js?v=6.10.1';
-import {localFlavor} from './local-flavors.js?v=6.10.1';
-import {ROUTES} from './model.js?v=6.10.1';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.10.1';
-import {COLLECTION_ITEMS} from './shopping.js?v=6.10.1';
+import {CITY_EPISODES} from './travel-experience.js?v=6.11.0';
+import {localFlavor} from './local-flavors.js?v=6.11.0';
+import {ROUTES} from './model.js?v=6.11.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.11.0';
+import {COLLECTION_ITEMS} from './shopping.js?v=6.11.0';
 
 // Fictional, city-specific play directions. These are not factual travel advice.
 const themes=['돌담과 바닷바람','전차와 작은 골목','등불과 찻잔','강변의 빵집','파도와 꽃그늘','달의 발자국','물가의 부채','비 뒤의 정원','다리와 모래그림','꽃 접시와 초록길','항구의 벤치','초록 언덕의 새소리','분수와 그늘 회랑','계단의 찻집','분수와 젤라토 골목','모자이크 언덕','노란 전차와 지붕','공원의 책갈피','운하의 다리','항구의 색연필','숲속의 따뜻한 창','호수에 비친 창문','다리와 붉은 지붕','공원에서 들은 공연','언덕 아래 항구','숲과 바닷바람','서리라와 동네 약속','절벽 위 바다 벤치','바람과 온천의 창','별빛 정거장','대나무 책갈피'];

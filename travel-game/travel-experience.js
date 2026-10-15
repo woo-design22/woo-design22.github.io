@@ -1,8 +1,8 @@
-import {normalizeIncidents,earnedDecor,itineraryStoryLabel} from './travel-connections.js?v=6.10.1';
-import {normalizeCapture} from './travel-life.js?v=6.10.1';
-import {ROUTES} from './model.js?v=6.10.1';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.10.1';
-import {COLLECTION_ITEMS} from './shopping.js?v=6.10.1';
+import {normalizeIncidents,earnedDecor,itineraryStoryLabel} from './travel-connections.js?v=6.11.0';
+import {normalizeCapture} from './travel-life.js?v=6.11.0';
+import {ROUTES} from './model.js?v=6.11.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.11.0';
+import {COLLECTION_ITEMS} from './shopping.js?v=6.11.0';
 
 // These are fictional, gentle travel episodes, not a real-world itinerary guide.
 const rows={
@@ -85,14 +85,16 @@ export function memoryOptions(record,p){
  for(const id of e.photoIds){const photo=p.travel?.photos.find(x=>x.id===id);if(photo)options.push({id,label:localItems(photo.route).find(x=>x.id===photo.place).name+' · '+DAY_PHASES[photo.phase]+' 사진',kind:'photo'});}
  for(const entry of e.incidents.slice().reverse())options.push({id:'incident:'+entry.key,label:entry.title,kind:'story'});
  if(e.choice!==null)options.push({id:'story:'+record.route,label:itineraryStoryLabel(record.route,e),kind:'story'});
- if(record?.life?.orders>0)options.push({id:'cafe:'+record.route,label:'현지 카페에서 직접 만든 음료',kind:'handmade'});
+ if((record?.life?.orders||record?.craftCount||0)>0)options.push({id:'cafe:'+record.route,label:'현지 카페에서 직접 만든 음료',kind:'handmade'});
+ if(record?.errandActions||record?.playStory)options.push({id:'errand:'+record.route,label:record.playStory?.reunited?'함께 발견한 작은 쉼터':'길 위에서 물건의 주인 찾기',kind:'story'});
+ if(record?.postcard)options.push({id:'postcard:'+record.route,label:'쉼터에서 직접 만든 엽서',kind:'photo'});
  if(record?.animalMet)options.push({id:'animal:'+record.route,label:CITY_DISCOVERIES[record.route].animal.name,kind:'animal'});
  for(const name of Object.values(record?.purchases||{})){const item=COLLECTION_ITEMS.find(x=>x.name===name);if(item)options.push({id:'gift:'+item.id,label:item.name,kind:'gift'});}
  if(!options.length)options.push({id:'rest:'+record.route,label:'숙소에서 보낸 조용한 하루',kind:'rest'});
  return [...new Map(options.map(x=>[x.id,x])).values()];
 }
 export function automaticHighlights(options){options=options.slice().sort((a,b)=>({story:0,photo:1,handmade:2,animal:3}[a.kind]??4)-({story:0,photo:1,handmade:2,animal:3}[b.kind]??4));const selected=[],kinds=new Set();for(const x of options){if(kinds.has(x.kind))continue;selected.push(x.id);kinds.add(x.kind);if(selected.length===3)break;}for(const x of options){if(selected.length===3)break;if(!selected.includes(x.id))selected.push(x.id);}return selected;}
-export function setHighlights(j,p,ids){const record={route:j.routeId,discovered:j.discovered,purchases:Object.fromEntries((j.purchases||[]).map(id=>[id,COLLECTION_ITEMS.find(x=>x.id===id)?.name])),animalMet:j.animalMet,life:{orders:j.life?.paid?.length||0},experience:recordExperience(j)},valid=memoryOptions(record,p).map(x=>x.id);experience(j).highlights=[...new Set(ids.filter(x=>valid.includes(x)))].slice(0,3);return record;}
+export function setHighlights(j,p,ids){const record={craftCount:j.craftCount||0,errandActions:j.errandActions||0,postcard:Number.isInteger(j.postcardStamp),route:j.routeId,discovered:j.discovered,purchases:Object.fromEntries((j.purchases||[]).map(id=>[id,COLLECTION_ITEMS.find(x=>x.id===id)?.name])),animalMet:j.animalMet,life:{orders:j.life?.paid?.length||0},experience:recordExperience(j)},valid=memoryOptions(record,p).map(x=>x.id);experience(j).highlights=[...new Set(ids.filter(x=>valid.includes(x)))].slice(0,3);return record;}
 export function displayMemory(p,id,slot){p.travel||=travelState();if(!Number.isInteger(slot)||slot<0||slot>2)return false;if(id&&!p.travel.photos.some(x=>x.id===id)&&!COLLECTION_ITEMS.some(x=>x.id===id&&p.collection?.[id]))return false;p.travel.displays[slot]=id||null;earnedDecor(p);return true;}
 export function unifyWallet(p){
  // One-time 1:1 migration. Reserved journey funds are already outside the wallet.

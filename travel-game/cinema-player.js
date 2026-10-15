@@ -1,5 +1,5 @@
-import {atlasReady,drawAtlas,discoveryAsset} from './generated-art.js?v=6.10.1';
-import {drawAnimal} from './animal-art.js?v=6.10.1';
+import {atlasReady,drawAtlas,discoveryAsset} from './generated-art.js?v=6.11.0';
+import {drawAnimal} from './animal-art.js?v=6.11.0';
 export const CINEMA_FILMS={
  '도시 산책':[{id:'paris:place-0',title:'파리 · 에펠탑'},{id:'tokyo:place-0',title:'도쿄 · 센소지'},{id:'lis:place-0',title:'리스본 · 벨렝 탑'}],
  '바다 여행':[{id:'hawaii:place-0',title:'하와이 · 와이키키 해변'},{id:'jeju:place-1',title:'제주 · 협재해변'},{id:'syd:place-1',title:'시드니 · 본다이 비치'}],

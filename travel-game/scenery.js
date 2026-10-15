@@ -1,6 +1,6 @@
 // Quiet, fictional aerial landscapes inspired by each destination.
 // Geometry is deterministic; flight time moves ground, clouds and light independently.
-import {aerialPictures} from './aerial-atlas.js?v=6.10.1';
+import {aerialPictures} from './aerial-atlas.js?v=6.11.0';
 export const CITY_SCENES = {
  chengdu:['river','temple',353,'금강과 대나무 숲 너머 도시'],
  jeju:['island','volcano',17,'섬과 푸른 바다'],tokyo:['city','fuji',31,'도시 너머의 후지산'],taipei:['mountain','tower',45,'산 사이로 이어지는 도시'],paris:['river','eiffel',53,'센강과 낮은 지붕들'],hawaii:['island','palm',67,'작은 섬과 산호빛 바다'],moon:['ocean','moon',79,'달빛이 내려앉은 바다'],

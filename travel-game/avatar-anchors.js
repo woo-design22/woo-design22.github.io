@@ -1,4 +1,4 @@
-import {AVATAR_EYES} from './avatar-eye-data.js?v=6.10.1';
+import {AVATAR_EYES} from './avatar-eye-data.js?v=6.11.0';
 export function travelerEyes(id=7,frame=0,walking=false){return AVATAR_EYES[walking?'walk':'seated'][Math.max(0,Math.min(11,Math.floor(id)))][frame?1:0];}
 export function travelerFaceOffset(id=7,frame=0,walking=false){const [left,right]=travelerEyes(id,frame,walking);return 48-(left[0]+right[0])/2;}
 // Lens centers are measured in each 32px accessory drawing, not its blank box.

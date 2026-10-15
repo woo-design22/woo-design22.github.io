@@ -1,3 +1,4 @@
+import {layoutState} from './home-layout.js?v=6.11.0';
 export const HOME_CITIES=[
  {id:'jung',name:'서울 중구',view:'남산과 오래된 도심의 지붕',cost:1800},
  {id:'yeongdeungpo',name:'서울 영등포구',view:'한강과 여의도 빌딩',cost:2200},
@@ -35,7 +36,7 @@ export function residenceState(raw){
  const types=HOME_TYPES.filter(x=>x.id==='studio'||raw?.ownedTypes?.includes(x.id)).map(x=>x.id);
  const finishes=HOME_FINISHES.filter(x=>x.id==='wood'||raw?.ownedFinishes?.includes(x.id)).map(x=>x.id);
  const equipped={};for(const slot of categories){const candidate=HOME_FURNITURE.find(x=>x.id===raw?.furniture?.[slot]&&x.slot===slot&&furniture.includes(x.id));equipped[slot]=candidate?.id||(categories.indexOf(slot)<5?'wood-'+slot:null);}
- return {city:cities.includes(raw?.city)?raw.city:'seongbuk',type:types.includes(raw?.type)?raw.type:'studio',wall:finishes.includes(raw?.wall)?raw.wall:'wood',floor:finishes.includes(raw?.floor)?raw.floor:'wood',ownedCities:cities,ownedTypes:types,ownedFinishes:finishes,ownedFurniture:furniture,furniture:equipped};
+ return {layout:layoutState(raw?.layout),city:cities.includes(raw?.city)?raw.city:'seongbuk',type:types.includes(raw?.type)?raw.type:'studio',wall:finishes.includes(raw?.wall)?raw.wall:'wood',floor:finishes.includes(raw?.floor)?raw.floor:'wood',ownedCities:cities,ownedTypes:types,ownedFinishes:finishes,ownedFurniture:furniture,furniture:equipped};
 }
 export function homePurchase(p,kind,id){
  p.residence=residenceState(p.residence);const h=p.residence;

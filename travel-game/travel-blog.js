@@ -1,9 +1,9 @@
-import {coherentMemories,itineraryStoryLabel} from './travel-connections.js?v=6.9.0';
-import {memoryOptions,normalizeExperience,CITY_EPISODES,automaticHighlights} from './travel-experience.js?v=6.9.0';
-import {ROUTES} from './model.js?v=6.9.0';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.9.0';
-import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.9.0';
-import {cityGuide} from './city-guide.js?v=6.9.0';
+import {coherentMemories,itineraryStoryLabel} from './travel-connections.js?v=6.10.0';
+import {memoryOptions,normalizeExperience,CITY_EPISODES,automaticHighlights} from './travel-experience.js?v=6.10.0';
+import {ROUTES} from './model.js?v=6.10.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.10.0';
+import {COLLECTION_ITEMS,shopItem} from './shopping.js?v=6.10.0';
+import {cityGuide} from './city-guide.js?v=6.10.0';
 const cap=n=>Number.isFinite(n)?Math.max(0,Math.min(999999,Math.floor(n))):0;
 const knownRoute=id=>ROUTES.some(r=>r.id===id);
 export const STARTER_FUNDS=1000;
@@ -65,4 +65,4 @@ export function postStory(post){
  if(post.photos)lines.push(`창밖 사진 ${post.photos}장도 함께 남겼어요.`);
  const first=post.highlights?.[0],leading=options.find(x=>x.id===first)?.label||(first?.startsWith('photo:')?(DISCOVERY_ITEMS.find(x=>x.id===first.slice(6).replace(/:[0-2]:(wide|detail)(?::(scene|food|table|animal))?$/,''))?.name||'현지')+'의 한 장':null);return {title:leading?`${route.name}, ${leading}`:`${route.name}, ${post.animal?'작은 친구를 만난 날':foods.length?'맛있는 기억 한 줌':'잠시 쉬어 간 하루'}`,lines};
 }
-import {friendEventState} from './local-friends.js?v=6.9.0';
+import {friendEventState} from './local-friends.js?v=6.10.0';

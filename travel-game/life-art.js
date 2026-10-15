@@ -1,7 +1,7 @@
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.9.0';
-import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.9.0';
-import {drawAnimalSprite} from './animal-art.js?v=6.9.0';
-import {cafeSpec,photoMoment,photoTheme} from './travel-life.js?v=6.9.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.10.0';
+import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.10.0';
+import {drawAnimalSprite} from './animal-art.js?v=6.10.0';
+import {cafeSpec,photoMoment,photoTheme} from './travel-life.js?v=6.10.0';
 const rect=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h));};
 export function drawCafe(canvas,session,ts){const c=canvas.getContext('2d'),cup=session.cup,spec=cafeSpec(session.route),pour=session.pour&&(ts-session.pour.at)<700?session.pour:null;c.imageSmoothingEnabled=false;rect(c,0,0,360,230,'#e8e2cc');rect(c,0,0,360,14,'#7e9375');rect(c,20,30,100,76,'#869c83');rect(c,25,35,90,66,'#bed4ca');rect(c,69,35,4,66,'#f9f2d9');rect(c,25,68,90,4,'#f9f2d9');rect(c,242,32,90,8,'#a58a65');for(let i=0;i<3;i++){rect(c,253+i*24,15,13,17,['#adbc92','#cbb795','#d5c79f'][i]);rect(c,255+i*24,18,9,3,'#f7f1d9');}rect(c,250,85,80,48,'#8c9f8a');rect(c,257,91,65,18,'#cbd1b3');rect(c,260,118,25,6,'#566e58');rect(c,300,117,7,10,'#cfb875');rect(c,0,159,360,71,'#bda27d');rect(c,0,159,360,7,'#ddc9a4');rect(c,0,211,360,4,'#9c815e');rect(c,79,193,160,10,'#a58d6b');rect(c,88,190,140,7,'#eadbb7');rect(c,102,89,113,103,'#5c735e');rect(c,107,94,103,93,'#f6eed9');rect(c,212,109,22,48,'#5c735e');rect(c,214,114,15,38,'#f6eed9');
  const amount=cup.base+cup.milk+cup.sweet+cup.ice,fill=cup.base?Math.min(81,28+amount*7):cup.milk?Math.min(70,cup.milk*18):0,liquid=cup.milk?cup.stir>1?'#c9c3a0':'#e7dfc3':spec.color;rect(c,110,184-fill,97,fill,liquid);if(cup.base&&cup.milk&&cup.stir<3)rect(c,110,170-fill,97,Math.min(18,fill),spec.color);if(cup.sweet)rect(c,111,178,95,6,'#c7a164');for(let i=0;i<cup.ice;i++){rect(c,124+i*36,111,25,19,'#d5e8de');rect(c,127+i*36,114,18,3,'#f3fbeb');}if(cup.stir){rect(c,110,181-fill,97,5,'#f7f0dc');for(let i=0;i<5;i++)rect(c,119+i*16,179-fill,7,4,'#f7f0dc');}rect(c,103,86,113,6,'#5c735e');rect(c,106,88,107,3,'#fbf7e8');

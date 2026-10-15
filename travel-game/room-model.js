@@ -1,4 +1,4 @@
-import {shopItem} from './shopping.js?v=6.9.0';
+import {shopItem} from './shopping.js?v=6.10.0';
 export const ROOM_SPOTS=[
  {id:'desk',name:'창가 책상',icon:'coffee',capacity:4,hint:'여권·휴대폰·카메라·충전기'},
  {id:'bed',name:'포근한 침대',icon:'rest',capacity:3,hint:'잠옷·책·스카프'},

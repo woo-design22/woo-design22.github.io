@@ -1,6 +1,9 @@
-import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.9.0';
-import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.9.0';
-import {ROOM_BOUNDS} from './room-bounds.js?v=6.9.0';
+import {drawTransportSprite} from './transport-sprites.js?v=6.10.0';
+import {drawVehicleModel} from './vehicle-design.js?v=6.10.0';
+import {imageReady} from './image-ready.js?v=6.10.0';
+import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.10.0';
+import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.10.0';
+import {ROOM_BOUNDS} from './room-bounds.js?v=6.10.0';
 // Every destination resolves to its own painted rooms, terminal, and three vehicle bodies.
 export const CITY_VISUALS=[
   {
@@ -420,18 +423,11 @@ export function cityImage(spec){if(typeof Image==='undefined')return null;if(pic
 export function cityArtSource(id,kind,slot=0){const spec=cityArtSpec(id,kind,slot),image=cityImage(spec);if(!image?.complete||!image.naturalWidth)return null;const key=spec.col+':'+spec.row,bounds=kind==='vehicle'?VEHICLE_BOUNDS[spec.file]?.[key]:kind==='airport'?AIRPORT_BOUNDS[spec.file]?.[key]:ROOM_BOUNDS[spec.file]?.[key];if(bounds)return {image,x:bounds[0],y:bounds[1],width:bounds[2],height:bounds[3],spec};const width=image.naturalWidth/spec.cols,height=image.naturalHeight/spec.rows;return {image,x:spec.col*width+2,y:spec.row*height+2,width:width-4,height:height-4,spec};}
 export function drawCityPanel(c,id,kind,slot=0,box=[0,0,360,240]){const source=cityArtSource(id,kind,slot);if(!source)return false;
  if(kind==='airport'&&source.width/source.height>1.8){const height=box[2]*source.height/source.width;c.drawImage(source.image,source.x,source.y,source.width,source.height,box[0],box[1],box[2],height);const floor=airportFloorColor(source);c.fillStyle=floor;c.fillRect(box[0],box[1]+height-1,box[2],box[3]-height+1);c.fillStyle='#fff6e818';for(let row=0;row<3;row++)c.fillRect(box[0],Math.round(box[1]+height+(box[3]-height)*(row+1)/4),box[2],1);}else c.drawImage(source.image,source.x,source.y,source.width,source.height,...box);return true;}
-export function cityArtReady(ids,kinds=['hotel','hotel-night','airport','vehicle']){const files=new Map();for(const id of ids)for(const kind of kinds){const spec=cityArtSpec(id,kind);files.set(spec.file,spec);}return Promise.all([...files.values()].map(spec=>new Promise(resolve=>{const image=cityImage(spec);if(!image||image.complete){resolve(!!image?.naturalWidth);return;}image.addEventListener('load',()=>resolve(true),{once:true});image.addEventListener('error',()=>resolve(false),{once:true});})));}
+export function cityArtReady(ids,kinds=['hotel','hotel-night','airport']){const files=new Map();for(const id of ids)for(const kind of kinds){const spec=cityArtSpec(id,kind);files.set(spec.file,spec);}return Promise.all([...files.values()].map(spec=>imageReady(cityImage(spec))));}
 export function vehicleSlot(id){return id==='taxi'?2:['train','subway'].includes(id)?0:1;}
 // Arrival-road silhouettes do not apply filters/recolouring; they are separate original pixels.
-export function drawCityVehicle(c,route,id,night=false){const source=cityArtSource(route,'vehicle',vehicleSlot(id));if(!source)return false;
- if(id==='subway'){
-  // 현지 고유 차체 그림은 유지하며, 세 객차·연결부·양문 구조를 따로 구성한다.
-  const height=Math.min(102,278*source.height/source.width),y=218-height;c.save();if(night)c.filter='brightness(.78)';
-  for(let car=0;car<3;car++){const x=39+car*94,sx=source.x+source.width*car/3;c.drawImage(source.image,sx,source.y,source.width/3,source.height,x,y,90,height);
-   if(car<2){c.fillStyle='#53655d';c.fillRect(x+90,y+height*.3,4,height*.52);}
-   for(let door=0;door<2;door++){const dx=x+18+door*37,dy=y+height*.30,dh=height*.52;c.fillStyle='#ccd3c6';c.fillRect(dx,dy,14,dh);c.fillStyle='#526b67';c.fillRect(dx+2,dy+3,4,dh*.38);c.fillRect(dx+8,dy+3,4,dh*.38);c.fillStyle='#829185';c.fillRect(dx+7,dy,1,dh);}
-  }c.restore();return true;
- }
+export function drawCityVehicle(c,route,id,night=false){if(['subway','limousine','train'].includes(id))return drawTransportSprite(c,route,id,night)||drawVehicleModel(c,route,id,night,[0,id==='limousine'?70:80,360,150]);const source=cityArtSource(route,'vehicle',vehicleSlot(id));if(!source)return false;
+
  const scale=Math.min((id==='taxi'?156:226)/source.width,129/source.height),width=source.width*scale,height=source.height*scale;c.save();if(night)c.filter='brightness(.78)';c.drawImage(source.image,source.x,source.y,source.width,source.height,180-width/2,218-height,width,height);c.restore();return true;}
 
 // Sample only the central clear floor; stretching a full-width strip stretched foreground plants.

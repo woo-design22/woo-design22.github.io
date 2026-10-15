@@ -1,8 +1,8 @@
-import {keepsakeHome} from './connections-ui.js?v=6.9.0';
-import {recipeHome} from './life-ui.js?v=6.9.0';
-import {HOME_CITIES,HOME_TYPES,HOME_FINISHES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.9.0';
-import {atlasArt} from './generated-art.js?v=6.9.0';
-import {homeViewAsset,furnitureAsset} from './home-art.js?v=6.9.0';
+import {keepsakeHome} from './connections-ui.js?v=6.10.0';
+import {recipeHome} from './life-ui.js?v=6.10.0';
+import {HOME_CITIES,HOME_TYPES,HOME_FINISHES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.10.0';
+import {atlasArt} from './generated-art.js?v=6.10.0';
+import {homeViewAsset,furnitureAsset} from './home-art.js?v=6.10.0';
 export function residenceHTML(p,tab='furniture',category='bed'){
  const h=residenceState(p.residence),city=HOME_CITIES.find(x=>x.id===h.city),type=HOME_TYPES.find(x=>x.id===h.type);
  const intro=`<div class="home-address"><strong>${city.name} · ${type.name}</strong><small>${city.view}</small></div><canvas id="residence-preview" width="720" height="480" aria-label="현재 집과 창밖 풍경"></canvas><button id="memory-display" class="secondary">사진과 기념품 전시하기</button><button id="residence-look" class="secondary">풍경보기 · 우리 집 창밖</button>${keepsakeHome(p)}<button class="secondary" data-recipe-book>책상 위 레시피 수첩 펼치기</button>${recipeHome(p)}<div class="home-design-tabs">${[['furniture','가구 교체'],['interior','집 인테리어'],['move','이사하기']].map(([id,name])=>`<button data-home-tab="${id}" class="${tab===id?'selected':''}">${name}</button>`).join('')}</div><p class="note">여행머니로 다음 여행을 준비하거나 집을 꾸며요. 구매한 가구와 집, 동네는 언제든 다시 선택할 수 있어요.</p>`;

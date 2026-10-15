@@ -1,5 +1,5 @@
-import {airportRegion} from './airport-context.js?v=6.10.0';
-import {aerialPictures,aerialReady} from './aerial-atlas.js?v=6.10.0';
+import {airportRegion} from './airport-context.js?v=6.10.1';
+import {aerialPictures,aerialReady} from './aerial-atlas.js?v=6.10.1';
 export function observatoryContext(j,view){const region=airportRegion(j);return region?{region,local:region!=='incheon',view:region==='incheon'?'terminal':view==='terminal'?'terminal':'regional',night:j.departure==='night'}:null;}
 export function localObservatoryReady(region){return aerialReady([region]);}
 export function drawLocalObservatory(canvas,region,night=false,t=0){

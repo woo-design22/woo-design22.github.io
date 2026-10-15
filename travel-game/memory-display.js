@@ -1,8 +1,8 @@
-import {drawSnapshot} from './life-art.js?v=6.10.0';
-import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.10.0';
-import {drawItemArt} from './item-art.js?v=6.10.0';
-import {memoryOrigin,earnedDecor} from './travel-connections.js?v=6.10.0';
-import {drawDutyProduct} from './duty-art.js?v=6.10.0';
+import {drawSnapshot} from './life-art.js?v=6.10.1';
+import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.10.1';
+import {drawItemArt} from './item-art.js?v=6.10.1';
+import {memoryOrigin,earnedDecor} from './travel-connections.js?v=6.10.1';
+import {drawDutyProduct} from './duty-art.js?v=6.10.1';
 const rect=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
 export function memoryHotspots(p){const count={photo:0,magnet:0,souvenir:0};return (p.travel?.displays||[]).filter(Boolean).map(id=>{const o=memoryOrigin(p,id),i=count[o.kind]++,box=o.kind==='photo'?[9,38+i*28,43,27]:o.kind==='magnet'?[10+i*14,126,13,16]:[291+i*15,95,14,22];return {id,kind:o.kind,box};});}
 export function drawMemoryDisplay(c,p){

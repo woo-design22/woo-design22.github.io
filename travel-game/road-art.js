@@ -1,7 +1,7 @@
-import {drawRailBackground} from './rail-art.js?v=6.10.0';
-import {aerialPictures} from './aerial-atlas.js?v=6.10.0';
-import {drawTransportVehicle,transportRegion,warmTransport} from './transport-art.js?v=6.10.0';
-import {imageReady} from './image-ready.js?v=6.10.0';
+import {drawRailBackground} from './rail-art.js?v=6.10.1';
+import {aerialPictures} from './aerial-atlas.js?v=6.10.1';
+import {drawTransportVehicle,transportRegion,warmTransport} from './transport-art.js?v=6.10.1';
+import {imageReady} from './image-ready.js?v=6.10.1';
 const art={};
 function roadImage(id){if(typeof Image==='undefined')return null;if(!art[id]){const image=new Image();image.src=new URL(`./assets/road-${id}-v4.png`,import.meta.url).href;art[id]=image;}return art[id];}
 export function warmRoad(j){const region=transportRegion(j),night=j.departure==='night',tasks=[imageReady(roadImage(night?'night':'day')),warmTransport(region)];if(region!=='incheon'){const sky=aerialPictures(region);tasks.push(imageReady(night?sky.night:sky.day));}return Promise.all(tasks);}

@@ -1,4 +1,4 @@
-import {drawAtlas} from './generated-art.js?v=6.10.0';
+import {drawAtlas} from './generated-art.js?v=6.10.1';
 // Individually generated transparent product icons, shared across shop and collection.
 export const DUTY_ART_IDS=['magnet-tower','magnet-paris','magnet-windmill','magnet-tram','magnet-panda','magnet-cactus','magnet-shell','magnet-snow','round-glasses','amber-glasses','sage-sunglasses','rose-glasses','milk-chocolate','dark-chocolate','berry-chocolate','city-chocolate','whisky','brandy','rum','gin','perfume','rabbit-keyring','silk-scarf','city-mug'];
 export const AIRPORT_ART_IDS=['coffee-latte', 'coffee-matcha', 'coffee-cocoa', 'restaurant-udon', 'restaurant-sandwich', 'restaurant-bibimbap', 'postcard-plane', 'postcard-cloud', 'postcard-stamp', 'facility-coffee', 'facility-restaurant', 'facility-dutyfree', 'facility-postcard'];

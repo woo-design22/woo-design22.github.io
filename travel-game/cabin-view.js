@@ -1,4 +1,4 @@
-import {drawTraveler} from './avatar-art.js?v=6.10.0';
+import {drawTraveler} from './avatar-art.js?v=6.10.1';
 const pictures={};for(const id of ['economy','business','first'])if(typeof Image!=='undefined'){const image=new Image();image.src=new URL('./assets/cabin-'+id+'-v6.5.webp',import.meta.url).href;pictures[id]=image;}
 const r=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
 function seat(c,x,y,w,h,color,label,guest){r(c,x+2,y+3,w,h,'#697c6b');r(c,x,y,w,h,color);r(c,x+5,y+5,w-10,8,'#d8ddc6');r(c,x+4,y+h-12,w-8,12,'#a5b49a');r(c,x-3,y+h-19,w+6,6,'#d4d4be');r(c,x+6,y+h,4,8,'#657669');r(c,x+w-10,y+h,4,8,'#657669');if(guest!==undefined)drawTraveler(c,guest,0,null,false,[x+w*.15,y-19,w*.7,w*.7]);c.fillStyle='#526849';c.font='7px Neo';c.fillText(label,x+6,y+h-2);}

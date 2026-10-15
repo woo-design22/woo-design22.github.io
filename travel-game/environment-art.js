@@ -1,14 +1,14 @@
-import {drawLocalRoom} from './local-flavors.js?v=6.10.0';
-import {drawCityPanel,cityArtReady,cityArtSource} from './city-art.js?v=6.10.0';
-import {roomGeometry} from './room-geometry.js?v=6.10.0';
+import {drawLocalRoom} from './local-flavors.js?v=6.10.1';
+import {drawCityPanel,cityArtReady,cityArtSource} from './city-art.js?v=6.10.1';
+import {roomGeometry} from './room-geometry.js?v=6.10.1';
 // Original room illustrations, rendered at a small logical resolution for crisp pixels.
-import {drawScenery,CITY_SCENES} from './scenery.js?v=6.10.0';
-import {shopItem} from './shopping.js?v=6.10.0';
-import {aerialReady} from './aerial-atlas.js?v=6.10.0';
-import {drawRoad} from './road-art.js?v=6.10.0';
-import {drawItemArt} from './item-art.js?v=6.10.0';
-import {drawCase} from './generated-art.js?v=6.10.0';
-import {drawResidence} from './home-art.js?v=6.10.0';
+import {drawScenery,CITY_SCENES} from './scenery.js?v=6.10.1';
+import {shopItem} from './shopping.js?v=6.10.1';
+import {aerialReady} from './aerial-atlas.js?v=6.10.1';
+import {drawRoad} from './road-art.js?v=6.10.1';
+import {drawItemArt} from './item-art.js?v=6.10.1';
+import {drawCase} from './generated-art.js?v=6.10.1';
+import {drawResidence} from './home-art.js?v=6.10.1';
 const pictures=new Map();
 function pictureFor(name){if(!name||typeof Image==='undefined')return null;if(!pictures.has(name)){const image=new Image();image.src=new URL(`./assets/${name==='airport'?'incheon-terminal-v6.5.png':name+'-v4.png'}`,import.meta.url).href;pictures.set(name,image);}return pictures.get(name);}
 export function environmentsReady(names,routes=[]){return Promise.all([aerialReady(routes),cityArtReady(routes),...names.map(name=>new Promise(resolve=>{const image=pictureFor(name);if(!image||image.complete){resolve();return;}image.addEventListener('load',resolve,{once:true});image.addEventListener('error',resolve,{once:true});}))]);}
@@ -89,4 +89,4 @@ export function drawEnvironment(c,j,p,t){
  return true;
 }
 
-import {drawDutyProduct} from './duty-art.js?v=6.10.0';
+import {drawDutyProduct} from './duty-art.js?v=6.10.1';

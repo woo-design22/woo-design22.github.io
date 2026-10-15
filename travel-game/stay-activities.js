@@ -1,5 +1,5 @@
-import {newDay} from './travel-experience.js?v=6.11.0';
-import {resetWalk} from './city-streets.js?v=6.11.0';
+import {newDay} from './travel-experience.js?v=6.11.1';
+import {resetWalk} from './city-streets.js?v=6.11.1';
 export const CONVENIENCE_ITEMS=[
  {id:'water',name:'생수',cost:2,comfort:6,joy:2,art:'convenience-water'},
  {id:'snack',name:'작은 간식',cost:3,comfort:4,joy:8,art:'meal-cookie'},

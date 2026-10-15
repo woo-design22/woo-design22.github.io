@@ -1,13 +1,13 @@
-import {playCity,errandSpec,normalizeRecipe} from './travel-play.js?v=6.11.0';
-import {resumeWalk} from './city-streets.js?v=6.11.0';
-import {normalizeExperience,recordExperience,experience} from './travel-experience.js?v=6.11.0';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.11.0';
-import {ROUTES,routeOpen,newFlight,levelFor} from './passenger-model.js?v=6.11.0';
-import {suitcaseCapacity,shopItem,DUTY_ITEMS} from './shopping.js?v=6.11.0';
-import {roomProgress,restoreRoomLayout} from './room-model.js?v=6.11.0';
-import {cityGuide} from './city-guide.js?v=6.11.0';
-import {wishProgress,TRAVEL_WISHES} from './travel-wishes.js?v=6.11.0';
-import {tripFunds,returnTripFunds,publishTrip} from './travel-blog.js?v=6.11.0';
+import {playCity,errandSpec,normalizeRecipe} from './travel-play.js?v=6.11.1';
+import {resumeWalk} from './city-streets.js?v=6.11.1';
+import {normalizeExperience,recordExperience,experience} from './travel-experience.js?v=6.11.1';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.11.1';
+import {ROUTES,routeOpen,newFlight,levelFor} from './passenger-model.js?v=6.11.1';
+import {suitcaseCapacity,shopItem,DUTY_ITEMS} from './shopping.js?v=6.11.1';
+import {roomProgress,restoreRoomLayout} from './room-model.js?v=6.11.1';
+import {cityGuide} from './city-guide.js?v=6.11.1';
+import {wishProgress,TRAVEL_WISHES} from './travel-wishes.js?v=6.11.1';
+import {tripFunds,returnTripFunds,publishTrip} from './travel-blog.js?v=6.11.1';
 export const STAGES=['packing','to-airport','airport','flight','arrival','to-hotel','hotel','complete'];
 export const PACKING=[
  {id:'passport',name:'여권',weight:0,icon:'book',tags:['document'],hint:'탑승에 꼭 필요해요'},
@@ -38,7 +38,7 @@ export function destination(id){const i=Math.max(0,ROUTES.findIndex(r=>r.id===id
 export function bagWeight(j){return j.bag.reduce((n,id)=>n+(PACKING.find(x=>x.id===id)?.weight||0),0);}
 export function packingGoals(j){return destination(j.routeId).need.map(tag=>j.bag.some(id=>PACKING.find(x=>x.id===id)?.tags.includes(tag)));}
 export function togglePack(j,id){const item=PACKING.find(x=>x.id===id);if(!item||j.stage!=='packing')return {ok:false,message:'지금은 짐을 바꿀 수 없어요.'};if(j.bag.includes(id)){j.bag=j.bag.filter(v=>v!==id);return {ok:true};}if(bagWeight(j)+item.weight>j.capacity)return {ok:false,message:'가방이 가득 찼어요. 다른 물건을 빼볼까요?'};j.bag.push(id);return {ok:true};}
-import {normalizeTripLife,tripLife,cityLife} from './travel-life.js?v=6.11.0';
+import {normalizeTripLife,tripLife,cityLife} from './travel-life.js?v=6.11.1';
 export function newJourney(p,hotel='guesthouse',now=Date.now()){
  if(!routeOpen(p,p.route)||!HOTELS.some(h=>h.id===hotel))return null;
  const room=HOTELS.find(h=>h.id===hotel),funds=tripFunds(p);if(funds<room.cost+55)return null;
@@ -91,4 +91,4 @@ export function restoreJourney(raw){
  j.experience=normalizeExperience(raw.experience||{visits:raw.discovered,phase:raw.departure==='night'?2:raw.departure==='evening'?1:0,dayTicks:raw.departure==='night'?4:raw.departure==='evening'?2:0},j.routeId,raw.wish);j.discovered=Array.isArray(raw.discovered)?[...new Set(raw.discovered.filter(id=>CITY_DISCOVERIES[j.routeId]&&[...CITY_DISCOVERIES[j.routeId].foods,...CITY_DISCOVERIES[j.routeId].places].some(item=>item.id===id)))]:[];j.animalMet=raw.animalMet===true;j.animalFed=raw.animalFed===true&&j.animalMet;
  j.nights=Number.isInteger(raw.nights)?Math.max(1,Math.min(30,raw.nights)):1;j.hotelLocation=['room','lobby','neighborhood'].includes(raw.hotelLocation)?raw.hotelLocation:'room';j.visitedToday=Array.isArray(raw.visitedToday)?raw.visitedToday.filter(id=>j.discovered.includes(id)):[...j.discovered];j.convenienceToday=Array.isArray(raw.convenienceToday)?raw.convenienceToday.filter(id=>['water','snack','animal-treat'].includes(id)):[];j.walkPosition=raw.walkPosition&&Number.isFinite(raw.walkPosition.x)&&Number.isFinite(raw.walkPosition.y)?{x:Math.max(20,Math.min(340,raw.walkPosition.x)),y:Math.max(42,Math.min(230,raw.walkPosition.y))}:null;j.walkTarget=null;j.walkPath=null;j.friendEvent=friendEventState(raw.friendEvent,j.routeId);j.wish=TRAVEL_WISHES.some(w=>w.id===raw.wish)?raw.wish:null;j.preparedCount=packingGoals(j).filter(Boolean).length;j.roomLayout=restoreRoomLayout(j);if(bagWeight(j)>j.capacity)return null;resumeWalk(j,raw);return j;
 }
-import {friendEventState} from './local-friends.js?v=6.11.0';
+import {friendEventState} from './local-friends.js?v=6.11.1';

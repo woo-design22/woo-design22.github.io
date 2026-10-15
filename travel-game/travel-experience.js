@@ -1,8 +1,8 @@
-import {normalizeIncidents,earnedDecor,itineraryStoryLabel} from './travel-connections.js?v=6.11.0';
-import {normalizeCapture} from './travel-life.js?v=6.11.0';
-import {ROUTES} from './model.js?v=6.11.0';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.11.0';
-import {COLLECTION_ITEMS} from './shopping.js?v=6.11.0';
+import {normalizeIncidents,earnedDecor,itineraryStoryLabel} from './travel-connections.js?v=6.11.1';
+import {normalizeCapture} from './travel-life.js?v=6.11.1';
+import {ROUTES} from './model.js?v=6.11.1';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.11.1';
+import {COLLECTION_ITEMS} from './shopping.js?v=6.11.1';
 
 // These are fictional, gentle travel episodes, not a real-world itinerary guide.
 const rows={

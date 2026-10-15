@@ -1,5 +1,5 @@
-import {HOME_CATEGORIES,residenceState} from './home-model.js?v=6.11.0';
-import {playState} from './travel-play.js?v=6.11.0';
+import {HOME_CATEGORIES,residenceState} from './home-model.js?v=6.11.1';
+import {playState} from './travel-play.js?v=6.11.1';
 export const DEFAULT_FURNITURE_BOXES={rug:[125,177,143,55],curtain:[48,31,154,94],art:[201,43,53,52],storage:[206,94,49,62],bed:[266,127,85,78],sofa:[167,161,83,47],desk:[33,128,84,62],lamp:[126,83,40,100],plant:[5,133,46,62],table:[119,191,73,44]};
 export function layoutState(raw){const out={};for(const {id} of HOME_CATEGORIES){const v=raw?.[id];if(!v||!Number.isFinite(v.x)||!Number.isFinite(v.y))continue;const [, ,w,h]=DEFAULT_FURNITURE_BOXES[id];const hanging=['curtain','art'].includes(id);out[id]={x:Math.max(0,Math.min(360-w,v.x)),y:Math.max(hanging?24:148-h,Math.min((hanging?146:240)-h,v.y)),flip:v.flip===true};}return out;}
 export function placeFurniture(p,slot,x,y,flip){if(!HOME_CATEGORIES.some(x=>x.id===slot)||!p.residence?.furniture?.[slot]||!Number.isFinite(x)||!Number.isFinite(y))return false;const old=p.residence.layout?.[slot];p.residence.layout={...(p.residence.layout||{}),...layoutState({[slot]:{x,y,flip:flip??old?.flip}})};return true;}

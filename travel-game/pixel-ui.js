@@ -28,7 +28,7 @@ const patterns={
  star:['................','.......aa.......','......abba......','......abba......','.....abbbba.....','..aaaabbbbaaaa..','.abbbbbbbbbbba..','..abbbbbbbbba...','...abbbbbbba....','....abbbbba.....','...abbbbb b a...','...abb..b b a...','...aa....aaa....','................','................','................']
 };
 const palettes={default:{a:'#67756a',b:'#b7c7b2',c:'#e3e9d9',d:'#f5f5e9'},bow:{a:'#866d6f',b:'#c3a5a3',c:'#e0c7b9',d:'#f3e9db'},book:{a:'#877f6b',b:'#b5b99c',c:'#dde1cc',d:'#f5f3df'},lamp:{a:'#8b846b',b:'#d1c79d',c:'#b1b7a0',d:'#e4dcb7'},coin:{a:'#9a8d69',b:'#cec098',c:'#ddd4ac',d:'#f5edcf'},coffee:{a:'#7d796d',b:'#e3e2d2',c:'#d2d8c2',d:'#b3b8a6'},cake:{a:'#9b8478',b:'#d7c4ae',c:'#e9dfcb',d:'#bd9898'},juice:{a:'#8b846e',b:'#e5e5d1',c:'#caba8e',d:'#eef1df'},bread:{a:'#918370',b:'#d3c3a1',c:'#e0d6bb',d:'#f5f0df'},star:{a:'#9c916f',b:'#d3c9a4',c:'#e6dfc6',d:'#f5f0df'}};
-import {moneyIcon} from './money-ui.js?v=6.11.0';
+import {moneyIcon} from './money-ui.js?v=6.11.1';
 export function pixelIcon(name,size=16){if(name==='coin')return moneyIcon(size);const rows=patterns[name]||patterns.plane,pal=palettes[name]||palettes.default;let body='';rows.forEach((row,y)=>[...row.padEnd(16,'.').slice(0,16)].forEach((v,x)=>{if(pal[v])body+=`<rect x="${x}" y="${y}" width="1" height="1" fill="${pal[v]}"/>`;}));return `<svg class="pixel-icon" width="${size}" height="${size}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${body}</svg>`;}
 const replacement={'🎀':'bow','📔':'book','💡':'lamp','🎫':'ticket','🪙':'coin','🤖':'cart','✈':'plane','☕':'coffee','🍰':'cake','🍵':'tea','🥐':'bread','🍊':'juice','★':'star'};
 export function decoratePixels(root=document.body){

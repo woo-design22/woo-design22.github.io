@@ -1,5 +1,5 @@
-import {STYLES,HATS,SUNGLASSES} from './wardrobe-model.js?v=6.11.0';
-import {mealArt,drawMealArt} from './meal-art.js?v=6.11.0';
+import {STYLES,HATS,SUNGLASSES} from './wardrobe-model.js?v=6.11.1';
+import {mealArt,drawMealArt} from './meal-art.js?v=6.11.1';
 const regionalSymbols={
  jeju:[[2,26,28,3],[6,21,20,4],[10,17,12,4],[13,13,6,4]],
  taipei:[[11,4,10,25],[9,10,14,3],[9,16,14,3],[8,23,16,3]],

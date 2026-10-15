@@ -1,12 +1,12 @@
-import {drawAtlas,atlasReady} from './generated-art.js?v=6.11.0';
-import {currentLook,STYLES} from './wardrobe-model.js?v=6.11.0';
-import {eyewearBox} from './avatar-anchors.js?v=6.11.0';
-import {drawItemArt} from './item-art.js?v=6.11.0';
-import {drawTraveler} from './avatar-art.js?v=6.11.0';
-import {drawAnimalSprite} from './animal-art.js?v=6.11.0';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.11.0';
-import {craftSpec,errandSpec,playCity,hideawayOpen} from './travel-play.js?v=6.11.0';
-export const HIDEAWAY_FILE='hideaways-v6.11.webp';
+import {drawAtlas,atlasReady} from './generated-art.js?v=6.11.1';
+import {currentLook,STYLES} from './wardrobe-model.js?v=6.11.1';
+import {eyewearBox} from './avatar-anchors.js?v=6.11.1';
+import {drawItemArt} from './item-art.js?v=6.11.1';
+import {drawTraveler} from './avatar-art.js?v=6.11.1';
+import {drawAnimalSprite} from './animal-art.js?v=6.11.1';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.11.1';
+import {craftSpec,errandSpec,playCity,hideawayOpen} from './travel-play.js?v=6.11.1';
+export const HIDEAWAY_FILE='hideaways-v6.11.1.webp';
 export function hideawayAsset(route){const i=craftSpec(route).index,cell=({jeju:0,tokyo:1,taipei:2,paris:3,hawaii:4,moon:5,stars:5,chengdu:7,bkk:2,sin:6,dad:4,dps:4,syd:4,akl:6,dxb:6,ist:6,fco:6,bcn:6,lis:6,lhr:6,ams:6,cph:6,hel:6,zrh:6,prg:6,jfk:6,sfo:4,yvr:6,mex:6,lim:4,kef:6})[route]??6;return {file:HIDEAWAY_FILE,columns:2,rows:4,col:cell%2,row:Math.floor(cell/2)};}
 export function warmHideaway(){return atlasReady([HIDEAWAY_FILE]);}
 const fill=(c,x,y,w,h,color)=>{c.fillStyle=color;c.fillRect(Math.round(x),Math.round(y),w,h);};

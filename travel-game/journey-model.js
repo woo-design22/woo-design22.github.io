@@ -1,12 +1,12 @@
-import {resumeWalk} from './city-streets.js?v=6.7.0';
-import {normalizeExperience,recordExperience} from './travel-experience.js?v=6.7.0';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.7.0';
-import {ROUTES,routeOpen,newFlight,levelFor} from './passenger-model.js?v=6.7.0';
-import {suitcaseCapacity,shopItem,DUTY_ITEMS} from './shopping.js?v=6.7.0';
-import {roomProgress,restoreRoomLayout} from './room-model.js?v=6.7.0';
-import {cityGuide} from './city-guide.js?v=6.7.0';
-import {wishProgress,TRAVEL_WISHES} from './travel-wishes.js?v=6.7.0';
-import {tripFunds,returnTripFunds,publishTrip} from './travel-blog.js?v=6.7.0';
+import {resumeWalk} from './city-streets.js?v=6.8.0';
+import {normalizeExperience,recordExperience} from './travel-experience.js?v=6.8.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.8.0';
+import {ROUTES,routeOpen,newFlight,levelFor} from './passenger-model.js?v=6.8.0';
+import {suitcaseCapacity,shopItem,DUTY_ITEMS} from './shopping.js?v=6.8.0';
+import {roomProgress,restoreRoomLayout} from './room-model.js?v=6.8.0';
+import {cityGuide} from './city-guide.js?v=6.8.0';
+import {wishProgress,TRAVEL_WISHES} from './travel-wishes.js?v=6.8.0';
+import {tripFunds,returnTripFunds,publishTrip} from './travel-blog.js?v=6.8.0';
 export const STAGES=['packing','to-airport','airport','flight','arrival','to-hotel','hotel','complete'];
 export const PACKING=[
  {id:'passport',name:'여권',weight:0,icon:'book',tags:['document'],hint:'탑승에 꼭 필요해요'},
@@ -37,10 +37,11 @@ export function destination(id){const i=Math.max(0,ROUTES.findIndex(r=>r.id===id
 export function bagWeight(j){return j.bag.reduce((n,id)=>n+(PACKING.find(x=>x.id===id)?.weight||0),0);}
 export function packingGoals(j){return destination(j.routeId).need.map(tag=>j.bag.some(id=>PACKING.find(x=>x.id===id)?.tags.includes(tag)));}
 export function togglePack(j,id){const item=PACKING.find(x=>x.id===id);if(!item||j.stage!=='packing')return {ok:false,message:'지금은 짐을 바꿀 수 없어요.'};if(j.bag.includes(id)){j.bag=j.bag.filter(v=>v!==id);return {ok:true};}if(bagWeight(j)+item.weight>j.capacity)return {ok:false,message:'가방이 가득 찼어요. 다른 물건을 빼볼까요?'};j.bag.push(id);return {ok:true};}
+import {normalizeTripLife,tripLife,cityLife} from './travel-life.js?v=6.8.0';
 export function newJourney(p,hotel='guesthouse',now=Date.now()){
  if(!routeOpen(p,p.route)||!HOTELS.some(h=>h.id===hotel))return null;
  const room=HOTELS.find(h=>h.id===hotel),funds=tripFunds(p);if(funds<room.cost+55)return null;
- return {version:1,id:`trip-${now}-${Math.random().toString(36).slice(2,8)}`,routeId:p.route,stage:'packing',seat:p.seat,cabin:p.cabin,departure:p.departure,duration:p.duration,hotel,wish:TRAVEL_WISHES.some(w=>w.id===p.tripWish)?p.tripWish:'scenery',budget:funds-room.cost,fundTotal:funds,funded:false,fundsReturned:false,capacity:suitcaseCapacity(p),bag:[],purchases:[],minutes:0,comfort:35,joy:35,airport:{ticket:false,security:false,coffee:false,restaurant:false,dutyfree:false,postcard:false},entry:{passed:p.route==='jeju'},baggage:false,hotelTask:null,memories:[],flightId:null,flightResult:null,ride:null,checkedIn:false,completed:false,startedAt:now};
+ return {version:1,life:normalizeTripLife(),knownFriend:!!p.animals?.[p.route+':animal'],id:`trip-${now}-${Math.random().toString(36).slice(2,8)}`,routeId:p.route,stage:'packing',seat:p.seat,cabin:p.cabin,departure:p.departure,duration:p.duration,hotel,wish:TRAVEL_WISHES.some(w=>w.id===p.tripWish)?p.tripWish:'scenery',budget:funds-room.cost,fundTotal:funds,funded:false,fundsReturned:false,capacity:suitcaseCapacity(p),bag:[],purchases:[],minutes:0,comfort:35,joy:35,airport:{ticket:false,security:false,coffee:false,restaurant:false,dutyfree:false,postcard:false},entry:{passed:p.route==='jeju'},baggage:false,hotelTask:null,memories:[],flightId:null,flightResult:null,ride:null,checkedIn:false,completed:false,startedAt:now};
 }
 export function moveTrip(j,id,now=Date.now()){
  const outgoing=j.stage==='packing',incoming=j.stage==='arrival';if(!outgoing&&!incoming)return {ok:false,message:'이동할 준비를 먼저 해주세요.'};
@@ -74,7 +75,7 @@ export function finishJourney(p,j,now=Date.now()){
  j.preparedCount=prepared;const wish=wishProgress(j);const xp=70+prepared*25+(thrifty?20:0)+(cozy?20:0)+(wish?.xp||0),coins=35+prepared*15+(thrifty?15:0)+(wish?.coins||0);const before=levelFor(p.xp);
  p.xp+=xp;p.coins+=coins;p.journeys=(p.journeys||0)+1;p.journeyClaimed=[...(p.journeyClaimed||[]),j.id].slice(-150);j.completed=true;j.stage='complete';
  const record={id:j.id,route:j.routeId,hotel:j.hotel,date:now,startedAt:j.startedAt,bag:[...j.bag],budget:j.budget,memories:[...j.memories],purchases:{...(j.orders||{}),...Object.fromEntries((j.purchases||[]).map((id,i)=>['item-'+i,shopItem(id)?.name||'']))},prepared,transport:j.transport||null,roomLayout:{...(j.roomLayout||{})},hotelTask:j.hotelTask,nights:j.nights||1,departure:j.departure,seat:j.seat,traveler:{avatar:p.avatar,style:p.style},wish:j.wish,wishCount:wish?.count||0,discovered:[...(j.discovered||[])],animalMet:j.animalMet===true,animalFed:j.animalFed===true};
- record.experience=recordExperience(j);
+ record.experience=recordExperience(j);record.life={orders:tripLife(j).paid.length,recipe:cityLife(p,j.routeId).recipe};
  record.friendEvent=friendEventState(j.friendEvent,j.routeId);
  p.stays=[record,...(p.stays||[])].slice(0,40);p.visitedRooms=[...new Set([...(p.visitedRooms||[]),j.routeId+':'+j.hotel])];
  const returned=returnTripFunds(p,j),post=publishTrip(p,record,now);
@@ -82,10 +83,10 @@ export function finishJourney(p,j,now=Date.now()){
 }
 export function restoreJourney(raw){
  if(!raw||raw.version!==1||typeof raw.id!=='string'||!ROUTES.some(r=>r.id===raw.routeId)||!STAGES.includes(raw.stage)||!HOTELS.some(h=>h.id===raw.hotel))return null;
- const j={...raw,capacity:[7,8,9,10,11].includes(raw.capacity)?raw.capacity:7,purchases:Array.isArray(raw.purchases)?[...new Set(raw.purchases.filter(id=>shopItem(id)))]:[],bag:Array.isArray(raw.bag)?[...new Set(raw.bag.filter(id=>PACKING.some(x=>x.id===id)))]:[],budget:Number.isFinite(raw.budget)?Math.max(0,Math.min(300,raw.budget)):0,minutes:Number.isFinite(raw.minutes)?Math.max(0,raw.minutes):0,comfort:Number.isFinite(raw.comfort)?Math.max(0,Math.min(100,raw.comfort)):35,joy:Number.isFinite(raw.joy)?Math.max(0,Math.min(100,raw.joy)):35,airport:{ticket:raw.airport?.ticket===true,security:raw.airport?.security===true,coffee:raw.airport?.coffee===true,restaurant:raw.airport?.restaurant===true,dutyfree:raw.airport?.dutyfree===true,postcard:raw.airport?.postcard===true},entry:{passed:raw.entry?.passed===true||raw.routeId==='jeju'},memories:Array.isArray(raw.memories)?raw.memories.filter(x=>['airport','hotel','road','city','gift'].includes(x)):[],ride:null};
+ const j={...raw,life:normalizeTripLife(raw.life),capacity:[7,8,9,10,11].includes(raw.capacity)?raw.capacity:7,purchases:Array.isArray(raw.purchases)?[...new Set(raw.purchases.filter(id=>shopItem(id)))]:[],bag:Array.isArray(raw.bag)?[...new Set(raw.bag.filter(id=>PACKING.some(x=>x.id===id)))]:[],budget:Number.isFinite(raw.budget)?Math.max(0,Math.min(300,raw.budget)):0,minutes:Number.isFinite(raw.minutes)?Math.max(0,raw.minutes):0,comfort:Number.isFinite(raw.comfort)?Math.max(0,Math.min(100,raw.comfort)):35,joy:Number.isFinite(raw.joy)?Math.max(0,Math.min(100,raw.joy)):35,airport:{ticket:raw.airport?.ticket===true,security:raw.airport?.security===true,coffee:raw.airport?.coffee===true,restaurant:raw.airport?.restaurant===true,dutyfree:raw.airport?.dutyfree===true,postcard:raw.airport?.postcard===true},entry:{passed:raw.entry?.passed===true||raw.routeId==='jeju'},memories:Array.isArray(raw.memories)?raw.memories.filter(x=>['airport','hotel','road','city','gift'].includes(x)):[],ride:null};
  if(raw.ride&&['to-airport','to-hotel'].includes(j.stage)&&Number.isFinite(raw.ride.from)&&Number.isFinite(raw.ride.until))j.ride={...raw.ride,next:j.stage==='to-airport'?'airport':'hotel'};
  if(['to-airport','to-hotel'].includes(j.stage)&&!j.ride)j.stage=j.stage==='to-airport'?'airport':'hotel';
  j.experience=normalizeExperience(raw.experience||{visits:raw.discovered,phase:raw.departure==='night'?2:raw.departure==='evening'?1:0,dayTicks:raw.departure==='night'?4:raw.departure==='evening'?2:0},j.routeId,raw.wish);j.discovered=Array.isArray(raw.discovered)?[...new Set(raw.discovered.filter(id=>CITY_DISCOVERIES[j.routeId]&&[...CITY_DISCOVERIES[j.routeId].foods,...CITY_DISCOVERIES[j.routeId].places].some(item=>item.id===id)))]:[];j.animalMet=raw.animalMet===true;j.animalFed=raw.animalFed===true&&j.animalMet;
  j.nights=Number.isInteger(raw.nights)?Math.max(1,Math.min(30,raw.nights)):1;j.hotelLocation=['room','lobby','neighborhood'].includes(raw.hotelLocation)?raw.hotelLocation:'room';j.visitedToday=Array.isArray(raw.visitedToday)?raw.visitedToday.filter(id=>j.discovered.includes(id)):[...j.discovered];j.convenienceToday=Array.isArray(raw.convenienceToday)?raw.convenienceToday.filter(id=>['water','snack','animal-treat'].includes(id)):[];j.walkPosition=raw.walkPosition&&Number.isFinite(raw.walkPosition.x)&&Number.isFinite(raw.walkPosition.y)?{x:Math.max(20,Math.min(340,raw.walkPosition.x)),y:Math.max(42,Math.min(230,raw.walkPosition.y))}:null;j.walkTarget=null;j.walkPath=null;j.friendEvent=friendEventState(raw.friendEvent,j.routeId);j.wish=TRAVEL_WISHES.some(w=>w.id===raw.wish)?raw.wish:null;j.preparedCount=packingGoals(j).filter(Boolean).length;j.roomLayout=restoreRoomLayout(j);if(bagWeight(j)>j.capacity)return null;resumeWalk(j,raw);return j;
 }
-import {friendEventState} from './local-friends.js?v=6.7.0';
+import {friendEventState} from './local-friends.js?v=6.8.0';

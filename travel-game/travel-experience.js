@@ -1,6 +1,7 @@
-import {ROUTES} from './model.js?v=6.7.0';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.7.0';
-import {COLLECTION_ITEMS} from './shopping.js?v=6.7.0';
+import {normalizeCapture} from './travel-life.js?v=6.8.0';
+import {ROUTES} from './model.js?v=6.8.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.8.0';
+import {COLLECTION_ITEMS} from './shopping.js?v=6.8.0';
 
 // These are fictional, gentle travel episodes, not a real-world itinerary guide.
 const rows={
@@ -50,7 +51,7 @@ export function normalizeExperience(raw,route,wish='scenery'){
 }
 export function experience(j){const phase=j.departure==='night'?2:j.departure==='evening'?1:0;return j.experience||=(normalizeExperience({phase,dayTicks:phase*2},j.routeId,j.wish));}
 export function travelState(raw){
- const photos=(Array.isArray(raw?.photos)?raw.photos:[]).filter(x=>x&&routeOK(x.route)&&localItems(x.route).some(i=>i.id===x.place)&&PHOTO_FRAMES.some(f=>f.id===x.frame)&&Number.isFinite(x.date)).slice(-1000).map(x=>({id:`photo:${x.place}:${integer(x.phase,2)}:${x.frame}`,route:x.route,place:x.place,frame:x.frame,phase:integer(x.phase,2),date:integer(x.date,Number.MAX_SAFE_INTEGER)}));
+ const photos=(Array.isArray(raw?.photos)?raw.photos:[]).filter(x=>x&&routeOK(x.route)&&localItems(x.route).some(i=>i.id===x.place)&&PHOTO_FRAMES.some(f=>f.id===x.frame)&&Number.isFinite(x.date)).slice(-1000).map(x=>({id:`photo:${x.place}:${integer(x.phase,2)}:${x.frame}`,route:x.route,place:x.place,frame:x.frame,phase:integer(x.phase,2),date:integer(x.date,Number.MAX_SAFE_INTEGER),...(normalizeCapture(x.capture)?{capture:normalizeCapture(x.capture)}:{})}));
  const events=(Array.isArray(raw?.events)?raw.events:[]).filter(x=>x&&routeOK(x.route)&&[0,1].includes(x.choice)).slice(-100).map(x=>({route:x.route,choice:x.choice,followed:x.followed===true}));
  const owned=id=>photos.some(x=>x.id===id)||COLLECTION_ITEMS.some(x=>x.id===id);
  return {photos,events,unlockFloor:integer(raw?.unlockFloor,31),flightClaims:[...new Set((Array.isArray(raw?.flightClaims)?raw.flightClaims:[]).filter(x=>typeof x==='string'&&routeOK(x.split(':')[0])&&/:(economy|business|first):(day|evening|night)$/.test(x)))].slice(0,300),pages:[...new Set((Array.isArray(raw?.pages)?raw.pages:[]).filter(routeOK))],displays:Array.from({length:3},(_,i)=>{const id=raw?.displays?.[i];return typeof id==='string'&&owned(id)?id:null;})};
@@ -67,11 +68,11 @@ export function chooseEpisode(p,j,choice){
 }
 export function followDestination(j){const e=experience(j);return e.choice===0?e.plan[0]:j.routeId+':cafe';}
 export function followEpisode(p,j){const e=experience(j);if(e.choice===null||e.followed||(j.nights||1)<2||!(j.visitedToday||[]).includes(followDestination(j)))return false;e.followed=true;p.travel||=travelState();const old=p.travel.events.find(x=>x.route===j.routeId&&x.choice===e.choice);if(old&&!old.followed){old.followed=true;p.xp+=15;}return true;}
-export function takeLocalPhoto(p,j,place,frame,now=Date.now()){
+export function takeLocalPhoto(p,j,place,frame,now=Date.now(),capture=null){
  if(j.completed||j.stage!=='hotel'||!j.checkedIn||!localItems(j.routeId).some(x=>x.id===place)||!PHOTO_FRAMES.some(x=>x.id===frame))return null;
  p.travel||=travelState();const e=experience(j);if(!e.visits.includes(place))return null;const id=`photo:${place}:${e.phase}:${frame}`,old=p.travel.photos.find(x=>x.id===id);let photo=old;
  if(!photo){photo={id,route:j.routeId,place,frame,phase:e.phase,date:now};p.travel.photos.push(photo);p.travel.photos=p.travel.photos.slice(-1000);p.xp+=8;}
- if(!e.photoIds.includes(id))e.photoIds.push(id);return {photo,isNew:!old};
+ if(normalizeCapture(capture))photo.capture=normalizeCapture(capture);if(!e.photoIds.includes(id))e.photoIds.push(id);return {photo,isNew:!old};
 }
 export function pageProgress(p,j){const e=experience(j);return [e.plan.length===2&&e.plan.every(id=>e.visits.includes(id)),e.photoIds.some(id=>p.travel?.photos.some(x=>x.id===id&&x.route===j.routeId)),e.choice!==null];}
 export function claimPage(p,j){p.travel||=travelState();if(p.travel.pages.includes(j.routeId)||!pageProgress(p,j).every(Boolean))return false;p.travel.pages.push(j.routeId);p.xp+=45;p.coins+=25;experience(j).pageClaimed=true;return true;}
@@ -81,6 +82,7 @@ export function memoryOptions(record,p){
  for(const id of record?.discovered||[]){const item=DISCOVERY_ITEMS.find(x=>x.id===id);if(item)options.push({id:'visit:'+id,label:item.name,kind:item.kind});}
  for(const id of e.photoIds){const photo=p.travel?.photos.find(x=>x.id===id);if(photo)options.push({id,label:localItems(photo.route).find(x=>x.id===photo.place).name+' · '+DAY_PHASES[photo.phase]+' 사진',kind:'photo'});}
  if(e.choice!==null)options.push({id:'story:'+record.route,label:CITY_EPISODES[record.route].choices[e.choice],kind:'story'});
+ if(record?.life?.orders>0)options.push({id:'cafe:'+record.route,label:'현지 카페에서 직접 만든 음료',kind:'handmade'});
  if(record?.animalMet)options.push({id:'animal:'+record.route,label:CITY_DISCOVERIES[record.route].animal.name,kind:'animal'});
  for(const name of Object.values(record?.purchases||{})){const item=COLLECTION_ITEMS.find(x=>x.name===name);if(item)options.push({id:'gift:'+item.id,label:item.name,kind:'gift'});}
  if(!options.length)options.push({id:'rest:'+record.route,label:'숙소에서 보낸 조용한 하루',kind:'rest'});

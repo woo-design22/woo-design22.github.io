@@ -1,4 +1,4 @@
-import {drawAnimalSprite} from './animal-art.js?v=6.7.0';
+import {drawAnimalSprite} from './animal-art.js?v=6.8.0';
 export const ANIMAL_MOUTHS=[[.66,.39],[.56,.43],[.30,.52],[.82,.62],[.56,.58],[.48,.54],[.55,.45],[.52,.33],[.28,.72],[.86,.38],[.23,.59],[.24,.61],[.48,.48]];
 export function feedingFrame(seconds){const t=Math.max(0,seconds);return {phase:t<1?'offer':t<2.5?'approach':t<6?'eat':'happy',approach:Math.min(1,Math.max(0,(t-1)/1.5)),bite:Math.min(1,Math.max(0,(t-2.5)/3.5)),chew:t>=2.5&&t<6?Math.floor((t-2.5)*6)%2:0,done:t>=7.5};}
 export function treatKind(id){return id===12?'bamboo':id===3?'carrot':[5,6,11].includes(id)?'leaf':[7,8,9].includes(id)?'fish':id===10?'acorn':'biscuit';}

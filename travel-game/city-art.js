@@ -1,6 +1,6 @@
-import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.7.0';
-import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.7.0';
-import {ROOM_BOUNDS} from './room-bounds.js?v=6.7.0';
+import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.8.0';
+import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.8.0';
+import {ROOM_BOUNDS} from './room-bounds.js?v=6.8.0';
 // Every destination resolves to its own painted rooms, terminal, and three vehicle bodies.
 export const CITY_VISUALS=[
   {

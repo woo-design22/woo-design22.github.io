@@ -1,13 +1,14 @@
-import {playHome} from './play-ui.js?v=6.11.1';
-import {roomLayoutHTML} from './home-layout.js?v=6.11.1';
-import {keepsakeHome} from './connections-ui.js?v=6.11.1';
-import {recipeHome} from './life-ui.js?v=6.11.1';
-import {HOME_CITIES,HOME_TYPES,HOME_FINISHES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.11.1';
-import {atlasArt} from './generated-art.js?v=6.11.1';
-import {homeViewAsset,furnitureAsset} from './home-art.js?v=6.11.1';
+import {wanderHome} from './wander-ui.js?v=6.12.0';
+import {playHome} from './play-ui.js?v=6.12.0';
+import {roomLayoutHTML} from './home-layout.js?v=6.12.0';
+import {keepsakeHome} from './connections-ui.js?v=6.12.0';
+import {recipeHome} from './life-ui.js?v=6.12.0';
+import {HOME_CITIES,HOME_TYPES,HOME_FINISHES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.12.0';
+import {atlasArt} from './generated-art.js?v=6.12.0';
+import {homeViewAsset,furnitureAsset} from './home-art.js?v=6.12.0';
 export function residenceHTML(p,tab='furniture',category='bed'){
  const h=residenceState(p.residence),city=HOME_CITIES.find(x=>x.id===h.city),type=HOME_TYPES.find(x=>x.id===h.type);
- const intro=`<div class="home-address"><strong>${city.name} · ${type.name}</strong><small>${city.view}</small></div><canvas id="residence-preview" width="720" height="480" aria-label="현재 집과 창밖 풍경"></canvas><button id="memory-display" class="secondary">사진과 기념품 전시하기</button><button id="residence-look" class="secondary">풍경보기 · 우리 집 창밖</button>${roomLayoutHTML(p)}${playHome(p)}<details class="play-details"><summary>전시한 기억과 이전 레시피</summary>${keepsakeHome(p)}<button class="secondary" data-recipe-book>책상 위 레시피 수첩 펼치기</button>${recipeHome(p)}</details><div class="home-design-tabs">${[['furniture','가구 교체'],['interior','집 인테리어'],['move','이사하기']].map(([id,name])=>`<button data-home-tab="${id}" class="${tab===id?'selected':''}">${name}</button>`).join('')}</div><p class="note">여행머니로 다음 여행을 준비하거나 집을 꾸며요. 구매한 가구와 집, 동네는 언제든 다시 선택할 수 있어요.</p>`;
+ const intro=`<div class="home-address"><strong>${city.name} · ${type.name}</strong><small>${city.view}</small></div><canvas id="residence-preview" width="720" height="480" aria-label="현재 집과 창밖 풍경"></canvas><button id="memory-display" class="secondary">사진과 기념품 전시하기</button><button id="residence-look" class="secondary">풍경보기 · 우리 집 창밖</button>${roomLayoutHTML(p)}${wanderHome(p)}<details class="play-details"><summary>배운 레시피로 친구 초대하기</summary>${playHome(p)}</details><details class="play-details"><summary>전시한 기억과 이전 레시피</summary>${keepsakeHome(p)}<button class="secondary" data-recipe-book>책상 위 레시피 수첩 펼치기</button>${recipeHome(p)}</details><div class="home-design-tabs">${[['furniture','가구 교체'],['interior','집 인테리어'],['move','이사하기']].map(([id,name])=>`<button data-home-tab="${id}" class="${tab===id?'selected':''}">${name}</button>`).join('')}</div><p class="note">여행머니로 다음 여행을 준비하거나 집을 꾸며요. 구매한 가구와 집, 동네는 언제든 다시 선택할 수 있어요.</p>`;
  if(tab==='move')return intro+`<h3>어떤 집에서 살까요?</h3><div class="home-type-grid">${HOME_TYPES.map(x=>`<button class="home-choice ${h.type===x.id?'selected':''}" data-home-kind="type" data-home-choice="${x.id}">${atlasArt({file:'home-interiors-v6.1.png',columns:3,rows:1,col:HOME_TYPES.indexOf(x),row:0},100)}<strong>${x.name}</strong><small>${x.note}</small><b>${h.type===x.id?'현재 집':h.ownedTypes.includes(x.id)?'이 집으로':'확장 · '+x.cost+'머니'}</b></button>`).join('')}</div><h3>창밖이 달라지는 열두 동네</h3><div class="home-city-grid">${HOME_CITIES.map(x=>`<button class="home-choice ${h.city===x.id?'selected':''}" data-home-kind="city" data-home-choice="${x.id}">${atlasArt(homeViewAsset(x.id),96)}<strong>${x.name}</strong><small>${x.view}</small><b>${h.city===x.id?'우리 동네':h.ownedCities.includes(x.id)?'다시 이사하기':x.cost+'머니'}</b></button>`).join('')}</div>`;
  if(tab==='interior')return intro+['wall','floor'].map(kind=>`<h3>${kind==='wall'?'벽과 벽지':'바닥과 마루'}</h3><div class="home-finish-grid">${HOME_FINISHES.map(x=>`<button class="home-choice ${h[kind]===x.id?'selected':''}" data-home-kind="${kind}" data-home-choice="${x.id}"><span class="finish-sample finish-${kind}-${x.id}"></span><strong>${x[kind]}</strong><small>${x.name}</small><b>${h[kind]===x.id?'사용 중':h.ownedFinishes.includes(x.id)?'바꾸기':'도안 · '+x.cost+'머니'}</b></button>`).join('')}</div>`).join('');
  const selected=HOME_CATEGORIES.find(x=>x.id===category)||HOME_CATEGORIES[0],slot=selected.id;

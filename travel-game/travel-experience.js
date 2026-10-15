@@ -1,8 +1,8 @@
-import {normalizeIncidents,earnedDecor,itineraryStoryLabel} from './travel-connections.js?v=6.11.1';
-import {normalizeCapture} from './travel-life.js?v=6.11.1';
-import {ROUTES} from './model.js?v=6.11.1';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.11.1';
-import {COLLECTION_ITEMS} from './shopping.js?v=6.11.1';
+import {normalizeIncidents,earnedDecor,itineraryStoryLabel} from './travel-connections.js?v=6.12.0';
+import {normalizeCapture} from './travel-life.js?v=6.12.0';
+import {ROUTES} from './model.js?v=6.12.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS} from './city-discoveries.js?v=6.12.0';
+import {COLLECTION_ITEMS} from './shopping.js?v=6.12.0';
 
 // These are fictional, gentle travel episodes, not a real-world itinerary guide.
 const rows={
@@ -81,6 +81,7 @@ export function claimPage(p,j){p.travel||=travelState();if(p.travel.pages.includ
 export function recordExperience(j){return {...normalizeExperience(j.experience,j.routeId,j.wish),route:j.routeId};}
 export function memoryOptions(record,p){
  const e=normalizeExperience(record?.experience,record?.route,record?.wish),options=[];
+ for(const [i,note] of (record?.exploreNotes||[]).entries())options.push({id:'wander:'+record.route+':'+i,label:note,kind:'story'});
  for(const id of record?.discovered||[]){const item=DISCOVERY_ITEMS.find(x=>x.id===id);if(item)options.push({id:'visit:'+id,label:item.name,kind:item.kind});}
  for(const id of e.photoIds){const photo=p.travel?.photos.find(x=>x.id===id);if(photo)options.push({id,label:localItems(photo.route).find(x=>x.id===photo.place).name+' · '+DAY_PHASES[photo.phase]+' 사진',kind:'photo'});}
  for(const entry of e.incidents.slice().reverse())options.push({id:'incident:'+entry.key,label:entry.title,kind:'story'});
@@ -94,7 +95,7 @@ export function memoryOptions(record,p){
  return [...new Map(options.map(x=>[x.id,x])).values()];
 }
 export function automaticHighlights(options){options=options.slice().sort((a,b)=>({story:0,photo:1,handmade:2,animal:3}[a.kind]??4)-({story:0,photo:1,handmade:2,animal:3}[b.kind]??4));const selected=[],kinds=new Set();for(const x of options){if(kinds.has(x.kind))continue;selected.push(x.id);kinds.add(x.kind);if(selected.length===3)break;}for(const x of options){if(selected.length===3)break;if(!selected.includes(x.id))selected.push(x.id);}return selected;}
-export function setHighlights(j,p,ids){const record={craftCount:j.craftCount||0,errandActions:j.errandActions||0,postcard:Number.isInteger(j.postcardStamp),route:j.routeId,discovered:j.discovered,purchases:Object.fromEntries((j.purchases||[]).map(id=>[id,COLLECTION_ITEMS.find(x=>x.id===id)?.name])),animalMet:j.animalMet,life:{orders:j.life?.paid?.length||0},experience:recordExperience(j)},valid=memoryOptions(record,p).map(x=>x.id);experience(j).highlights=[...new Set(ids.filter(x=>valid.includes(x)))].slice(0,3);return record;}
+export function setHighlights(j,p,ids){const record={exploreNotes:j.exploreNotes||[],craftCount:j.craftCount||0,errandActions:j.errandActions||0,postcard:Number.isInteger(j.postcardStamp),route:j.routeId,discovered:j.discovered,purchases:Object.fromEntries((j.purchases||[]).map(id=>[id,COLLECTION_ITEMS.find(x=>x.id===id)?.name])),animalMet:j.animalMet,life:{orders:j.life?.paid?.length||0},experience:recordExperience(j)},valid=memoryOptions(record,p).map(x=>x.id);experience(j).highlights=[...new Set(ids.filter(x=>valid.includes(x)))].slice(0,3);return record;}
 export function displayMemory(p,id,slot){p.travel||=travelState();if(!Number.isInteger(slot)||slot<0||slot>2)return false;if(id&&!p.travel.photos.some(x=>x.id===id)&&!COLLECTION_ITEMS.some(x=>x.id===id&&p.collection?.[id]))return false;p.travel.displays[slot]=id||null;earnedDecor(p);return true;}
 export function unifyWallet(p){
  // One-time 1:1 migration. Reserved journey funds are already outside the wallet.

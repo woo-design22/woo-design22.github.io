@@ -1,4 +1,4 @@
-import {layoutState} from './home-layout.js?v=6.11.1';
+import {layoutState} from './home-layout.js?v=6.12.0';
 export const HOME_CITIES=[
  {id:'jung',name:'서울 중구',view:'남산과 오래된 도심의 지붕',cost:1800},
  {id:'yeongdeungpo',name:'서울 영등포구',view:'한강과 여의도 빌딩',cost:2200},

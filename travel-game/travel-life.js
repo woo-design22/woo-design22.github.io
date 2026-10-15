@@ -1,6 +1,6 @@
-import {ROUTES} from './model.js?v=6.11.1';
-import {CITY_DISCOVERIES,meetAnimal} from './city-discoveries.js?v=6.11.1';
-import {localFlavor} from './local-flavors.js?v=6.11.1';
+import {ROUTES} from './model.js?v=6.12.0';
+import {CITY_DISCOVERIES,meetAnimal} from './city-discoveries.js?v=6.12.0';
+import {localFlavor} from './local-flavors.js?v=6.12.0';
 const n=(v,max=999)=>Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
 const finite=(v,min,max,fallback)=>Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback;
 const validRoute=id=>ROUTES.some(r=>r.id===id);

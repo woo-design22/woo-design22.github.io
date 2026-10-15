@@ -1,4 +1,4 @@
-import {localFlavor} from './local-flavors.js?v=6.11.1';
+import {localFlavor} from './local-flavors.js?v=6.12.0';
 // Cultural keepsakes, with game prices rather than real-world ticket or restaurant prices.
 const rows={
  chengdu:['훠궈','빙펀','청두 판다 기지','콴자이샹쯔',12,'대나무 판다','보호 쉼터의 대나무 그늘에서 느긋하게 쉬어요.'],

@@ -1,4 +1,4 @@
-import {ROUTES} from './model.js?v=6.11.1';
+import {ROUTES} from './model.js?v=6.12.0';
 const colors=['#789581','#8b9b92','#8499ab','#b79b85','#86a7a1','#b0a9bb','#baaa7e','#73978b'];
 const taxiForms={tokyo:'van',lhr:'cab',hawaii:'minivan',ams:'wagon',cph:'wagon',yvr:'suv',jeju:'suv',dps:'van',bkk:'sedan',dxb:'sedan',moon:'pod',stars:'pod',chengdu:'sedan'};
 export const TRANSPORT_TYPES=['bus','limousine','taxi','train','subway'];

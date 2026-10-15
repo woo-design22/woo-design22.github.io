@@ -1,14 +1,14 @@
-import {currentLook} from './wardrobe-model.js?v=6.12.0';
+import {currentLook} from './wardrobe-model.js?v=6.13.0';
 // Original pixel scenery built from simple shapes. All art works offline.
-import {destination} from './journey-model.js?v=6.12.0';
-import {STYLES} from './passenger-model.js?v=6.12.0';
-import {drawTraveler} from './avatar-art.js?v=6.12.0';
-import {eyewearBox} from './avatar-anchors.js?v=6.12.0';
-import {drawNeighborhood} from './city-streets.js?v=6.12.0';
-import {shopItem} from './shopping.js?v=6.12.0';
-import {drawEnvironment} from './environment-art.js?v=6.12.0';
-import {drawItemArt} from './item-art.js?v=6.12.0';
-import {drawCase} from './generated-art.js?v=6.12.0';
+import {destination} from './journey-model.js?v=6.13.0';
+import {STYLES} from './passenger-model.js?v=6.13.0';
+import {drawTraveler} from './avatar-art.js?v=6.13.0';
+import {eyewearBox} from './avatar-anchors.js?v=6.13.0';
+import {drawNeighborhood} from './city-streets.js?v=6.13.0';
+import {shopItem} from './shopping.js?v=6.13.0';
+import {drawEnvironment} from './environment-art.js?v=6.13.0';
+import {drawItemArt} from './item-art.js?v=6.13.0';
+import {drawCase} from './generated-art.js?v=6.13.0';
 const guests=typeof Image==='undefined'?null:new Image();if(guests)guests.src=new URL('./assets/guests-motion.png',import.meta.url).href;
 const walkers=typeof Image==='undefined'?null:new Image();if(walkers)walkers.src=new URL('./assets/guests-walk-v4.png',import.meta.url).href;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));

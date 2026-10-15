@@ -1,9 +1,9 @@
-import {drawTransportSprite} from './transport-sprites.js?v=6.12.0';
-import {drawVehicleModel} from './vehicle-design.js?v=6.12.0';
-import {imageReady} from './image-ready.js?v=6.12.0';
-import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.12.0';
-import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.12.0';
-import {ROOM_BOUNDS} from './room-bounds.js?v=6.12.0';
+import {drawTransportSprite} from './transport-sprites.js?v=6.13.0';
+import {drawVehicleModel} from './vehicle-design.js?v=6.13.0';
+import {imageReady} from './image-ready.js?v=6.13.0';
+import {AIRPORT_BOUNDS} from './airport-bounds.js?v=6.13.0';
+import {VEHICLE_BOUNDS} from './vehicle-bounds.js?v=6.13.0';
+import {ROOM_BOUNDS} from './room-bounds.js?v=6.13.0';
 // Every destination resolves to its own painted rooms, terminal, and three vehicle bodies.
 export const CITY_VISUALS=[
   {

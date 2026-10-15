@@ -1,14 +1,14 @@
-import {drawWanderStreet} from './wander-art.js?v=6.12.0';
-import {drawStreetPlay} from './play-art.js?v=6.12.0';
-import {incidentTarget} from './travel-connections.js?v=6.12.0';
-import {drawAnimalSprite} from './animal-art.js?v=6.12.0';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.12.0';
-import {CITY_EPISODES,experience} from './travel-experience.js?v=6.12.0';
-import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.12.0';
-import {drawTraveler} from './avatar-art.js?v=6.12.0';
-import {currentLook,STYLES} from './wardrobe-model.js?v=6.12.0';
-import {eyewearBox} from './avatar-anchors.js?v=6.12.0';
-import {drawItemArt} from './item-art.js?v=6.12.0';
+import {drawWanderStreet} from './wander-art.js?v=6.13.0';
+import {drawStreetPlay} from './play-art.js?v=6.13.0';
+import {incidentTarget} from './travel-connections.js?v=6.13.0';
+import {drawAnimalSprite} from './animal-art.js?v=6.13.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.13.0';
+import {CITY_EPISODES,experience} from './travel-experience.js?v=6.13.0';
+import {drawAtlas,discoveryAsset} from './generated-art.js?v=6.13.0';
+import {drawTraveler} from './avatar-art.js?v=6.13.0';
+import {currentLook,STYLES} from './wardrobe-model.js?v=6.13.0';
+import {eyewearBox} from './avatar-anchors.js?v=6.13.0';
+import {drawItemArt} from './item-art.js?v=6.13.0';
 const hash=s=>[...s].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,17);
 const layouts={
  lanes:[[180,220],[310,216],[52,145],[284,141],[62,79],[144,70],[250,74]],

@@ -1,6 +1,6 @@
-import {ROUTES} from './model.js?v=6.12.0';
-import {CITY_DISCOVERIES,meetAnimal} from './city-discoveries.js?v=6.12.0';
-import {localFlavor} from './local-flavors.js?v=6.12.0';
+import {ROUTES} from './model.js?v=6.13.0';
+import {CITY_DISCOVERIES,meetAnimal} from './city-discoveries.js?v=6.13.0';
+import {localFlavor} from './local-flavors.js?v=6.13.0';
 const n=(v,max=999)=>Number.isFinite(v)?Math.max(0,Math.min(max,Math.floor(v))):0;
 const finite=(v,min,max,fallback)=>Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback;
 const validRoute=id=>ROUTES.some(r=>r.id===id);
@@ -21,7 +21,7 @@ export function animalTier(p,route){const bond=p.animals?.[CITY_DISCOVERIES[rout
 export function greetAnimal(j){const t=tripLife(j);if(t.waited||j.completed)return false;t.waited=true;return true;}
 export function playAnimal(p,j){const t=tripLife(j);if(!t.waited||t.played||animalTier(p,j.routeId)<2||j.completed||j.stage!=='hotel'||!j.checkedIn)return false;if(!j.animalMet)meetAnimal(p,j,false);t.played=true;j.joy=Math.min(100,j.joy+6);return true;}
 export function animalSecret(p,j){if(!j||j.completed||animalTier(p,j.routeId)<3||!tripLife(j).played)return false;const city=cityLife(p,j.routeId);if(city.secret)return false;city.secret=true;tripLife(j).secret=true;p.xp+=20;return true;}
-export function normalizeCapture(raw){if(!raw||!Number.isFinite(raw.time))return null;return {pan:finite(raw.pan,-.22,.22,0),zoom:finite(raw.zoom,1,1.8,1),time:finite(raw.time,0,10000,0),quality:n(raw.quality,3),...( ['scene','food','table','animal'].includes(raw.subject)?{subject:raw.subject}:{})};}
+export function normalizeCapture(raw){if(!raw||!Number.isFinite(raw.time))return null;return {pan:finite(raw.pan,-.22,.22,0),zoom:finite(raw.zoom,1,1.8,1),time:finite(raw.time,0,10000,0),quality:n(raw.quality,3),...( ['scene','food','table','animal'].includes(raw.subject)?{subject:raw.subject}:{}),...(raw.subject==='table'&&raw.table?{table:{food:raw.table.food==='dessert'?'dessert':'meal',sugar:n(raw.table.sugar,2),brew:n(raw.table.brew,2),cold:raw.table.cold===true,moment:['walk','rain','together','dessert','reading','picnic'].includes(raw.table.moment)?raw.table.moment:'walk'}}:{})};}
 export function photoTheme(route,place='',phase=0){if(place&&!place.includes(':place-'))return {kind:'light',title:'한 장에 담는 작은 맛',hint:'맛을 가까이 남길지, 테이블의 분위기를 담을지 골라요.'};return route==='tokyo'?{kind:'tram',title:'전차가 지나가는 골목',hint:'전차가 지나가는 골목에서 마음에 드는 순간을 남겨요.'}:route==='chengdu'?{kind:'panda',title:'대나무를 맛보는 순간',hint:'대나무를 먹는 판다와 주변 풍경 중 무엇을 담을까요?'}:route==='jeju'?{kind:'sun',title:phase===2?'구름 사이의 달빛':'구름 사이의 햇살',hint:phase===2?'구름과 달빛이 흐르는 저녁을 담아요.':'구름 사이로 비치는 햇살을 담아요.'}:{kind:'light',title:ROUTES.find(r=>r.id===route)?.name+'의 빛',hint:'마음에 드는 빛과 풍경을 자유롭게 담아요.'};}
 export function photoMoment(route,time,place=''){const phase=((time%8)+8)%8/8,kind=photoTheme(route,place).kind;return {phase,x:kind==='tram'?.12+phase*.76:.5+Math.sin(phase*Math.PI*2)*.17,y:kind==='sun'?.3:kind==='panda'?.58:kind==='tram'?.77:.55,ready:phase>.39&&phase<.67};}
 export function photoQuality(route,capture,clue,place=''){const s=photoMoment(route,capture.time,place),x=.5+(s.x-.5+capture.pan)*capture.zoom,centered=Math.abs(x-.5)<(clue==='scenery'?.18:.12);return centered&&s.ready?3:Math.abs(x-.5)<.27&&s.ready?2:centered?1:0;}

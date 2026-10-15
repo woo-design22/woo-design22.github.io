@@ -1,9 +1,9 @@
-import {discoveryArt} from './generated-art.js?v=6.12.0';
-import {ROUTES} from './model.js?v=6.12.0';
-import {CITY_DISCOVERIES,animalEncounter} from './city-discoveries.js?v=6.12.0';
-import {cafeSpec,cafeOrder,cityLife,tripLife,normalizeCup,addIngredient,tasteCup,serveCup,hostRecipe,photoTheme,photoQuality,normalizeCapture,nextPromise,animalTier,greetAnimal,playAnimal,animalSecret} from './travel-life.js?v=6.12.0';
-import {drawCafe,drawCamera,drawPhotoMemories} from './life-art.js?v=6.12.0';
-import {itemArt} from './item-art.js?v=6.12.0';
+import {discoveryArt} from './generated-art.js?v=6.13.0';
+import {ROUTES} from './model.js?v=6.13.0';
+import {CITY_DISCOVERIES,animalEncounter} from './city-discoveries.js?v=6.13.0';
+import {cafeSpec,cafeOrder,cityLife,tripLife,normalizeCup,addIngredient,tasteCup,serveCup,hostRecipe,photoTheme,photoQuality,normalizeCapture,nextPromise,animalTier,greetAnimal,playAnimal,animalSecret} from './travel-life.js?v=6.13.0';
+import {drawCafe,drawCamera,drawPhotoMemories} from './life-art.js?v=6.13.0';
+import {itemArt} from './item-art.js?v=6.13.0';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function ingredientArt(id){const shapes={base:'<rect x="4" y="9" width="24" height="18" fill="#d4d8b0"/><rect x="6" y="10" width="20" height="6" fill="#82995f"/><rect x="7" y="18" width="18" height="6" fill="#f6edce"/>',milk:'<path d="M8 5H23L27 11V29H7V11Z" fill="#e9ebd7"/><path d="M8 5L12 1H21L23 5Z" fill="#719582"/><rect x="8" y="13" width="18" height="8" fill="#96b5a0"/>',sweet:'<rect x="12" y="2" width="9" height="6" fill="#718468"/><path d="M12 8H21L25 13V29H8V13Z" fill="#c6a061"/><rect x="10" y="15" width="13" height="8" fill="#f8edcb"/>',ice:'<path d="M3 13L12 8L22 13V25L13 30L3 25Z" fill="#b8d7d6"/><path d="M15 3L24 0L31 5V15L23 19L15 14Z" fill="#d5e8df"/><path d="M5 14L12 11L19 14L12 17Z" fill="#f8f9e8"/><path d="M18 5L24 3L28 6L23 9Z" fill="#fffbed"/>'};return `<svg width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges" aria-hidden="true">${shapes[id]}</svg>`;}
 const cityName=id=>ROUTES.find(r=>r.id===id)?.name||'';

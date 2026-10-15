@@ -1,9 +1,9 @@
-import {ROUTES} from './model.js?v=6.12.0';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.12.0';
-import {ADDITIONS,finishGesture,craftSpec,craftOrder,normalizeRecipe,recipeTaste,serveCraft,playCity,playState,errandSpec,errandAction,hideawayOpen,keepPostcard,hostCraft,fulfillRequest,cornerProgress,chooseCorner} from './travel-play.js?v=6.12.0';
-import {drawCraft,drawHideaway,streetTokens,warmHideaway} from './play-art.js?v=6.12.0';
-import {streetGraph,walkToPoint,walkToPlace} from './city-streets.js?v=6.12.0';
-import {itemArt} from './item-art.js?v=6.12.0';
+import {ROUTES} from './model.js?v=6.13.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.13.0';
+import {ADDITIONS,finishGesture,craftSpec,craftOrder,normalizeRecipe,recipeTaste,serveCraft,playCity,playState,errandSpec,errandAction,hideawayOpen,keepPostcard,hostCraft,fulfillRequest,cornerProgress,chooseCorner} from './travel-play.js?v=6.13.0';
+import {drawCraft,drawHideaway,streetTokens,warmHideaway} from './play-art.js?v=6.13.0';
+import {streetGraph,walkToPoint,walkToPlace} from './city-streets.js?v=6.13.0';
+import {itemArt} from './item-art.js?v=6.13.0';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cityName=id=>ROUTES.find(x=>x.id===id)?.name||'';
 export function playFocus(p,j){const c=playCity(p,j.routeId),e=errandSpec(j.routeId);if(c.errand>0)warmHideaway();const nights=j.nights||1,reunion=c.errand===3&&(c.errandTrip!==j.id||nights>c.errandDay);return `<section class="play-focus"><div class="eyebrow">오늘의 작은 즐거움</div><h3>${c.recipes.length?'나를 기억하는 카페에 들러요':'여행지에서 나의 한 잔을 만들어요'}</h3><p>${c.recipes.length?`${esc(c.recipes.at(-1).name)}의 향을 기억하는 손님에게 오늘의 취향을 물어봐요.`:`${craftSpec(j.routeId).name}에서 재료를 고르고 마지막 손동작으로 완성해요.`}</p><button class="primary" data-play-go-cafe>${c.recipes.length?'단골손님 만나기':'카페에서 첫 한 잔 만들기'}</button><div class="play-small-actions"><button data-play-errand>${c.errand===0?'길 위의 작은 물건 찾아보기':c.errand===1?'카페에 물건의 주인 물어보기':c.errand===2?'숙소 앞 이웃 찾아가기':reunion?'어제의 이웃 다시 만나기':c.errand===3?'내일 이어질 만남 보기':'함께 찾은 쉼터로'}</button>${hideawayOpen(p,j.routeId)&&c.errand<4?'<button data-play-hideaway>작은 쉼터에 가기</button>':''}<button data-play-camera>${c.hosted&&!c.requestDone?'친구가 부탁한 카페 사진':'사진 한 장 남기기'}</button></div>${c.errand>0&&c.errand<4?`<p class="play-hint">${c.errand===1?e.item+' 하나를 찾았어요. 카페 주인이 주인을 알 것 같아요.':c.errand===2?e.owner+'의 물건이래요. 숙소 앞에서 만나요.':reunion?'이웃이 나를 알아보고 손을 흔들어요.':'하루 더 묵거나 다음 여행에 돌아오면 새로운 인사를 만나요.'}</p>`:''}</section>`;}

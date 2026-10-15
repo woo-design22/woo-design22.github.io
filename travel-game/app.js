@@ -1,54 +1,55 @@
-import {createWanderController,wanderPanel,wanderBoarding} from './wander-ui.js?v=6.12.0';
-import {transitFor,wanderPromise} from './wander-model.js?v=6.12.0';
-import {createPlayController,playFocus,playHome} from './play-ui.js?v=6.12.0';
-import {createRoomEditor} from './home-layout.js?v=6.12.0';
-import {transportOptionArt,paintTransportPreviews,warmTransport} from './transport-art.js?v=6.12.0';
-import {warmRoad} from './road-art.js?v=6.12.0';
-import {createLifeController,lifePanel,lifeEntry} from './life-ui.js?v=6.12.0';
-import {registerArrival,tripLife,cityLife,animalTier,nextPromise,canQuickTrip,prepareQuickTrip} from './travel-life.js?v=6.12.0';
-import {createConnectionsUI,trailPanel} from './connections-ui.js?v=6.12.0';
-import {sceneFor} from './travel-connections.js?v=6.12.0';
-import {memoryHotspots} from './memory-display.js?v=6.12.0';
-import {recipeHome} from './life-ui.js?v=6.12.0';
-import {CITY_EPISODES,DAY_PHASES,PHOTO_FRAMES,localItems,planFor,experience,normalizeExperience,travelState,selectPlan,advanceDay,newDay,noteVisit,episodeReady,chooseEpisode,followEpisode,takeLocalPhoto,claimPage,recordExperience,memoryOptions,automaticHighlights,setHighlights,displayMemory,unifyWallet} from './travel-experience.js?v=6.12.0';
-import {planPicker,experiencePanel,cameraHTML,composeHTML,displayHTML,photoPicture} from './experience-ui.js?v=6.12.0';
-import {exportSave,importSave} from './save-backup.js?v=6.12.0';
-import {railOptionArt} from './rail-art.js?v=6.12.0';
-import {observatoryContext,localObservatoryReady,drawLocalObservatory} from './airport-observatory.js?v=6.12.0';
-import {cinemaFrame,cinemaReady,drawCinema} from './cinema-player.js?v=6.12.0';
-import {neighborhoodArtReady} from './neighborhood-art.js?v=6.12.0';
-import {airportRegion,ORIGIN_AIRPORT,atLocalAirport} from './airport-context.js?v=6.12.0';
-import {drawCabinView} from './cabin-view.js?v=6.12.0';
-import {CABIN_EXPERIENCES,cabinExperience} from './cabin-experiences.js?v=6.12.0';
-import {neighborhoodPlaces,walkToPlace,walkToPoint,stepWalk,resetWalk} from './city-streets.js?v=6.12.0';
-import {CONVENIENCE_ITEMS,extendStay,conveniencePurchase} from './stay-activities.js?v=6.12.0';
-import {cityArtReady,drawCityPanel} from './city-art.js?v=6.12.0';
-import {cityCaption,cityTransitName} from './city-captions.js?v=6.12.0';
-import {localFlavor} from './local-flavors.js?v=6.12.0';
-import {CITY_DISCOVERIES,DISCOVERY_ITEMS,canDiscover,discover,animalEncounter,meetAnimal} from './city-discoveries.js?v=6.12.0';
-import {moneyHTML,installMoneyUI} from './money-ui.js?v=6.12.0';
-import {drawFeeding} from './animal-feeding.js?v=6.12.0';
-import {drawAnimalElements} from './animal-art.js?v=6.12.0';
-import {DUTY_ITEMS,shopInventory,COLLECTION_ITEMS,SHOP_CATEGORIES,shopItem,shopIcon,canPurchase,purchase,equipPurchase,suitcaseCapacity} from './shopping.js?v=6.12.0';
-import {pixelIcon} from './pixel-ui.js?v=6.12.0';
-import {itemArt} from './item-art.js?v=6.12.0';
-import {atlasArt,atlasReady,discoveryArt,discoveryAsset,navArt,caseAsset} from './generated-art.js?v=6.12.0';
-import {HOME_CITIES,HOME_FURNITURE,homePurchase} from './home-model.js?v=6.12.0';
-import {drawResidence,drawHomeWindow,drawDestinationWindow,homeArtReady,furnitureAsset} from './home-art.js?v=6.12.0';
-import {residenceHTML} from './home-ui.js?v=6.12.0';
-import {GUESTS,destinationLabel} from './model.js?v=6.12.0';
-import {wearableAvailable,MEMORY_OUTFITS,HATS,SUNGLASSES,currentLook,selectTraveler,dressTraveler,wearPurchasedGlasses} from './wardrobe-model.js?v=6.12.0';
-import {drawScenery,flightAtmosphere,CITY_SCENES} from './scenery.js?v=6.12.0';
-import {ROUTES,CLASSES,TIMES,STYLES,GEAR,MAINS,DRINKS,DESSERTS,TAGS,profile,levelFor,threshold,validSeat,routeOpen,wishes,mealScore,newFlight,goals,takePhoto,finish,filmLimit,restFlight} from './passenger-model.js?v=6.12.0';
-import {PACKING,HOTELS,TO_AIRPORT,TO_HOTEL,AIRPORT_SHOPS,destination,bagWeight,packingGoals,togglePack,newJourney,moveTrip,settleRide,airportAction,board,land,immigration,collectBaggage,roomTask,checkIn,finishJourney} from './journey-model.js?v=6.12.0';
-import {drawTravelScene} from './travel-scene.js?v=6.12.0';
-import {ROOM_SPOTS,roomItems,roomProgress,placeInRoom} from './room-model.js?v=6.12.0';
-import {TravelSound} from './soundscape.js?v=6.12.0';
-import {environmentsReady,drawStayMemory} from './environment-art.js?v=6.12.0';
-import {TRAVEL_WISHES,wishProgress} from './travel-wishes.js?v=6.12.0';
-import {drawTravelerElements} from './avatar-art.js?v=6.12.0';
-import {tripFunds,fundJourney,returnTripFunds,publishTrip,settleBlog,postStory} from './travel-blog.js?v=6.12.0';
-import {MUSIC_THEMES,musicTheme} from './music-themes.js?v=6.12.0';
+import {createDepthController} from './depth-ui.js?v=6.13.0';
+import {createWanderController,wanderPanel,wanderBoarding} from './wander-ui.js?v=6.13.0';
+import {transitFor,wanderPromise} from './wander-model.js?v=6.13.0';
+import {createPlayController,playFocus,playHome} from './play-ui.js?v=6.13.0';
+import {createRoomEditor} from './home-layout.js?v=6.13.0';
+import {transportOptionArt,paintTransportPreviews,warmTransport} from './transport-art.js?v=6.13.0';
+import {warmRoad} from './road-art.js?v=6.13.0';
+import {createLifeController,lifePanel,lifeEntry} from './life-ui.js?v=6.13.0';
+import {registerArrival,tripLife,cityLife,animalTier,nextPromise,canQuickTrip,prepareQuickTrip} from './travel-life.js?v=6.13.0';
+import {createConnectionsUI,trailPanel} from './connections-ui.js?v=6.13.0';
+import {sceneFor} from './travel-connections.js?v=6.13.0';
+import {memoryHotspots} from './memory-display.js?v=6.13.0';
+import {recipeHome} from './life-ui.js?v=6.13.0';
+import {CITY_EPISODES,DAY_PHASES,PHOTO_FRAMES,localItems,planFor,experience,normalizeExperience,travelState,selectPlan,advanceDay,newDay,noteVisit,episodeReady,chooseEpisode,followEpisode,takeLocalPhoto,claimPage,recordExperience,memoryOptions,automaticHighlights,setHighlights,displayMemory,unifyWallet} from './travel-experience.js?v=6.13.0';
+import {planPicker,experiencePanel,cameraHTML,composeHTML,displayHTML,photoPicture} from './experience-ui.js?v=6.13.0';
+import {exportSave,importSave} from './save-backup.js?v=6.13.0';
+import {railOptionArt} from './rail-art.js?v=6.13.0';
+import {observatoryContext,localObservatoryReady,drawLocalObservatory} from './airport-observatory.js?v=6.13.0';
+import {cinemaFrame,cinemaReady,drawCinema} from './cinema-player.js?v=6.13.0';
+import {neighborhoodArtReady} from './neighborhood-art.js?v=6.13.0';
+import {airportRegion,ORIGIN_AIRPORT,atLocalAirport} from './airport-context.js?v=6.13.0';
+import {drawCabinView} from './cabin-view.js?v=6.13.0';
+import {CABIN_EXPERIENCES,cabinExperience} from './cabin-experiences.js?v=6.13.0';
+import {neighborhoodPlaces,walkToPlace,walkToPoint,stepWalk,resetWalk} from './city-streets.js?v=6.13.0';
+import {CONVENIENCE_ITEMS,extendStay,conveniencePurchase} from './stay-activities.js?v=6.13.0';
+import {cityArtReady,drawCityPanel} from './city-art.js?v=6.13.0';
+import {cityCaption,cityTransitName} from './city-captions.js?v=6.13.0';
+import {localFlavor} from './local-flavors.js?v=6.13.0';
+import {CITY_DISCOVERIES,DISCOVERY_ITEMS,canDiscover,discover,animalEncounter,meetAnimal} from './city-discoveries.js?v=6.13.0';
+import {moneyHTML,installMoneyUI} from './money-ui.js?v=6.13.0';
+import {drawFeeding} from './animal-feeding.js?v=6.13.0';
+import {drawAnimalElements} from './animal-art.js?v=6.13.0';
+import {DUTY_ITEMS,shopInventory,COLLECTION_ITEMS,SHOP_CATEGORIES,shopItem,shopIcon,canPurchase,purchase,equipPurchase,suitcaseCapacity} from './shopping.js?v=6.13.0';
+import {pixelIcon} from './pixel-ui.js?v=6.13.0';
+import {itemArt} from './item-art.js?v=6.13.0';
+import {atlasArt,atlasReady,discoveryArt,discoveryAsset,navArt,caseAsset} from './generated-art.js?v=6.13.0';
+import {HOME_CITIES,HOME_FURNITURE,homePurchase} from './home-model.js?v=6.13.0';
+import {drawResidence,drawHomeWindow,drawDestinationWindow,homeArtReady,furnitureAsset} from './home-art.js?v=6.13.0';
+import {residenceHTML} from './home-ui.js?v=6.13.0';
+import {GUESTS,destinationLabel} from './model.js?v=6.13.0';
+import {wearableAvailable,MEMORY_OUTFITS,HATS,SUNGLASSES,currentLook,selectTraveler,dressTraveler,wearPurchasedGlasses} from './wardrobe-model.js?v=6.13.0';
+import {drawScenery,flightAtmosphere,CITY_SCENES} from './scenery.js?v=6.13.0';
+import {ROUTES,CLASSES,TIMES,STYLES,GEAR,MAINS,DRINKS,DESSERTS,TAGS,profile,levelFor,threshold,validSeat,routeOpen,wishes,mealScore,newFlight,goals,takePhoto,finish,filmLimit,restFlight} from './passenger-model.js?v=6.13.0';
+import {PACKING,HOTELS,TO_AIRPORT,TO_HOTEL,AIRPORT_SHOPS,destination,bagWeight,packingGoals,togglePack,newJourney,moveTrip,settleRide,airportAction,board,land,immigration,collectBaggage,roomTask,checkIn,finishJourney} from './journey-model.js?v=6.13.0';
+import {drawTravelScene} from './travel-scene.js?v=6.13.0';
+import {ROOM_SPOTS,roomItems,roomProgress,placeInRoom} from './room-model.js?v=6.13.0';
+import {TravelSound} from './soundscape.js?v=6.13.0';
+import {environmentsReady,drawStayMemory} from './environment-art.js?v=6.13.0';
+import {TRAVEL_WISHES,wishProgress} from './travel-wishes.js?v=6.13.0';
+import {drawTravelerElements} from './avatar-art.js?v=6.13.0';
+import {tripFunds,fundJourney,returnTripFunds,publishTrip,settleBlog,postStory} from './travel-blog.js?v=6.13.0';
+import {MUSIC_THEMES,musicTheme} from './music-themes.js?v=6.13.0';
 const $=id=>document.getElementById(id),KEY='flight-cafe-passenger-v1';
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let raw,legacy;try{raw=JSON.parse(localStorage.getItem(KEY));legacy=JSON.parse(localStorage.getItem('cloud-cafe-v1'));}catch{}
@@ -56,7 +57,8 @@ let warmedGroundKey='';
 let p=unifyWallet(profile(raw,legacy)),f=p.active,j=p.journey,view='seat',page='',toastTimer,pausedAt=0,focusBefore,mealChoices=[null,null,null],sound=false,lastPaint=0,lastSave=0,walkTarget=155,musicPreview=null,lastRevenue=0,homeTab='furniture',homeCategory='bed',wardrobeTab='style';
 const connectionsUI=createConnectionsUI({profile:()=>p,journey:()=>j,modal,close,save,render:()=>renderJourney(true),photo:photoPicture,product:productArt,recipes:pp=>playHome(pp)+recipeHome(pp)});
 const playUI=createPlayController({profile:()=>p,journey:()=>j,modal,close,save,art,toast,ping,render:()=>{currencies();if(page)renderPage(true);else renderJourney(true);},walk:async()=>{wanderUI.suspend();if(j?.hotelLocation!=='neighborhood')await cityWalk();},branch:()=>wanderUI.branch(),camera:()=>goLifeActivity('photo'),noteVisit:noteLifeVisit});
-const wanderUI=createWanderController({profile:()=>p,journey:()=>j,close,save,toast,ping,render:()=>{if(page)renderPage(true);else renderJourney(true);},walk:async()=>{if(j?.hotelLocation!=='neighborhood')await cityWalk();},quick:()=>document.getElementById('quick-city')?.click(),boarding:()=>openPage('boarding'),store:convenienceModal,craft:()=>playUI.openCafe(j.routeId),errand:()=>document.querySelector('[data-play-errand]')?.click(),hideaway:()=>playUI.openHideaway(),visit:noteLifeVisit});
+const depthUI=createDepthController({profile:()=>p,journey:()=>j,modal,close,save,toast,ping,render:()=>{if(page)renderPage(true);else renderJourney(true);},suspend:()=>wanderUI.suspend(),walk:async()=>{if(j?.hotelLocation!=='neighborhood')await cityWalk();},visit:noteLifeVisit,photo:place=>takeLocalPhoto(p,j,place,'detail',Date.now(),{subject:'table',pan:0,time:0,zoom:1,quality:2,table:j.tasteTable})});
+const wanderUI=createWanderController({profile:()=>p,journey:()=>j,close,save,toast,ping,render:()=>{if(page)renderPage(true);else renderJourney(true);},table:(place,onsite)=>depthUI.open(place,onsite),closeTable:()=>depthUI.close(),walk:async()=>{if(j?.hotelLocation!=='neighborhood')await cityWalk();},quick:()=>document.getElementById('quick-city')?.click(),boarding:()=>openPage('boarding'),store:convenienceModal,craft:()=>playUI.openCafe(j.routeId),errand:()=>document.querySelector('[data-play-errand]')?.click(),hideaway:()=>playUI.openHideaway(),visit:noteLifeVisit});
 const roomEditor=createRoomEditor({profile:()=>p,save,paint:()=>{const canvas=$('residence-preview');if(canvas){const c=canvas.getContext('2d');c.clearRect(0,0,720,480);c.save();c.scale(2,2);drawResidence(c,p);c.restore();}},showPhoto:showRoomPhoto,ready:()=>homeArtReady(p)});
 const lifeUI=createLifeController({profile:()=>p,journey:()=>j,modal,close,save,art,toast,ping,render:()=>page?renderPage(true):j?renderJourney(true):home(),animalVisit,openHideaway:()=>playUI.openHideaway(),go:goLifeActivity,ensureVisit:ensureLifeVisit,noteVisit:noteLifeVisit,keepPhoto:(place,frame,capture)=>{const result=takeLocalPhoto(p,j,place,frame,Date.now(),capture);if(result)claimPage(p,j);return result;}});
 const travelSound=new TravelSound();
@@ -159,7 +161,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||
  if(b.id==='save-name'){p.name=$('name-input').value.trim().slice(0,18)||'하늘 여행자';close();home();return;}
  if(b.dataset.photo!==undefined){const photo=p.photos[+b.dataset.photo];modal(`<div class="eyebrow">WINDOW MEMORIES</div><h2 id="modal-title">${destinationLabel(photo.route)} · ${photo.phase}</h2><canvas id="album-detail" class="large-photo" width="320" height="320"></canvas><p>${photo.weather} · ${new Date(photo.date).toLocaleDateString('ko-KR')}</p><button class="primary" data-close>수첩으로 돌아가기</button>`);drawScenery($('album-detail'),miniature(photo),photo.time);}
 });
-function animate(ts){requestAnimationFrame(animate);if(ts-lastPaint<(j?.hotelLocation==='neighborhood'||$('cafe-worktop')||$('life-camera')?33:90))return;const frameDt=Math.min(.2,(ts-lastPaint)/1000);lastPaint=ts;paintAirportLook(ts);paintCinema(ts);paintCabinPreview(ts);paintWindowLook();lifeUI.paint(ts);playUI.paint(ts);wanderUI.paint(ts);paintTransportPreviews();travelSound.ambience(ts);paintAnimalFeeding(ts);drawTravelerElements(ts/1000);drawAnimalElements();travelSound.step(f?'flight':j?.stage==='hotel'?(j.hotelLocation==='neighborhood'?'walk':'room'):j?.stage||'home',musicPreview||f?.routeId||j?.routeId||(page==='boarding'?p.route:'home'));syncSoundButton();if(ts-lastRevenue>60000){lastRevenue=ts;const income=settleBlog(p);if(income){save();currencies();if(page==='blog')renderPage(true);}}if(f&&!f.completed){syncTime();resolveActivity();updateFlight();paintFlight();if(f.elapsed>=f.duration&&!pausedAt)arrival();if(ts-lastSave>5000){save();lastSave=ts;}}else if(j&&!j.completed){if(ts-lastSave>5000){save();lastSave=ts;}if(settleRide(j)){walkTarget=155;save();renderJourney();}if(!$('journey-screen').hidden)drawTravelScene($('travel-scene'),j,p,ts/1000,walkTarget);if(j.stage==='hotel'&&j.hotelLocation==='neighborhood'&&$('modal').hidden){const arrived=stepWalk(j,frameDt);playUI.arrived();if(arrived){save();enterNeighborhoodPlace(arrived);}}if(j.ride){const remain=Math.max(0,Math.ceil((j.ride.until-Date.now())/1000));if($('ride-time'))$('ride-time').textContent=remain+'초';if($('ride-fill'))$('ride-fill').style.width=Math.min(100,(Date.now()-j.ride.from)/6000*100)+'%';}};
+function animate(ts){requestAnimationFrame(animate);if(ts-lastPaint<(j?.hotelLocation==='neighborhood'||$('cafe-worktop')||$('life-camera')?33:90))return;const frameDt=Math.min(.2,(ts-lastPaint)/1000);lastPaint=ts;paintAirportLook(ts);paintCinema(ts);paintCabinPreview(ts);paintWindowLook();lifeUI.paint(ts);playUI.paint(ts);wanderUI.paint(ts);depthUI.paint(ts);paintTransportPreviews();travelSound.ambience(ts);paintAnimalFeeding(ts);drawTravelerElements(ts/1000);drawAnimalElements();travelSound.step(f?'flight':j?.stage==='hotel'?(j.hotelLocation==='neighborhood'?'walk':'room'):j?.stage||'home',musicPreview||f?.routeId||j?.routeId||(page==='boarding'?p.route:'home'));syncSoundButton();if(ts-lastRevenue>60000){lastRevenue=ts;const income=settleBlog(p);if(income){save();currencies();if(page==='blog')renderPage(true);}}if(f&&!f.completed){syncTime();resolveActivity();updateFlight();paintFlight();if(f.elapsed>=f.duration&&!pausedAt)arrival();if(ts-lastSave>5000){save();lastSave=ts;}}else if(j&&!j.completed){if(ts-lastSave>5000){save();lastSave=ts;}if(settleRide(j)){walkTarget=155;save();renderJourney();}if(!$('journey-screen').hidden)drawTravelScene($('travel-scene'),j,p,ts/1000,walkTarget);if(j.stage==='hotel'&&j.hotelLocation==='neighborhood'&&$('modal').hidden){const arrived=stepWalk(j,frameDt);playUI.arrived();if(arrived){save();enterNeighborhoodPlace(arrived);}}if(j.ride){const remain=Math.max(0,Math.ceil((j.ride.until-Date.now())/1000));if($('ride-time'))$('ride-time').textContent=remain+'초';if($('ride-fill'))$('ride-fill').style.width=Math.min(100,(Date.now()-j.ride.from)/6000*100)+'%';}};
  document.querySelectorAll('#home-avatar .sprite,#seat-avatar .sprite').forEach(el=>{const id=+el.dataset.avatar,frame=Math.floor(ts/2600)%2;el.style.backgroundPosition=`${((id%2)*2+frame)/3*100}% ${Math.floor(id/2)/5*100}%`;});}
 window.addEventListener('resize',resizeCanvas);document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(backInsideGame())e.preventDefault();return;}if(e.key==='Tab'&&!$('modal').hidden){const buttons=[...$('modal-content').querySelectorAll('button:not(:disabled),input')];if(!buttons.length)return;const first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
 function backInsideGame(){if(j?.completed){j=null;home();return true;}if(!$('modal').hidden){close();return true;}if(f){pause();return true;}if(j&&!$('journey-screen').hidden){if($('journey-screen').classList.contains('scenery-only')){$('scene-look').click();return true;}$('journey-pause').click();return true;}if(page){home();return true;}return false;}
@@ -188,7 +190,7 @@ function renderJourney(keep=false){if(!j||j.completed)return;const warmKey=j.id+
  else if(j.stage==='arrival'){ $('journey-card').innerHTML=arrivalHTML();groundFooter('',j.entry?.passed?'짐을 찾은 뒤 숙소까지 이어서 여행해요.':'해외 여행의 첫 순서, 입국 수속을 마쳐요.');}
  else if(j.stage==='hotel'){ $('journey-card').innerHTML=hotelHTML();groundFooter(j.hotelLocation==='neighborhood'||j.hotelLocation==='lobby'?'<button id="return-room" class="primary">내 객실로 돌아가기</button>':`<button id="finish-journey" class="primary" ${j.checkedIn&&j.hotelTask?'':'disabled'}>오늘의 여행 완성하기</button>`,j.hotelLocation==='neighborhood'?'표시된 장소를 누르면 길을 따라 걸어요. 고른 동선에서 이야기를 만나요.':'산책과 휴식을 즐기고, 여행을 마칠 때 블로그에 남길 기억을 골라요.');}
  else{$('journey-card').innerHTML=rideHTML();groundFooter('','6초의 짧은 이동 후 다음 장소에 도착해요. 앱을 닫아도 이동은 이어져요.');}
- wanderUI.mount();$('journey-body').scrollTop=keep?top:0;paintTransportPreviews();drawTravelScene($('travel-scene'),j,p,performance.now()/1000,walkTarget);}
+ wanderUI.mount();depthUI.mount();$('journey-body').scrollTop=keep?top:0;paintTransportPreviews();drawTravelScene($('travel-scene'),j,p,performance.now()/1000,walkTarget);}
 function chooseOutbound(){warmRoad(j).then(paintTransportPreviews);modal(`<div class="eyebrow">ON THE WAY TO AIRPORT</div><h2 id="modal-title">어떻게 공항에 갈까요?</h2><p>남은 여행 경비 ${j.budget} · 집에서 챙긴 짐 무게 ${bagWeight(j)}<br>이동 뒤에는 체크인과 보안 검색에 13분이 필요해요.</p>${transportHTML(TO_AIRPORT)}<button class="secondary" data-close>짐을 조금 더 살펴보기</button>`);}
 function passSecurity(){const result=airportAction(j,'security');if(result.ok){walkTarget=158;save();renderJourney(true);}if(result.message)toast(result.message);}
 const SHOP_MENU_ART={coffee:['coffee-latte','coffee-matcha','coffee-cocoa'],restaurant:['restaurant-udon','restaurant-sandwich','restaurant-bibimbap'],postcard:['postcard-plane','postcard-cloud','postcard-stamp']};
@@ -288,9 +290,9 @@ function paintWindowLook(){
 homeArtReady(p);
 for(const [id,name] of [['wardrobe-icon','wardrobe'],['book-icon','passport'],['help-icon','help'],['home-design-icon','home']])$(id).innerHTML=navArt(name,34);
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;if(b.id==='residence-look'){windowLook();}else if(b.dataset.homeCategory){homeCategory=b.dataset.homeCategory;renderPage(true);homeArtReady(p,homeCategory).then(drawResidencePreview);}else if(b.dataset.homeTab){homeTab=b.dataset.homeTab;renderPage(true);}else if(b.dataset.homeChoice){const kind=b.dataset.homeKind,id=b.dataset.homeChoice,result=homePurchase(p,kind,id);if(result.ok){save();currencies();renderPage(true);if(result.cost>0){const item=HOME_FURNITURE.find(x=>x.id===id);purchaseComplete(kind==='furniture'?item.name:'나의 집 꾸미기',kind==='furniture'?atlasArt(furnitureAsset(id),240,item.name):'<canvas id="purchase-home-preview" width="720" height="480" class="cabin-choice-preview" aria-label="구매 후 적용된 나의 집"></canvas>',result.message+' · 남은 머니 '+p.coins);if(kind!=='furniture'){const paint=()=>{const canvas=$('purchase-home-preview');if(canvas){const c=canvas.getContext('2d');c.save();c.scale(2,2);drawResidence(c,p,performance.now()/1000);c.restore();}};paint();homeArtReady(p).then(paint);}}else toast(result.message);}else toast(result.message);}});
-import {SEORIRA,FRIEND_TOPICS,friendEventAvailable,inviteLocalFriend,visitLocalFriend,friendPortrait,friendNotebookHTML} from './local-friends.js?v=6.12.0';
+import {SEORIRA,FRIEND_TOPICS,friendEventAvailable,inviteLocalFriend,visitLocalFriend,friendPortrait,friendNotebookHTML} from './local-friends.js?v=6.13.0';
 
-import {dutyProductArt} from './duty-art.js?v=6.12.0';
+import {dutyProductArt} from './duty-art.js?v=6.13.0';
 
 function wishTitle(w){const key={scenery:'풍경',cozy:'푹 쉬는',thrifty:'가볍게',gifts:'선물'}[w.id];return w.name.replace(key,'<b class="keyword">'+key+'</b>');}
 function paintFlight(){if(view==='seat')drawCabinView($('scenery'),f,p,performance.now()/1000);else drawScenery($('scenery'),renderFlight(),f.elapsed);}
@@ -401,4 +403,4 @@ function noteLifeVisit(id){if(!j)return;if(!experience(j).visits.includes(id))no
 function ensureLifeVisit(id){if(!j||j.stage!=='hotel'||!j.checkedIn||j.completed)return false;if(experience(j).visits.includes(id))return true;if(j.discovered?.includes(id)){noteLifeVisit(id);return true;}const result=discover(p,j,id);if(!result.ok){toast(result.message);return false;}noteLifeVisit(id);save();return true;}
 function goLifeActivity(kind){if(!j||j.stage!=='hotel'||!j.checkedIn)return;if(kind==='friend'){if(animalEncounter(j))animalVisit();else toast('오늘은 조용한 산책을 즐겨요. 다음 만남을 기다려봐요.');return;}const requested=p.play?.cities?.[j.routeId];const target=kind==='cafe'||requested?.hosted&&!requested.requestDone?j.routeId+':cafe':j.routeId+':place-0';tripLife(j).pending=kind;close();const tripId=j.id,go=()=>{if(j?.id===tripId&&walkToPlace(j,target))save();};if(j.hotelLocation!=='neighborhood')cityWalk().then(go);else go();}
 document.addEventListener('click',e=>{if(e.target.closest('#quick-city')&&canQuickTrip(p)){if(j&&!j.completed){renderJourney();return;}close();const next=newJourney(p,p.lodging);if(!next||!fundJourney(p,next))return;if(!prepareQuickTrip(p,next)){returnTripFunds(p,next);return;}next.experience=normalizeExperience({plan:p.travelPlans[p.route],phase:next.departure==='night'?2:next.departure==='evening'?1:0,dayTicks:next.departure==='night'?4:next.departure==='evening'?2:0},next.routeId,next.wish);j=next;f=null;registerArrival(p,j,bagWeight(j));save();renderJourney();toast('숙소에 도착했어요. 궁금한 풍경과 만남을 찾아 나서요.');}});
-$('updates').onclick=()=>modal(`<div class="eyebrow">TRAVEL GAME · 6.12.0</div><h2 id="modal-title">내가 고른 길에서 이어지는 여행</h2><div class="experience-paper"><h3>골목에서 이어지는 나의 여행</h3><p>사진 조각을 보고 장소를 찾고, 교통수단마다 다른 단서를 만나요. 물건을 돌려준 방법에 따라 공방과 답장 지도로 길이 달라져요. 작은 친구와 세 번의 만남을 이어가고, 만든 카드와 맛 조합을 집에 전시해요.</p><h3>골라 타는 다섯 가지 교통수단</h3><p>버스, 리무진, 택시, 열차, 지하철의 모습이 달라졌어요. 선택 목록에서 본 차량을 이동 화면에서도 만나요. 그림을 미리 준비하고 첫 화면부터 선택한 차종을 보여줘요.</p><h3>고른 길에서 만나는 이야기</h3><p>첫 장소에서 갈림길을 고르면 다음 만남이 달라져요. 하루 더 묵고 돌아오면 나를 기억하는 인사를 만나요. 31개 도시에서 서로 다른 장면을 남겨요.</p><h3>점수 없이, 나만의 사진</h3><p>넓은 풍경과 가까운 맛, 테이블과 작은 친구를 자유롭게 담아요. 사진을 평가하는 별점은 없어요.</p><h3>기억을 골라 쓰는 블로그</h3><p>오늘 남길 기억을 고르고 순서를 바꿔요. 자동 구성도 가능해요. 새로운 발견과 이어지는 이야기가 다음 여행 경비가 돼요.</p><h3>집에 쌓이는 추억</h3><p>사진은 액자에, 마그넷은 보드에, 작은 물건은 선반에 놓아요. 물건을 누르면 어디에서 얻었는지 다시 봐요. 추억 목표를 채우면 장식과 여행 옷도 받아요.</p></div><button class="primary" data-close>나의 여행 계속하기</button>`,false);
+$('updates').onclick=()=>modal(`<div class="eyebrow">TRAVEL GAME · 6.13.0</div><h2 id="modal-title">배운 맛과 기억을 다음 여행으로</h2><div class="experience-paper"><h3>한 테이블에서 취향 찾기</h3><p>산책 전, 비 오는 저녁, 서로 다른 취향의 친구 둘. 여섯 가지 상황에서 음식과 음료의 단맛·진하기·온도를 바꾸며 반응을 살펴봐요. 배운 조합은 다음 도시에서 떠올리고 집에서 친구에게 추천해요.</p><h3>내 물건으로 만드는 여행</h3><p>가방에는 실제 챙긴 물건과 산 기념품이 들어가요. 여행 사진과 티켓·도장을 크기와 방향까지 골라 엽서에 붙이고 집에 전시해요. 작은 친구는 같은 날에도 기다리기·놀기·걷기에 서로 다르게 반응해요.</p><h3>골목에서 이어지는 나의 여행</h3><p>사진 조각을 보고 장소를 찾고, 교통수단마다 다른 단서를 만나요. 물건을 돌려준 방법에 따라 공방과 답장 지도로 길이 달라져요. 작은 친구와 세 번의 만남을 이어가고, 만든 카드와 맛 조합을 집에 전시해요.</p><h3>골라 타는 다섯 가지 교통수단</h3><p>버스, 리무진, 택시, 열차, 지하철의 모습이 달라졌어요. 선택 목록에서 본 차량을 이동 화면에서도 만나요. 그림을 미리 준비하고 첫 화면부터 선택한 차종을 보여줘요.</p><h3>고른 길에서 만나는 이야기</h3><p>첫 장소에서 갈림길을 고르면 다음 만남이 달라져요. 하루 더 묵고 돌아오면 나를 기억하는 인사를 만나요. 31개 도시에서 서로 다른 장면을 남겨요.</p><h3>점수 없이, 나만의 사진</h3><p>넓은 풍경과 가까운 맛, 테이블과 작은 친구를 자유롭게 담아요. 사진을 평가하는 별점은 없어요.</p><h3>기억을 골라 쓰는 블로그</h3><p>오늘 남길 기억을 고르고 순서를 바꿔요. 자동 구성도 가능해요. 새로운 발견과 이어지는 이야기가 다음 여행 경비가 돼요.</p><h3>집에 쌓이는 추억</h3><p>사진은 액자에, 마그넷은 보드에, 작은 물건은 선반에 놓아요. 물건을 누르면 어디에서 얻었는지 다시 봐요. 추억 목표를 채우면 장식과 여행 옷도 받아요.</p></div><button class="primary" data-close>나의 여행 계속하기</button>`,false);

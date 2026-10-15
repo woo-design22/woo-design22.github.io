@@ -1,13 +1,13 @@
-import {wanderSpec} from './wander-model.js?v=6.12.0';
-import {drawWanderHome} from './wander-art.js?v=6.12.0';
-import {DEFAULT_FURNITURE_BOXES} from './home-layout.js?v=6.12.0';
-import {cornerProgress} from './travel-play.js?v=6.12.0';
-import {dutyAsset} from './duty-art.js?v=6.12.0';
-import {drawMemoryDisplay} from './memory-display.js?v=6.12.0';
-import {HOME_CITIES,HOME_TYPES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.12.0';
-import {drawAtlas,atlasReady,discoveryAsset} from './generated-art.js?v=6.12.0';
+import {wanderSpec} from './wander-model.js?v=6.13.0';
+import {drawWanderHome} from './wander-art.js?v=6.13.0';
+import {DEFAULT_FURNITURE_BOXES} from './home-layout.js?v=6.13.0';
+import {cornerProgress} from './travel-play.js?v=6.13.0';
+import {dutyAsset} from './duty-art.js?v=6.13.0';
+import {drawMemoryDisplay} from './memory-display.js?v=6.13.0';
+import {HOME_CITIES,HOME_TYPES,HOME_FURNITURE,HOME_CATEGORIES,residenceState} from './home-model.js?v=6.13.0';
+import {drawAtlas,atlasReady,discoveryAsset} from './generated-art.js?v=6.13.0';
 export const HOME_ART_FILES=['home-views-v6.png','home-interiors-v6.1.png','navigation-cases-v6.png',...HOME_FURNITURE.map(x=>'furniture-'+x.id+'-v6.3.png')];
-export function homeArtReady(p,category){const ids=p?Object.values(p.residence?.furniture||{}).filter(Boolean):['wood-bed','wood-desk','wood-lamp','wood-curtain','wood-plant'];if(category)ids.push(...HOME_FURNITURE.filter(x=>x.slot===category).map(x=>x.id));return atlasReady([...(p?.explore?.display?[discoveryAsset(wanderSpec(p.explore.display.route).target).file,discoveryAsset(p.explore.display.route+':meal').file,discoveryAsset(p.explore.display.route+':cafe').file]:[]),'home-views-v6.png','home-interiors-v6.1.png','navigation-cases-v6.png',...new Set(ids.map(id=>'furniture-'+id+'-v6.3.png')),...(p?.travel?.displays||[]).map(id=>dutyAsset(id)?.file).filter(Boolean),...(p?.travel?.displays||[]).map(id=>p.travel.photos.find(x=>x.id===id)?.place).filter(Boolean).map(id=>discoveryAsset(id).file)]);}
+export function homeArtReady(p,category){const ids=p?Object.values(p.residence?.furniture||{}).filter(Boolean):['wood-bed','wood-desk','wood-lamp','wood-curtain','wood-plant'];if(category)ids.push(...HOME_FURNITURE.filter(x=>x.slot===category).map(x=>x.id));return atlasReady([...(p?.explore?.display?(p.explore.cities[p.explore.display.route]?.card||[]).filter(x=>x.id.startsWith('photo:')).map(x=>discoveryAsset(x.id.slice(6)).file):[]),...(p?.explore?.display?[discoveryAsset(wanderSpec(p.explore.display.route).target).file,discoveryAsset(p.explore.display.route+':meal').file,discoveryAsset(p.explore.display.route+':cafe').file]:[]),'home-views-v6.png','home-interiors-v6.1.png','navigation-cases-v6.png',...new Set(ids.map(id=>'furniture-'+id+'-v6.3.png')),...(p?.travel?.displays||[]).map(id=>dutyAsset(id)?.file).filter(Boolean),...(p?.travel?.displays||[]).map(id=>p.travel.photos.find(x=>x.id===id)?.place).filter(Boolean).map(id=>discoveryAsset(id).file)]);}
 export function homeViewAsset(id){const cell=Math.max(0,HOME_CITIES.findIndex(x=>x.id===id));return {file:'home-views-v6.png',columns:3,rows:4,col:cell%3,row:Math.floor(cell/3)};}
 export function furnitureAsset(id,placed=false){const item=HOME_FURNITURE.find(x=>x.id===id);return item?{file:'furniture-'+item.id+'-v6.3.png',columns:1,rows:1,col:0,row:0,source:[0,0,1,1],contain:true}:null;}
 const r=(c,x,y,w,h,col)=>{c.fillStyle=col;c.fillRect(x,y,w,h);};

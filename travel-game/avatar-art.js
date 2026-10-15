@@ -1,8 +1,8 @@
-import {travelerProtection} from './avatar-protection.js?v=6.12.0';
-import {travelerFaceOffset,eyewearBox} from './avatar-anchors.js?v=6.12.0';
-import {SPRITE_BOUNDS} from './sprite-bounds.js?v=6.12.0';
-import {drawItemArt} from './item-art.js?v=6.12.0';
-import {wardrobeFrame} from './wardrobe-model.js?v=6.12.0';
+import {travelerProtection} from './avatar-protection.js?v=6.13.0';
+import {travelerFaceOffset,eyewearBox} from './avatar-anchors.js?v=6.13.0';
+import {SPRITE_BOUNDS} from './sprite-bounds.js?v=6.13.0';
+import {drawItemArt} from './item-art.js?v=6.13.0';
+import {wardrobeFrame} from './wardrobe-model.js?v=6.13.0';
 const sheets={};
 for(const kind of ['seated','walk'])if(typeof Image!=='undefined'){
  const im=new Image();sheets[kind]=im;

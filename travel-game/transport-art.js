@@ -1,7 +1,7 @@
-import {drawTransportSprite,warmTransportSprites,spriteImage} from './transport-sprites.js?v=6.12.0';
-import {cityArtReady,drawCityVehicle,cityImage,cityArtSpec} from './city-art.js?v=6.12.0';
-import {drawVehicleModel,vehicleSVG,vehicleDesign} from './vehicle-design.js?v=6.12.0';
-import {imageReady} from './image-ready.js?v=6.12.0';
+import {drawTransportSprite,warmTransportSprites,spriteImage} from './transport-sprites.js?v=6.13.0';
+import {cityArtReady,drawCityVehicle,cityImage,cityArtSpec} from './city-art.js?v=6.13.0';
+import {drawVehicleModel,vehicleSVG,vehicleDesign} from './vehicle-design.js?v=6.13.0';
+import {imageReady} from './image-ready.js?v=6.13.0';
 const native=id=>['subway','limousine','train'].includes(id),images=new Map();
 const boxes={bus:[850,139,656,338],taxi:[1025,626,481,290]};
 function legacy(){if(typeof Image==='undefined')return null;if(!images.has('outbound')){const im=new Image();im.src=new URL('./assets/vehicles-v4.png',import.meta.url).href;images.set('outbound',im);}return images.get('outbound');}

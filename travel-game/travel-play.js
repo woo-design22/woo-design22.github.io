@@ -1,6 +1,6 @@
-import {ROUTES} from './model.js?v=6.12.0';
-import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.12.0';
-import {localFlavor} from './local-flavors.js?v=6.12.0';
+import {ROUTES} from './model.js?v=6.13.0';
+import {CITY_DISCOVERIES} from './city-discoveries.js?v=6.13.0';
+import {localFlavor} from './local-flavors.js?v=6.13.0';
 const n=(x,max=999)=>Number.isFinite(x)?Math.max(0,Math.min(max,Math.floor(x))):0;
 const known=id=>ROUTES.some(r=>r.id===id);
 export const ADDITIONS=[{id:'plain',name:'그대로',taste:[0,0,0]},{id:'milk',name:'우유',taste:[2,0,-1]},{id:'honey',name:'꿀',taste:[0,2,0]},{id:'citrus',name:'과일 조각',taste:[-1,0,2]},{id:'foam',name:'우유 거품',taste:[2,1,-1]},{id:'mint',name:'허브 잎',taste:[0,-1,2]}];

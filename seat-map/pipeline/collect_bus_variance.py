@@ -24,8 +24,8 @@
   python pipeline/build_variance.py                         # → data/bus/variance.json
 
 --daemon 은 시간대 적응형이다: 출퇴근(7~9·17~19시) 10분 · 낮 20분 · 심야(23~05시) 60분 간격.
-하루 예산이 12개 노선 기준 약 900건 = 상한과 같게 설계돼 있다. 이중 실행은 잠금이 막고
-(state.json 의 lock, 10분 이상 조용하면 죽은 것으로 보고 이어받는다), 기록은
+하루 예산이 12개 노선 기준 약 900건 = 상한과 같게 설계돼 있다. 이중 실행은 프로세스가
+끝날 때까지 유지되는 OS 파일 잠금이 막는다(대기 중에도 유지). 기록은
 data/raw/variance/collector.log 에도 남긴다(pythonw 로 돌면 콘솔이 없어서다).
 """
 import argparse
@@ -34,6 +34,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -50,6 +51,7 @@ DAILY_CAP = 900                                        # 개발계정 1,000 에�
 
 LOG = os.path.join(OUT_DIR, 'collector.log')
 _daemon = False
+_lock_file = None
 
 
 def log(msg):
@@ -72,17 +74,38 @@ def adaptive_interval(now):
 
 
 def take_lock():
-    st = load_state()
-    lk = st.get('lock') or {}
+    """스케줄 이름·실행 방식과 무관하게 수집기는 하나만 살아 있게 한다."""
+    global _lock_file
+    if _lock_file is not None:
+        return True
+    os.makedirs(OUT_DIR, exist_ok=True)
+    handle = open(os.path.join(OUT_DIR, 'collector.lock'), 'a+b')
+    if os.fstat(handle.fileno()).st_size == 0:
+        handle.write(b'\0')
+        handle.flush()
+    handle.seek(0)
     try:
-        fresh = (dt.datetime.now() - dt.datetime.strptime(lk.get('t', ''), '%Y-%m-%dT%H:%M:%S')).total_seconds() < 600
-    except ValueError:
-        fresh = False
-    if fresh and lk.get('pid') != os.getpid():
+        if os.name == 'nt':
+            import msvcrt
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
         return False
+    _lock_file = handle
+    st = load_state()
     st['lock'] = {'pid': os.getpid(), 't': dt.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}
     save_state(st)
     return True
+
+
+def release_lock():
+    global _lock_file
+    if _lock_file is not None:
+        _lock_file.close()  # OS가 잠금을 해제한다. 강제 종료 때도 같은 방식으로 풀린다.
+        _lock_file = None
 
 
 def load_state():
@@ -91,14 +114,21 @@ def load_state():
         # BOM 때문에 상태를 빈 것으로 보면 호출 계수가 리셋돼 하루 상한이 뚫린다(실제로 났다)
         with io.open(STATE, encoding='utf-8-sig') as f:
             return json.load(f)
-    except (OSError, ValueError):
+    except FileNotFoundError:
         return {}
 
 
 def save_state(st):
     os.makedirs(OUT_DIR, exist_ok=True)
-    with io.open(STATE, 'w', encoding='utf-8') as f:
-        json.dump(st, f)
+    # 쓰는 도중 종료돼 장부가 빈 파일이 되면 호출량이 0으로 되돌아간다.
+    fd, tmp = tempfile.mkstemp(dir=OUT_DIR, prefix='state-', suffix='.tmp')
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(st, f)
+        os.replace(tmp, STATE)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
 
 
 def build_panel(n, include_village):
@@ -167,10 +197,16 @@ def main():
     args = ap.parse_args()
     global _daemon
     _daemon = args.daemon
-    if args.daemon and not take_lock():
-        C.log('이미 다른 수집기가 살아 있다 — 조용히 물러난다')
-        return
+    try:
+        if not take_lock():
+            C.log('이미 다른 수집기가 살아 있다 — 조용히 물러난다')
+            return
+        collect(args)
+    finally:
+        release_lock()
 
+
+def collect(args):
     key = C.load_keys().get('DATA_GO_KR_KEY')
     if not key:
         raise SystemExit('DATA_GO_KR_KEY 가 없다 (pipeline/keys.json)')
@@ -195,6 +231,9 @@ def main():
             C.log('오늘 호출 %d — 상한(%d)에 닿아 멈춘다' % (used, DAILY_CAP))
             break
         path = os.path.join(OUT_DIR, today + '.jsonl')
+        # 호출 전에 몫을 잡는다. 중간 종료·실패로 이미 쓴 호출이 장부에서 빠지지 않는다.
+        st[today] = used + len(panel)
+        save_state(st)
         got = errs = 0
         with io.open(path, 'a', encoding='utf-8') as f:
             for name, rid, kind in panel:
@@ -208,8 +247,7 @@ def main():
                     errs += 1
                     C.log('  %s 실패 %s' % (name, str(e)[:60]))
                 time.sleep(1.2)                             # 서버 예절
-        st = load_state()                     # 그 사이 다른 손이 만졌을 수 있다
-        st[today] = st.get(today, 0) + len(panel)
+        st = load_state()
         if args.daemon:
             st['lock'] = {'pid': os.getpid(), 't': dt.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}
         save_state(st)

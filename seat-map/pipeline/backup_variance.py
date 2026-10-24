@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""편차 수집 자료 백업 + 집계 갱신 (6시간마다, 작업 스케줄러용).
+"""서울 편차·경기 빈자리 원천 백업 + 서울 집계 갱신 (6시간마다, 작업 스케줄러용).
 
 수집 원본(data/raw/variance/)은 C 드라이브 한 곳에만 있어 디스크 사고면 통째로 사라진다.
 그래서 세 겹으로 만든다:
@@ -15,6 +15,7 @@ import io
 import os
 import shutil
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C   # noqa: E402
@@ -33,23 +34,44 @@ def pick_dest():
     return CANDIDATES[-1]
 
 
-def main():
-    if not os.path.isdir(SRC):
-        return
-    dest = pick_dest()
+def backup_tree(src, dest):
+    """날짜별 하위 폴더까지 보존한다. 실패한 복사가 기존 백업을 덮지 않게 한다."""
+    if not os.path.isdir(src):
+        return 0
     os.makedirs(dest, exist_ok=True)
     copied = 0
-    for name in os.listdir(SRC):
-        s = os.path.join(SRC, name)
-        d = os.path.join(dest, name)
-        if not os.path.isfile(s):
-            continue
-        # 크기가 같으면 안 건드린다 — jsonl 은 자라기만 하므로 이걸로 충분하다
-        if os.path.exists(d) and os.path.getsize(d) == os.path.getsize(s):
-            continue
-        shutil.copy2(s, d)
-        copied += 1
+    for directory, _, names in os.walk(src):
+        target = os.path.join(dest, os.path.relpath(directory, src))
+        os.makedirs(target, exist_ok=True)
+        for name in names:
+            if name.endswith(('.lock', '.tmp')):
+                continue
+            s, d = os.path.join(directory, name), os.path.join(target, name)
+            stat = os.stat(s)
+            if os.path.exists(d):
+                other = os.stat(d)
+                if stat.st_size == other.st_size and stat.st_mtime_ns == other.st_mtime_ns:
+                    continue
+            fd, tmp = tempfile.mkstemp(dir=target, prefix='.backup-', suffix='.tmp')
+            os.close(fd)
+            try:
+                shutil.copy2(s, tmp)
+                os.replace(tmp, d)
+            finally:
+                if os.path.exists(tmp):
+                    os.unlink(tmp)
+            copied += 1
+    return copied
+
+
+def main():
+    dest = pick_dest()
+    copied = backup_tree(SRC, dest)
+    gg_dest = os.path.join(os.path.dirname(dest), 'ggseats')
+    gg_copied = backup_tree(os.path.join(C.RAW, 'ggseats'), gg_dest)
+    os.makedirs(dest, exist_ok=True)
     line = '[%s] 복사 %d개 → %s' % (dt.datetime.now().strftime('%m-%d %H:%M'), copied, dest)
+    line += ' / 경기 빈자리 %d개 → %s' % (gg_copied, gg_dest)
     try:
         with io.open(os.path.join(dest, 'backup.log'), 'a', encoding='utf-8') as f:
             f.write(line + '\n')
